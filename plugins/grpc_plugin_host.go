@@ -9,51 +9,25 @@ import (
 	"github.com/jumppad-labs/hclconfig/plugins/proto"
 )
 
-// PluginHost manages remote plugin processes and provides host services
-type PluginHost struct {
-	logger         Logger
-	state          State
-	client         *plugin.Client
-	plugin         PluginEntityProvider
-	inProcessHost  *InProcessPluginHost
-	isInProcess    bool
+// GRPCPluginHost manages external plugin processes via gRPC and provides host services
+type GRPCPluginHost struct {
+	logger Logger
+	state  State
+	client *plugin.Client
+	plugin PluginEntityProvider
 }
 
-// NewPluginHost creates a new plugin host with the specified plugin binary
-func NewPluginHost(logger Logger, state State, pluginPath string) *PluginHost {
-	return &PluginHost{
-		logger:      logger,
-		state:       state,
-		isInProcess: false,
+// NewGRPCPluginHost creates a new gRPC plugin host for external plugin binaries
+func NewGRPCPluginHost(logger Logger, state State) *GRPCPluginHost {
+	return &GRPCPluginHost{
+		logger: logger,
+		state:  state,
 	}
 }
 
-// NewPluginHostWithInstance creates a new plugin host with an in-process plugin instance
-func NewPluginHostWithInstance(logger Logger, state State, plugin Plugin) *PluginHost {
-	inProcessHost := NewInProcessPluginHost(logger, state, plugin)
-	return &PluginHost{
-		logger:        logger,
-		state:         state,
-		inProcessHost: inProcessHost,
-		isInProcess:   true,
-	}
-}
 
-// Start initializes and starts the plugin process
-func (h *PluginHost) Start(pluginPath string) error {
-	if h.isInProcess {
-		// Start in-process plugin
-		if h.inProcessHost == nil {
-			return fmt.Errorf("in-process plugin host not initialized")
-		}
-		if err := h.inProcessHost.Start(); err != nil {
-			return fmt.Errorf("failed to start in-process plugin: %w", err)
-		}
-		h.plugin = h.inProcessHost
-		return nil
-	}
-
-	// External process plugin (existing logic)
+// Start initializes and starts the external plugin process
+func (h *GRPCPluginHost) Start(pluginPath string) error {
 	var PluginMap = map[string]plugin.Plugin{
 		"plugin": &GRPCPlugin{logger: h.logger},
 	}
@@ -86,10 +60,7 @@ func (h *PluginHost) Start(pluginPath string) error {
 }
 
 // Stop shuts down the plugin host and cleans up resources
-func (h *PluginHost) Stop() {
-	if h.isInProcess && h.inProcessHost != nil {
-		h.inProcessHost.Stop()
-	}
+func (h *GRPCPluginHost) Stop() {
 	if h.client != nil {
 		h.client.Kill()
 	}
@@ -200,11 +171,11 @@ func (w *grpcPluginWrapper) Changed(entityType, entitySubType string, entityData
 	return resp.Changed, nil
 }
 
-// Ensure PluginHost implements PluginEntityProvider interface
-var _ PluginEntityProvider = (*PluginHost)(nil)
+// Ensure GRPCPluginHost implements PluginHost interface
+var _ PluginHost = (*GRPCPluginHost)(nil)
 
 // GetTypes returns the types handled by the plugin
-func (h *PluginHost) GetTypes() []RegisteredType {
+func (h *GRPCPluginHost) GetTypes() []RegisteredType {
 	if h.plugin == nil {
 		return nil
 	}
@@ -212,7 +183,7 @@ func (h *PluginHost) GetTypes() []RegisteredType {
 }
 
 // Validate validates the given entity data
-func (h *PluginHost) Validate(entityType, entitySubType string, entityData []byte) error {
+func (h *GRPCPluginHost) Validate(entityType, entitySubType string, entityData []byte) error {
 	if h.plugin == nil {
 		return fmt.Errorf("plugin not initialized")
 	}
@@ -220,7 +191,7 @@ func (h *PluginHost) Validate(entityType, entitySubType string, entityData []byt
 }
 
 // Create creates a new entity
-func (h *PluginHost) Create(entityType, entitySubType string, entityData []byte) error {
+func (h *GRPCPluginHost) Create(entityType, entitySubType string, entityData []byte) error {
 	if h.plugin == nil {
 		return fmt.Errorf("plugin not initialized")
 	}
@@ -228,7 +199,7 @@ func (h *PluginHost) Create(entityType, entitySubType string, entityData []byte)
 }
 
 // Destroy deletes an existing entity
-func (h *PluginHost) Destroy(entityType, entitySubType string, entityData []byte) error {
+func (h *GRPCPluginHost) Destroy(entityType, entitySubType string, entityData []byte) error {
 	if h.plugin == nil {
 		return fmt.Errorf("plugin not initialized")
 	}
@@ -236,7 +207,7 @@ func (h *PluginHost) Destroy(entityType, entitySubType string, entityData []byte
 }
 
 // Refresh refreshes the plugin state
-func (h *PluginHost) Refresh(ctx context.Context) error {
+func (h *GRPCPluginHost) Refresh(ctx context.Context) error {
 	if h.plugin == nil {
 		return fmt.Errorf("plugin not initialized")
 	}
@@ -244,7 +215,7 @@ func (h *PluginHost) Refresh(ctx context.Context) error {
 }
 
 // Changed checks if the entity has changed
-func (h *PluginHost) Changed(entityType, entitySubType string, entityData []byte) (bool, error) {
+func (h *GRPCPluginHost) Changed(entityType, entitySubType string, entityData []byte) (bool, error) {
 	if h.plugin == nil {
 		return false, fmt.Errorf("plugin not initialized")
 	}
