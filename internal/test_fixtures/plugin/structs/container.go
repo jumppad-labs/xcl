@@ -6,9 +6,10 @@ import (
 
 // TypeContainer is the resource string for a Container resource
 const TypeContainer = "container"
+const TypeSidecar = "sidecar"
 
 // Container defines a structure for creating Docker containers
-type Container struct {
+type ContainerBase struct {
 	// embedded type holding name, etc
 	types.ResourceBase `hcl:"rm,remain"`
 
@@ -91,30 +92,14 @@ type Build struct {
 	Tag     string `hcl:"tag,optional" json:"tag,omitempty"`   // Image tag, defaults to latest
 }
 
-// Called when resource is read from the file, can be used to validate resource but
-// you can not set any resource properties
-// here as they are overwritten when the resource is processed by the dag
-// ResourceBase properties can be set
-func (c *Container) Parse(conf types.Findable) error {
-	c.Meta.Properties["status"] = "something"
-	return nil
+type Container struct {
+	ContainerBase `hcl:",remain"`
+
+	ContainerID string `hcl:"container_id,optional" json:"container_id,omitempty"`
 }
 
-// Called when resources is processed by the Graph
-func (c *Container) Process() error {
-	c.CreatedNetworks = []NetworkAttachment{
-		NetworkAttachment{
-			Name: "test1",
-		},
-		NetworkAttachment{
-			Name: "test2",
-		},
-	}
+type Sidecar struct {
+	ContainerBase `hcl:",remain"`
 
-	//c.CreatedNetworksMap = map[string]Network{
-	//	"one": Network{ResourceBase: types.ResourceBase{ID: "one", Name: "test1"}},
-	//	"two": Network{ResourceBase: types.ResourceBase{ID: "two", Name: "test2"}},
-	//}
-
-	return nil
+	SidecarID string `hcl:"sidecar_id,optional" json:"sidecar_id,omitempty"`
 }

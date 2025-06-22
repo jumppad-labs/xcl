@@ -3,13 +3,15 @@ package convert
 import (
 	"testing"
 
-	"github.com/jumppad-labs/hclconfig/test_fixtures/structs"
+	"github.com/jumppad-labs/hclconfig/internal/test_fixtures/plugin/structs"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGoStructToCtyValue(t *testing.T) {
 	cont := structs.Container{
-		Command: []string{"ls", "-las"},
+		ContainerBase: structs.ContainerBase{
+			Command: []string{"ls", "-las"},
+		},
 	}
 
 	//val := reflect.ValueOf(cont)
