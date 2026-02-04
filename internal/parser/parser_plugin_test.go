@@ -1,27 +1,30 @@
-package hclconfig
+package parser
 
 import (
 	"testing"
 
-	"github.com/jumppad-labs/hclconfig/logger"
-	"github.com/jumppad-labs/hclconfig/plugins"
-	"github.com/jumppad-labs/hclconfig/plugins/example/pkg/person"
-	"github.com/jumppad-labs/hclconfig/types"
+	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/plugins"
+	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
+	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
 // TestPluginRegistration tests that we can register and use plugins
 func TestPluginRegistration(t *testing.T) {
-	// Create a new parser with TestLogger
+	// Create a new parser with TestLogger and PluginRegistry
 	o := DefaultOptions()
 	o.Logger = logger.NewTestLogger(t)
+	o.PluginRegistry = registry.NewPluginRegistry(o.Logger)
+
 	parser := NewParser(o)
 
 	// Create a simple test plugin
 	plugin := &SimpleTestPlugin{}
 
-	// Register the plugin
-	err := parser.RegisterPlugin(plugin)
+	// Register the plugin via the PluginRegistry
+	err := o.PluginRegistry.RegisterPlugin(plugin)
 	require.NoError(t, err, "Should register plugin without error")
 
 	// Verify the plugin was added to the registry

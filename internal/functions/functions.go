@@ -1,4 +1,4 @@
-package hclconfig
+package functions
 
 import (
 	"fmt"
@@ -8,12 +8,13 @@ import (
 	"strings"
 
 	"github.com/infinytum/raymond/v2"
+	"github.com/jumppad-labs/xcl/internal/utils"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/function"
 	"github.com/zclconf/go-cty/cty/function/stdlib"
 )
 
-func createCtyFunctionFromGoFunc(f any) (function.Function, error) {
+func CreateCtyFunctionFromGoFunc(f any) (function.Function, error) {
 	// get the parameters
 	inParams := []function.Parameter{}
 	var outParam function.TypeFunc
@@ -204,7 +205,7 @@ func appendParms(inType *[]reflect.Kind, params *[]function.Parameter, name stri
 	})
 }
 
-func getDefaultFunctions(filePath string) map[string]function.Function {
+func GetDefaultFunctions(filePath string) map[string]function.Function {
 	var EnvFunc = function.New(&function.Spec{
 		Params: []function.Parameter{
 			{
@@ -238,7 +239,7 @@ func getDefaultFunctions(filePath string) map[string]function.Function {
 		Type: function.StaticReturnType(cty.String),
 		Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
 			// convert the file path to an absolute
-			fp := ensureAbsolute(args[0].AsString(), filePath)
+			fp := utils.EnsureAbsolute(args[0].AsString(), filePath)
 
 			// read the contents of the file
 			d, err := os.ReadFile(fp)
@@ -267,7 +268,7 @@ func getDefaultFunctions(filePath string) map[string]function.Function {
 		Type: function.StaticReturnType(cty.String),
 		Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
 			// convert the file path to an absolute
-			fp := ensureAbsolute(args[0].AsString(), filePath)
+			fp := utils.EnsureAbsolute(args[0].AsString(), filePath)
 
 			// read the contents of the file
 			d, err := os.ReadFile(fp)
@@ -280,7 +281,7 @@ func getDefaultFunctions(filePath string) map[string]function.Function {
 				return cty.StringVal(""), fmt.Errorf(`variables is either empty or not correctly formatted, e.g. { foo = "bar" list = ["a", "b"] number = 3 }`)
 			}
 
-			variables := ParseVars(vars.AsValueMap())
+			variables := utils.ParseVars(vars.AsValueMap())
 
 			tmpl, err := raymond.Parse(string(d))
 			if err != nil {

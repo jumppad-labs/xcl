@@ -1,4 +1,4 @@
-package hclconfig
+package logger
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jumppad-labs/hclconfig/types"
+	"github.com/jumppad-labs/xcl/types"
 	"github.com/mitchellh/go-wordwrap"
 )
 

@@ -1,4 +1,4 @@
-package hclconfig
+package functions
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jumppad-labs/hclconfig/internal/test_fixtures/plugin/structs"
+	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -16,7 +16,7 @@ func TestCreateFunctionCreatesFunctionWithCorrectInParameters(t *testing.T) {
 		return 0, nil
 	}
 
-	ctyFunc, err := createCtyFunctionFromGoFunc(myfunc)
+	ctyFunc, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 
 	require.Equal(t, cty.String, ctyFunc.Params()[0].Type)
@@ -28,7 +28,7 @@ func TestCreateFunctionWithInvalidInParameterReturnsError(t *testing.T) {
 		return 0, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.Error(t, err)
 }
 
@@ -37,7 +37,7 @@ func TestCreateFunctionCreatesFunctionWithCorrectOutParameters(t *testing.T) {
 		return 0, nil
 	}
 
-	ctyFunc, err := createCtyFunctionFromGoFunc(myfunc)
+	ctyFunc, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 
 	rt, err := ctyFunc.ReturnType([]cty.Type{cty.String, cty.Number})
@@ -52,14 +52,14 @@ func TestCreateFunctionWithInvalidOutParameterReturnsError(t *testing.T) {
 		}
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.Error(t, err)
 
 	myfunc2 := func(a string, b int) int {
 		return 1
 	}
 
-	_, err = createCtyFunctionFromGoFunc(myfunc2)
+	_, err = CreateCtyFunctionFromGoFunc(myfunc2)
 	require.Error(t, err)
 }
 
@@ -68,7 +68,7 @@ func TestCreateFunctionCallsFunction(t *testing.T) {
 		return a + b, nil
 	}
 
-	ctyFunc, err := createCtyFunctionFromGoFunc(myfunc)
+	ctyFunc, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 
 	val, err := ctyFunc.Call([]cty.Value{cty.NumberIntVal(2), cty.NumberIntVal(3)})
@@ -84,7 +84,7 @@ func TestCreateFunctionHandlesIntegerInputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -93,7 +93,7 @@ func TestCreateFunctionHandlesInt16InputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -102,7 +102,7 @@ func TestCreateFunctionHandlesInt32InputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -111,7 +111,7 @@ func TestCreateFunctionHandlesInt64InputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -120,7 +120,7 @@ func TestCreateFunctionHandlesUintInputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -129,7 +129,7 @@ func TestCreateFunctionHandlesUint16InputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -138,7 +138,7 @@ func TestCreateFunctionHandlesUint32InputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -147,7 +147,7 @@ func TestCreateFunctionHandlesUint64InputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -156,7 +156,7 @@ func TestCreateFunctionHandlesFloat32InputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -165,7 +165,7 @@ func TestCreateFunctionHandlesFloat64InputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 
@@ -174,7 +174,7 @@ func TestCreateFunctionHandlesStringInputParams(t *testing.T) {
 		return a + b, nil
 	}
 
-	_, err := createCtyFunctionFromGoFunc(myfunc)
+	_, err := CreateCtyFunctionFromGoFunc(myfunc)
 	require.NoError(t, err)
 }
 

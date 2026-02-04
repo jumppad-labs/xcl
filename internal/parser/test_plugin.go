@@ -1,13 +1,13 @@
-package hclconfig
+package parser
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/jumppad-labs/hclconfig/internal/test_fixtures/plugin/structs"
-	"github.com/jumppad-labs/hclconfig/logger"
-	"github.com/jumppad-labs/hclconfig/plugins"
-	"github.com/jumppad-labs/hclconfig/types"
+	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
+	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/plugins"
+	"github.com/jumppad-labs/xcl/types"
 )
 
 // TestPlugin provides test resource types for testing the parser

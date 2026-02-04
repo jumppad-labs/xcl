@@ -1,4 +1,4 @@
-package registry
+package modules
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type Registry interface {
+type ModuleRegistry interface {
 	GetModuleVersions(organization string, module string) (*Versions, error)
 	GetModule(organization string, name string, version string) (*Module, error)
 }
@@ -62,7 +62,7 @@ type Version struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
-func New(host string, token string) (Registry, error) {
+func New(host string, token string) (ModuleRegistry, error) {
 	client := http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &TransportWithCredentials{

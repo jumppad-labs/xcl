@@ -1,4 +1,4 @@
-package hclconfig
+package getter
 
 import (
 	"context"
