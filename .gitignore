@@ -9,3 +9,9 @@ plugins/example/build/
 *.test
 __debug_bin*
 example/*/build/
+plugins/example/bin/
+# stray `go build` output: without -o the binary is named after its package dir
+/example/example
+/example/main
+# spektacular debug logs
+.spektacular/debug/
