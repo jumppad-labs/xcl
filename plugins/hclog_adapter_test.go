@@ -5,6 +5,8 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/jumppad-labs/xcl/logger"
 )
 
 type adapterCall struct {
@@ -44,10 +46,10 @@ func TestHCLogAdapterPassesOnDebugAndInfoAtDebugAndWarnAndErrorAtTheirLevel(t *t
 	l.Error("plugin failed", "error", "boom")
 
 	require.Equal(t, []adapterCall{
-		{"debug", "starting plugin", []interface{}{"path", "build/external"}},
-		{"debug", "plugin process exited", nil},
-		{"warn", "plugin slow", nil},
-		{"error", "plugin failed", []interface{}{"error", "boom"}},
+		{"debug", "starting plugin", []interface{}{"event", "go-plugin", "path", "build/external"}},
+		{"debug", "plugin process exited", []interface{}{"event", "go-plugin"}},
+		{"warn", "plugin slow", []interface{}{"event", "go-plugin"}},
+		{"error", "plugin failed", []interface{}{"event", "go-plugin", "error", "boom"}},
 	}, r.calls)
 }
 
@@ -73,10 +75,10 @@ func TestHCLogAdapterLogPassesOnAtTheGivenLevel(t *testing.T) {
 	l.Log(hclog.Error, "plugin failed")
 
 	require.Equal(t, []adapterCall{
-		{"debug", "plugin address", nil},
-		{"debug", "using plugin", nil},
-		{"warn", "plugin slow", nil},
-		{"error", "plugin failed", nil},
+		{"debug", "plugin address", []interface{}{"event", "go-plugin"}},
+		{"debug", "using plugin", []interface{}{"event", "go-plugin"}},
+		{"warn", "plugin slow", []interface{}{"event", "go-plugin"}},
+		{"error", "plugin failed", []interface{}{"event", "go-plugin"}},
 	}, r.calls)
 }
 
@@ -88,7 +90,7 @@ func TestHCLogAdapterWithAddsImpliedArgs(t *testing.T) {
 
 	require.Equal(t, []interface{}{"pid", 123}, l.ImpliedArgs())
 	require.Equal(t, []adapterCall{
-		{"debug", "plugin started", []interface{}{"pid", 123, "path", "build/external"}},
+		{"debug", "plugin started", []interface{}{"event", "go-plugin", "pid", 123, "path", "build/external"}},
 	}, r.calls)
 }
 
@@ -107,8 +109,29 @@ func TestHCLogAdapterStandardWriterWritesEachLineAtDebug(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []adapterCall{
-		{"debug", "first line", nil},
-		{"debug", "second line", nil},
+		{"debug", "first line", []interface{}{"event", "go-plugin"}},
+		{"debug", "second line", []interface{}{"event", "go-plugin"}},
+	}, r.calls)
+}
+
+func TestHCLogAdapterGivesEveryLogTheGoPluginEvent(t *testing.T) {
+	r := &adapterRecorder{}
+	l := newHCLogAdapter(r)
+
+	l.Warn("plugin slow", "pid", 123)
+
+	require.Len(t, r.calls, 1)
+	require.Equal(t, []interface{}{"event", "go-plugin", "pid", 123}, r.calls[0].args)
+}
+
+func TestHCLogAdapterGivesTheGoPluginEventToAPluginTaggedLog(t *testing.T) {
+	r := &adapterRecorder{}
+	l := newHCLogAdapter(logger.WithTag(r, "plugin", "external"))
+
+	l.Debug("starting plugin", "path", "build/external")
+
+	require.Equal(t, []adapterCall{
+		{"debug", "event=go-plugin plugin=external starting plugin", []interface{}{"path", "build/external"}},
 	}, r.calls)
 }
 
@@ -136,6 +159,6 @@ func TestHCLogAdapterPassesOnEndOfStdioStreamAboveDebug(t *testing.T) {
 	l.Error("received EOF, stopping recv loop")
 
 	require.Equal(t, []adapterCall{
-		{"error", "received EOF, stopping recv loop", nil},
+		{"error", "received EOF, stopping recv loop", []interface{}{"event", "go-plugin"}},
 	}, r.calls)
 }

@@ -308,7 +308,7 @@ func TestPluginExampleLogsInProcessProviderCreateAtDebug(t *testing.T) {
 }
 
 // TestPluginExampleLogsExternalProviderCreateAtDebug asserts a log from the external plugin process reaches the host logger,
-// tagged with the plugin binary's name and the provider's block type
+// led by its event and tagged with the plugin binary's name and the provider's block type
 func TestPluginExampleLogsExternalProviderCreateAtDebug(t *testing.T) {
 	log := &recordingLogger{}
 

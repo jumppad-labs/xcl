@@ -516,10 +516,11 @@ func TestInProcessPluginLogsToHostLogger(t *testing.T) {
 	_, err := ph.Create("resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	// xcl tags the message with the plugin's Go type and the provider's block type
-	created := log.withMessage("info", "plugin=PersonPlugin provider=person Creating person")
+	// xcl leads the message with the provider's event, then tags it with the
+	// plugin's Go type and the provider's block type
+	created := log.withMessage("info", "event=create plugin=PersonPlugin provider=person Creating person")
 	require.Len(t, created, 1, "Provider should log the create once")
-	require.Equal(t, []any{"id", "test-person", "name", "John Doe"}, created[0].args)
+	require.Equal(t, []any{"resource", "test-person", "name", "John Doe"}, created[0].args)
 }
 
 // TestExternalPluginLogsToHostLogger tests that a provider running in an
@@ -536,11 +537,12 @@ func TestExternalPluginLogsToHostLogger(t *testing.T) {
 	_, err := ph.Create("resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	// xcl tags the message with the plugin's binary name and the provider's
-	// block type, the provider tag is added inside the plugin process
-	created := log.withMessage("info", "plugin=example provider=person Creating person")
+	// xcl leads the message with the provider's event, then tags it with the
+	// plugin's binary name and the provider's block type, the event and
+	// provider tag are added inside the plugin process
+	created := log.withMessage("info", "event=create plugin=example provider=person Creating person")
 	require.Len(t, created, 1, "Provider should log the create once")
-	require.Equal(t, []any{"id", "test-person", "name", "John Doe"}, created[0].args)
+	require.Equal(t, []any{"resource", "test-person", "name", "John Doe"}, created[0].args)
 }
 
 // TestExternalPluginFrameworkLogsReachHostLogger tests that go-plugin, which
@@ -554,7 +556,7 @@ func TestExternalPluginFrameworkLogsReachHostLogger(t *testing.T) {
 	log := &recordingLogger{}
 	plugintesting.ExternalPluginSetupWithLogger(t, "./build/example", log)
 
-	started := log.withMessage("debug", "plugin=example starting plugin")
+	started := log.withMessage("debug", "event=go-plugin plugin=example starting plugin")
 	require.Len(t, started, 1, "go-plugin should log that it started the plugin")
 	require.Equal(t, []any{"path", "./build/example", "args", []string{"./build/example"}}, started[0].args)
 }
@@ -584,13 +586,13 @@ func TestInProcessPluginLogsFrameworkMessagesAtDebug(t *testing.T) {
 	_, err := ph.Create("resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	loaded := log.withMessage("debug", "plugin=PersonPlugin plugin loaded")
+	loaded := log.withMessage("debug", "event=load plugin=PersonPlugin plugin loaded")
 	require.Len(t, loaded, 1)
 	require.Equal(t, []any{"block_types", "person"}, loaded[0].args)
 
-	called := log.withMessage("debug", "plugin=PersonPlugin provider=person calling provider")
+	called := log.withMessage("debug", "event=create plugin=PersonPlugin provider=person calling provider")
 	require.Len(t, called, 1)
-	require.Equal(t, []any{"operation", "create", "id", "test-person"}, called[0].args)
+	require.Equal(t, []any{"resource", "test-person"}, called[0].args)
 }
 
 // TestExternalPluginLogsFrameworkMessagesAtDebug tests that xcl logs loading
@@ -607,14 +609,14 @@ func TestExternalPluginLogsFrameworkMessagesAtDebug(t *testing.T) {
 	_, err := ph.Create("resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	loaded := log.withMessage("debug", "plugin=example plugin loaded")
+	loaded := log.withMessage("debug", "event=load plugin=example plugin loaded")
 	require.Len(t, loaded, 1)
 	require.Equal(t, []any{"block_types", "person"}, loaded[0].args)
 
 	// args from an external plugin cross gRPC as strings
-	called := log.withMessage("debug", "plugin=example provider=person calling provider")
+	called := log.withMessage("debug", "event=create plugin=example provider=person calling provider")
 	require.Len(t, called, 1)
-	require.Equal(t, []any{"operation", "create", "id", "test-person"}, called[0].args)
+	require.Equal(t, []any{"resource", "test-person"}, called[0].args)
 }
 
 // TestInProcessPluginLogsOnlyProviderMessagesAtInfo tests that xcl logs
@@ -626,7 +628,7 @@ func TestInProcessPluginLogsOnlyProviderMessagesAtInfo(t *testing.T) {
 	_, err := ph.Create("resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	require.Equal(t, []string{"plugin=PersonPlugin provider=person Creating person"}, log.infoMessages())
+	require.Equal(t, []string{"event=create plugin=PersonPlugin provider=person Creating person"}, log.infoMessages())
 }
 
 // TestExternalPluginLogsOnlyProviderMessagesAtInfo tests that xcl logs
@@ -643,5 +645,5 @@ func TestExternalPluginLogsOnlyProviderMessagesAtInfo(t *testing.T) {
 	_, err := ph.Create("resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	require.Equal(t, []string{"plugin=example provider=person Creating person"}, log.infoMessages())
+	require.Equal(t, []string{"event=create plugin=example provider=person Creating person"}, log.infoMessages())
 }

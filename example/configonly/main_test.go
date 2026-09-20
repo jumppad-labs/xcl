@@ -392,6 +392,37 @@ func TestConfigOnlyExampleLogsNothingAtInfo(t *testing.T) {
 	}
 }
 
+// hasEvent reports whether a recorded message carries an event, either
+// leading its text, put there by a tagged logger, or as an "event" arg, the
+// way the event log handler logs it
+func hasEvent(m loggedMessage) bool {
+	if strings.HasPrefix(m.msg, "event=") {
+		return true
+	}
+
+	for i := 0; i+1 < len(m.args); i += 2 {
+		if m.args[i] == "event" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// TestConfigOnlyExampleLogsAnEventOnEveryLine asserts every message the run
+// logged carries an event
+func TestConfigOnlyExampleLogsAnEventOnEveryLine(t *testing.T) {
+	log := &recordingLogger{}
+
+	_, err := run(&bytes.Buffer{}, log, configDir, filepath.Join(t.TempDir(), "state.json"))
+	require.NoError(t, err)
+
+	require.NotEmpty(t, log.messages)
+	for _, m := range log.messages {
+		require.True(t, hasEvent(m), "message logged without an event: %q %v", m.msg, m.args)
+	}
+}
+
 // TestConfigOnlyExampleLogsParseErrorAtError asserts a block that fails to
 // parse is logged at error, with its file
 func TestConfigOnlyExampleLogsParseErrorAtError(t *testing.T) {
