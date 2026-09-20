@@ -1,0 +1,161 @@
+# A complete application configuration in one file, the kind that is usually
+# written as JSON: one object, with objects, arrays of objects and a few free
+# form maps inside it. The Go types it is parsed into are in ../resources.
+#
+# Variables can be overridden with environment variables prefixed HCL_VAR_,
+# i.e. HCL_VAR_environment.
+variable "environment" {
+  default = "production"
+}
+
+variable "db_host" {
+  default = "postgres.internal"
+}
+
+resource "application" "api" {
+  name        = "checkout-api"
+  environment = variable.environment
+
+  # A list of values, and a map for keys the Go type does not name
+  owners = ["platform-team", "payments-team"]
+
+  labels = {
+    tier      = "edge"
+    component = "api"
+  }
+
+  # server appears once, so it is a pointer in Go
+  server {
+    host = "0.0.0.0"
+    port = 8443
+
+    # tls is nested inside server, and nests client_auth inside itself
+    tls {
+      enabled   = true
+      cert_file = "/etc/certs/api.pem"
+      key_file  = "/etc/certs/api-key.pem"
+
+      ciphers = [
+        "TLS_AES_128_GCM_SHA256",
+        "TLS_AES_256_GCM_SHA384",
+      ]
+
+      client_auth {
+        mode    = "require_and_verify"
+        ca_file = "/etc/certs/ca.pem"
+      }
+    }
+
+    timeouts {
+      read  = 15
+      write = 15
+      idle  = 60
+    }
+  }
+
+  database {
+    driver   = "postgres"
+    host     = variable.db_host
+    port     = 5432
+    name     = "checkout"
+    username = "checkout"
+
+    # Functions are evaluated while the configuration is parsed, so a secret
+    # stays out of the file
+    password = env("DB_PASSWORD")
+
+    pool {
+      max_open     = 25
+      max_idle     = 5
+      max_lifetime = 300
+    }
+
+    # replica is a repeated block, written once per replica
+    replica {
+      host   = "postgres-replica-1.internal"
+      port   = 5432
+      weight = 70
+    }
+
+    replica {
+      host   = "postgres-replica-2.internal"
+      port   = 5432
+      weight = 30
+    }
+
+    options = {
+      sslmode          = "verify-full"
+      application_name = "checkout-api"
+    }
+  }
+
+  telemetry {
+    logging {
+      level  = "info"
+      format = "json"
+    }
+
+    metrics {
+      enabled = true
+      path    = "/metrics"
+    }
+
+    tracing {
+      enabled     = true
+      endpoint    = "otel-collector.internal:4317"
+      sample_rate = 0.1
+    }
+  }
+
+  # service repeats, and each one holds repeated route blocks of its own
+  service {
+    name = "payments"
+    url  = "https://payments.internal"
+
+    headers = {
+      "x-service" = "checkout-api"
+    }
+
+    retry {
+      attempts = 3
+      backoff  = 250
+    }
+
+    route {
+      path    = "/v1/charges"
+      methods = ["POST"]
+
+      rate_limit {
+        requests_per_second = 50
+        burst               = 100
+      }
+    }
+
+    route {
+      path    = "/v1/refunds"
+      methods = ["POST", "DELETE"]
+
+      rate_limit {
+        requests_per_second = 10
+      }
+    }
+  }
+
+  service {
+    name = "inventory"
+    url  = "https://inventory.internal"
+
+    retry {
+      attempts = 2
+    }
+
+    route {
+      path    = "/v1/stock"
+      methods = ["GET"]
+    }
+  }
+}
+
+output "listen_address" {
+  value = "${resource.application.api.server.host}:${resource.application.api.server.port}"
+}

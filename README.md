@@ -62,7 +62,7 @@ node in graph.
 
 ## Example
 
-The [`example`](./example) directory holds two self-contained programs, each
+The [`example`](./example) directory holds three self-contained programs, each
 with its own configuration and Go types.
 
 ### Configuration only
@@ -143,20 +143,77 @@ Every line leads with its event, `event=log` when a message has none.
 Everything in the example logs at debug except a failure, which logs at
 error.
 
+### Application configuration
+
+[`example/appconfig`](./example/appconfig) is the shape configuration most
+often takes outside infrastructure: one application configuration file, of the
+kind usually written as JSON, read into a tree of Go structs. Its
+configuration is a single file,
+[`appconfig/config/app.xcl`](./example/appconfig/config/app.xcl), and one
+block type ([`appconfig/resources`](./example/appconfig/resources)) is
+registered for it, with no plugin and no provider.
+
+Every shape a JSON document is built from has an equivalent: an object is a
+nested block held in a pointer (`server`, and `tls` and `client_auth` nested
+below it), an array of objects is a repeated block held in a slice (`service`,
+each holding repeated `route` blocks of its own), an array of values is a list
+attribute (`ciphers`), and an object whose keys the Go type does not know is a
+map attribute (`labels`, `options`, `headers`). Nesting goes four blocks deep
+on two different paths.
+
+```hcl
+resource "application" "api" {
+  name        = "checkout-api"
+  environment = variable.environment
+
+  server {
+    host = "0.0.0.0"
+    port = 8443
+
+    tls {
+      enabled   = true
+      cert_file = "/etc/certs/api.pem"
+
+      client_auth {
+        mode    = "require_and_verify"
+        ca_file = "/etc/certs/ca.pem"
+      }
+    }
+  }
+
+  service {
+    name = "payments"
+    url  = "https://payments.internal"
+
+    route {
+      path    = "/v1/charges"
+      methods = ["POST"]
+
+      rate_limit {
+        requests_per_second = 50
+      }
+    }
+  }
+}
+```
+
+The program prints the parsed configuration as a tree, then prints the same
+resource as JSON, which is the document this configuration replaces.
+
 ### Running them
 
-Both examples keep their state in a file, apply the configuration, print the
-resources, then `Destroy` everything and print what is left under
-`## Destroyed`. For the configuration only example, where no provider is ever
-called, destroying only clears the state. They log every event xcl fires,
-parse and destroy events included, through the shared
+Every example keeps its state in a file, applies the configuration and prints
+the resources it parsed. The plugin example then `Destroy`s everything through
+the providers and prints what is left under `## Destroyed`. They all log every
+event xcl fires, parse and destroy events included, through the shared
 [`example/eventlog`](./example/eventlog) handler, at debug unless something
 fails.
 
-Run either one from its directory with `make run`. For `plugin` this builds
-the external plugin into `build/` first. Both have the same Makefile targets:
-`build`, `run`, `test` and `clean`. The tests for both run as part of `go test ./...`, and build the
-external plugin themselves.
+Run any of them from its directory with `make run`. For `plugin` this builds
+the external plugin into `build/` first, and it has the extra Makefile targets
+`build` and `clean`; every example has `run` and `test`. The tests for all
+three run as part of `go test ./...`, and the plugin tests build the external
+plugin themselves.
 
 Block types are defined as Go structs that embed `types.ResourceBase` and map
 configuration to fields with `xcl` tags.

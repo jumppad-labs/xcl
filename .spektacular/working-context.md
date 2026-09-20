@@ -147,3 +147,30 @@ config-only-types work. Findings from the code (2026-09-19):
 - test_plan: none required (all 3 metrics automated).
 - feature changelog: project + repo records written; CHANGELOG.md entry prepended.
 - reconcile_spec: all 14 requirements + 16 ACs ticked.
+
+## Adding the documentation website repo (2026-09-20)
+
+- User asked to add the xcl.dev documentation website to this project's
+  managed repos. Code lives at
+  `/home/nicj/code/github.com/jumppad-labs/xclconf-website` (a sibling of the
+  xclconfig checkout, not inside it).
+- The website is an Astro 5 + MDX + Tailwind v4 static site, built on the same
+  layout and components as spektacular-website. It documents xcl: a home page
+  and three example pages (plugins and the lifecycle, configuration only, an
+  application config file), each quoting code from this repo's `example/`
+  directory.
+- It is a new folder created this session and is not yet a git repository, so
+  its code is registered from the filesystem rather than cloned.
+- User is renaming the repos: this one becomes `xcl` (matching the Go module
+  path `github.com/jumppad-labs/xcl`), and the website becomes `xcl-website`.
+  Registered the website under the agreed name `xcl-website`, and renamed its
+  folder to `/home/nicj/code/github.com/jumppad-labs/xcl-website` to match,
+  updating its package name and README heading with it.
+- Website description agreed: "The documentation site for xcl, served at
+  xcl.dev, built with Astro 5 (MDX) and Tailwind CSS v4."
+- Website role agreed: documentation. Documentation work lands in the website
+  repo, library code changes stay in this one.
+- Website tags agreed: astro, mdx, tailwind, documentation, static-site, xcl.
+- User confirmed the registration (folder created inside the website repo).
+- Registration finished: the project now manages two repos, `xclconfig` (the
+  library, to be renamed `xcl`) and `xcl-website`.

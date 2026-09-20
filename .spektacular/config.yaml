@@ -20,3 +20,5 @@ changelog:
 repos:
     - name: xclconfig
       location: .
+    - name: xcl-website
+      location: ../../xcl-website/.spektacular

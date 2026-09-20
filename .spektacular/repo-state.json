@@ -1,0 +1,63 @@
+{
+  "kind": "repo",
+  "current_step": "finished",
+  "completed_steps": [
+    "new",
+    "locate",
+    "name",
+    "description",
+    "role",
+    "tags",
+    "placement",
+    "confirm",
+    "register",
+    "finished"
+  ],
+  "created_at": "2026-09-20T07:23:12.818676914Z",
+  "updated_at": "2026-09-20T07:31:23.529300854Z",
+  "data": {
+    "description": "The documentation site for xcl, served at xcl.dev, built with Astro 5 (MDX) and Tailwind CSS v4.",
+    "evidence": {
+      "identity": "xclconf-website",
+      "languages": [
+        "JavaScript"
+      ],
+      "languages_line": "JavaScript",
+      "manifest": "package.json",
+      "readable": true,
+      "readme": "The documentation site for [xcl](https://github.com/jumppad-labs/xcl), served at [xcl.dev](https://xcl.dev). Built with [Astro 5](https://astro.build/) (MDX) and [Tailwind CSS v4](https://tailwindcss.com/), on the same layout and components as the Spektacular site.",
+      "summary": "xcl.dev documentation site",
+      "top_level": [
+        "dist/",
+        "node_modules/",
+        "public/",
+        "src/",
+        "Makefile",
+        "README.md",
+        "astro.config.mjs",
+        "ec.config.mjs",
+        "package-lock.json",
+        "package.json",
+        "tsconfig.json"
+      ],
+      "top_level_line": "dist/, node_modules/, public/, src/, Makefile, README.md, astro.config.mjs, ec.config.mjs, package-lock.json, package.json, tsconfig.json"
+    },
+    "location": "/home/nicj/code/github.com/jumppad-labs/xcl-website",
+    "name": "xcl-website",
+    "placement": "inside",
+    "registration": {
+      "footprint": "created",
+      "metadata_note": "",
+      "registered": true
+    },
+    "role": "documentation",
+    "tags": [
+      "astro",
+      "mdx",
+      "tailwind",
+      "documentation",
+      "static-site",
+      "xcl"
+    ]
+  }
+}
