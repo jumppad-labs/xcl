@@ -48,7 +48,7 @@ var dependentParents = map[string][]string{
 
 // destroyAll loads the state the harness store last saved and destroys it with
 // a fresh Parser, just as a separate destroy run would. onEvent may be nil.
-func destroyAll(t *testing.T, h *lifecycleHarness, onEvent func(ParserEvent)) (*state.State, error) {
+func destroyAll(t *testing.T, h *lifecycleHarness, onEvent func(ParserEvent)) (*State, error) {
 	t.Helper()
 
 	p := h.newParser(t, onEvent)
@@ -72,12 +72,12 @@ func destroyCalls(p *TestPlugin) []string {
 	return ids
 }
 
-// stateIDs returns the sorted IDs of every resource in st.
-func stateIDs(t *testing.T, st *state.State) []string {
+// stateIDs returns the sorted IDs of every entity in entities.
+func stateIDs(t *testing.T, entities []any) []string {
 	t.Helper()
 
 	ids := []string{}
-	for _, r := range st.GetResources() {
+	for _, r := range entities {
 		meta, err := types.GetMeta(r)
 		require.NoError(t, err)
 
@@ -129,12 +129,12 @@ type recordingStore struct {
 	snapshots [][]byte
 }
 
-func (s *recordingStore) Load() (*state.State, error) {
+func (s *recordingStore) Load() ([]any, error) {
 	return s.store.Load()
 }
 
-func (s *recordingStore) Save(st *state.State) error {
-	snapshot, err := st.Bytes()
+func (s *recordingStore) Save(entities []any) error {
+	snapshot, err := json.MarshalIndent(entities, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (s *recordingStore) Save(st *state.State) error {
 	s.snapshots = append(s.snapshots, snapshot)
 	s.mu.Unlock()
 
-	return s.store.Save(st)
+	return s.store.Save(entities)
 }
 
 func (s *recordingStore) Exists() bool {
@@ -202,14 +202,14 @@ func TestDestroyCallsProvidersChildrenFirst(t *testing.T) {
 func TestDestroyRemovesEveryResourceFromSavedState(t *testing.T) {
 	h := setupLifecycle(t)
 	h.applyAndSave(t, lifecycleDependentConfig)
-	require.Equal(t, 6, h.loadSaved(t).ResourceCount())
+	require.Equal(t, 6, len(h.loadSaved(t)))
 
 	remaining, err := destroyAll(t, h, nil)
 	require.NoError(t, err)
 	require.NotNil(t, remaining)
 	require.Equal(t, 0, remaining.ResourceCount())
 
-	require.Equal(t, 0, h.loadSaved(t).ResourceCount())
+	require.Equal(t, 0, len(h.loadSaved(t)))
 }
 
 func TestDestroyCallsEachProviderResourceExactlyOnce(t *testing.T) {
@@ -242,7 +242,7 @@ func TestDestroyFailureLeavesParentsAndDestroysUnrelated(t *testing.T) {
 	require.Contains(t, calls, dependentSecondID)
 	require.NotContains(t, calls, dependentFirstID)
 
-	require.Equal(t, sorted(dependentSecondID, dependentFirstID), stateIDs(t, remaining))
+	require.Equal(t, sorted(dependentSecondID, dependentFirstID), stateIDs(t, remaining.GetResources()))
 
 	saved := h.loadSaved(t)
 	require.Equal(t, sorted(dependentSecondID, dependentFirstID), stateIDs(t, saved))
@@ -266,7 +266,7 @@ func TestDestroyRetriesFailedResource(t *testing.T) {
 	require.Equal(t, 0, remaining.ResourceCount())
 
 	require.Equal(t, []string{dependentSecondID, dependentFirstID}, destroyCalls(h.plugin))
-	require.Equal(t, 0, h.loadSaved(t).ResourceCount())
+	require.Equal(t, 0, len(h.loadSaved(t)))
 }
 
 func TestDestroySavesStateAfterEachResource(t *testing.T) {
@@ -365,7 +365,7 @@ func TestInterruptedDestroyResumesFromSavedState(t *testing.T) {
 		require.Equal(t, 0, remaining.ResourceCount())
 
 		require.ElementsMatch(t, remainingProviderIDs, destroyCalls(h.plugin), "resuming from snapshot %d", i)
-		require.Equal(t, 0, h.loadSaved(t).ResourceCount())
+		require.Equal(t, 0, len(h.loadSaved(t)))
 	}
 }
 
@@ -415,7 +415,7 @@ func TestDestroyNeverCallsProviderForBuiltinAndRegisteredBlocks(t *testing.T) {
 
 	loaded, err := h.store.Load()
 	require.NoError(t, err)
-	require.Equal(t, 7, loaded.ResourceCount())
+	require.Len(t, loaded, 7)
 
 	remaining, err := p.Destroy(loaded)
 	require.NoError(t, err)
@@ -423,7 +423,7 @@ func TestDestroyNeverCallsProviderForBuiltinAndRegisteredBlocks(t *testing.T) {
 
 	saved, err := h.store.Load()
 	require.NoError(t, err)
-	require.Equal(t, 0, saved.ResourceCount())
+	require.Empty(t, saved)
 
 	events := collector.all()
 	for _, id := range []string{
@@ -464,7 +464,7 @@ func TestDestroyNeverCallsProviderForDisabledRegisteredBlock(t *testing.T) {
 
 	saved, err := h.store.Load()
 	require.NoError(t, err)
-	require.Equal(t, 0, saved.ResourceCount())
+	require.Empty(t, saved)
 
 	require.Equal(t, []string{"destroy success"}, eventsFor(collector.all(), registeredDisabledID))
 }
@@ -483,7 +483,7 @@ func TestDestroyNeverCallsProviderForDisabledProviderBlock(t *testing.T) {
 
 	require.Equal(t, []string{disabledOnID}, destroyCalls(h.plugin))
 	require.Equal(t, []string{"destroy success"}, eventsFor(collector.all(), disabledOffID))
-	require.Equal(t, 0, h.loadSaved(t).ResourceCount())
+	require.Equal(t, 0, len(h.loadSaved(t)))
 }
 
 func TestDestroyOrphansNothingWhenAResourceFails(t *testing.T) {
@@ -532,7 +532,7 @@ func TestDestroyNeverDestroysParentOfFailedChild(t *testing.T) {
 	saved := h.loadSaved(t)
 
 	failed := 0
-	for _, r := range saved.GetResources() {
+	for _, r := range saved {
 		meta, err := types.GetMeta(r)
 		require.NoError(t, err)
 
@@ -553,7 +553,7 @@ func TestDestroyWithEmptyStateCallsNoProvider(t *testing.T) {
 	h := setupLifecycle(t)
 	p := h.newParser(t, nil)
 
-	remaining, err := p.Destroy(state.NewState())
+	remaining, err := p.Destroy(nil)
 	require.NoError(t, err)
 	require.NotNil(t, remaining)
 	require.Equal(t, 0, remaining.ResourceCount())

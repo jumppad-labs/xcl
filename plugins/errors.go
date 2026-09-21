@@ -7,4 +7,9 @@ import "errors"
 //
 // Check for it with errors.Is. It keeps its identity when the provider runs in
 // a separate plugin process.
+//
+// This means the real infrastructure is gone, not that the configuration does
+// not declare the entity. It is deliberately distinct from the lookup
+// surface's xcl.ErrNotFound, which means no entity is declared at an address:
+// same words, different meaning, and neither matches the other.
 var ErrNotFound = errors.New("resource not found")

@@ -14,10 +14,19 @@ func NewMockState(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockState {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockState{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -70,7 +79,7 @@ type MockState_Find_Call struct {
 
 // Find is a helper method to define mock.On call
 //   - pattern string
-func (_e *MockState_Expecter) Find(pattern interface{}) *MockState_Find_Call {
+func (_e *MockState_Expecter) Find(pattern any) *MockState_Find_Call {
 	return &MockState_Find_Call{Call: _e.mock.On("Find", pattern)}
 }
 
@@ -87,8 +96,8 @@ func (_c *MockState_Find_Call) Run(run func(pattern string)) *MockState_Find_Cal
 	return _c
 }
 
-func (_c *MockState_Find_Call) Return(vs []any, err error) *MockState_Find_Call {
-	_c.Call.Return(vs, err)
+func (_c *MockState_Find_Call) Return(anyMoqParams []any, err error) *MockState_Find_Call {
+	_c.Call.Return(anyMoqParams, err)
 	return _c
 }
 
@@ -132,7 +141,7 @@ type MockState_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - key string
-func (_e *MockState_Expecter) Get(key interface{}) *MockState_Get_Call {
+func (_e *MockState_Expecter) Get(key any) *MockState_Get_Call {
 	return &MockState_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
@@ -149,8 +158,8 @@ func (_c *MockState_Get_Call) Run(run func(key string)) *MockState_Get_Call {
 	return _c
 }
 
-func (_c *MockState_Get_Call) Return(v any, err error) *MockState_Get_Call {
-	_c.Call.Return(v, err)
+func (_c *MockState_Get_Call) Return(anyMoqParam any, err error) *MockState_Get_Call {
+	_c.Call.Return(anyMoqParam, err)
 	return _c
 }
 

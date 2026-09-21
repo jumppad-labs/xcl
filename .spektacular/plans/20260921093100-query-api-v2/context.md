@@ -225,7 +225,7 @@ its tests.
 - `errors/query_errors.go` (new, package `errors` — the project's existing error package, alongside `config_error.go` and `parser_error.go`) — seven sentinels as package-level `var … = errors.New(…)`, each with a doc comment naming who returns it and that it is matched with `errors.Is`, following `plugins/errors.go:5-10` exactly. Seven detail structs with **pointer** receivers, each `Unwrap`ing to its sentinel: address/segments queried, the Go type involved, and the **count found** for the not-unique case (an explicit acceptance criterion).
 - **Import cycle, resolved — do not wire this the obvious way.** `config.go:10` imports `xcl/state`, so `state` **cannot** import the root `xcl` package, and `ResourceNotFoundError.Is` therefore cannot reference a sentinel declared in `xcl`. Resolution: declare **all seven** sentinels in the project's existing `errors` package (`github.com/jumppad-labs/xcl/errors`), which already holds `ConfigError` (`errors/config_error.go:5-33`) and `ParserError` (`errors/parser_error.go:13-79`). Verified safe: that package imports only `internal/xcl` and `github.com/mitchellh/go-wordwrap` — not `state`, not `internal/parser`, not the root package — so `state -> errors` and `xcl -> errors` both introduce no cycle.
 - **Re-export the sentinels from `xcl`**, following the precedent at `config.go:16` (`var ErrEmptyConfiguration = parser.ErrEmptyConfiguration`). This is ergonomics, not indirection: the package is *named* `errors`, so without the re-export every consumer matching one would have to alias-import it to keep the standard library's `errors.Is` usable. With it, a caller writes `errors.Is(err, xcl.ErrNotFound)` using stdlib `errors` and nothing else. Identity is preserved because a re-export is the same value, so a sentinel raised inside `state` matches the name a consumer holds from `xcl`.
-- `state/errors.go:8-15` — add `func (r ResourceNotFoundError) Is(target error) bool` matching the sentinel declared in the same package. Keep the **value** receiver: `internal/parser/lifecycle.go:87-90` and `querier_test.go:120,188` use `errors.As` against the value type, and seven construction sites (`state/state.go:50,71,128,174,230`, `config.go:61`, `querier.go:41,73`) depend on it.
+- `state/errors.go:8-15` — add `func (r ResourceNotFoundError) Is(target error) bool` matching the sentinel declared in the same package. Keep the **value** receiver: `internal/parser/lifecycle.go:87-90` uses `errors.As` against the value type. **Inventory corrected during implementation**: there are eight construction sites, not seven (`state/state.go:50,71,128,174,230`, `config.go:61`, `querier.go:41,73`), and the `Resource` field carries four kinds of string across them — empty (×2), a bare type name (×2), a module name (×1) and an FQRN (×3) — which is why equality matching cannot work and an `Is` method is the only route to one not-found concept. Three of those sites disappear before this phase lands: `querier.go:41,73` go with the superseded helper in Phase 2.5, and `state/state.go:230` goes with `findResource` in Phase 5.1. The `Is` method still earns its place, because `state` keeps raising the error from `RemoveResource` (`:50,71`) and `FindModuleResources` (`:174`).
 - `plugins/errors.go:5-10` — extend the doc comment to state that this condition means the **real infrastructure** is gone and is distinct from the configuration-lookup not-found, per the spec's "stays distinct" requirement.
 - Avoid the trap at `types/register.go:38`, where `ErrTypeNotRegistered` is formatted with `%s` rather than wrapped and is consequently matched nowhere. Every new error wraps.
 
@@ -240,8 +240,9 @@ constrains where the sentinels live.
 **Repo:** xclconfig
 
 **File changes**
-- `query.go` (new, package `xcl`) — unexported `find[T any](c *Config, id string) (*T, error)` plus exported `Find`. Resolution order per the design: `Config.FindResource` (`config.go:59`, which delegates to `state/state.go:81-86` → `findResource` `:212-231`), then the published-value branch, then conversion.
-- Address tolerance comes free from `ParseFQRN` + `findResource`: `state/state.go:223-225` matches only `Module`/`Type`/`Name` and ignores `Attribute`, so a trailing attribute suffix already resolves. Module-relative goes through `AppendParentModule` (`internal/resources/fqrn.go:150-164`). Assert all three rather than assuming.
+- **Shared address matcher (new, `internal/resources`)** — created here, because this is the first phase that needs it. A function taking a plain `[]any` and an address and returning the item it names. `internal/resources` is the right home: it already owns `FQRN`, imports only `types` plus stdlib, is already imported by `internal/parser`, and the root package can import it with no cycle (verified). It cannot live anywhere that would require handing the parser a `*Config` — `config.go:7` imports `internal/parser`, so the reverse is a cycle. The parser adopts this matcher in Phase 5.1; writing it here means the logic exists once rather than being duplicated between `query.go` and `state`.
+- `query.go` (new, package `xcl`) — unexported `find[T any](c *Config, id string) (*T, error)` plus exported `Find`. Resolution order: the shared matcher over `Config.Entities()` (`config.go:51`), then the published-value branch, then conversion. **Do not delegate to `Config.FindResource` → `state.findResource`**: the storage layer is being taken out of the query path (see Architecture & Design Decisions), and resolving here makes `find` consistent with `findByType` and `all`, which already scan `Entities()`.
+- Address tolerance is now this phase's own responsibility rather than inherited: match on `Module`/`Type`/`Subtype`/`Name` and ignore `Attribute`, so a trailing attribute suffix resolves; module-relative goes through `AppendParentModule` (`internal/resources/fqrn.go`). The existing `state/state.go` `findResource` is the reference implementation to lift. Assert all three forms rather than assuming.
 - Published-value branch — `internal/resources/output.go:11-17`: return `Output.Value` (`:15`, populated at `internal/parser/callbacks.go:173` during apply, only when `CtyValue` is non-null), **not** the `Output` entity. Note `Value` has a `json` tag but no `xcl` tag and `CtyValue` the reverse, so only `Value` survives a JSON copy. `Output` lives in `internal/resources`, so the type is not nameable by a consumer — the conversion must target the caller's `T`, not the entity type.
 - Require a full address: a bare name must fail. `ParseFQRN`'s catch-all `onlymodules` alternation (`internal/resources/fqrn.go:60`, `:118-133`) is where a bare name would otherwise land — confirm it errors rather than resolving.
 - `As[T any](entity any) (*T, error)` — lift `asType` from `querier.go:82-89` (its only caller is that file, so it moves cleanly). Two changes: the `*T` fast path at `:83-85` stays; the fallback at `:87-89` must **not** return the partially-filled value alongside an error. Add the verification gate in front: where `T` is a registered type, compare its registered variety against `Meta.Subtype` and return the type-mismatch error before reaching `internal/schema/unmarshal.go:5-20`.
@@ -412,6 +413,55 @@ risks inconsistent phrasing across pages that a reader sees side by side.
 **Agent strategy**: Single agent, sequential. Must not be delegated blindly — a sub-agent inherits the
 store-access rules but not the propose-then-confirm obligation, so the confirmation step stays with
 the driving agent.
+
+
+### Phase 5.1: Take lookups out of storage
+
+**Repo:** xclconfig (`/home/nicj/code/github.com/jumppad-labs/xcl`)
+
+**File changes**
+- `state/state.go` — delete `FindResource` (`:82`), `FindRelativeResource` (`:90`), `FindResourcesByType` (`:110`), `FindModuleResources` (`:134`) and the unexported `findResource`. Keep `GetResources`, `AppendResource`, `RemoveResource`, `ResourceCount`, `Bytes` and `addResource`. The `resources` import goes with them — but note `addResource` builds the FQRN that becomes `meta.ID`, so either it keeps that one use or ID assignment moves to the parser, which already does the same thing at `internal/parser/parser.go:707,821` via `FQRNFromResource`. Prefer moving it: it is the last thing tying storage to the address type.
+- `internal/parser/dag.go:13-24` — `ConfigProvider` is named for `Config` but satisfied by `*state.State`. Rename it for what it provides. `ResourceProvider` embeds it and adds `GetResources()`.
+- `internal/parser/util.go:254` (`FindRelativeResource`), `:539` and `internal/parser/callbacks.go:97` (`FindModuleResources`), `internal/parser/util.go:555,565`, `internal/parser/lifecycle.go:85`, `internal/parser/parser.go:344`, `internal/parser/progress.go:65` (`FindResource`) — move each onto the shared matcher from Phase 2.2, applied over `GetResources()`.
+- `config.go:59-63` — `Config.FindResource` currently delegates to `currentState.FindResource`. Repoint it at the shared matcher over `Entities()`, which is what `find[T]` already does after Phase 2.2.
+- **Do not** change `StateStore` here; that is Phase 5.2. This phase must leave the suite green on its own.
+
+**Complexity**: Medium
+**Token estimate**: ~30k tokens
+**Agent strategy**: Single agent, sequential. The edit is mechanical but the call sites are load-bearing — `lifecycle.go:85` and `progress.go:65` drive re-apply and failed-apply state — so verification matters more than volume.
+
+### Phase 5.2: Narrow the persistence contract to raw items
+
+**Repo:** xclconfig
+
+**File changes**
+- `state/state_store.go:6-21` — `Load() ([]any, error)` and `Save(resources []any) error`; `Exists()` and `Clear()` unchanged.
+- `state/file_state_store.go:33` (`Load`) — return the built slice instead of assembling a `*State`; `:143` (`Save`) — take `[]any` and marshal it directly, replacing the `state.Bytes()` call at `:144`. The `UnknownTypesError` accumulation (`:81-91`, `:110-113`) and the two-axis read added in Phase 1.1 are unchanged.
+- `state/mocks/mock_state_store.go` — regenerate with Mockery for the new signatures.
+- `config.go:22,34` — `currentState` becomes the raw slice, or `State` moves behind `internal/`. Note `NewConfig` builds the state **before** the options loop runs, so whichever shape is chosen must be valid with no store configured.
+- `internal/parser/parser.go:231,303,306,383,387`, `internal/parser/progress.go:49` — every `state.NewState()` site follows whatever shape is chosen.
+- `docs/parser-lifecycle.md:9,127` show `Apply`/`Destroy` returning `*state.State`; those signatures change, and Phase 5.3 covers the prose.
+- **Breaking**: sanctioned by the spec's non-goal on compatibility shims for an unreleased version. No example implements `StateStore` (verified), and `NewFileStateStore` and `WithStateStore` both survive, so `README.md:287-297` barely moves.
+
+**Complexity**: Medium
+**Token estimate**: ~30k tokens
+**Agent strategy**: Single agent, sequential. One contract change rippling through a known set of call sites; splitting it risks two agents choosing different shapes for `currentState`.
+
+### Phase 5.3: Document the state contract the library now has
+
+**Repo:** xclconfig
+
+**File changes**
+- `docs/state.md:3-53` — `## State — the in-memory resource registry` presents the container as a public type with a query surface. Replace with the storage contract. `:114` (`## StateStore — the persistence contract`) and `:145` (`## FileStateStore`) are updated for the new signatures. The linear-scan passage at `:30-34` was already carried forward in Phase 4.1 — do not undo that.
+- `docs/parser-lifecycle.md:9,127,133,156` — signatures and prose naming `*state.State`.
+- `docs/overview.md:13,31,49,58,61-62,100` — `owns: … in-memory current State`, and the `Config{currentState: state.NewState()}` walkthrough.
+- `docs/README.md:26,43` — the component table row `state/ | State, StateStore interface, FileStateStore`.
+- `README.md:287-297` — check only; `NewFileStateStore` and `WithStateStore` survive, so this likely needs no change.
+- Add the statement that the configuration object is the only supported way to reach a declared item, so a reader does not go looking for a second one.
+
+**Complexity**: Low
+**Token estimate**: ~15k tokens
+**Agent strategy**: Single agent, sequential. Prose with a fixed inventory.
 
 
 ## Testing Strategy

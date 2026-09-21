@@ -37,7 +37,8 @@ func TestPluginRegistration(t *testing.T) {
 	meta, err := types.GetMeta(resource)
 	require.NoError(t, err)
 	require.Equal(t, "test_person", meta.Name)
-	require.Equal(t, "person", meta.Type)
+	require.Equal(t, types.TypeResource, meta.Type)
+	require.Equal(t, "person", meta.Subtype)
 }
 
 // TestPluginResourceCreationWithFallback tests plugin creation with fallback to registered types

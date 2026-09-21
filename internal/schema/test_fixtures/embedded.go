@@ -46,6 +46,11 @@ var EmbeddedJson = `{
         "tags": "xcl:\"type,optional\" json:\"type\""
        },
        {
+        "name": "Subtype",
+        "type": "string",
+        "tags": "xcl:\"subtype,optional\" json:\"subtype,omitempty\""
+       },
+       {
         "name": "Module",
         "type": "string",
         "tags": "xcl:\"module,optional\" json:\"module,omitempty\""
@@ -144,6 +149,11 @@ var EmbeddedInEmbeddedJson = `{
           "name": "Type",
           "type": "string",
           "tags": "xcl:\"type,optional\" json:\"type\""
+         },
+         {
+          "name": "Subtype",
+          "type": "string",
+          "tags": "xcl:\"subtype,optional\" json:\"subtype,omitempty\""
          },
          {
           "name": "Module",

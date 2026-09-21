@@ -21,6 +21,14 @@ func (p *ConfigError) AppendError(err error) {
 	p.Errors = append(p.Errors, err)
 }
 
+// Unwrap returns the errors this collected so that errors.Is and errors.As
+// find anything inside it. Without it a caller holding the result of Apply has
+// to walk Errors by hand to discover what went wrong, which is the opposite of
+// matching an error by identity.
+func (p *ConfigError) Unwrap() []error {
+	return p.Errors
+}
+
 // Error pretty prints the error message as a string
 func (p *ConfigError) Error() string {
 	err := strings.Builder{}

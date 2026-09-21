@@ -15,10 +15,19 @@ func NewMockProviderResolver(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockProviderResolver {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockProviderResolver{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -62,7 +71,7 @@ type MockProviderResolver_GetProviderForResource_Call struct {
 
 // GetProviderForResource is a helper method to define mock.On call
 //   - resource any
-func (_e *MockProviderResolver_Expecter) GetProviderForResource(resource interface{}) *MockProviderResolver_GetProviderForResource_Call {
+func (_e *MockProviderResolver_Expecter) GetProviderForResource(resource any) *MockProviderResolver_GetProviderForResource_Call {
 	return &MockProviderResolver_GetProviderForResource_Call{Call: _e.mock.On("GetProviderForResource", resource)}
 }
 

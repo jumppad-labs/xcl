@@ -12,9 +12,17 @@ type Meta struct {
 	// this is an internal property that is set from the stanza label
 	Name string `xcl:"name,optional" json:"name"`
 
-	// Type is the type of resource, this is the text representation of the golang type
+	// Type is the kind of stanza that declared this entity: "resource",
+	// "variable", "output", "module" or "root". It is the same for every
+	// entity declared by the same kind of stanza, whatever its variety
 	// this is an internal property that can not be set with hcl
 	Type string `xcl:"type,optional" json:"type"`
+
+	// Subtype is the specific variety of a resource-kind entity, i.e. the
+	// "container" in resource "container" "mine". It is empty for entities
+	// declared by a stanza carrying a single label, which have no variety
+	// this is an internal property that can not be set with hcl
+	Subtype string `xcl:"subtype,optional" json:"subtype,omitempty"`
 
 	// Module is the name of the module if a resource has been loaded from a module
 	// this is an internal property that can not be set with hcl
@@ -51,6 +59,19 @@ type Meta struct {
 	// (see StatusCreated, StatusUpdated, StatusFailed, StatusDestroyed, StatusDestroyFailed)
 	// this is an internal property that can not be set with hcl
 	Status string `json:"status,omitempty"`
+}
+
+// AddressType returns the segment that identifies this entity in its address:
+// the variety for a resource-kind entity, and the stanza kind for an entity
+// declared with a single label, which has no variety of its own. It is what
+// the address resource.container.mine carries in its second segment, and what
+// a reader recognises an entity by.
+func (m *Meta) AddressType() string {
+	if m.Subtype != "" {
+		return m.Subtype
+	}
+
+	return m.Type
 }
 
 // ResourceBase is the embedded type for any config resources

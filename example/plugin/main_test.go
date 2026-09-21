@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"sync"
 	"testing"
@@ -528,4 +529,87 @@ func TestPluginExampleLogsDestroyEventPhases(t *testing.T) {
 		"variable.db_password":                         {"success"},
 		"variable.db_username":                         {"success"},
 	}, eventPhases(t, log, "debug", "destroy"))
+}
+
+// TestPluginExampleRetrievesPublishedValues asserts a value the configuration
+// publishes is read back by its address, and comes back as the value itself
+// rather than the declaration that produced it. Both the root configuration
+// and the module publish one
+func TestPluginExampleRetrievesPublishedValues(t *testing.T) {
+	out := &bytes.Buffer{}
+
+	_, err := run(out, logger.NewTestLogger(t), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	require.NoError(t, err)
+
+	require.Contains(t, out.String(), "## Published\n")
+	require.Contains(t, out.String(), "  output.web_database=\"localhost\"\n")
+	require.Contains(t, out.String(), "  module.analytics.output.location=\"analytics.localhost\"\n")
+}
+
+// TestPluginExamplePrintsPublishedTotal asserts every published value is
+// reachable at once, the total counting the module's output alongside the
+// root's
+func TestPluginExamplePrintsPublishedTotal(t *testing.T) {
+	out := &bytes.Buffer{}
+
+	_, err := run(out, logger.NewTestLogger(t), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	require.NoError(t, err)
+
+	require.Contains(t, out.String(), "  2 published in total\n")
+}
+
+// methodFormLookups are the lookups that the configuration also offers as
+// generic methods from Go 1.27, the form an example must not be written in
+var methodFormLookups = []string{"Find", "FindByType", "FindOne", "All"}
+
+// TestPluginExampleUsesPortableLookupForm asserts the example looks entities
+// up through the package level functions rather than the generic methods of
+// the same name. Generic methods arrived in Go 1.27, so the method form would
+// stop the code a reader copies from compiling on the project's minimum
+// supported version. Entities, EntityCount and Outputs are ordinary methods
+// and are not affected
+func TestPluginExampleUsesPortableLookupForm(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
+	require.NoError(t, err)
+
+	lookups := 0
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		// a lookup names its type at the call, xcl.Find[T](c, address), so the
+		// function called is the selector wrapped in an index expression
+		fun := call.Fun
+		switch indexed := fun.(type) {
+		case *ast.IndexExpr:
+			fun = indexed.X
+		case *ast.IndexListExpr:
+			fun = indexed.X
+		}
+
+		selector, ok := fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		if !slices.Contains(methodFormLookups, selector.Sel.Name) {
+			return true
+		}
+
+		qualifier, ok := selector.X.(*ast.Ident)
+		require.True(t, ok,
+			"main.go calls %s as a method, which needs Go 1.27, call xcl.%s instead", selector.Sel.Name, selector.Sel.Name)
+
+		require.Equal(t, "xcl", qualifier.Name,
+			"main.go calls the %s method form, which needs Go 1.27, call xcl.%s instead", selector.Sel.Name, selector.Sel.Name)
+
+		lookups++
+
+		return true
+	})
+
+	require.NotZero(t, lookups, "the guard found no lookups in main.go, so it proves nothing")
 }

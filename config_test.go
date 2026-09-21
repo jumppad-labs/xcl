@@ -3,7 +3,6 @@ package xcl
 import (
 	"testing"
 
-	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,8 +24,7 @@ func TestFindResourceReturnsNotFoundError(t *testing.T) {
 	c := NewConfig()
 
 	r, err := c.FindResource("resource.container.notexist")
-	require.Error(t, err)
-	require.IsType(t, state.ResourceNotFoundError{}, err)
+	require.ErrorIs(t, err, ErrNotFound)
 	require.Nil(t, r)
 }
 

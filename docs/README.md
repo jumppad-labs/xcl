@@ -40,9 +40,9 @@ not at end users writing `.xcl` config.
 | `internal/schema/` | Reflection-based JSON schema generation/instantiation (Go struct ⇄ schema ⇄ dynamic struct) |
 | `internal/modules/` | HTTP client for a Terraform-registry-style remote module API (not yet wired in) |
 | `internal/functions/` | Custom HCL functions available to config authors |
-| `state/` | `State`, `StateStore` interface, `FileStateStore` |
+| `state/` | `StateStore` interface (exchanges plain entities), `FileStateStore`, state error types |
 | `errors/` | Structured error types (`ParserError`, `ConfigError`) |
 | `logger/` | Pluggable `Logger` interface + implementations |
-| `example/` | Two runnable, tested examples, each with its own `config/` and `resources/`: `configonly` (a Kubernetes-like configuration parsed into registered types, no plugin) and `plugin` (an in-process and an external plugin, each providing two block types), sharing the `eventlog/` event handler |
+| `example/` | Three runnable, tested examples, each with its own `config/` and `resources/`: `appconfig` (a single application block decoded into a Go type), `configonly` (a Kubernetes-like configuration parsed into registered types, no plugin) and `plugin` (an in-process and an external plugin, each providing two block types), sharing the `eventlog/` event handler |
 
 See individual pages for details on how these pieces connect.

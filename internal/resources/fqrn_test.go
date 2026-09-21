@@ -19,7 +19,8 @@ func TestParseFQRNParsesComponents(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "module1.module2", fqrn.Module)
-	require.Equal(t, typeTestContainer, fqrn.Type)
+	require.Equal(t, types.TypeResource, fqrn.Type)
+	require.Equal(t, typeTestContainer, fqrn.Subtype)
 	require.Equal(t, "mine", fqrn.Resource)
 	require.Equal(t, "attr.other", fqrn.Attribute)
 
@@ -32,7 +33,8 @@ func TestParseFQRNParsesComponents2(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "consul_1", fqrn.Module)
-	require.Equal(t, "network", fqrn.Type)
+	require.Equal(t, types.TypeResource, fqrn.Type)
+	require.Equal(t, "network", fqrn.Subtype)
 	require.Equal(t, "onprem", fqrn.Resource)
 	require.Equal(t, "name", fqrn.Attribute)
 
@@ -45,7 +47,8 @@ func TestParseFQRNParsesSplat(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "", fqrn.Module)
-	require.Equal(t, "chapter", fqrn.Type)
+	require.Equal(t, types.TypeResource, fqrn.Type)
+	require.Equal(t, "chapter", fqrn.Subtype)
 	require.Equal(t, "installation", fqrn.Resource)
 	require.Equal(t, "tasks.*.id", fqrn.Attribute)
 
@@ -119,7 +122,8 @@ func TestParseFQRNReturnsResource(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "", fqrn.Module)
-	require.Equal(t, "container", fqrn.Type)
+	require.Equal(t, types.TypeResource, fqrn.Type)
+	require.Equal(t, "container", fqrn.Subtype)
 	require.Equal(t, "mine", fqrn.Resource)
 	require.Equal(t, "", fqrn.Attribute)
 
@@ -133,7 +137,8 @@ func TestParseFQRNReturnsResourceWithAttr(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "", fqrn.Module)
-	require.Equal(t, "container", fqrn.Type)
+	require.Equal(t, types.TypeResource, fqrn.Type)
+	require.Equal(t, "container", fqrn.Subtype)
 	require.Equal(t, "mine", fqrn.Resource)
 	require.Equal(t, "my.stuff", fqrn.Attribute)
 
@@ -172,7 +177,8 @@ func TestParseResourceFQRNWithIndexReturnsCorrectData(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "", fqrn.Module)
-	require.Equal(t, typeTestContainer, fqrn.Type)
+	require.Equal(t, types.TypeResource, fqrn.Type)
+	require.Equal(t, typeTestContainer, fqrn.Subtype)
 	require.Equal(t, "mine", fqrn.Resource)
 	require.Equal(t, "property.0", fqrn.Attribute)
 
@@ -239,13 +245,19 @@ func TestFQRNFromResourceReturnsCorrectData(t *testing.T) {
 	r, err := dt.CreateResource(typeTestContainer, "mytest")
 	require.NoError(t, err)
 
+	// CreateResource sets the axes from the name alone, which is only right
+	// for a single label builtin. A variety bearing type is corrected by
+	// PluginRegistry.CreateResource, so set the axes here the same way
 	meta, _ := types.GetMeta(r)
 	meta.Module = "mymodule"
+	meta.Type = types.TypeResource
+	meta.Subtype = typeTestContainer
 
 	fqrn := FQRNFromResource(r)
 
 	require.Equal(t, "mymodule", fqrn.Module)
-	require.Equal(t, typeTestContainer, fqrn.Type)
+	require.Equal(t, types.TypeResource, fqrn.Type)
+	require.Equal(t, typeTestContainer, fqrn.Subtype)
 	require.Equal(t, "mytest", fqrn.Resource)
 
 	sfrqn := fqrn.String()
@@ -311,4 +323,158 @@ func TestFQRNAppedDoesNothingWhenNoParent(t *testing.T) {
 
 	new := fqrn.AppendParentModule("")
 	require.Equal(t, "module.module1.output.mine", new.String())
+}
+
+func TestFQRNAppendsParentKeepsSubtype(t *testing.T) {
+	fqrn, err := ParseFQRN("resource.container.mine")
+	require.NoError(t, err)
+
+	new := fqrn.AppendParentModule("parent")
+
+	require.Equal(t, types.TypeResource, new.Type)
+	require.Equal(t, "container", new.Subtype)
+	require.Equal(t, "module.parent.resource.container.mine", new.String())
+}
+
+func TestFQRNAppendsParentKeepsSubtypeWhenExistingModule(t *testing.T) {
+	fqrn, err := ParseFQRN("module.module1.resource.container.mine")
+	require.NoError(t, err)
+
+	new := fqrn.AppendParentModule("parent")
+
+	require.Equal(t, types.TypeResource, new.Type)
+	require.Equal(t, "container", new.Subtype)
+	require.Equal(t, "module.parent.module1.resource.container.mine", new.String())
+}
+
+func TestParseFQRNRoundTripsResourceAddress(t *testing.T) {
+	address := "resource.container.mine"
+
+	fqrn, err := ParseFQRN(address)
+	require.NoError(t, err)
+
+	require.Equal(t, address, fqrn.String())
+}
+
+func TestParseFQRNRoundTripsResourceAddressWithAttribute(t *testing.T) {
+	address := "resource.container.mine.attr.other"
+
+	fqrn, err := ParseFQRN(address)
+	require.NoError(t, err)
+
+	require.Equal(t, address, fqrn.String())
+}
+
+func TestParseFQRNRoundTripsModuleRelativeResourceAddress(t *testing.T) {
+	address := "module.module1.module2.resource.container.mine"
+
+	fqrn, err := ParseFQRN(address)
+	require.NoError(t, err)
+
+	require.Equal(t, address, fqrn.String())
+}
+
+func TestFQRNFromResourceFormatsAnAddressThatParsesBackToTheSameParts(t *testing.T) {
+	r := &testContainer{}
+
+	meta, err := types.GetMeta(r)
+	require.NoError(t, err)
+
+	meta.Type = types.TypeResource
+	meta.Subtype = typeTestContainer
+	meta.Name = "mytest"
+	meta.Module = "module1.module2"
+
+	fqrn := FQRNFromResource(r)
+	require.NotNil(t, fqrn)
+
+	address := fqrn.String()
+	require.Equal(t, "module.module1.module2.resource.container.mytest", address)
+
+	parsed, err := ParseFQRN(address)
+	require.NoError(t, err)
+
+	require.Equal(t, fqrn.Module, parsed.Module)
+	require.Equal(t, fqrn.Type, parsed.Type)
+	require.Equal(t, fqrn.Subtype, parsed.Subtype)
+	require.Equal(t, fqrn.Resource, parsed.Resource)
+	require.Equal(t, fqrn.Attribute, parsed.Attribute)
+}
+
+func TestParseFQRNKeepsVariableAddressForm(t *testing.T) {
+	fqrn, err := ParseFQRN("variable.mytest")
+	require.NoError(t, err)
+
+	require.Equal(t, TypeVariable, fqrn.Type)
+	require.Equal(t, "", fqrn.Subtype)
+	require.Equal(t, "variable.mytest", fqrn.String())
+}
+
+func TestParseFQRNKeepsOutputAddressForm(t *testing.T) {
+	fqrn, err := ParseFQRN("output.mine")
+	require.NoError(t, err)
+
+	require.Equal(t, TypeOutput, fqrn.Type)
+	require.Equal(t, "", fqrn.Subtype)
+	require.Equal(t, "output.mine", fqrn.String())
+}
+
+func TestParseFQRNKeepsModuleAddressForm(t *testing.T) {
+	fqrn, err := ParseFQRN("module.module1")
+	require.NoError(t, err)
+
+	require.Equal(t, TypeModule, fqrn.Type)
+	require.Equal(t, "", fqrn.Subtype)
+	require.Equal(t, "module.module1", fqrn.String())
+}
+
+func TestParseFQRNKeepsOutputInModuleAddressForm(t *testing.T) {
+	fqrn, err := ParseFQRN("module.module1.output.mine")
+	require.NoError(t, err)
+
+	require.Equal(t, TypeOutput, fqrn.Type)
+	require.Equal(t, "", fqrn.Subtype)
+	require.Equal(t, "module.module1.output.mine", fqrn.String())
+}
+
+func TestParseFQRNKeepsLocalAddressForm(t *testing.T) {
+	fqrn, err := ParseFQRN("local.x")
+	require.NoError(t, err)
+
+	require.Equal(t, "local", fqrn.Type)
+	require.Equal(t, "", fqrn.Subtype)
+
+	// the formatter emits the resource. prefix only for the resource kind, so a
+	// local renders through its own kind and round-trips as local.x. This falls
+	// out of opening the address grammar to every single label kind, it was not
+	// a fix that went looking for this address
+	require.Equal(t, "local.x", fqrn.String())
+}
+
+// A module relative address cannot be split by position alone: in
+// module.m1.container.nics, "container" begins the body only when something is
+// registered under that name. AddressParser exists to settle that, and is the
+// only reason it exists, because a body is otherwise read positionally.
+
+func TestAddressParserSplitsTheModulePrefixOfAKnownType(t *testing.T) {
+	parser := NewAddressParser([]types.TypeInfo{{Name: typeTestContainer, Bare: true}})
+
+	fqrn, err := parser.Parse("module.m1.container.nics")
+	require.NoError(t, err)
+
+	require.Equal(t, "m1", fqrn.Module)
+	require.Equal(t, typeTestContainer, fqrn.Type)
+	require.Equal(t, "", fqrn.Subtype)
+	require.Equal(t, "nics", fqrn.Resource)
+}
+
+func TestParseFQRNReadsAnUnknownTypeSegmentAsPartOfTheModulePath(t *testing.T) {
+	// ParseFQRN resolves the structural keywords only, so nothing in
+	// module.m1.container.nics names a type and the whole prefix is a module
+	fqrn, err := ParseFQRN("module.m1.container.nics")
+	require.NoError(t, err)
+
+	require.Equal(t, "m1.container", fqrn.Module)
+	require.Equal(t, TypeModule, fqrn.Type)
+	require.Equal(t, "nics", fqrn.Resource)
 }

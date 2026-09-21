@@ -201,7 +201,7 @@ func TestConfigDestroyDestroysEverythingAndEmptiesState(t *testing.T) {
 
 	saved, err := f.store.Load()
 	require.NoError(t, err)
-	require.Equal(t, 0, saved.ResourceCount())
+	require.Empty(t, saved)
 
 	require.Equal(t, 0, f.config.ResourceCount())
 }
@@ -229,7 +229,7 @@ func TestConfigDestroyNeedsNoConfiguration(t *testing.T) {
 
 	saved, err := f.store.Load()
 	require.NoError(t, err)
-	require.Equal(t, 0, saved.ResourceCount())
+	require.Empty(t, saved)
 }
 
 // TestConfigDestroyOrdersFromSavedStateWithoutConfiguration asserts that with
@@ -383,20 +383,20 @@ func TestConfigDestroyReturnsErrorNamingFailedResource(t *testing.T) {
 	saved, err := f.store.Load()
 	require.NoError(t, err)
 
-	second, err := saved.FindResource("resource.container.second")
+	second, err := entityByID(saved, "resource.container.second")
 	require.NoError(t, err)
 
 	secondMeta, err := types.GetMeta(second)
 	require.NoError(t, err)
 	require.Equal(t, types.StatusDestroyFailed, secondMeta.Status)
 
-	_, err = saved.FindResource("resource.network.first")
+	_, err = entityByID(saved, "resource.network.first")
 	require.NoError(t, err)
 
-	_, err = saved.FindResource("resource.container.third")
+	_, err = entityByID(saved, "resource.container.third")
 	require.Error(t, err)
 
-	_, err = saved.FindResource("resource.network.independent")
+	_, err = entityByID(saved, "resource.network.independent")
 	require.Error(t, err)
 
 	require.Equal(t, 2, f.config.ResourceCount())
@@ -429,7 +429,7 @@ func TestConfigDestroyRetriesFailedResources(t *testing.T) {
 
 	saved, err := f.store.Load()
 	require.NoError(t, err)
-	require.Equal(t, 0, saved.ResourceCount())
+	require.Empty(t, saved)
 	require.Equal(t, 0, f.config.ResourceCount())
 }
 

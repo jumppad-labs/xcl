@@ -7,7 +7,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -28,12 +27,12 @@ const (
 )
 
 // savedResourceWithoutLocation returns the resource with the given ID as it is
-// held in st, decoded from its JSON, without the file, line and column its
-// block was read from, those follow the configuration file being applied.
-func savedResourceWithoutLocation(t *testing.T, st *state.State, resourceID string) map[string]any {
+// held in entities, decoded from its JSON, without the file, line and column
+// its block was read from, those follow the configuration file being applied.
+func savedResourceWithoutLocation(t *testing.T, entities []any, resourceID string) map[string]any {
 	t.Helper()
 
-	resource, err := st.FindResource(resourceID)
+	resource, err := findByID(entities, resourceID)
 	require.NoError(t, err)
 
 	data, err := json.Marshal(resource)
@@ -212,7 +211,7 @@ func TestRemovalNeverDestroysParentOfFailedChild(t *testing.T) {
 	saved := h.loadSaved(t)
 
 	failed := 0
-	for _, r := range saved.GetResources() {
+	for _, r := range saved {
 		meta, err := types.GetMeta(r)
 		require.NoError(t, err)
 

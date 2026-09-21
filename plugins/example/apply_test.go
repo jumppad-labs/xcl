@@ -13,6 +13,7 @@ import (
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
+	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,7 +54,7 @@ func (c *applyEventCollector) successfulResources(operation string) []string {
 // applyPeople applies the people config with a fresh parser that shares the
 // registry and state store, saves the returned state and returns the events
 // the apply fired
-func applyPeople(t *testing.T, reg *registry.PluginRegistry, store *state.FileStateStore) (*state.State, *applyEventCollector) {
+func applyPeople(t *testing.T, reg *registry.PluginRegistry, store *state.FileStateStore) ([]any, *applyEventCollector) {
 	t.Helper()
 
 	collector := &applyEventCollector{}
@@ -71,21 +72,33 @@ func applyPeople(t *testing.T, reg *registry.PluginRegistry, store *state.FileSt
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	err = store.Save(st)
+	err = store.Save(st.GetResources())
 	require.NoError(t, err)
 
-	return st, collector
+	return st.GetResources(), collector
 }
 
-// findPerson returns the person with the given ID from the state
-func findPerson(t *testing.T, st *state.State, id string) *person.Person {
+// findPerson returns the person with the given ID from the given entities.
+//
+// Storage answers no questions about addresses, so the entities are scanned
+// for the one recording the id, which an entity carries as its rendered address
+func findPerson(t *testing.T, entities []any, id string) *person.Person {
 	t.Helper()
 
-	resource, err := st.FindResource(id)
-	require.NoError(t, err)
+	var resource any
+	for _, e := range entities {
+		meta, err := types.GetMeta(e)
+		require.NoError(t, err)
+
+		if meta.ID == id {
+			resource = e
+			break
+		}
+	}
+	require.NotNil(t, resource, "state holds no entity with the id %s", id)
 
 	found := &person.Person{}
-	err = schema.UnmarshalUntyped(resource, found)
+	err := schema.UnmarshalUntyped(resource, found)
 	require.NoError(t, err)
 
 	return found

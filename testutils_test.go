@@ -4,10 +4,32 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jumppad-labs/xcl/internal/utils"
-	"github.com/stretchr/testify/require"
 	"github.com/jumppad-labs/xcl/internal/cty"
+	"github.com/jumppad-labs/xcl/internal/utils"
+	"github.com/jumppad-labs/xcl/state"
+	"github.com/jumppad-labs/xcl/types"
+	"github.com/stretchr/testify/require"
 )
+
+// entityByID returns the entity a saved state holds under the given id.
+// Storage answers no questions about addresses, so a test holding saved
+// entities rather than a configuration scans them and compares the id each
+// entity already records. Where a configuration is at hand, its own
+// FindResource resolves the address instead
+func entityByID(entities []any, id string) (any, error) {
+	for _, e := range entities {
+		meta, err := types.GetMeta(e)
+		if err != nil {
+			continue
+		}
+
+		if meta.ID == id {
+			return e, nil
+		}
+	}
+
+	return nil, state.ResourceNotFoundError{Resource: id}
+}
 
 func TestProcessesTypes(t *testing.T) {
 	vars := map[string]cty.Value{}

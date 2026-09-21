@@ -10,7 +10,7 @@ persisted in between runs.
 
 ```
 Config            (repo root, package xcl)
-  owns: PluginRegistry, StateStore, in-memory current State
+  owns: PluginRegistry, StateStore, the entities currently declared
   entry point: NewConfig(opts...), then Apply()/Validate()/Destroy()
 
 Parser            (internal/parser)
@@ -46,7 +46,7 @@ err := cfg.Destroy()                   // destroys everything in the saved state
 ```
 
 [`config.go:27`](../config.go#L27) `NewConfig` applies functional options
-([`options.go`](../options.go)) onto a `Config{currentState: state.NewState()}`.
+([`options.go`](../options.go)) onto a `Config` holding no entities yet.
 With no options, you get a config that parses and validates HCL but never
 touches a real provider or disk — useful for testing.
 
@@ -58,7 +58,7 @@ touches a real provider or disk — useful for testing.
    `StateStore`, `PluginRegistry`, and variables via `ParserOptions`.
 2. Call `p.Apply(paths...)`, see
    [Parser & Resource Lifecycle](parser-lifecycle.md).
-3. Adopt the returned `*state.State` as `c.currentState`.
+3. Adopt the entities the parse produced as the configuration's own.
 4. If a `StateStore` is configured, `Save` the new state.
 5. Return the error from `p.Apply`, if any.
 

@@ -121,7 +121,8 @@ func TestCreateResourceReturnsRegisteredGoType(t *testing.T) {
 	thing, ok := resource.(*Thing)
 	require.True(t, ok, "expected *Thing, got %T", resource)
 	require.Equal(t, "my_thing", thing.Meta.Name)
-	require.Equal(t, "thing", thing.Meta.Type)
+	require.Equal(t, types.TypeResource, thing.Meta.Type)
+	require.Equal(t, "thing", thing.Meta.Subtype)
 }
 
 func TestRegisterTypeRejectsDuplicateName(t *testing.T) {
@@ -145,7 +146,8 @@ func TestRegisterTypeRejectsDuplicateName(t *testing.T) {
 	thing, ok := resource.(*Thing)
 	require.True(t, ok, "expected *Thing, got %T", resource)
 	require.Equal(t, "my_thing", thing.Meta.Name)
-	require.Equal(t, "thing", thing.Meta.Type)
+	require.Equal(t, types.TypeResource, thing.Meta.Type)
+	require.Equal(t, "thing", thing.Meta.Subtype)
 }
 
 func TestRegisterTypeRejectsBuiltinNameVariable(t *testing.T) {
@@ -296,7 +298,8 @@ func TestRegisterTypeAcceptsComputedField(t *testing.T) {
 	thing, ok := resource.(*ComputedThing)
 	require.True(t, ok, "expected *ComputedThing, got %T", resource)
 	require.Equal(t, "my_thing", thing.Meta.Name)
-	require.Equal(t, "computed_thing", thing.Meta.Type)
+	require.Equal(t, types.TypeResource, thing.Meta.Type)
+	require.Equal(t, "computed_thing", thing.Meta.Subtype)
 }
 
 func TestRegisterTypeRejectsNonPointer(t *testing.T) {
@@ -379,6 +382,109 @@ func TestIsRegisteredTypeIgnoresPluginTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	require.False(t, r.IsRegisteredType("thing"))
+}
+
+// A type is registered under one declaration form or the other, never both.
+// RegisterBareType records the bare form, so the type leads its own
+// declaration and is addressed <name>.<resource>, while RegisterType leaves it
+// kind led and addressed resource.<name>.<resource>.
+
+func TestRegisterBareTypeRecordsTheBareForm(t *testing.T) {
+	r := NewPluginRegistry(logger.NewTestLogger(t))
+
+	err := r.RegisterBareType("thing", &Thing{})
+	require.NoError(t, err)
+
+	info, ok := r.Type("thing")
+	require.True(t, ok)
+	require.True(t, info.Bare)
+	require.Equal(t, "thing", info.Name)
+}
+
+func TestRegisterTypeDoesNotRecordTheBareForm(t *testing.T) {
+	r := NewPluginRegistry(logger.NewTestLogger(t))
+
+	err := r.RegisterType("thing", &Thing{})
+	require.NoError(t, err)
+
+	info, ok := r.Type("thing")
+	require.True(t, ok)
+	require.False(t, info.Bare)
+}
+
+func TestCreateResourceMakesABareTypeItsOwnKind(t *testing.T) {
+	r := NewPluginRegistry(logger.NewTestLogger(t))
+
+	err := r.RegisterBareType("thing", &Thing{})
+	require.NoError(t, err)
+
+	resource, err := r.CreateResource("thing", "my_thing")
+	require.NoError(t, err)
+
+	thing, ok := resource.(*Thing)
+	require.True(t, ok, "expected *Thing, got %T", resource)
+	require.Equal(t, "my_thing", thing.Meta.Name)
+	require.Equal(t, "thing", thing.Meta.Type)
+	require.Equal(t, "", thing.Meta.Subtype)
+}
+
+func TestCreateResourceMakesAKindLedTypeAResourceOfThatVariety(t *testing.T) {
+	r := NewPluginRegistry(logger.NewTestLogger(t))
+
+	err := r.RegisterType("thing", &Thing{})
+	require.NoError(t, err)
+
+	resource, err := r.CreateResource("thing", "my_thing")
+	require.NoError(t, err)
+
+	thing, ok := resource.(*Thing)
+	require.True(t, ok, "expected *Thing, got %T", resource)
+	require.Equal(t, types.TypeResource, thing.Meta.Type)
+	require.Equal(t, "thing", thing.Meta.Subtype)
+}
+
+// KnownType answers for every source the registry draws on, which is what the
+// parser asks before accepting a leading keyword. IsRegisteredType stays the
+// narrow question of whether RegisterType alone provided a name, because the
+// lifecycle reads it to decide what never reaches a provider.
+
+func TestKnownTypeReportsABuiltin(t *testing.T) {
+	r := NewPluginRegistry(logger.NewTestLogger(t))
+
+	require.True(t, r.KnownType("variable"))
+}
+
+func TestKnownTypeReportsARegisteredType(t *testing.T) {
+	r := NewPluginRegistry(logger.NewTestLogger(t))
+
+	err := r.RegisterType("thing", &Thing{})
+	require.NoError(t, err)
+
+	require.True(t, r.KnownType("thing"))
+}
+
+func TestKnownTypeReportsABareRegisteredType(t *testing.T) {
+	r := NewPluginRegistry(logger.NewTestLogger(t))
+
+	err := r.RegisterBareType("thing", &Thing{})
+	require.NoError(t, err)
+
+	require.True(t, r.KnownType("thing"))
+}
+
+func TestKnownTypeReportsAPluginProvidedType(t *testing.T) {
+	r := NewPluginRegistry(logger.NewTestLogger(t))
+
+	err := r.RegisterPlugin(&thingPlugin{})
+	require.NoError(t, err)
+
+	require.True(t, r.KnownType("thing"))
+}
+
+func TestKnownTypeIgnoresAnUnknownName(t *testing.T) {
+	r := NewPluginRegistry(logger.NewTestLogger(t))
+
+	require.False(t, r.KnownType("nosuchtype"))
 }
 
 func TestTypeNameClashErrorMessage(t *testing.T) {

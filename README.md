@@ -264,23 +264,112 @@ Every type name must be unique across builtin blocks (`variable`, `output`,
 plugin whose type name is already taken fails with a
 `*registry.TypeNameClashError` that names the type.
 
-### Querying resources
+### Querying a configuration
 
-`NewQuerier` returns resources as your Go type, found by path or listed by
-block type.
+Ask the configuration for what you want, as your own Go type, in a single call.
 
 ```go
-q := xcl.NewQuerier[PostgreSQL](c)
+// one entity, by its address
+db, err := xcl.Find[PostgreSQL](c, "resource.postgres.main")
 
 // every resource "postgres" block
-databases, err := q.FindResourcesByType("postgres")
+databases, err := xcl.FindByType[PostgreSQL](c, "resource", "postgres")
 
-// one block, by its path
-db, err := q.FindResource("resource.postgres.main")
+// the one you expect there to be exactly one of
+ingress, err := xcl.FindOne[Ingress](c, "resource", "ingress")
+
+// every entity of a Go type, without naming it as a string
+all, err := xcl.All[PostgreSQL](c)
+```
+
+The segments given to `FindByType` and `FindOne` are the leading segments of an
+address, matched in order from the left: segment one is the kind, segment two
+the variety. A block declared by its own keyword, `container "nics"`, is a
+different type from `resource "container" "nics"` and is reached as
+`xcl.FindByType[Container](c, "container")`.
+
+Everything a configuration declares can be enumerated without naming a type,
+and an entity from that enumeration converts in one call:
+
+```go
+for _, entity := range c.Entities() {
+    // ...
+}
+
+container, err := xcl.As[Container](entity)
 ```
 
 A registered type is returned as the value held in state, so changing it
 changes state. A plugin type is returned as a copy.
+
+#### Reading values a configuration publishes
+
+An `output` is read by its address like anything else, and comes back as the
+value itself rather than the declaration that produced it. Nothing needs to
+know how outputs are stored.
+
+```go
+// output "web_database" { ... } at the root
+url, err := xcl.Find[string](c, "output.web_database")
+
+// an output published by a module
+location, err := xcl.Find[string](c, "module.analytics.output.location")
+
+// or all of them at once, keyed by address
+published := c.Outputs()
+```
+
+An output needs its complete address, including the module it belongs to. A
+bare name is not an address and is not inferred.
+
+#### When a lookup cannot be answered
+
+An empty result and an unanswerable question are never the same thing. A
+well-formed query that matches nothing returns an empty result and a nil error;
+a query that cannot be answered returns an error you can match by identity.
+
+```go
+db, err := xcl.Find[PostgreSQL](c, "resource.postgres.main")
+switch {
+case errors.Is(err, xcl.ErrNotFound):
+    // nothing is declared at that address
+case errors.Is(err, xcl.ErrTypeMismatch):
+    // something is, but it is not a PostgreSQL
+}
+
+// the detail behind a failure is recoverable
+_, err = xcl.FindOne[PostgreSQL](c, "resource", "postgres")
+var many *xcl.NotUniqueError
+if errors.As(err, &many) {
+    fmt.Printf("expected one, found %d\n", many.Count)
+}
+```
+
+The full vocabulary is `ErrNotFound`, `ErrUnknownType`, `ErrNotTypeable`,
+`ErrNotRegistered`, `ErrTypeMismatch`, `ErrNotAnEntity` and `ErrNotUnique`.
+`ErrNotFound` and `ErrNotUnique` are ordinary outcomes to handle; the other
+five mean the question itself had no answer. Errors returned from `Apply` and
+`Destroy` are matchable the same way, so `errors.Is` reaches a failure nested
+inside them without unwrapping anything by hand.
+
+#### Two spellings, one implementation
+
+Every lookup above is also a method on the configuration — `c.Find[T](addr)`,
+`c.FindByType[T](...)`, `c.FindOne[T](...)`, `c.All[T]()`. The method form is
+the idiomatic one and is what this documentation presents as the destination.
+
+Generic methods arrived in Go 1.27, and this project supports Go 1.25.0, so the
+method form is excluded below 1.27 by a build constraint while the package
+level functions compile everywhere. **That is why every runnable example in
+this repository uses the function form**: what a reader copies works on the
+oldest supported toolchain. The two spellings delegate to one implementation
+and cannot differ; tests assert they return equal values and equal errors.
+
+`As` is a function in both worlds, because it takes no configuration for a
+method to hang off.
+
+Lookups are linear scans over the configuration's entities. There is no index,
+which is adequate at one configuration's scale; see `docs/state.md`.
 
 ### State and Destroy
 
@@ -553,12 +642,10 @@ You could then access the properties of the referenced `PostgreSQL` structs
 in the normal go way.
 
 ```go
-  r,err := c.FindResource("resource.config.default") 
+  conf, err := xcl.Find[Config](c, "resource.config.default")
   if err != nil {
     return err
   }
-
-  conf := r.(*Config)
 
   fmt.Println("loc main", conf.MainDBConnection.Location)
   fmt.Println("loc other 1", conf.OtherDBConnections[0].Location)

@@ -1,29 +1,46 @@
 ---
-tags: [meta, parsing, types, subtype]
+tags: [meta, parsing, types, subtype, fqrn, addressing]
 ---
 
-# `Meta.Type` holds a different axis depending on the stanza
+# `Meta.Type` and `FQRN.Type` each held two axes
 
-`Meta.Type` does not mean one thing. `blockResource`
-(`internal/parser/parser.go:565-575`) sets it from the stanza keyword, then
-**overwrites it with the first label** when the stanza is `resource`:
+**Status: split landed 2026-09-21** (query-api-v2 plan, Phases 1.1–1.3).
+`types.Meta` now carries `Type` (the stanza kind) and `Subtype` (the variety,
+empty for single-label stanzas), and `internal/resources.FQRN` carries the same
+pair. This entry stays because the *shape* of the trap recurs.
 
-- `resource "postgres" "main"` → `Meta.Type == "postgres"`, the subtype
-- `output "api_url"` → `Meta.Type == "output"`, the stanza keyword
+Both structs held one `Type` field meaning the variety for a `resource` stanza
+and the stanza keyword for everything else:
 
-So the word `resource` never appears in `Meta.Type`, and matching
-`meta.Type == "resource"` finds **nothing, silently**. It reads back as "you
-have none of those" rather than "that is not what this field holds".
+- `resource "postgres" "main"` → the variety, `"postgres"`
+- `output "api_url"` → the stanza keyword, `"output"`
 
-The second half of the trap is the conversion. `schema.UnmarshalUntyped`
-(`internal/schema/unmarshal.go:7`) round-trips through JSON and does **not**
-fail on mismatched structs: unknown fields are dropped, absent fields zeroed,
-and `ResourceBase` populates from the shared embed. Converting an ingress into
-a `Container` therefore yields a half-empty value and a nil error.
+So the word `resource` never appeared in either field, and matching
+`Type == "resource"` found **nothing, silently** — it read back as "you have
+none of those" rather than "that is not what this field holds".
 
-Match on the subtype you actually mean, and verify the type before converting
-rather than trusting the round-trip to fail.
+The part that makes this expensive: `Meta` and `FQRN` are separate structs in
+separate packages with **no compile-time link**, and both fields are plain
+`string`. A reader left on the wrong axis keeps building while behaviour
+changes underneath.
 
-Splitting these into separate `Type` and `Subtype` fields is the fix, and it
-is designed in `design/querier-api-v2.md`. Adding the field will also trip
-`gotchas/meta-field-golden-schema.md`.
+This is not hypothetical. The query-api-v2 plan was written accounting for
+`Meta` but not `FQRN`, and got three instructions wrong as a result: it stated
+that four `state` sites "each need the variety added to the comparison, not
+substituted for the kind", which held for only one of them. Left as written,
+`state.findResource` would have compared `"resource"` against `"postgres"` and
+made **every** resource lookup return not-found, silently.
+
+When changing either struct's type axes, walk the other's boundaries
+deliberately rather than relying on the build. The boundaries are wherever a
+`Meta` is turned into an `FQRN` or compared against one: `FQRNFromResource`,
+`state` `addResource`/`findResource`, and the parser's cycle detection.
+
+The conversion half of the original trap is unchanged. `schema.UnmarshalUntyped`
+(`internal/schema/unmarshal.go`) round-trips through JSON and does **not** fail
+on mismatched structs: unknown fields are dropped, absent fields zeroed, and
+`ResourceBase` populates from the shared embed. Converting an ingress into a
+`Container` therefore yields a half-empty value and a nil error. Verify the type
+before converting rather than trusting the round-trip to fail.
+
+Adding a field to `Meta` also trips `gotchas/meta-field-golden-schema.md`.

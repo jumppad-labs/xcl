@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/xcl/tags"
 	"github.com/jumppad-labs/xcl/types"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 // Resource types mark fields with options in their `xcl` struct tag, after the

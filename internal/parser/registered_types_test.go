@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
+	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
@@ -21,6 +22,7 @@ const (
 	registeredDisabledConfig      = "../test_fixtures/config/registered/disabled/main.xcl"
 	registeredRemovedBeforeConfig = "../test_fixtures/config/registered/removed/before/main.xcl"
 	registeredRemovedAfterConfig  = "../test_fixtures/config/registered/removed/after/main.xcl"
+	registeredBareConfig          = "../test_fixtures/config/registered/bare/main.xcl"
 
 	registeredVariableID       = "variable.environment"
 	registeredDatabaseID       = "resource.database.main"
@@ -30,6 +32,7 @@ const (
 	registeredDisabledID       = "resource.database.off"
 	registeredKeptID           = "resource.database.kept"
 	registeredRemovedID        = "resource.database.removed"
+	registeredCacheID          = "cache.main"
 )
 
 // registeredHarness holds what every apply in a registered type scenario
@@ -64,6 +67,11 @@ func setupRegisteredTypes(t *testing.T) *registeredHarness {
 	err = reg.RegisterType(registered.TypeConsumer, &registered.Consumer{})
 	require.NoError(t, err)
 
+	// cache is the one type registered in the bare form, it is declared by its
+	// own keyword with a single label rather than under the resource kind
+	err = reg.RegisterBareType(registered.TypeCache, &registered.Cache{})
+	require.NoError(t, err)
+
 	store, err := state.NewFileStateStore(filepath.Join(t.TempDir(), "state.json"), reg)
 	require.NoError(t, err)
 
@@ -92,7 +100,7 @@ func (h *registeredHarness) newParser(t *testing.T, log logger.Logger, onEvent f
 
 // applyAndSave applies the config at path with a fresh Parser, requires it to
 // succeed, saves the returned state as Config.Apply does and returns it.
-func (h *registeredHarness) applyAndSave(t *testing.T, path string) *state.State {
+func (h *registeredHarness) applyAndSave(t *testing.T, path string) *State {
 	t.Helper()
 
 	p := h.newParser(t, nil, nil)
@@ -101,17 +109,17 @@ func (h *registeredHarness) applyAndSave(t *testing.T, path string) *state.State
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	err = h.store.Save(st)
+	err = h.store.Save(st.GetResources())
 	require.NoError(t, err)
 
 	return st
 }
 
-// requireMeta returns the Meta of the resource with the given ID in st
-func requireMeta(t *testing.T, st *state.State, id string) *types.Meta {
+// requireMeta returns the Meta of the entity with the given ID in entities
+func requireMeta(t *testing.T, entities []any, id string) *types.Meta {
 	t.Helper()
 
-	r, err := st.FindResource(id)
+	r, err := findByID(entities, id)
 	require.NoError(t, err)
 
 	meta, err := types.GetMeta(r)
@@ -120,12 +128,12 @@ func requireMeta(t *testing.T, st *state.State, id string) *types.Meta {
 	return meta
 }
 
-// requireDatabase returns the resource with the given ID in st, requiring it
-// to be exactly a *registered.Database
-func requireDatabase(t *testing.T, st *state.State, id string) *registered.Database {
+// requireDatabase returns the entity with the given ID in entities, requiring
+// it to be exactly a *registered.Database
+func requireDatabase(t *testing.T, entities []any, id string) *registered.Database {
 	t.Helper()
 
-	r, err := st.FindResource(id)
+	r, err := findByID(entities, id)
 	require.NoError(t, err)
 
 	db, ok := r.(*registered.Database)
@@ -142,12 +150,12 @@ func TestApplyRegisteredTypesSucceedsWithoutProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	variableStatus := requireMeta(t, st, registeredVariableID).Status
+	variableStatus := requireMeta(t, st.GetResources(), registeredVariableID).Status
 
-	require.Equal(t, variableStatus, requireMeta(t, st, registeredDatabaseID).Status)
-	require.Equal(t, variableStatus, requireMeta(t, st, registeredAppID).Status)
-	require.Equal(t, variableStatus, requireMeta(t, st, registeredConsumerID).Status)
-	require.Equal(t, variableStatus, requireMeta(t, st, registeredModuleDatabaseID).Status)
+	require.Equal(t, variableStatus, requireMeta(t, st.GetResources(), registeredDatabaseID).Status)
+	require.Equal(t, variableStatus, requireMeta(t, st.GetResources(), registeredAppID).Status)
+	require.Equal(t, variableStatus, requireMeta(t, st.GetResources(), registeredConsumerID).Status)
+	require.Equal(t, variableStatus, requireMeta(t, st.GetResources(), registeredModuleDatabaseID).Status)
 }
 
 func TestApplyRegisteredTypeDecodesValuesAndNestedBlock(t *testing.T) {
@@ -157,7 +165,7 @@ func TestApplyRegisteredTypeDecodesValuesAndNestedBlock(t *testing.T) {
 	st, err := p.Apply(registeredBasicConfig)
 	require.NoError(t, err)
 
-	db := requireDatabase(t, st, registeredDatabaseID)
+	db := requireDatabase(t, st.GetResources(), registeredDatabaseID)
 
 	require.Equal(t, "us-east", db.Location)
 	require.Equal(t, 5432, db.Port)
@@ -173,18 +181,18 @@ func TestApplyRegisteredTypeReturnsRegisteredGoType(t *testing.T) {
 	st, err := p.Apply(registeredBasicConfig)
 	require.NoError(t, err)
 
-	r, err := st.FindResource(registeredDatabaseID)
+	r, err := findByID(st.GetResources(), registeredDatabaseID)
 	require.NoError(t, err)
 	require.Equal(t, reflect.TypeOf(&registered.Database{}), reflect.TypeOf(r))
 
 	_, ok := r.(*registered.Database)
 	require.True(t, ok)
 
-	r, err = st.FindResource(registeredAppID)
+	r, err = findByID(st.GetResources(), registeredAppID)
 	require.NoError(t, err)
 	require.Equal(t, reflect.TypeOf(&registered.App{}), reflect.TypeOf(r))
 
-	r, err = st.FindResource(registeredConsumerID)
+	r, err = findByID(st.GetResources(), registeredConsumerID)
 	require.NoError(t, err)
 	require.Equal(t, reflect.TypeOf(&registered.Consumer{}), reflect.TypeOf(r))
 }
@@ -196,7 +204,7 @@ func TestApplyRegisteredTypeResolvesReferences(t *testing.T) {
 	st, err := p.Apply(registeredBasicConfig)
 	require.NoError(t, err)
 
-	r, err := st.FindResource(registeredAppID)
+	r, err := findByID(st.GetResources(), registeredAppID)
 	require.NoError(t, err)
 	app, ok := r.(*registered.App)
 	require.True(t, ok)
@@ -205,7 +213,7 @@ func TestApplyRegisteredTypeResolvesReferences(t *testing.T) {
 	require.Equal(t, "us-east", app.DatabaseLocation)
 	require.Equal(t, 5432, app.DatabasePort)
 
-	r, err = st.FindResource(registeredConsumerID)
+	r, err = findByID(st.GetResources(), registeredConsumerID)
 	require.NoError(t, err)
 	consumer, ok := r.(*registered.Consumer)
 	require.True(t, ok)
@@ -220,7 +228,7 @@ func TestApplyRegisteredTypeReadsModuleOutput(t *testing.T) {
 	st, err := p.Apply(registeredBasicConfig)
 	require.NoError(t, err)
 
-	r, err := st.FindResource(registeredAppID)
+	r, err := findByID(st.GetResources(), registeredAppID)
 	require.NoError(t, err)
 	app, ok := r.(*registered.App)
 	require.True(t, ok)
@@ -267,7 +275,7 @@ func TestReapplyRegisteredTypesSucceedsWithoutProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	db := requireDatabase(t, st, registeredDatabaseID)
+	db := requireDatabase(t, st.GetResources(), registeredDatabaseID)
 	require.Equal(t, "us-east", db.Location)
 	require.Equal(t, 5432, db.Port)
 }
@@ -276,7 +284,7 @@ func TestApplyAfterRemovingRegisteredBlockSucceedsWithoutProvider(t *testing.T) 
 	h := setupRegisteredTypes(t)
 
 	first := h.applyAndSave(t, registeredRemovedBeforeConfig)
-	requireDatabase(t, first, registeredRemovedID)
+	requireDatabase(t, first.GetResources(), registeredRemovedID)
 
 	p := h.newParser(t, nil, nil)
 
@@ -284,12 +292,12 @@ func TestApplyAfterRemovingRegisteredBlockSucceedsWithoutProvider(t *testing.T) 
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	requireDatabase(t, st, registeredKeptID)
+	requireDatabase(t, st.GetResources(), registeredKeptID)
 
-	_, err = st.FindResource(registeredRemovedID)
+	_, err = findByID(st.GetResources(), registeredRemovedID)
 	require.Error(t, err)
 
-	err = h.store.Save(st)
+	err = h.store.Save(st.GetResources())
 	require.NoError(t, err)
 
 	saved, err := h.store.Load()
@@ -314,7 +322,7 @@ func TestApplyAfterRemovingRegisteredBlockNeverCallsProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	_, err = st.FindResource(registeredRemovedID)
+	_, err = findByID(st.GetResources(), registeredRemovedID)
 	require.Error(t, err)
 }
 
@@ -325,7 +333,7 @@ func TestApplyRegisteredTypeInModuleIsStoredUnderModulePath(t *testing.T) {
 	st, err := p.Apply(registeredBasicConfig)
 	require.NoError(t, err)
 
-	db := requireDatabase(t, st, registeredModuleDatabaseID)
+	db := requireDatabase(t, st.GetResources(), registeredModuleDatabaseID)
 
 	require.Equal(t, registeredModuleDatabaseID, db.Meta.ID)
 	require.Equal(t, "shared", db.Meta.Module)
@@ -334,7 +342,7 @@ func TestApplyRegisteredTypeInModuleIsStoredUnderModulePath(t *testing.T) {
 	require.NotNil(t, db.Timeouts)
 	require.Equal(t, 10, db.Timeouts.Connect)
 
-	moduleResources, err := st.FindModuleResources("module.shared", false)
+	moduleResources, err := findModule(st, resources.NewAddressParser(nil), "module.shared", false)
 	require.NoError(t, err)
 	require.Contains(t, moduleResources, any(db))
 }
@@ -360,7 +368,7 @@ func TestApplyMarksDisabledRegisteredTypeDisabled(t *testing.T) {
 	st, err := p.Apply(registeredDisabledConfig)
 	require.NoError(t, err)
 
-	r, err := st.FindResource(registeredDisabledID)
+	r, err := findByID(st.GetResources(), registeredDisabledID)
 	require.NoError(t, err)
 
 	disabled, err := types.GetDisabled(r)
@@ -388,7 +396,7 @@ func TestApplyRegisteredTypeWithComputedFieldLogsNoWarning(t *testing.T) {
 
 	require.Empty(t, log.warnings())
 
-	db := requireDatabase(t, st, registeredDatabaseID)
+	db := requireDatabase(t, st.GetResources(), registeredDatabaseID)
 	require.Equal(t, "", db.ConnectionString)
 }
 
@@ -411,7 +419,7 @@ func TestRegisteredResourcesAreInStateAndFoundByPath(t *testing.T) {
 	moduleDB := requireDatabase(t, loaded, registeredModuleDatabaseID)
 	require.Equal(t, "eu-west", moduleDB.Location)
 
-	r, err := loaded.FindResource(registeredAppID)
+	r, err := findByID(loaded, registeredAppID)
 	require.NoError(t, err)
 	app, ok := r.(*registered.App)
 	require.True(t, ok, "expected *registered.App, got %T", r)
@@ -420,7 +428,7 @@ func TestRegisteredResourcesAreInStateAndFoundByPath(t *testing.T) {
 	require.Equal(t, 5432, app.DatabasePort)
 	require.Equal(t, "eu-west", app.SharedLocation)
 
-	r, err = loaded.FindResource(registeredConsumerID)
+	r, err = findByID(loaded, registeredConsumerID)
 	require.NoError(t, err)
 	consumer, ok := r.(*registered.Consumer)
 	require.True(t, ok, "expected *registered.Consumer, got %T", r)
@@ -437,16 +445,17 @@ func TestDestroyWalkSkipsProviderForRegisteredType(t *testing.T) {
 	db := &registered.Database{
 		ResourceBase: types.ResourceBase{
 			Meta: types.Meta{
-				ID:   registeredDatabaseID,
-				Name: "main",
-				Type: registered.TypeDatabase,
+				ID:      registeredDatabaseID,
+				Name:    "main",
+				Type:    types.TypeResource,
+				Subtype: registered.TypeDatabase,
 			},
 		},
 		Location: "us-east",
 		Port:     5432,
 	}
 
-	working := state.NewState()
+	working := NewState()
 	err := working.AppendResource(db)
 	require.NoError(t, err)
 
@@ -463,4 +472,210 @@ func TestDestroyWalkSkipsProviderForRegisteredType(t *testing.T) {
 	require.False(t, diags.HasErrors())
 	require.Empty(t, diags)
 	require.Equal(t, 0, working.ResourceCount())
+}
+
+// The two axes of Meta. Type is the stanza kind, always one of "resource",
+// "variable", "output", "module" or "root". Subtype is the variety a resource
+// stanza carries in its second label, and is empty for every other stanza.
+
+func TestApplyReportsResourceKindAndVarietyOnSeparateAxes(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBasicConfig)
+	require.NoError(t, err)
+
+	meta := requireMeta(t, st.GetResources(), registeredDatabaseID)
+
+	require.Equal(t, types.TypeResource, meta.Type)
+	require.Equal(t, registered.TypeDatabase, meta.Subtype)
+	require.Equal(t, registered.TypeDatabase, meta.AddressType())
+}
+
+func TestApplyReportsVariableKindWithoutAVariety(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBasicConfig)
+	require.NoError(t, err)
+
+	meta := requireMeta(t, st.GetResources(), registeredVariableID)
+
+	require.Equal(t, resources.TypeVariable, meta.Type)
+	require.Empty(t, meta.Subtype)
+	require.Equal(t, resources.TypeVariable, meta.AddressType())
+}
+
+func TestApplyReportsOutputKindWithoutAVariety(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBasicConfig)
+	require.NoError(t, err)
+
+	meta := requireMeta(t, st.GetResources(), registeredModuleOutputID)
+
+	require.Equal(t, resources.TypeOutput, meta.Type)
+	require.Empty(t, meta.Subtype)
+	require.Equal(t, resources.TypeOutput, meta.AddressType())
+}
+
+func TestApplyReportsModuleKindWithoutAVariety(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBasicConfig)
+	require.NoError(t, err)
+
+	meta := requireMeta(t, st.GetResources(), registeredSharedModuleID)
+
+	require.Equal(t, resources.TypeModule, meta.Type)
+	require.Empty(t, meta.Subtype)
+	require.Equal(t, resources.TypeModule, meta.AddressType())
+}
+
+// The expression namespace is keyed by the segment an entity is addressed by,
+// so a reference written against a resource, a variable or a module output has
+// to land the value it names on the resource that read it.
+
+func TestApplyGivesResourceTheFieldValuesOfAnotherResource(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBasicConfig)
+	require.NoError(t, err)
+
+	r, err := findByID(st.GetResources(), registeredAppID)
+	require.NoError(t, err)
+	app, ok := r.(*registered.App)
+	require.True(t, ok, "expected *registered.App, got %T", r)
+
+	// app.web reads resource.database.main.location and .port
+	require.Equal(t, "us-east", app.DatabaseLocation)
+	require.Equal(t, 5432, app.DatabasePort)
+
+	r, err = findByID(st.GetResources(), registeredConsumerID)
+	require.NoError(t, err)
+	consumer, ok := r.(*registered.Consumer)
+	require.True(t, ok, "expected *registered.Consumer, got %T", r)
+
+	// consumer.reader reads resource.app.web.environment, itself a value the
+	// app only holds because it resolved a reference of its own
+	require.Equal(t, "production", consumer.AppEnvironment)
+}
+
+func TestApplyGivesResourceTheValueOfAVariable(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBasicConfig)
+	require.NoError(t, err)
+
+	r, err := findByID(st.GetResources(), registeredAppID)
+	require.NoError(t, err)
+	app, ok := r.(*registered.App)
+	require.True(t, ok, "expected *registered.App, got %T", r)
+
+	// app.web reads variable.environment, whose default is "production"
+	require.Equal(t, "production", app.Environment)
+}
+
+func TestApplyGivesResourceTheValueOfAModuleOutput(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBasicConfig)
+	require.NoError(t, err)
+
+	// the module output reads a resource declared inside the module
+	moduleDB := requireDatabase(t, st.GetResources(), registeredModuleDatabaseID)
+	require.Equal(t, "eu-west", moduleDB.Location)
+
+	r, err := findByID(st.GetResources(), registeredModuleOutputID)
+	require.NoError(t, err)
+	out, ok := r.(*resources.Output)
+	require.True(t, ok, "expected *resources.Output, got %T", r)
+	require.Equal(t, "eu-west", out.CtyValue.AsString())
+
+	// and app.web, outside the module, reads module.shared.output.location
+	r, err = findByID(st.GetResources(), registeredAppID)
+	require.NoError(t, err)
+	app, ok := r.(*registered.App)
+	require.True(t, ok, "expected *registered.App, got %T", r)
+	require.Equal(t, "eu-west", app.SharedLocation)
+}
+
+// handledWithoutProvider answers on two axes: the builtins are stanza kinds,
+// read from Type, while a registered Go type is registered under its variety,
+// read from Subtype. Any provider lookup here fails the test.
+func TestApplyNeverLooksUpAProviderForRegisteredOrBuiltinBlocks(t *testing.T) {
+	h := setupRegisteredTypes(t)
+
+	options := testOptions(t)
+	options.PluginRegistry = h.registry
+	options.StateStore = h.store
+	// no expectations, any provider lookup fails the test
+	options.ProviderResolver = mocks.NewMockProviderResolver(t)
+
+	p := NewParser(options)
+
+	st, err := p.Apply(registeredBasicConfig)
+	require.NoError(t, err)
+	require.Equal(t, 7, st.ResourceCount())
+}
+
+// A type registered in the bare form leads its own declaration, cache "main",
+// and carries no variety. It is a different type from the kind led
+// resource "database" "main", not another spelling of it, and is addressed
+// cache.main rather than resource.cache.main.
+
+func TestParseBareDeclarationParsesWithoutError(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBareConfig)
+	require.NoError(t, err)
+	require.NotNil(t, st)
+}
+
+func TestParseBareDeclarationReportsKeywordAsKindWithoutAVariety(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBareConfig)
+	require.NoError(t, err)
+
+	meta := requireMeta(t, st.GetResources(), registeredCacheID)
+
+	require.Equal(t, registered.TypeCache, meta.Type)
+	require.Equal(t, "", meta.Subtype)
+	require.Equal(t, "main", meta.Name)
+	require.Equal(t, registeredCacheID, meta.ID)
+}
+
+func TestParseGivesEachDeclarationFormItsOwnAddress(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	st, err := p.Apply(registeredBareConfig)
+	require.NoError(t, err)
+
+	// both declarations name "main", only the form they are declared in
+	// separates them
+	bare, err := findByID(st.GetResources(), registeredCacheID)
+	require.NoError(t, err)
+
+	kindLed, err := findByID(st.GetResources(), registeredDatabaseID)
+	require.NoError(t, err)
+
+	require.NotSame(t, bare, kindLed)
+
+	_, ok := bare.(*registered.Cache)
+	require.True(t, ok, "expected *registered.Cache, got %T", bare)
+
+	_, ok = kindLed.(*registered.Database)
+	require.True(t, ok, "expected *registered.Database, got %T", kindLed)
+
+	require.Equal(t, registeredCacheID, requireMeta(t, st.GetResources(), registeredCacheID).ID)
+	require.Equal(t, registeredDatabaseID, requireMeta(t, st.GetResources(), registeredDatabaseID).ID)
 }

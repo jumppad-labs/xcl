@@ -63,9 +63,10 @@ func loggingTestPerson(t *testing.T) []byte {
 	p := &person.Person{
 		ResourceBase: types.ResourceBase{
 			Meta: types.Meta{
-				ID:   "test-person",
-				Type: "resource",
-				Name: "person",
+				ID:      "test-person",
+				Type:    "resource",
+				Subtype: "person",
+				Name:    "john",
 			},
 		},
 		FirstName: "John",
@@ -246,8 +247,8 @@ func TestInProcessPluginRead(t *testing.T) {
 	ph := setupInProcessPlugin(t)
 
 	ctx := context.Background()
-	oldData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com","address":"1 Old Street"}`)
-	newData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":31,"email":"test@example.com","address":"2 New Street"}`)
+	oldData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com","address":"1 Old Street"}`)
+	newData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":31,"email":"test@example.com","address":"2 New Street"}`)
 
 	result, err := ph.Read(ctx, "resource", "person", oldData, newData)
 	require.NoError(t, err, "Should read successfully")
@@ -269,8 +270,8 @@ func TestInProcessPluginReadNotFoundIsErrNotFound(t *testing.T) {
 	ph := setupInProcessPlugin(t)
 
 	ctx := context.Background()
-	oldData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
-	newData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
+	oldData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
+	newData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
 
 	result, err := ph.Read(ctx, "resource", "person", oldData, newData)
 	require.Error(t, err, "Should fail to read a missing person")
@@ -290,8 +291,8 @@ func TestExternalPluginRead(t *testing.T) {
 	// The old and new copies differ in age and address so that the result
 	// shows which copy the plugin returned
 	ctx := context.Background()
-	oldData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com","address":"1 Old Street"}`)
-	newData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":31,"email":"test@example.com","address":"2 New Street"}`)
+	oldData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com","address":"1 Old Street"}`)
+	newData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":31,"email":"test@example.com","address":"2 New Street"}`)
 
 	result, err := ph.Read(ctx, "resource", "person", oldData, newData)
 	require.NoError(t, err, "Should read successfully")
@@ -319,8 +320,8 @@ func TestExternalPluginReadUsesOldCopyToLocateResource(t *testing.T) {
 	ph := setupExternalPlugin(t)
 
 	ctx := context.Background()
-	oldData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
-	newData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
+	oldData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
+	newData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 
 	result, err := ph.Read(ctx, "resource", "person", oldData, newData)
 	require.Error(t, err, "Should fail to read when the old copy can not be located")
@@ -338,8 +339,8 @@ func TestExternalPluginReadNotFoundIsErrNotFound(t *testing.T) {
 	ph := setupExternalPlugin(t)
 
 	ctx := context.Background()
-	oldData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
-	newData := []byte(`{"meta":{"id":"test","type":"resource","sub_type":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
+	oldData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
+	newData := []byte(`{"meta":{"id":"test","type":"resource","subtype":"person"},"first_name":"Test","last_name":"User","age":30,"email":"missing@example.com"}`)
 
 	result, err := ph.Read(ctx, "resource", "person", oldData, newData)
 	require.Error(t, err, "Should fail to read a missing person")

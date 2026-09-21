@@ -10,7 +10,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
-	"github.com/jumppad-labs/xcl/state"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/mock"
@@ -275,22 +274,22 @@ func TestApplySavesStateWhenProviderFails(t *testing.T) {
 
 	ss.AssertCalled(t, "Save", mock.Anything)
 
-	var saved *state.State
+	var saved []any
 	for _, call := range ss.Calls {
 		if call.Method == "Save" {
-			saved = call.Arguments.Get(0).(*state.State)
+			saved = call.Arguments.Get(0).([]any)
 		}
 	}
 	require.NotNil(t, saved)
 
-	consul, err := saved.FindResource("resource.container.consul")
+	consul, err := entityByID(saved, "resource.container.consul")
 	require.NoError(t, err)
 
 	consulMeta, err := types.GetMeta(consul)
 	require.NoError(t, err)
 	require.Equal(t, types.StatusFailed, consulMeta.Status)
 
-	onprem, err := saved.FindResource("resource.network.onprem")
+	onprem, err := entityByID(saved, "resource.network.onprem")
 	require.NoError(t, err)
 
 	onpremMeta, err := types.GetMeta(onprem)

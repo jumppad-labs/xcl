@@ -109,7 +109,7 @@ func (h *lifecycleHarness) newParser(t *testing.T, onEvent func(ParserEvent)) *P
 
 // applyAndSave applies the config at path with a fresh Parser, requires it to
 // succeed, saves the returned state and returns it.
-func (h *lifecycleHarness) applyAndSave(t *testing.T, path string) *state.State {
+func (h *lifecycleHarness) applyAndSave(t *testing.T, path string) *State {
 	t.Helper()
 
 	p := h.newParser(t, nil)
@@ -118,7 +118,7 @@ func (h *lifecycleHarness) applyAndSave(t *testing.T, path string) *state.State 
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	err = h.store.Save(st)
+	err = h.store.Save(st.GetResources())
 	require.NoError(t, err)
 
 	return st
@@ -127,7 +127,7 @@ func (h *lifecycleHarness) applyAndSave(t *testing.T, path string) *state.State 
 // applyAndSaveExpectingFailure applies the config at path with a fresh Parser
 // and requires it to fail. Like Config.Apply it saves whatever state the failed
 // apply returned, then returns that state and the error.
-func (h *lifecycleHarness) applyAndSaveExpectingFailure(t *testing.T, path string) (*state.State, error) {
+func (h *lifecycleHarness) applyAndSaveExpectingFailure(t *testing.T, path string) (*State, error) {
 	t.Helper()
 
 	p := h.newParser(t, nil)
@@ -136,15 +136,15 @@ func (h *lifecycleHarness) applyAndSaveExpectingFailure(t *testing.T, path strin
 	require.Error(t, err)
 
 	if st != nil {
-		saveErr := h.store.Save(st)
+		saveErr := h.store.Save(st.GetResources())
 		require.NoError(t, saveErr)
 	}
 
 	return st, err
 }
 
-// loadSaved loads the state the harness store last saved.
-func (h *lifecycleHarness) loadSaved(t *testing.T) *state.State {
+// loadSaved loads the entities the harness store last saved.
+func (h *lifecycleHarness) loadSaved(t *testing.T) []any {
 	t.Helper()
 
 	saved, err := h.store.Load()
@@ -154,11 +154,11 @@ func (h *lifecycleHarness) loadSaved(t *testing.T) *state.State {
 	return saved
 }
 
-// resourceStatus returns the status recorded for the resource in the given state.
-func resourceStatus(t *testing.T, st *state.State, resourceID string) string {
+// resourceStatus returns the status recorded for the resource in the given entities.
+func resourceStatus(t *testing.T, entities []any, resourceID string) string {
 	t.Helper()
 
-	resource, err := st.FindResource(resourceID)
+	resource, err := findByID(entities, resourceID)
 	require.NoError(t, err)
 
 	meta, err := types.GetMeta(resource)
@@ -203,11 +203,11 @@ func (c *eventCollector) all() []ParserEvent {
 	return append([]ParserEvent{}, c.events...)
 }
 
-// networkStatus returns the status recorded for the network in the given state.
-func networkStatus(t *testing.T, st *state.State) string {
+// networkStatus returns the status recorded for the network in the given entities.
+func networkStatus(t *testing.T, entities []any) string {
 	t.Helper()
 
-	resource, err := st.FindResource(lifecycleNetworkID)
+	resource, err := findByID(entities, lifecycleNetworkID)
 	require.NoError(t, err)
 
 	meta, err := types.GetMeta(resource)
@@ -242,7 +242,7 @@ func TestApplyUnchangedConfigTwiceCreatesOnceAndOnlyReadsOnSecondApply(t *testin
 	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetReadResources())
 	require.Empty(t, h.plugin.GetCreatedResources())
 	require.Empty(t, h.plugin.GetUpdatedResources())
-	require.Equal(t, types.StatusCreated, networkStatus(t, st))
+	require.Equal(t, types.StatusCreated, networkStatus(t, st.GetResources()))
 
 	saved, err := h.store.Load()
 	require.NoError(t, err)
@@ -257,7 +257,7 @@ func TestFirstApplyNeverReads(t *testing.T) {
 	require.Empty(t, h.plugin.GetReadResources())
 	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetCreatedResources())
 	require.Equal(t, []string{"create " + lifecycleNetworkID}, h.plugin.GetCalls())
-	require.Equal(t, types.StatusCreated, networkStatus(t, st))
+	require.Equal(t, types.StatusCreated, networkStatus(t, st.GetResources()))
 }
 
 func TestReadReceivesSavedAndConfiguredCopies(t *testing.T) {
@@ -304,9 +304,9 @@ func TestConfigEditTriggersUpdate(t *testing.T) {
 	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetUpdatedResources())
 	require.Empty(t, h.plugin.GetCreatedResources())
 
-	network := findResource[structs.Network](t, st, lifecycleNetworkID)
+	network := findResource[structs.Network](t, st.GetResources(), lifecycleNetworkID)
 	require.Equal(t, "10.1.0.0/16", network.Subnet)
-	require.Equal(t, types.StatusUpdated, networkStatus(t, st))
+	require.Equal(t, types.StatusUpdated, networkStatus(t, st.GetResources()))
 }
 
 func TestDriftTriggersUpdate(t *testing.T) {
@@ -320,7 +320,7 @@ func TestDriftTriggersUpdate(t *testing.T) {
 
 	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetUpdatedResources())
 	require.Empty(t, h.plugin.GetCreatedResources())
-	require.Equal(t, types.StatusUpdated, networkStatus(t, st))
+	require.Equal(t, types.StatusUpdated, networkStatus(t, st.GetResources()))
 }
 
 func TestMissingResourceIsRecreated(t *testing.T) {
@@ -335,7 +335,7 @@ func TestMissingResourceIsRecreated(t *testing.T) {
 	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetReadResources())
 	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetCreatedResources())
 	require.Empty(t, h.plugin.GetUpdatedResources())
-	require.Equal(t, types.StatusCreated, networkStatus(t, st))
+	require.Equal(t, types.StatusCreated, networkStatus(t, st.GetResources()))
 }
 
 func TestReadFailureFailsApply(t *testing.T) {
@@ -394,8 +394,8 @@ func TestDefaultChangeDetectionIgnoresMetadata(t *testing.T) {
 	second := h.applyAndSave(t, lifecycleMovedConfig)
 
 	// the metadata really does differ between the two applies
-	firstNetwork := findResource[structs.Network](t, first, lifecycleNetworkID)
-	secondNetwork := findResource[structs.Network](t, second, lifecycleNetworkID)
+	firstNetwork := findResource[structs.Network](t, first.GetResources(), lifecycleNetworkID)
+	secondNetwork := findResource[structs.Network](t, second.GetResources(), lifecycleNetworkID)
 	require.NotEqual(t, firstNetwork.Meta.File, secondNetwork.Meta.File)
 	require.NotEqual(t, firstNetwork.Meta.Line, secondNetwork.Meta.Line)
 
@@ -431,7 +431,7 @@ func TestOverriddenChangeDetectionCanReportAChange(t *testing.T) {
 	st := h.applyAndSave(t, lifecycleOriginalConfig)
 
 	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetUpdatedResources())
-	require.Equal(t, types.StatusUpdated, networkStatus(t, st))
+	require.Equal(t, types.StatusUpdated, networkStatus(t, st.GetResources()))
 }
 
 func TestUnchangedResourceSavesWhatWasRead(t *testing.T) {
@@ -446,7 +446,7 @@ func TestUnchangedResourceSavesWhatWasRead(t *testing.T) {
 
 	require.Empty(t, h.plugin.GetUpdatedResources())
 
-	network := findResource[structs.Network](t, st, lifecycleNetworkID)
+	network := findResource[structs.Network](t, st.GetResources(), lifecycleNetworkID)
 	require.Equal(t, "running", network.Observed)
 	require.Equal(t, types.StatusCreated, network.Meta.Status)
 }
@@ -455,17 +455,17 @@ func TestUnchangedResourceKeepsUpdatedStatus(t *testing.T) {
 	h := setupLifecycle(t)
 
 	first := h.applyAndSave(t, lifecycleOriginalConfig)
-	require.Equal(t, types.StatusCreated, networkStatus(t, first))
+	require.Equal(t, types.StatusCreated, networkStatus(t, first.GetResources()))
 
 	second := h.applyAndSave(t, lifecycleEditedConfig)
-	require.Equal(t, types.StatusUpdated, networkStatus(t, second))
+	require.Equal(t, types.StatusUpdated, networkStatus(t, second.GetResources()))
 
 	h.plugin.ResetCalls()
 
 	third := h.applyAndSave(t, lifecycleEditedConfig)
 
 	require.Empty(t, h.plugin.GetUpdatedResources())
-	require.Equal(t, types.StatusUpdated, networkStatus(t, third))
+	require.Equal(t, types.StatusUpdated, networkStatus(t, third.GetResources()))
 }
 
 func TestReadEventsUseReadOperation(t *testing.T) {
@@ -544,10 +544,10 @@ func TestFailureSkipsOnlyDependents(t *testing.T) {
 	independent := findResource[structs.Network](t, saved, dependentIndependentID)
 	require.Equal(t, "id-independent", independent.ProviderID)
 
-	_, err = saved.FindResource(dependentSecondID)
+	_, err = findByID(saved, dependentSecondID)
 	require.Error(t, err)
 
-	_, err = saved.FindResource(dependentThirdID)
+	_, err = findByID(saved, dependentThirdID)
 	require.Error(t, err)
 }
 
@@ -728,7 +728,7 @@ func TestFailedResourceIsDestroyedThenCreated(t *testing.T) {
 		"destroy " + lifecycleNetworkID,
 		"create " + lifecycleNetworkID,
 	}, callsFor(h.plugin.GetCalls(), lifecycleNetworkID))
-	require.Equal(t, types.StatusCreated, networkStatus(t, st))
+	require.Equal(t, types.StatusCreated, networkStatus(t, st.GetResources()))
 
 	saved := h.loadSaved(t)
 	require.Equal(t, types.StatusCreated, networkStatus(t, saved))
@@ -778,7 +778,7 @@ func TestDestroyFailedResourceIsRetriedOnNextApply(t *testing.T) {
 		"destroy " + lifecycleNetworkID,
 		"create " + lifecycleNetworkID,
 	}, callsFor(h.plugin.GetCalls(), lifecycleNetworkID))
-	require.Equal(t, types.StatusCreated, networkStatus(t, st))
+	require.Equal(t, types.StatusCreated, networkStatus(t, st.GetResources()))
 
 	saved := h.loadSaved(t)
 	require.Equal(t, types.StatusCreated, networkStatus(t, saved))
@@ -907,7 +907,7 @@ func TestComputedValuesSurviveUnchangedApply(t *testing.T) {
 	require.Equal(t, types.StatusCreated, network.Meta.Status)
 
 	// the dependent resolved its reference to the carried provider id
-	user := findResource[structs.Container](t, st, computedRefUserID)
+	user := findResource[structs.Container](t, st.GetResources(), computedRefUserID)
 	require.Equal(t, []structs.NetworkAttachment{
 		{Name: "id-one", AssignedAddress: "assigned-id-one"},
 	}, user.Networks)
@@ -935,7 +935,7 @@ func TestNestedComputedValueSurvivesUnchangedApply(t *testing.T) {
 	}, web.Networks)
 
 	// the dependent resolved its reference to the carried nested address
-	consumer := findResource[structs.Container](t, st, nestedConsumerID)
+	consumer := findResource[structs.Container](t, st.GetResources(), nestedConsumerID)
 	require.Equal(t, []structs.NetworkAttachment{
 		{Name: "assigned-n1", AssignedAddress: "assigned-assigned-n1"},
 	}, consumer.Networks)
@@ -979,7 +979,7 @@ func TestProviderChangingConfiguredValueWarns(t *testing.T) {
 	st := h.applyAndSave(t, lifecycleOriginalConfig)
 
 	// the warning never fails the apply, the provider's value is kept
-	network := findResource[structs.Network](t, st, lifecycleNetworkID)
+	network := findResource[structs.Network](t, st.GetResources(), lifecycleNetworkID)
 	require.Equal(t, "10.9.0.0/16", network.Subnet)
 	require.Equal(t, types.StatusCreated, network.Meta.Status)
 
@@ -1016,7 +1016,135 @@ func TestReferenceSetFieldDoesNotWarn(t *testing.T) {
 
 	st := h.applyAndSave(t, lifecycleReferenceConfig)
 
-	b := findResource[structs.Network](t, st, referenceReferenceID)
+	b := findResource[structs.Network](t, st.GetResources(), referenceReferenceID)
 	require.Equal(t, "other", b.Subnet)
 	require.Empty(t, log.warningsWithMessage(changedConfiguredValueWarning))
+}
+
+// The dependent fixture mixes blocks a provider handles (network, container)
+// with blocks xcl handles itself (variable, output), which is the combination
+// the two Meta axes have to keep apart.
+
+func TestApplyReportsPluginResourceKindAndVarietyOnSeparateAxes(t *testing.T) {
+	h := setupLifecycle(t)
+
+	st := h.applyAndSave(t, lifecycleDependentConfig)
+
+	network, err := findByID(st.GetResources(), dependentFirstID)
+	require.NoError(t, err)
+	networkMeta, err := types.GetMeta(network)
+	require.NoError(t, err)
+
+	require.Equal(t, types.TypeResource, networkMeta.Type)
+	require.Equal(t, structs.TypeNetwork, networkMeta.Subtype)
+	require.Equal(t, structs.TypeNetwork, networkMeta.AddressType())
+
+	container, err := findByID(st.GetResources(), dependentSecondID)
+	require.NoError(t, err)
+	containerMeta, err := types.GetMeta(container)
+	require.NoError(t, err)
+
+	require.Equal(t, types.TypeResource, containerMeta.Type)
+	require.Equal(t, "container", containerMeta.Subtype)
+	require.Equal(t, "container", containerMeta.AddressType())
+}
+
+func TestApplyRoutesEveryProviderResourceToItsProvider(t *testing.T) {
+	h := setupLifecycle(t)
+
+	h.applyAndSave(t, lifecycleDependentConfig)
+
+	require.ElementsMatch(t, dependentProviderIDs, h.plugin.GetCreatedResources())
+}
+
+func TestApplyHandlesBuiltinBlocksWithoutAProvider(t *testing.T) {
+	h := setupLifecycle(t)
+
+	collector := &eventCollector{}
+	p := h.newParser(t, collector.collect)
+
+	st, err := p.Apply(lifecycleDependentConfig)
+	require.NoError(t, err)
+
+	// the variable and the output reach no provider at all
+	created := h.plugin.GetCreatedResources()
+	require.NotContains(t, created, dependentVariableID)
+	require.NotContains(t, created, dependentOutputID)
+
+	// yet both are applied, reported as created and held in the state
+	// alongside the provider resources
+	events := collector.all()
+	require.Equal(t, []string{"create success"}, eventsFor(events, dependentVariableID))
+	require.Equal(t, []string{"create success"}, eventsFor(events, dependentOutputID))
+
+	_, err = findByID(st.GetResources(), dependentVariableID)
+	require.NoError(t, err)
+
+	_, err = findByID(st.GetResources(), dependentOutputID)
+	require.NoError(t, err)
+}
+
+func TestReapplyDependentConfigCreatesNothingNewAndReadsEachProviderResource(t *testing.T) {
+	h := setupLifecycle(t)
+
+	h.applyAndSave(t, lifecycleDependentConfig)
+	h.plugin.ResetCalls()
+
+	st := h.applyAndSave(t, lifecycleDependentConfig)
+
+	require.Empty(t, h.plugin.GetCreatedResources())
+	require.ElementsMatch(t, dependentProviderIDs, h.plugin.GetReadResources())
+
+	// the values the references resolved to are still in place
+	second := findResource[structs.Container](t, st.GetResources(), dependentSecondID)
+	require.Equal(t, "first", second.Networks[0].Name)
+}
+
+func TestApplyThenDestroyLeavesNothingBehind(t *testing.T) {
+	h := setupLifecycle(t)
+
+	h.applyAndSave(t, lifecycleDependentConfig)
+	h.applyAndSave(t, lifecycleDependentConfig)
+	h.plugin.ResetCalls()
+
+	remaining, err := destroyAll(t, h, nil)
+	require.NoError(t, err)
+	require.Equal(t, 0, remaining.ResourceCount())
+
+	require.ElementsMatch(t, dependentProviderIDs, h.plugin.GetDestroyedResources())
+	require.Empty(t, h.loadSaved(t))
+}
+
+func TestApplyNamesTheVarietyOfEachResourceInItsEvents(t *testing.T) {
+	h := setupLifecycle(t)
+
+	collector := &eventCollector{}
+	p := h.newParser(t, collector.collect)
+
+	_, err := p.Apply(lifecycleDependentConfig)
+	require.NoError(t, err)
+
+	named := map[string]string{}
+	for _, event := range collector.all() {
+		named[event.ResourceID] = event.ResourceType
+	}
+
+	require.Equal(t, map[string]string{
+		dependentFirstID:       "network.first",
+		dependentSecondID:      "container.second",
+		dependentThirdID:       "container.third",
+		dependentIndependentID: "network.independent",
+		dependentVariableID:    "variable.independent_subnet",
+		dependentOutputID:      "output.first_name",
+	}, named)
+}
+
+func TestApplyCreatesReferencedResourceBeforeTheOneThatReferencesIt(t *testing.T) {
+	h := setupLifecycle(t)
+
+	h.applyAndSave(t, lifecycleDependentConfig)
+
+	created := h.plugin.GetCreatedResources()
+	requireBefore(t, dependentFirstID, dependentSecondID, created)
+	requireBefore(t, dependentSecondID, dependentThirdID, created)
 }

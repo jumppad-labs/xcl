@@ -24,9 +24,10 @@ func testCreateBasicResource() *TestBaseResource {
 			DependsOn: []string{"dependency1", "dependency2"},
 			Disabled:  true,
 			Meta: Meta{
-				ID:   "test-id",
-				Name: "test-name",
-				Type: "test-type",
+				ID:      "test-id",
+				Name:    "test-name",
+				Type:    TypeResource,
+				Subtype: "test-type",
 			},
 		},
 		Name: "test-resource",
@@ -49,7 +50,8 @@ func TestCanGetMetaOnBasicResource(t *testing.T) {
 
 	require.Equal(t, "test-id", meta.ID)
 	require.Equal(t, "test-name", meta.Name)
-	require.Equal(t, "test-type", meta.Type)
+	require.Equal(t, TypeResource, meta.Type)
+	require.Equal(t, "test-type", meta.Subtype)
 }
 
 func TestCanSetMetaOnBasicResource(t *testing.T) {
@@ -60,14 +62,16 @@ func TestCanSetMetaOnBasicResource(t *testing.T) {
 
 	meta.ID = "new-id"
 	meta.Name = "new-name"
-	meta.Type = "new-type"
+	meta.Type = TypeResource
+	meta.Subtype = "new-type"
 
 	newMeta, err := GetMeta(te)
 	require.NoError(t, err)
 
 	require.Equal(t, "new-id", newMeta.ID)
 	require.Equal(t, "new-name", newMeta.Name)
-	require.Equal(t, "new-type", newMeta.Type)
+	require.Equal(t, TypeResource, newMeta.Type)
+	require.Equal(t, "new-type", newMeta.Subtype)
 }
 
 func TestCanGetMetaOnExtendedResource(t *testing.T) {
@@ -78,7 +82,8 @@ func TestCanGetMetaOnExtendedResource(t *testing.T) {
 
 	require.Equal(t, "test-id", meta.ID)
 	require.Equal(t, "test-name", meta.Name)
-	require.Equal(t, "test-type", meta.Type)
+	require.Equal(t, TypeResource, meta.Type)
+	require.Equal(t, "test-type", meta.Subtype)
 }
 
 func TestCanSetMetaOnExtendedResource(t *testing.T) {
@@ -89,14 +94,16 @@ func TestCanSetMetaOnExtendedResource(t *testing.T) {
 
 	meta.ID = "new-id"
 	meta.Name = "new-name"
-	meta.Type = "new-type"
+	meta.Type = TypeResource
+	meta.Subtype = "new-type"
 
 	newMeta, err := GetMeta(te)
 	require.NoError(t, err)
 
 	require.Equal(t, "new-id", newMeta.ID)
 	require.Equal(t, "new-name", newMeta.Name)
-	require.Equal(t, "new-type", newMeta.Type)
+	require.Equal(t, TypeResource, newMeta.Type)
+	require.Equal(t, "new-type", newMeta.Subtype)
 }
 
 func TestCanGetDependenciesOnBasicResource(t *testing.T) {
@@ -188,14 +195,16 @@ func TestCanGetMetaOnExtendedResourceWhenCreatedFromSchema(t *testing.T) {
 	// Step 3: Verify we can set and get values
 	meta.ID = "new-id"
 	meta.Name = "new-name"
-	meta.Type = "new-type"
+	meta.Type = TypeResource
+	meta.Subtype = "new-type"
 
 	// Get meta again to verify the values were set
 	meta2, err := GetMeta(ni)
 	require.NoError(t, err)
 	require.Equal(t, "new-id", meta2.ID)
 	require.Equal(t, "new-name", meta2.Name)
-	require.Equal(t, "new-type", meta2.Type)
+	require.Equal(t, TypeResource, meta2.Type)
+	require.Equal(t, "new-type", meta2.Subtype)
 }
 
 func TestCanSetDependenciesOnExtendedResource(t *testing.T) {
@@ -255,4 +264,28 @@ func TestCanSetDisabledOnExtendedResource(t *testing.T) {
 	d, err := GetDisabled(te)
 	require.NoError(t, err)
 	require.False(t, d)
+}
+
+// AddressType returns the segment an entity is reached by in its address: the
+// variety for a resource kind entity, and the stanza kind for one declared
+// with a single label, which has no variety of its own.
+
+func TestAddressTypeReturnsTheVarietyOfAResource(t *testing.T) {
+	meta := Meta{
+		Name:    "mine",
+		Type:    TypeResource,
+		Subtype: "container",
+	}
+
+	require.Equal(t, "container", meta.AddressType())
+}
+
+func TestAddressTypeReturnsTheKindOfASingleLabelStanza(t *testing.T) {
+	meta := Meta{
+		Name: "cpu_resources",
+		Type: "variable",
+	}
+
+	require.Empty(t, meta.Subtype)
+	require.Equal(t, "variable", meta.AddressType())
 }

@@ -6,11 +6,11 @@ import (
 	"sort"
 
 	"github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/types"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 // validate runs the validation stages over a parsed configuration and returns

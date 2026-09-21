@@ -1,0 +1,11 @@
+# cache is registered in the bare form, so it leads its own declaration and is
+# addressed cache.main. database is registered in the kind led form, so the
+# same name under resource is addressed resource.database.main.
+cache "main" {
+  location = "us-east"
+}
+
+resource "database" "main" {
+  location = "us-east"
+  port     = 5432
+}

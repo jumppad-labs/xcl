@@ -110,7 +110,7 @@ func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, st
 	}
 
 	fmt.Fprintln(out, "## Resources")
-	for _, res := range c.GetResources() {
+	for _, res := range c.Entities() {
 		meta, err := types.GetMeta(res)
 		if err != nil {
 			return nil, err
@@ -120,8 +120,8 @@ func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, st
 	}
 
 	// Plugin types are held as types generated from the plugin's schema, the
-	// querier copies them into the Go type
-	databases, err := xcl.NewQuerier[resources.PostgreSQL](c).FindResourcesByType("postgres")
+	// lookup copies them into the Go type
+	databases, err := xcl.FindByType[resources.PostgreSQL](c, "resource", "postgres")
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, st
 		fmt.Fprintf(out, "  %s location=%s port=%d connection_string=%q\n", db.Meta.ID, db.Location, db.Port, db.ConnectionString)
 	}
 
-	caches, err := xcl.NewQuerier[resources.Redis](c).FindResourcesByType("redis")
+	caches, err := xcl.FindByType[resources.Redis](c, "resource", "redis")
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, st
 		fmt.Fprintf(out, "  %s location=%s port=%d connection_string=%q\n", cache.Meta.ID, cache.Location, cache.Port, cache.ConnectionString)
 	}
 
-	app, err := xcl.NewQuerier[resources.App](c).FindResource("resource.app.web")
+	app, err := xcl.Find[resources.App](c, "resource.app.web")
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, st
 	fmt.Fprintf(out, "  %s database_location=%s database_user=%s analytics_location=%s connection_string=%q cache_connection_string=%q url=%q\n",
 		app.Meta.ID, app.DatabaseLocation, app.DatabaseUser, app.AnalyticsLocation, app.ConnectionString, app.CacheConnectionString, app.URL)
 
-	ingress, err := xcl.NewQuerier[resources.Ingress](c).FindResource("resource.ingress.web")
+	ingress, err := xcl.Find[resources.Ingress](c, "resource.ingress.web")
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,27 @@ func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, st
 	fmt.Fprintln(out, "## Ingress")
 	fmt.Fprintf(out, "  %s hostname=%s app_url=%q\n", ingress.Meta.ID, ingress.Hostname, ingress.AppURL)
 
-	applied := append([]any{}, c.GetResources()...)
+	// A value the configuration publishes is read by its address like anything
+	// else, and comes back as the value itself rather than the declaration
+	// that produced it. Nothing here needs to know how outputs are stored
+	webDatabase, err := xcl.Find[string](c, "output.web_database")
+	if err != nil {
+		return nil, err
+	}
+
+	moduleLocation, err := xcl.Find[string](c, "module.analytics.output.location")
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Fprintln(out, "## Published")
+	fmt.Fprintf(out, "  output.web_database=%q\n", *webDatabase)
+	fmt.Fprintf(out, "  module.analytics.output.location=%q\n", *moduleLocation)
+
+	// or every published value at once, keyed by address
+	fmt.Fprintf(out, "  %d published in total\n", len(c.Outputs()))
+
+	applied := append([]any{}, c.Entities()...)
 
 	// Destroy everything that was applied, dependents before what they depend
 	// on, working only from the saved state
@@ -167,7 +187,7 @@ func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, st
 	}
 
 	fmt.Fprintln(out, "## Destroyed")
-	fmt.Fprintf(out, "  %d resources remaining\n", c.ResourceCount())
+	fmt.Fprintf(out, "  %d resources remaining\n", c.EntityCount())
 
 	return applied, nil
 }

@@ -22,7 +22,7 @@ import (
 type destroyer struct {
 	// working is the state being changed, it starts as the saved state and
 	// ends holding what survives the destroy
-	working *state.State
+	working *State
 
 	// store persists working after every resource, it may be nil in which
 	// case nothing is persisted
@@ -118,7 +118,7 @@ func (d *destroyer) save(r any) error {
 		return nil
 	}
 
-	err := d.store.Save(d.working)
+	err := d.store.Save(d.working.GetResources())
 	if err != nil {
 		id := ""
 		if meta, metaErr := types.GetMeta(r); metaErr == nil {

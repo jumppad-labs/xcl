@@ -1,8 +1,6 @@
 package parser
 
-import (
-	"github.com/jumppad-labs/xcl/internal/resources"
-)
+import ()
 
 // resolvedReference is the outcome of matching a reference string against
 // everything the configuration defines.
@@ -37,7 +35,7 @@ type resolvedReference struct {
 // module refer to its own resources while still being able to name anything
 // declared outside it.
 func (p *Parser) resolveReference(reference string, fromModule string) resolvedReference {
-	fqrn, err := resources.ParseFQRN(reference)
+	fqrn, err := p.addressParser().Parse(reference)
 	if err != nil {
 		// A reference that cannot be parsed names nothing that exists.
 		return resolvedReference{found: false}

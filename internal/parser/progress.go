@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -42,11 +41,11 @@ func (p *applyProgress) record(id string, o outcome) {
 //   - reached resources are saved as they are now, including failed ones
 //   - resources that were not reached keep their entry from the previous state
 //   - new resources that were not reached are left out
-func (p *applyProgress) buildState(current, previous *state.State) (*state.State, error) {
+func (p *applyProgress) buildState(current, previous *State) (*State, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	built := state.NewState()
+	built := NewState()
 
 	for _, r := range current.GetResources() {
 		meta, err := types.GetMeta(r)
@@ -62,7 +61,7 @@ func (p *applyProgress) buildState(current, previous *state.State) (*state.State
 			continue
 		}
 
-		previousResource, err := previous.FindResource(meta.ID)
+		previousResource, err := findByID(previous.GetResources(), meta.ID)
 		if err != nil {
 			// a new resource that was never reached
 			continue

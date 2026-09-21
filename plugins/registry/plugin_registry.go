@@ -16,19 +16,26 @@ import (
 
 // PluginRegistry manages all resource types (builtin, registered and plugin-based) and can create resource instances
 type PluginRegistry struct {
-	builtinTypes    types.RegisteredTypes
-	registeredTypes types.RegisteredTypes // plain Go types registered without a plugin
-	pluginHosts     []plugins.PluginHost
-	logger          logger.Logger
+	// typeInfo is the single place the details of every non plugin type live:
+	// its name, its declaration form, whether it is a builtin, and the Go value
+	// instances are built from. Plugin provided types are not here because they
+	// have no Go type; they are read from their host
+	typeInfo    map[string]types.TypeInfo
+	pluginHosts []plugins.PluginHost
+	logger      logger.Logger
 }
 
 // NewPluginRegistry creates a new plugin registry with builtin types
 func NewPluginRegistry(logger logger.Logger) *PluginRegistry {
+	typeInfo := map[string]types.TypeInfo{}
+	for name, prototype := range resources.DefaultResources() {
+		typeInfo[name] = types.TypeInfo{Name: name, Builtin: true, Prototype: prototype}
+	}
+
 	return &PluginRegistry{
-		builtinTypes:    resources.DefaultResources(),
-		registeredTypes: types.RegisteredTypes{},
-		pluginHosts:     []plugins.PluginHost{},
-		logger:          logger,
+		typeInfo:    typeInfo,
+		pluginHosts: []plugins.PluginHost{},
+		logger:      logger,
 	}
 }
 
@@ -54,50 +61,140 @@ func (r *PluginRegistry) RegisterType(name string, resource any) error {
 		return err
 	}
 
-	r.registeredTypes[name] = resource
+	r.typeInfo[name] = types.TypeInfo{Name: name, Prototype: resource}
 
 	return nil
+}
+
+// RegisterBareType registers resource under name in the bare declaration form,
+// declared by its own keyword with a single label, i.e. container "nics".
+// A type is registered under one form or the other and never both, so a type
+// registered here is addressed <name>.<resource> rather than
+// resource.<name>.<resource>.
+//
+// It shares RegisterType's validation and clash rules.
+func (r *PluginRegistry) RegisterBareType(name string, resource any) error {
+	if err := r.RegisterType(name, resource); err != nil {
+		return err
+	}
+
+	info := r.typeInfo[name]
+	info.Bare = true
+	r.typeInfo[name] = info
+
+	return nil
+}
+
+// Type returns the details held for name, from any source this registry draws
+// on. A plugin provided type is reported with a nil Prototype, because it
+// exists host side only as a schema.
+func (r *PluginRegistry) Type(name string) (types.TypeInfo, bool) {
+	if info, ok := r.typeInfo[name]; ok {
+		return info, true
+	}
+
+	for _, host := range r.pluginHosts {
+		for _, t := range host.GetTypes() {
+			if t.Type == types.TypeResource && t.SubType == name {
+				return types.TypeInfo{Name: name}, true
+			}
+		}
+	}
+
+	return types.TypeInfo{}, false
+}
+
+// Types returns the details of every type this registry knows, from all of its
+// sources.
+func (r *PluginRegistry) Types() []types.TypeInfo {
+	all := make([]types.TypeInfo, 0, len(r.typeInfo))
+	for _, info := range r.typeInfo {
+		all = append(all, info)
+	}
+
+	for _, host := range r.pluginHosts {
+		for _, t := range host.GetTypes() {
+			if t.Type != types.TypeResource {
+				continue
+			}
+
+			if _, ok := r.typeInfo[t.SubType]; ok {
+				continue
+			}
+
+			all = append(all, types.TypeInfo{Name: t.SubType})
+		}
+	}
+
+	return all
+}
+
+// KnownType returns true when name is a type this registry knows from any of
+// its sources: a builtin, a type registered with RegisterType or
+// RegisterBareType, or one provided by a loaded plugin.
+//
+// It is deliberately separate from IsRegisteredType, which answers the much
+// narrower question of whether a name came from RegisterType alone. The
+// lifecycle depends on that narrow meaning to decide what reaches a provider,
+// so widening it would silently change provider routing.
+func (r *PluginRegistry) KnownType(name string) bool {
+	_, ok := r.Type(name)
+	return ok
 }
 
 // IsRegisteredType returns true when name was registered with RegisterType.
 // Builtin and plugin types are not registered types.
 func (r *PluginRegistry) IsRegisteredType(name string) bool {
-	_, ok := r.registeredTypes[name]
-	return ok
+	info, ok := r.typeInfo[name]
+	return ok && !info.Builtin
 }
 
 // CreateResource creates a new resource instance of the specified type and name
 // It tries builtin types, then registered types, then falls back to plugin types
 // Returns any to accommodate builtin, registered and schema-generated resources
 func (r *PluginRegistry) CreateResource(resourceType, resourceName string) (any, error) {
-	// First try builtin types
-	if resource, err := r.builtinTypes.CreateResource(resourceType, resourceName); err == nil {
-		return resource, nil
+	info, ok := r.typeInfo[resourceType]
+	if !ok || info.Prototype == nil {
+		// no Go type here, so it is a plugin type or nothing at all
+		return r.createResourceFromPlugins(resourceType, resourceName)
 	}
 
-	// Then try registered types, which are created as the registered Go type
-	if resource, err := r.registeredTypes.CreateResource(resourceType, resourceName); err == nil {
-		return resource, nil
+	resource := reflect.New(reflect.TypeOf(info.Prototype).Elem()).Interface()
+
+	meta, err := types.GetMeta(resource)
+	if err != nil {
+		return nil, fmt.Errorf("type %q does not embed types.ResourceBase: %w", resourceType, err)
 	}
 
-	// Then try plugin types
-	return r.createResourceFromPlugins(resourceType, resourceName)
+	// the declaration form decides the axes: a bare or builtin type is its own
+	// kind and carries no variety, a kind led one is a resource of that variety
+	meta.Name = resourceName
+	meta.Type = types.TypeResource
+	meta.Subtype = info.Name
+	if info.Bare || info.Builtin {
+		meta.Type = info.Name
+		meta.Subtype = ""
+	}
+	meta.Properties = make(map[string]any)
+
+	return resource, nil
 }
 
 // checkTypeName returns a *TypeNameClashError when name is already provided
 // by a builtin, a registered type or a loaded plugin
 func (r *PluginRegistry) checkTypeName(name string) error {
-	if _, ok := r.builtinTypes[name]; ok {
-		return &TypeNameClashError{Name: name, Existing: "builtin"}
-	}
+	if info, ok := r.typeInfo[name]; ok {
+		existing := "registered type"
+		if info.Builtin {
+			existing = "builtin"
+		}
 
-	if _, ok := r.registeredTypes[name]; ok {
-		return &TypeNameClashError{Name: name, Existing: "registered type"}
+		return &TypeNameClashError{Name: name, Existing: existing}
 	}
 
 	for _, host := range r.pluginHosts {
 		for _, t := range host.GetTypes() {
-			if t.Type == "resource" && t.SubType == name {
+			if t.Type == types.TypeResource && t.SubType == name {
 				return &TypeNameClashError{Name: name, Existing: "plugin"}
 			}
 		}
@@ -159,8 +256,12 @@ func (r *PluginRegistry) createResourceFromPlugins(resourceType, resourceName st
 					panic(fmt.Sprintf("resource does not have ResourceBase embedded: %T", rawResource))
 				}
 
+				// the plugin wire already carries the two axes separately,
+				// so take both from the registered type rather than folding
+				// the variety into the kind
 				meta.Name = resourceName
-				meta.Type = resourceType
+				meta.Type = t.Type
+				meta.Subtype = t.SubType
 				meta.Properties = make(map[string]any)
 
 				return rawResource, nil
@@ -179,13 +280,13 @@ func (r *PluginRegistry) GetProvider(resource any) plugins.ProviderAdapter {
 	if err != nil {
 		return nil // Skip resources without ResourceBase
 	}
-	resourceType := meta.Type
-
-	// Check if it's a builtin type
-	if _, err := r.builtinTypes.CreateResource(resourceType, "dummy"); err == nil {
-		// This is a builtin type, not handled by plugins
+	// Only resource kind entities reach a plugin, the single label builtins
+	// are handled by xcl itself
+	if meta.Type != types.TypeResource {
 		return nil
 	}
+
+	resourceType := meta.Subtype
 
 	// Search through plugin hosts
 	for _, host := range r.pluginHosts {
@@ -329,7 +430,8 @@ func (r *PluginRegistry) GetProviderForResource(resource any) plugins.ProviderAd
 		panic(fmt.Sprintf("resource does not have ResourceBase embedded: %T", resource))
 	}
 
-	resourceType := meta.Type
+	// plugins are registered against the variety, not the stanza kind
+	resourceType := meta.Subtype
 
 	// Search through plugin hosts
 	for _, host := range r.pluginHosts {
@@ -344,4 +446,39 @@ func (r *PluginRegistry) GetProviderForResource(resource any) plugins.ProviderAd
 	}
 
 	return nil
+}
+
+// TypePath returns the address segments a registered Go type is reached by:
+// {"resource", "container"} for a type declared with the resource keyword, and
+// {"container"} for one declared by its own keyword. A type is registered
+// under one form or the other, so it is never both.
+//
+// It reports false for a type it cannot reach. A plugin provides a schema and
+// no Go type, so a plugin backed type has nothing to reflect against and is
+// always reported this way; the caller should fall back to naming the kind.
+func (r *PluginRegistry) TypePath(t reflect.Type) ([]string, bool) {
+	if t == nil {
+		return nil, false
+	}
+
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	for _, info := range r.typeInfo {
+		if info.Prototype == nil {
+			continue
+		}
+
+		pt := reflect.TypeOf(info.Prototype)
+		for pt.Kind() == reflect.Ptr {
+			pt = pt.Elem()
+		}
+
+		if pt == t {
+			return info.AddressPath(), true
+		}
+	}
+
+	return nil, false
 }

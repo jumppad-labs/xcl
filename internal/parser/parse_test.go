@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/schema"
@@ -19,19 +20,17 @@ import (
 	"github.com/jumppad-labs/xcl/logger"
 	pluginmocks "github.com/jumppad-labs/xcl/plugins/mocks"
 	"github.com/jumppad-labs/xcl/plugins/registry"
-	"github.com/jumppad-labs/xcl/state"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 // findResource is a test helper that finds and converts a resource to the given type.
 // It uses JSON marshal/unmarshal to convert the anonymous struct to the named type.
-func findResource[T any](t *testing.T, s *state.State, path string) *T {
+func findResource[T any](t *testing.T, entities []any, path string) *T {
 	t.Helper()
-	r, err := s.FindResource(path)
+	r, err := findByID(entities, path)
 	require.NoError(t, err)
 
 	result := new(T)
@@ -122,9 +121,9 @@ func TestParseFileProcessesResources(t *testing.T) {
 	require.NoError(t, err)
 
 	// check variable has been interpolated
-	cont := findResource[structs.Container](t, c, "resource.container.consul")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
 
-	vr, err := c.FindResource("variable.cpu_resources")
+	vr, err := findByID(c.GetResources(), "variable.cpu_resources")
 	require.NoError(t, err)
 	require.NotNil(t, vr)
 
@@ -136,7 +135,7 @@ func TestParseFileProcessesResources(t *testing.T) {
 	require.Equal(t, "10.6.0.200", cont.Networks[0].IPAddress)
 	require.Equal(t, 1024, cont.Resources.CPU)
 
-	base := findResource[structs.Container](t, c, "resource.container.base")
+	base := findResource[structs.Container](t, c.GetResources(), "resource.container.base")
 	require.NotNil(t, base)
 }
 
@@ -152,7 +151,7 @@ func TestParseFileSetsLinks(t *testing.T) {
 	require.NoError(t, err)
 
 	// check variable has been interpolated
-	cont := findResource[structs.Container](t, c, "resource.container.consul")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
 
 	// parser should replace any resource links with an empty value and return a list
 	// of links and the field paths where they were originally set
@@ -184,14 +183,14 @@ func TestParseResolvesArrayReferences(t *testing.T) {
 	require.NoError(t, err)
 
 	// check variable has been interpolated
-	out := findResource[resources.Output](t, c, "output.ip_address_1")
+	out := findResource[resources.Output](t, c.GetResources(), "output.ip_address_1")
 	require.Equal(t, "10.6.0.200", out.Value)
 
 	// check variable has been interpolated
-	out = findResource[resources.Output](t, c, "output.ip_address_2")
+	out = findResource[resources.Output](t, c.GetResources(), "output.ip_address_2")
 	require.Equal(t, "10.7.0.201", out.Value)
 
-	out = findResource[resources.Output](t, c, "output.ip_addresses")
+	out = findResource[resources.Output](t, c.GetResources(), "output.ip_addresses")
 	require.Equal(t, "10.6.0.200", out.Value.([]any)[0].(string))
 	require.Equal(t, "10.7.0.201", out.Value.([]any)[1].(string))
 	require.Equal(t, float64(12), out.Value.([]any)[2].(float64))
@@ -208,7 +207,7 @@ func TestParseSetsDefaultValues(t *testing.T) {
 	c, err := p.Apply(absoluteFolderPath)
 	require.NoError(t, err)
 
-	cont := findResource[structs.Container](t, c, "resource.container.default")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.default")
 
 	// check default values have been set
 	require.Equal(t, "hello world", cont.Default)
@@ -232,7 +231,7 @@ func TestLoadsVariableFilesInOptionsOverridingVariableDefaults(t *testing.T) {
 	c, err := p.Apply(filepath.Join(absoluteFolderPath, "container.xcl"))
 	require.NoError(t, err)
 
-	cont := findResource[structs.Container](t, c, "resource.container.consul")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
 
 	// check variable has been interpolated using the override value
 	require.Equal(t, 4096, cont.Resources.CPU)
@@ -253,7 +252,7 @@ func TestLoadsVariablesInEnvVarOverridingVariableDefaults(t *testing.T) {
 	c, err := p.Apply(filepath.Join(absoluteFolderPath, "container.xcl"))
 	require.NoError(t, err)
 
-	cont := findResource[structs.Container](t, c, "resource.container.consul")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
 
 	// check variable has been interpolated using the override value
 	require.Equal(t, 1000, cont.Resources.CPU)
@@ -268,7 +267,7 @@ func TestLoadsVariableFilesInDirectoryOverridingVariableDefaults(t *testing.T) {
 	c, err := p.Apply(absoluteFolderPath)
 	require.NoError(t, err)
 
-	cont := findResource[structs.Container](t, c, "resource.container.consul")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
 
 	// check variable has been interpolated using the override value
 	require.Equal(t, 1024, cont.Resources.CPU)
@@ -283,7 +282,7 @@ func TestLoadsVariablesFilesOverridingVariableDefaults(t *testing.T) {
 	c, err := p.Apply(absoluteFolderPath)
 	require.NoError(t, err)
 
-	cont := findResource[structs.Container](t, c, "resource.container.consul")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
 
 	// check variable has been interpolated using the override value
 	require.Equal(t, 1024, cont.Resources.CPU)
@@ -302,32 +301,32 @@ func TestResourceReferencesInExpressionsAreEvaluated(t *testing.T) {
 
 	require.Len(t, c.GetResources(), 10)
 
-	_ = findResource[structs.Container](t, c, "resource.container.consul")
+	_ = findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
 
-	out := findResource[resources.Output](t, c, "output.splat")
+	out := findResource[resources.Output](t, c.GetResources(), "output.splat")
 	require.Equal(t, "/cache", out.Value.([]any)[0])
 	require.Equal(t, "/cache2", out.Value.([]any)[1])
 
-	out = findResource[resources.Output](t, c, "output.splat_with_null")
+	out = findResource[resources.Output](t, c.GetResources(), "output.splat_with_null")
 	// Since created_network is not populated in the config, this should return an empty array
 	require.Equal(t, []any{}, out.Value)
 
-	out = findResource[resources.Output](t, c, "output.function")
+	out = findResource[resources.Output](t, c.GetResources(), "output.function")
 	require.Equal(t, float64(2), out.Value)
 
-	out = findResource[resources.Output](t, c, "output.binary")
+	out = findResource[resources.Output](t, c.GetResources(), "output.binary")
 	require.Equal(t, false, out.Value)
 
-	out = findResource[resources.Output](t, c, "output.condition")
+	out = findResource[resources.Output](t, c.GetResources(), "output.condition")
 	require.Equal(t, "/cache", out.Value)
 
-	out = findResource[resources.Output](t, c, "output.template")
+	out = findResource[resources.Output](t, c.GetResources(), "output.template")
 	require.Equal(t, "abc/2", out.Value)
 
-	out = findResource[resources.Output](t, c, "output.index")
+	out = findResource[resources.Output](t, c.GetResources(), "output.index")
 	require.Equal(t, "images.volume.shipyard.run", out.Value)
 
-	out = findResource[resources.Output](t, c, "output.index_interpolated")
+	out = findResource[resources.Output](t, c.GetResources(), "output.index_interpolated")
 	require.Equal(t, "root/images.volume.shipyard.run", out.Value)
 
 }
@@ -343,7 +342,7 @@ func TestResourceReferencesInExpressionStringsAreEvaluated(t *testing.T) {
 	c, err := p.Apply(absoluteFolderPath)
 	require.NoError(t, err)
 
-	con := findResource[structs.Container](t, c, "resource.container.container4")
+	con := findResource[structs.Container](t, c.GetResources(), "resource.container.container4")
 	require.Equal(t, "8500", con.Env["port_string"])
 }
 
@@ -361,18 +360,18 @@ func TestParseModuleCreatesResources(t *testing.T) {
 	require.Len(t, c.GetResources(), 41)
 
 	// check resource has been created
-	cont := findResource[structs.Container](t, c, "module.consul_1.resource.container.consul")
+	cont := findResource[structs.Container](t, c.GetResources(), "module.consul_1.resource.container.consul")
 
 	// check interpolation value
 	require.Equal(t, "onprem", cont.Networks[0].Name)
 
 	// check resource has been created
-	cont = findResource[structs.Container](t, c, "module.consul_2.resource.container.consul")
+	cont = findResource[structs.Container](t, c.GetResources(), "module.consul_2.resource.container.consul")
 
 	require.Equal(t, "onprem", cont.Networks[0].Name)
 
 	// check resource has been created
-	cont = findResource[structs.Container](t, c, "module.consul_3.resource.container.consul")
+	cont = findResource[structs.Container](t, c.GetResources(), "module.consul_3.resource.container.consul")
 
 	// check interpolation value
 	require.Equal(t, "onprem", cont.Networks[0].Name)
@@ -409,26 +408,26 @@ func TestParseModuleCreatesOutputs(t *testing.T) {
 
 	require.Len(t, c.GetResources(), 41)
 
-	out := findResource[resources.Output](t, c, "output.module1_container_resources_cpu")
+	out := findResource[resources.Output](t, c.GetResources(), "output.module1_container_resources_cpu")
 
 	// check output value from module is equal to the module variable
 	// which is set as an interpolated value of the container base
 	require.Equal(t, float64(4096), out.Value)
 
-	out = findResource[resources.Output](t, c, "output.module2_container_resources_cpu")
+	out = findResource[resources.Output](t, c.GetResources(), "output.module2_container_resources_cpu")
 
 	// check output value from module is equal to the module variable
 	// which is set as the variable for the config
 	require.Equal(t, float64(512), out.Value)
 
-	out = findResource[resources.Output](t, c, "output.module3_container_resources_cpu")
+	out = findResource[resources.Output](t, c.GetResources(), "output.module3_container_resources_cpu")
 
 	// check the output variable is set to the default value for the module
 	require.Equal(t, float64(2048), out.Value)
 
-	out = findResource[resources.Output](t, c, "output.module1_from_list_1")
+	out = findResource[resources.Output](t, c.GetResources(), "output.module1_from_list_1")
 
-	out2 := findResource[resources.Output](t, c, "output.module1_from_list_2")
+	out2 := findResource[resources.Output](t, c.GetResources(), "output.module1_from_list_2")
 
 	// check an element can be obtained from a list of values
 	// returned from a output
@@ -437,16 +436,16 @@ func TestParseModuleCreatesOutputs(t *testing.T) {
 
 	// check an element can be obtained from a map of values
 	// returned from a output
-	out = findResource[resources.Output](t, c, "output.module1_from_map_1")
+	out = findResource[resources.Output](t, c.GetResources(), "output.module1_from_map_1")
 
-	out2 = findResource[resources.Output](t, c, "output.module1_from_map_2")
+	out2 = findResource[resources.Output](t, c.GetResources(), "output.module1_from_map_2")
 
 	// check element can be obtained from a map of values
 	// returned in the output
 	require.Equal(t, "consul", out.Value)
 	require.Equal(t, float64(4096), out2.Value)
 
-	out = findResource[resources.Output](t, c, "output.object")
+	out = findResource[resources.Output](t, c.GetResources(), "output.object")
 
 	// check element can be obtained from a map of values
 	// returned in the output
@@ -466,7 +465,7 @@ func TestDoesNotLoadsVariablesFilesFromInsideModules(t *testing.T) {
 	require.NoError(t, err)
 
 	// check variable has been interpolated
-	cont := findResource[structs.Container](t, c, "module.consul_1.resource.container.consul")
+	cont := findResource[structs.Container](t, c.GetResources(), "module.consul_1.resource.container.consul")
 	require.Equal(t, 2048, cont.Resources.CPU)
 }
 
@@ -482,7 +481,7 @@ func TestModuleDisabledCanBeOverriden(t *testing.T) {
 	require.NoError(t, err)
 
 	// test disabled overrides are set
-	cont := findResource[structs.Container](t, c, "module.consul_2.resource.container.sidecar")
+	cont := findResource[structs.Container](t, c.GetResources(), "module.consul_2.resource.container.sidecar")
 
 	// check disabled has been interpolated
 	require.False(t, cont.Disabled)
@@ -492,7 +491,7 @@ func TestModuleDisabledCanBeOverriden(t *testing.T) {
 	// require.Contains(t, calls, "module.consul_2.resource.container.sidecar")
 
 	// test disabled is maintainerd
-	cont = findResource[structs.Container](t, c, "module.consul_1.resource.container.sidecar")
+	cont = findResource[structs.Container](t, c.GetResources(), "module.consul_1.resource.container.sidecar")
 
 	// check disabled has been interpolated
 	require.True(t, cont.Disabled)
@@ -526,8 +525,13 @@ func TestParseContainerWithNoTypeReturnsError(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestParseContainerWithNoTLDReturnsError(t *testing.T) {
-	absoluteFolderPath, err := filepath.Abs("../test_fixtures/config/invalid/no_resource.xcl")
+// A declaration may lead with the variety it is declaring, container "mine",
+// instead of the resource kind. The keyword names a type the registry knows,
+// so the single label is the name of the thing declared. The fixture this
+// reads used to live under invalid/ as no_resource.xcl, back when a top level
+// declaration had to lead with a stanza keyword
+func TestApplyRejectsTheBareFormOfAKindLedType(t *testing.T) {
+	absoluteFolderPath, err := filepath.Abs("../test_fixtures/config/bare/container.xcl")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -536,6 +540,29 @@ func TestParseContainerWithNoTLDReturnsError(t *testing.T) {
 
 	_, err = p.Apply(absoluteFolderPath)
 	require.Error(t, err)
+
+	// container is provided by a plugin, so it is declared with the resource
+	// keyword. Leading with it is a different type, not an alias
+	require.Contains(t, err.Error(), "container")
+	require.Contains(t, err.Error(), "declared with the resource keyword")
+}
+
+// The leading keyword names nothing the system knows, so the declaration is
+// rejected and the error names the keyword. Asserted on content rather than on
+// the number of diagnostics, the HCL parser halts at the first malformed block
+// header and a count would pin that rather than this
+func TestApplyUnknownLeadingKeywordReturnsErrorNamingTheKeyword(t *testing.T) {
+	absoluteFolderPath, err := filepath.Abs("../test_fixtures/config/unknown_keyword/unknown.xcl")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p, _ := setupParser(t)
+
+	_, err = p.Apply(absoluteFolderPath)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "wibble")
+	require.Contains(t, err.Error(), "is not a known type")
 }
 
 func TestParseDoesNotProcessDisabledResources(t *testing.T) {
@@ -550,13 +577,13 @@ func TestParseDoesNotProcessDisabledResources(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 5, c.ResourceCount())
 
-	r, err := c.FindResource("resource.container.disabled_value")
+	r, err := findByID(c.GetResources(), "resource.container.disabled_value")
 	require.NoError(t, err)
 	disabled, err := types.GetDisabled(r)
 	require.NoError(t, err)
 	require.True(t, disabled)
 
-	r, err = c.FindResource("resource.container.disabled_variable")
+	r, err = findByID(c.GetResources(), "resource.container.disabled_variable")
 	require.NoError(t, err)
 	disabled, err = types.GetDisabled(r)
 	require.NoError(t, err)
@@ -578,14 +605,14 @@ func TestParseDoesNotProcessDisabledResourcesWhenModuleDisabled(t *testing.T) {
 	c, err := p.Apply(absoluteFolderPath)
 	require.NoError(t, err)
 
-	r, err := c.FindResource("module.disabled.resource.container.enabled")
+	r, err := findByID(c.GetResources(), "module.disabled.resource.container.enabled")
 	require.NoError(t, err)
 
 	disabled, err := types.GetDisabled(r)
 	require.NoError(t, err)
 	require.True(t, disabled)
 
-	r, err = c.FindResource("module.disabled.sub.resource.container.enabled")
+	r, err = findByID(c.GetResources(), "module.disabled.sub.resource.container.enabled")
 	require.NoError(t, err)
 
 	disabled, err = types.GetDisabled(r)
@@ -882,7 +909,7 @@ func TestParseDirectoryReturnsConfigErrorWhenParseDirectoryFails(t *testing.T) {
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
-	require.Len(t, ce.Errors, 3)
+	require.Len(t, ce.Errors, 2)
 }
 
 func TestParseDirectoryReturnsConfigErrorWhenResourceProcessError(t *testing.T) {
@@ -1133,7 +1160,7 @@ func TestParserReadEventErrorCallback(t *testing.T) {
 
 	secondStore := &statemocks.MockStateStore{}
 	secondStore.On("Exists").Return(true)
-	secondStore.On("Load").Return(previousState, nil)
+	secondStore.On("Load").Return(previousState.GetResources(), nil)
 
 	secondOptions := testOptions(t)
 	secondOptions.StateStore = secondStore
@@ -1616,9 +1643,9 @@ func TestParseModuleParsesSameSourceUsedTwiceAsSiblings(t *testing.T) {
 	// its single network resource must be present: 2 modules + 2 networks.
 	require.Len(t, c.GetResources(), 4)
 
-	first := findResource[structs.Network](t, c, "module.first.resource.network.leafnet")
+	first := findResource[structs.Network](t, c.GetResources(), "module.first.resource.network.leafnet")
 	require.Equal(t, "10.7.0.0/16", first.Subnet)
 
-	second := findResource[structs.Network](t, c, "module.second.resource.network.leafnet")
+	second := findResource[structs.Network](t, c.GetResources(), "module.second.resource.network.leafnet")
 	require.Equal(t, "10.7.0.0/16", second.Subnet)
 }

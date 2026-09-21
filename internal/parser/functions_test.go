@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/cty/function"
 	"github.com/jumppad-labs/xcl/internal/functions"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/stretchr/testify/require"
-	"github.com/jumppad-labs/xcl/internal/cty/function"
 )
 
 // constantNumberOptions returns parser options with a custom function
@@ -35,7 +35,7 @@ func TestApplyProcessesDefaultFunctionsWithFile(t *testing.T) {
 	c, err := p.Apply(absoluteFilePath)
 	require.NoError(t, err)
 
-	cont := findResource[structs.Container](t, c, "resource.container.default")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.default")
 
 	home, _ := os.UserHomeDir()
 
@@ -64,7 +64,7 @@ func TestApplyProcessesDefaultFunctionsWithDirectory(t *testing.T) {
 	c, err := p.Apply(absoluteFolderPath)
 	require.NoError(t, err)
 
-	cont := findResource[structs.Container](t, c, "resource.container.default")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.default")
 
 	home, _ := os.UserHomeDir()
 
@@ -92,7 +92,7 @@ func TestApplyProcessesCustomFunctions(t *testing.T) {
 	c, err := p.Apply(absoluteFilePath)
 	require.NoError(t, err)
 
-	cont := findResource[structs.Container](t, c, "resource.container.custom")
+	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.custom")
 
 	require.Equal(t, "42", cont.Env["len"])
 }

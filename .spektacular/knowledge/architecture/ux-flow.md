@@ -1,3 +1,7 @@
+---
+tags: [architecture, config, query, public-api]
+---
+
 # XCL User Experience Flow
 
 ## Overview
@@ -35,19 +39,56 @@ if err != nil {
 }
 ```
 
-### 3. Query Resources
+### 3. Query the Configuration
 
-Use the type-safe Querier to find resources:
+Ask the configuration for what you want, as your own Go type, in a single call.
 
 ```go
-q := xcl.NewQuerier[MyResourceType](config)
+// one entity, by its address
+db, err := xcl.Find[PostgreSQL](config, "resource.postgres.main")
 
-// Find a specific resource by path
-resource, err := q.FindResource("resource.mytype.name")
+// every entity of a kind: segment one is the kind, segment two the variety
+dbs, err := xcl.FindByType[PostgreSQL](config, "resource", "postgres")
 
-// Find all resources of a type
-resources, err := q.FindResourcesByType()
+// the one you expect there to be exactly one of
+ingress, err := xcl.FindOne[Ingress](config, "resource", "ingress")
+
+// every entity of a Go type, without naming it as a string
+all, err := xcl.All[PostgreSQL](config)
 ```
+
+Values the configuration publishes are read the same way, and come back as the
+value rather than the declaration that produced it:
+
+```go
+url, err := xcl.Find[string](config, "output.web_database")
+published := config.Outputs() // all of them, keyed by address
+```
+
+Everything declared can be enumerated without naming a type, and an entity from
+that enumeration converts in one call:
+
+```go
+for _, entity := range config.Entities() {
+    typed, err := xcl.As[PostgreSQL](entity)
+}
+```
+
+An empty result and an unanswerable question are never the same thing. A
+well-formed query matching nothing returns an empty result and a nil error; a
+query that cannot be answered returns an error matched by identity:
+`ErrNotFound`, `ErrUnknownType`, `ErrNotTypeable`, `ErrNotRegistered`,
+`ErrTypeMismatch`, `ErrNotAnEntity`, `ErrNotUnique`. Each wraps a detail type
+recoverable with `errors.As` — `NotUniqueError.Count` reports how many matched.
+
+**Two spellings, one implementation.** The same surface exists as methods on
+`*Config` (`config.Find[T](addr)` and so on). Generic methods need Go 1.27 and
+this project supports 1.25.0, so the method form is excluded below 1.27 by a
+build constraint while the package-level functions compile everywhere. The
+method form is the idiomatic one; **every runnable example uses the function
+form** so what a reader copies works on the oldest supported toolchain. Both
+delegate to one implementation and cannot differ. `As` is a function in both
+worlds, since it takes no config for a method to hang off.
 
 ### 4. Validate Without Applying
 
@@ -108,8 +149,8 @@ err := config.Destroy()
 │                                                              │
 │  config := xcl.NewConfig(...)                               │
 │  config.Apply("config.xcl")                                 │
-│  q := xcl.NewQuerier[T](config)                             │
-│  resource, _ := q.FindResource("resource.type.name")        │
+│  db, _ := xcl.Find[T](config, "resource.type.name")         │
+│  all, _ := xcl.FindByType[T](config, "resource", "type")    │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -118,8 +159,11 @@ err := config.Destroy()
 │                    xcl Package (Public API)                  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  Config          - Main orchestrator                         │
-│  Querier[T]      - Type-safe resource queries               │
+│  Config          - Main orchestrator, the only query surface │
+│  Find/FindByType/FindOne/All - typed lookups (+ methods)     │
+│  As              - convert an enumerated entity to a type    │
+│  Entities/EntityCount/Outputs - untyped enumeration          │
+│  Err… sentinels  - every way a lookup can fail, errors.Is    │
 │  ConfigOption    - Functional options for Config            │
 │  ConfigError     - Collects every problem found by validation │
 │                                                              │
@@ -159,11 +203,14 @@ err := config.Destroy()
 - Parser is internal implementation detail
 - Config orchestrates parsing, state management, and plugin execution
 
-### 2. Querier Requires Config
+### 2. Config is the Only Public Query Surface
 
-- `Querier` works with `*Config`, not `*State`
-- This maintains the abstraction - users don't need to know about State
-- Querier provides type-safe access to parsed resources
+- The lookups take `*Config`, never `*State`; users need know nothing of State
+- They scan `Config.Entities()`, so the typed and untyped views agree by
+  construction
+- The `state` package is store-and-retrieve only. Its remaining `Find…` methods
+  are vestigial and slated for removal — see
+  `architecture/config-is-the-public-query-surface.md`
 
 ### 3. State is Managed Internally
 
@@ -171,21 +218,26 @@ err := config.Destroy()
 - Users configure storage via `WithStateStore()` option
 - State transitions are managed by Config during Apply/Destroy
 
-## Open Questions
+## Resolved Questions
 
-1. **Should Querier accept an interface instead of concrete Config?**
-   - Pro: More flexible, could work with State directly in tests
-   - Con: Adds complexity, exposes internal details
+These were open while `Querier[T]` existed. The query-api-v2 work settled all
+three, and they are kept rather than deleted so the reasoning is not
+re-litigated.
+
+1. **Should the query surface accept an interface rather than concrete Config?**
+   Moot. There is no `Querier`. The lookups are package-level generic functions
+   taking `*Config`, plus methods on `*Config` above Go 1.27. Nothing binds a
+   type at construction, so there is nothing for an interface to abstract.
 
 2. **How should tests query resources without circular dependencies?**
-   - Option A: External test package (`package parser_test`) imports both `internal/parser` and `xcl`
-   - Option B: Querier accepts interface that both Config and State implement
-   - Option C: Tests use Config wrapper around parser results
+   By not needing to. The lookups live in the root package and scan
+   `Config.Entities()`. Where a test genuinely needs both the parser and the
+   root package it uses an external test package, which is Option A — see
+   `state/file_state_store_apply_test.go`, in `package state_test` for exactly
+   this reason.
 
-3. **What's the minimal interface for Querier?**
-   ```go
-   type ResourceProvider interface {
-       GetResources() []any
-   }
-   ```
-   Both `*Config` and `*State` already implement this.
+3. **What is the minimal interface for the query surface?**
+   Not an interface at all. The shared address matcher takes a plain `[]any`
+   (`internal/resources.Match`), so the public surface and the parser both use
+   it without either depending on the other, and the storage layer needs no
+   knowledge of addresses.

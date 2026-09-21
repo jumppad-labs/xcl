@@ -183,7 +183,7 @@ func TestPropertyNamesForMeta(t *testing.T) {
 	properties := propertyNames(reflect.TypeOf(types.Meta{}))
 
 	require.Equal(t,
-		[]string{"column", "file", "id", "line", "module", "name", "type"},
+		[]string{"column", "file", "id", "line", "module", "name", "subtype", "type"},
 		sortedNames(properties),
 	)
 }

@@ -5,7 +5,6 @@
 package mocks
 
 import (
-	"github.com/jumppad-labs/xcl/state"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -15,10 +14,19 @@ func NewMockStateStore(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockStateStore {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockStateStore{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -125,23 +133,23 @@ func (_c *MockStateStore_Exists_Call) RunAndReturn(run func() bool) *MockStateSt
 }
 
 // Load provides a mock function for the type MockStateStore
-func (_mock *MockStateStore) Load() (*state.State, error) {
+func (_mock *MockStateStore) Load() ([]any, error) {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Load")
 	}
 
-	var r0 *state.State
+	var r0 []any
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (*state.State, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func() ([]any, error)); ok {
 		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func() *state.State); ok {
+	if returnFunc, ok := ret.Get(0).(func() []any); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*state.State)
+			r0 = ret.Get(0).([]any)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func() error); ok {
@@ -169,27 +177,27 @@ func (_c *MockStateStore_Load_Call) Run(run func()) *MockStateStore_Load_Call {
 	return _c
 }
 
-func (_c *MockStateStore_Load_Call) Return(state1 *state.State, err error) *MockStateStore_Load_Call {
-	_c.Call.Return(state1, err)
+func (_c *MockStateStore_Load_Call) Return(anyMoqParams []any, err error) *MockStateStore_Load_Call {
+	_c.Call.Return(anyMoqParams, err)
 	return _c
 }
 
-func (_c *MockStateStore_Load_Call) RunAndReturn(run func() (*state.State, error)) *MockStateStore_Load_Call {
+func (_c *MockStateStore_Load_Call) RunAndReturn(run func() ([]any, error)) *MockStateStore_Load_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Save provides a mock function for the type MockStateStore
-func (_mock *MockStateStore) Save(state1 *state.State) error {
-	ret := _mock.Called(state1)
+func (_mock *MockStateStore) Save(entities []any) error {
+	ret := _mock.Called(entities)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Save")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*state.State) error); ok {
-		r0 = returnFunc(state1)
+	if returnFunc, ok := ret.Get(0).(func([]any) error); ok {
+		r0 = returnFunc(entities)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -202,16 +210,16 @@ type MockStateStore_Save_Call struct {
 }
 
 // Save is a helper method to define mock.On call
-//   - state1 *state.State
-func (_e *MockStateStore_Expecter) Save(state1 interface{}) *MockStateStore_Save_Call {
-	return &MockStateStore_Save_Call{Call: _e.mock.On("Save", state1)}
+//   - entities []any
+func (_e *MockStateStore_Expecter) Save(entities any) *MockStateStore_Save_Call {
+	return &MockStateStore_Save_Call{Call: _e.mock.On("Save", entities)}
 }
 
-func (_c *MockStateStore_Save_Call) Run(run func(state1 *state.State)) *MockStateStore_Save_Call {
+func (_c *MockStateStore_Save_Call) Run(run func(entities []any)) *MockStateStore_Save_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *state.State
+		var arg0 []any
 		if args[0] != nil {
-			arg0 = args[0].(*state.State)
+			arg0 = args[0].([]any)
 		}
 		run(
 			arg0,
@@ -225,7 +233,7 @@ func (_c *MockStateStore_Save_Call) Return(err error) *MockStateStore_Save_Call 
 	return _c
 }
 
-func (_c *MockStateStore_Save_Call) RunAndReturn(run func(state1 *state.State) error) *MockStateStore_Save_Call {
+func (_c *MockStateStore_Save_Call) RunAndReturn(run func(entities []any) error) *MockStateStore_Save_Call {
 	_c.Call.Return(run)
 	return _c
 }

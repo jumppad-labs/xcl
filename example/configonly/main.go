@@ -97,7 +97,7 @@ func run(out io.Writer, log logger.Logger, dir string, statePath string) ([]any,
 	}
 
 	fmt.Fprintln(out, "## Resources")
-	for _, res := range c.GetResources() {
+	for _, res := range c.Entities() {
 		meta, err := types.GetMeta(res)
 		if err != nil {
 			return nil, err
@@ -114,7 +114,17 @@ func run(out io.Writer, log logger.Logger, dir string, statePath string) ([]any,
 		return nil, err
 	}
 
-	applied := append([]any{}, c.GetResources()...)
+	applied := append([]any{}, c.Entities()...)
+
+	// Destroy everything that was applied, dependents before what they depend
+	// on, working only from the saved state. For these types that means
+	// clearing them from state, since none of them has a provider
+	if err := c.Destroy(); err != nil {
+		return nil, err
+	}
+
+	fmt.Fprintln(out, "## Destroyed")
+	fmt.Fprintf(out, "  %d resources remaining\n", c.EntityCount())
 
 	return applied, nil
 }
@@ -124,7 +134,7 @@ func run(out io.Writer, log logger.Logger, dir string, statePath string) ([]any,
 // resource limits. Registered types come back as the Go type that was
 // registered, so the nested blocks are ordinary Go structs and slices.
 func printDeployments(out io.Writer, c *xcl.Config) error {
-	deployments, err := xcl.NewQuerier[resources.Deployment](c).FindResourcesByType("deployment")
+	deployments, err := xcl.FindByType[resources.Deployment](c, "resource", "deployment")
 	if err != nil {
 		return err
 	}
@@ -170,7 +180,7 @@ func printDeployments(out io.Writer, c *xcl.Config) error {
 // their values were read from the blocks they reference rather than repeated
 // in the configuration
 func printRouting(out io.Writer, c *xcl.Config) error {
-	service, err := xcl.NewQuerier[resources.Service](c).FindResource("resource.service.api")
+	service, err := xcl.Find[resources.Service](c, "resource.service.api")
 	if err != nil {
 		return err
 	}
@@ -178,7 +188,7 @@ func printRouting(out io.Writer, c *xcl.Config) error {
 	fmt.Fprintln(out, "## Service")
 	fmt.Fprintf(out, "  %s deployment=%s port=%d target_port=%d\n", service.Meta.ID, service.Deployment, service.Port, service.TargetPort)
 
-	ingress, err := xcl.NewQuerier[resources.Ingress](c).FindResource("resource.ingress.api")
+	ingress, err := xcl.Find[resources.Ingress](c, "resource.ingress.api")
 	if err != nil {
 		return err
 	}

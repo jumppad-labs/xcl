@@ -17,10 +17,19 @@ func NewMockProviderAdapter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockProviderAdapter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockProviderAdapter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -73,7 +82,7 @@ type MockProviderAdapter_Changed_Call struct {
 //   - ctx context.Context
 //   - oldEntityData []byte
 //   - newEntityData []byte
-func (_e *MockProviderAdapter_Expecter) Changed(ctx interface{}, oldEntityData interface{}, newEntityData interface{}) *MockProviderAdapter_Changed_Call {
+func (_e *MockProviderAdapter_Expecter) Changed(ctx any, oldEntityData any, newEntityData any) *MockProviderAdapter_Changed_Call {
 	return &MockProviderAdapter_Changed_Call{Call: _e.mock.On("Changed", ctx, oldEntityData, newEntityData)}
 }
 
@@ -146,7 +155,7 @@ type MockProviderAdapter_Create_Call struct {
 // Create is a helper method to define mock.On call
 //   - ctx context.Context
 //   - entityData []byte
-func (_e *MockProviderAdapter_Expecter) Create(ctx interface{}, entityData interface{}) *MockProviderAdapter_Create_Call {
+func (_e *MockProviderAdapter_Expecter) Create(ctx any, entityData any) *MockProviderAdapter_Create_Call {
 	return &MockProviderAdapter_Create_Call{Call: _e.mock.On("Create", ctx, entityData)}
 }
 
@@ -204,7 +213,7 @@ type MockProviderAdapter_Destroy_Call struct {
 //   - ctx context.Context
 //   - entityData []byte
 //   - force bool
-func (_e *MockProviderAdapter_Expecter) Destroy(ctx interface{}, entityData interface{}, force interface{}) *MockProviderAdapter_Destroy_Call {
+func (_e *MockProviderAdapter_Expecter) Destroy(ctx any, entityData any, force any) *MockProviderAdapter_Destroy_Call {
 	return &MockProviderAdapter_Destroy_Call{Call: _e.mock.On("Destroy", ctx, entityData, force)}
 }
 
@@ -267,7 +276,7 @@ type MockProviderAdapter_Init_Call struct {
 //   - state plugins.State
 //   - functions plugins.ProviderFunctions
 //   - logger plugins.Logger
-func (_e *MockProviderAdapter_Expecter) Init(state interface{}, functions interface{}, logger interface{}) *MockProviderAdapter_Init_Call {
+func (_e *MockProviderAdapter_Expecter) Init(state any, functions any, logger any) *MockProviderAdapter_Init_Call {
 	return &MockProviderAdapter_Init_Call{Call: _e.mock.On("Init", state, functions, logger)}
 }
 
@@ -341,7 +350,7 @@ type MockProviderAdapter_Read_Call struct {
 //   - ctx context.Context
 //   - oldEntityData []byte
 //   - newEntityData []byte
-func (_e *MockProviderAdapter_Expecter) Read(ctx interface{}, oldEntityData interface{}, newEntityData interface{}) *MockProviderAdapter_Read_Call {
+func (_e *MockProviderAdapter_Expecter) Read(ctx any, oldEntityData any, newEntityData any) *MockProviderAdapter_Read_Call {
 	return &MockProviderAdapter_Read_Call{Call: _e.mock.On("Read", ctx, oldEntityData, newEntityData)}
 }
 
@@ -414,7 +423,7 @@ type MockProviderAdapter_Update_Call struct {
 // Update is a helper method to define mock.On call
 //   - ctx context.Context
 //   - entityData []byte
-func (_e *MockProviderAdapter_Expecter) Update(ctx interface{}, entityData interface{}) *MockProviderAdapter_Update_Call {
+func (_e *MockProviderAdapter_Expecter) Update(ctx any, entityData any) *MockProviderAdapter_Update_Call {
 	return &MockProviderAdapter_Update_Call{Call: _e.mock.On("Update", ctx, entityData)}
 }
 
@@ -471,7 +480,7 @@ type MockProviderAdapter_Validate_Call struct {
 // Validate is a helper method to define mock.On call
 //   - ctx context.Context
 //   - entityData []byte
-func (_e *MockProviderAdapter_Expecter) Validate(ctx interface{}, entityData interface{}) *MockProviderAdapter_Validate_Call {
+func (_e *MockProviderAdapter_Expecter) Validate(ctx any, entityData any) *MockProviderAdapter_Validate_Call {
 	return &MockProviderAdapter_Validate_Call{Call: _e.mock.On("Validate", ctx, entityData)}
 }
 

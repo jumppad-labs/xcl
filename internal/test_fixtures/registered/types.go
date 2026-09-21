@@ -13,6 +13,10 @@ const TypeApp = "app"
 // TypeConsumer is the string resource type for Consumer resources
 const TypeConsumer = "consumer"
 
+// TypeCache is the string resource type for Cache resources, registered in the
+// bare form so that it leads its own declaration, cache "main" {}
+const TypeCache = "cache"
+
 // Database is a registered type with a nested block and a computed field
 type Database struct {
 	types.ResourceBase `xcl:",remain"`
@@ -47,4 +51,12 @@ type Consumer struct {
 	types.ResourceBase `xcl:",remain"`
 
 	AppEnvironment string `xcl:"app_environment" json:"app_environment"`
+}
+
+// Cache is registered with RegisterBareType, it is declared by its own keyword
+// with a single label and is addressed cache.<name>
+type Cache struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Location string `xcl:"location" json:"location"`
 }

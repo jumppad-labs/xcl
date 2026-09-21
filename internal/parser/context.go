@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/jumppad-labs/xcl/internal/convert"
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/types"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 // buildContextForResource creates a fresh context for a specific resource
@@ -105,7 +105,7 @@ func buildContextForResource(res *parsed, r any, options *ParserOptions, functio
 				}
 
 				var innerMap map[string]cty.Value
-				if existing, exists := typeMap[resourceMeta.Type]; exists && !existing.IsNull() {
+				if existing, exists := typeMap[resourceMeta.AddressType()]; exists && !existing.IsNull() {
 					innerMap = make(map[string]cty.Value)
 					for k, v := range existing.AsValueMap() {
 						innerMap[k] = v
@@ -115,7 +115,7 @@ func buildContextForResource(res *parsed, r any, options *ParserOptions, functio
 				}
 
 				innerMap[resourceMeta.Name] = ctyRes
-				typeMap[resourceMeta.Type] = cty.ObjectVal(innerMap)
+				typeMap[resourceMeta.AddressType()] = cty.ObjectVal(innerMap)
 				moduleVars[fqdn.Module] = typeMap
 
 				continue
@@ -123,7 +123,7 @@ func buildContextForResource(res *parsed, r any, options *ParserOptions, functio
 
 			// Add to the appropriate nested map structure
 			var typeMap map[string]cty.Value
-			if existingTypeVal, exists := resourceVars[resourceMeta.Type]; exists && !existingTypeVal.IsNull() {
+			if existingTypeVal, exists := resourceVars[resourceMeta.AddressType()]; exists && !existingTypeVal.IsNull() {
 				typeMap = make(map[string]cty.Value)
 				for k, v := range existingTypeVal.AsValueMap() {
 					typeMap[k] = v
@@ -133,7 +133,7 @@ func buildContextForResource(res *parsed, r any, options *ParserOptions, functio
 			}
 
 			typeMap[resourceMeta.Name] = ctyRes
-			resourceVars[resourceMeta.Type] = cty.ObjectVal(typeMap)
+			resourceVars[resourceMeta.AddressType()] = cty.ObjectVal(typeMap)
 		}
 	}
 

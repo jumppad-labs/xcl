@@ -20,7 +20,7 @@ import (
 // it holds no per-resource state of its own.
 type resourceLifecycle struct {
 	// previous is the state saved by the last apply, it is never nil
-	previous *state.State
+	previous *State
 	resolver ProviderResolver
 	options  *ParserOptions
 
@@ -72,17 +72,17 @@ func (l *resourceLifecycle) run(r any) error {
 	}
 
 	// builtin and registered resource types have no provider, they always succeed
-	if handledWithoutProvider(l.types, meta.Type) {
+	if handledWithoutProvider(l.types, meta) {
 		fireParserEvent(l.options, "create", resourceType(meta), meta.ID, "success", 0, nil, nil)
 		return nil
 	}
 
 	adapter := l.resolver.GetProviderForResource(r)
 	if adapter == nil {
-		return fmt.Errorf("no provider found for resource type %s", meta.Type)
+		return fmt.Errorf("no provider found for resource type %s", meta.AddressType())
 	}
 
-	old, err := l.previous.FindResource(meta.ID)
+	old, err := findByID(l.previous.GetResources(), meta.ID)
 	if err != nil {
 		var notFound state.ResourceNotFoundError
 		if errors.As(err, &notFound) {
@@ -353,18 +353,23 @@ func (l *resourceLifecycle) callProvider(operation string, r any, data []byte, c
 // provider: the builtin types xcl handles itself, and the plain Go types
 // registered without a plugin. typeRegistry may be nil, in which case only
 // builtin types are handled without a provider.
-func handledWithoutProvider(typeRegistry TypeRegistry, t string) bool {
-	if t == resources.TypeVariable ||
-		t == resources.TypeOutput ||
-		t == resources.TypeModule ||
-		t == resources.TypeRoot {
+// It takes the whole meta rather than a single name because the two questions
+// it asks sit on different axes: the builtins are stanza kinds, while a
+// registered Go type is registered under its variety.
+func handledWithoutProvider(typeRegistry TypeRegistry, meta *types.Meta) bool {
+	if meta.Type == resources.TypeVariable ||
+		meta.Type == resources.TypeOutput ||
+		meta.Type == resources.TypeModule ||
+		meta.Type == resources.TypeRoot {
 		return true
 	}
 
-	return typeRegistry != nil && typeRegistry.IsRegisteredType(t)
+	// a kind led type is registered under its variety and a bare one under its
+	// own keyword, which is exactly what AddressType returns
+	return typeRegistry != nil && typeRegistry.IsRegisteredType(meta.AddressType())
 }
 
 // resourceType returns the "<type>.<name>" form used in parser events
 func resourceType(meta *types.Meta) string {
-	return fmt.Sprintf("%s.%s", meta.Type, meta.Name)
+	return fmt.Sprintf("%s.%s", meta.AddressType(), meta.Name)
 }

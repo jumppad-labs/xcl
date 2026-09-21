@@ -85,7 +85,7 @@ func run(out io.Writer, log logger.Logger, dir string, statePath string) (*resou
 
 	// A registered type comes back as the Go type it was registered as, so
 	// the whole tree below it is ordinary Go structs, slices and maps
-	app, err := xcl.NewQuerier[resources.Application](c).FindResource("resource.application.api")
+	app, err := xcl.Find[resources.Application](c, "resource.application.api")
 	if err != nil {
 		return nil, err
 	}

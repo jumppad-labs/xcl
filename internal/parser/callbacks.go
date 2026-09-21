@@ -8,13 +8,13 @@ import (
 
 	"github.com/creasty/defaults"
 	"github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/cty"
+	"github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
-	"github.com/jumppad-labs/xcl/internal/dag"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 // ProviderResolver resolves the provider adapter responsible for a given resource.
@@ -34,7 +34,7 @@ type TypeRegistry interface {
 // walkCallback creates the internal callback that is called when a node in the
 // dag is visited. This callback is responsible for processing the resource and setting
 // any linked values.
-func walkCallback(parsedData *parsed, rp ResourceProvider, lifecycle *resourceLifecycle, options *ParserOptions, functions functionsForFile) func(v dag.Vertex) (diags dag.Diagnostics) {
+func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.AddressParser, lifecycle *resourceLifecycle, options *ParserOptions, functions functionsForFile) func(v dag.Vertex) (diags dag.Diagnostics) {
 	return func(v dag.Vertex) (diags dag.Diagnostics) {
 
 		// v should be a resource (either builtin or schema-generated)
@@ -94,7 +94,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, lifecycle *resourceLi
 			// Find all dependent resources for this module. Ignore the error:
 			// a module with no remaining resources returns a not-found error,
 			// which is not a failure here.
-			dr, _ := rp.FindModuleResources(rMeta.ID, true)
+			dr, _ := findModule(rp, addresses, rMeta.ID, true)
 
 			// Set all the dependents to disabled
 			for _, d := range dr {
@@ -209,7 +209,7 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 
 		// Skip disabled, builtin and registered resource types, they never
 		// reach a provider
-		if disabled || handledWithoutProvider(d.types, rMeta.Type) {
+		if disabled || handledWithoutProvider(d.types, rMeta) {
 			// Fire destroy events for provider-less types (always succeed with 0 time)
 			fireParserEvent(d.options, "destroy", rType, resourceID, "success", 0, nil, nil)
 
@@ -226,7 +226,7 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 		if adapter == nil {
 			pe := errors.NewParserErrorFromResource(
 				r,
-				fmt.Sprintf("no provider found for resource type %s", rMeta.Type),
+				fmt.Sprintf("no provider found for resource type %s", rMeta.AddressType()),
 			)
 			diags = diags.Append(pe)
 

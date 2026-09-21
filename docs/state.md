@@ -1,21 +1,22 @@
 # State & Persistence
 
-## `State` — the in-memory resource registry
+## What the state layer is, and is not
 
-[`state/state.go`](../state/state.go) is deliberately simple: a
-mutex-protected flat list.
+The `state` package **stores and retrieves entities**. That is all it does.
 
-```go
-type State struct {
-    resources []any
-    mu        sync.Mutex
-}
-```
+It does not search a configuration, and it does not parse addresses. Asking a
+configuration what it declares is the job of `Config` — see
+[the querying section of the README](../README.md#querying-a-configuration) —
+and resolving an address is done there, against the types the registry knows.
+The `state` package imports nothing address-related, which a test in
+`state/dependencies_test.go` guards.
 
-There's no separate index or status table — a resource's operational
-status lives on its own `types.Meta.Status` field (see
-[Resource statuses](#resource-statuses)), so `State` itself just needs to
-store and find resources.
+There is no public container type. A `StateStore` exchanges plain entities, so
+an implementation needs no type from this library in its signatures and has
+nothing to construct. The parser keeps its own working container internally
+(`internal/parser/entities.go`), which is a mutex-protected flat list with no
+index or status table — a resource's operational status lives on its own
+`types.Meta.Status` field (see [Resource statuses](#resource-statuses)).
 
 Each saved resource also records its parents in `meta.parents`
 ([`types/resource.go`](../types/resource.go#L42)): the sorted IDs of the
@@ -27,11 +28,16 @@ is omitted when empty. It is what lets `Destroy` order resources from the
 saved state alone; state saved before it existed has no parents, and is
 destroyed with no ordering guarantee.
 
-Every lookup (`FindResource`, `FindResourcesByType`, `FindModuleResources`)
-is a **linear scan** comparing `types.GetMeta(r)` fields against a parsed
-FQRN (fully-qualified resource name, `internal/resources/fqrn.go`) — there
-is no index, which is fine at the scale this is used (one config's worth of
-resources) but worth knowing if you're tempted to call these in a hot loop.
+Every lookup is a **linear scan** comparing `types.GetMeta(r)` fields against a
+parsed FQRN (fully-qualified resource name, `internal/resources/fqrn.go`) —
+there is no index, which is fine at the scale this is used (one config's worth
+of resources) but worth knowing if you're tempted to call these in a hot loop.
+
+That applies to the public lookup surface too. `xcl.Find`, `xcl.FindByType`,
+`xcl.FindOne` and `xcl.All` scan `Config.Entities()`, so an address lookup is
+O(n) over the entities the configuration holds. `xcl.All[T]` additionally
+resolves `T` to its address segments through the type registry before it
+scans. None of this is indexed or cached, deliberately.
 
 Key operations:
 
@@ -116,12 +122,18 @@ writes nothing.
 ```go
 // state/state_store.go
 type StateStore interface {
-    Load() (*State, error) // nil if no state exists (first run)
-    Save(state *State) error
+    Load() ([]any, error)      // nil if nothing was saved (first run)
+    Save(entities []any) error
     Exists() bool
     Clear() error
 }
 ```
+
+The contract exchanges plain entities deliberately. Storing them is all it
+does: how they are searched is the configuration object's concern, not a
+store's. Writing one needs no library type — `state/custom_store_test.go` has a
+twenty-line in-memory implementation that round-trips a real apply, written
+against the public API alone.
 
 `Parser.Apply` (and `Parser.Validate`) call `Exists()`/`Load()` at the
 start of every run to get the "previous state", the state saved by the last
@@ -129,7 +141,7 @@ apply. `Config.Destroy` calls them too, to get the state to destroy.
 `Parser.Apply` uses each resource's entry in it to decide between
 create, read-then-update and rebuild (see
 [Parser & Resource Lifecycle](parser-lifecycle.md)). `Config.Apply` calls
-`Save()` after adopting the returned state, including after a failed apply
+`Save()` after adopting the entities the parse produced, including after a failed apply
 (see [State saved after a failed apply](#state-saved-after-a-failed-apply)).
 Destroying, in `Config.Destroy` or an apply's removal phase, calls `Save()`
 after every resource (see [State during a destroy](#state-during-a-destroy)).

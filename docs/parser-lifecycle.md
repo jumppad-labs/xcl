@@ -6,7 +6,7 @@ of provider calls. It lives in `internal/parser/`.
 ## `Parser.Apply` — the single entry point
 
 ```go
-func (p *Parser) Apply(paths ...string) (*state.State, error)
+func (p *Parser) Apply(paths ...string) (*State, error)
 ```
 
 ([`internal/parser/parser.go`](../internal/parser/parser.go)) does,
@@ -124,7 +124,7 @@ root) are skipped early — see "Instrumentation" below for a subtlety here.
 ### Destroy
 
 ```go
-func (p *Parser) Destroy(saved *state.State) (*state.State, error)
+func (p *Parser) Destroy(saved []any) (*State, error)
 ```
 
 ([`internal/parser/parser.go`](../internal/parser/parser.go#L301)) destroys

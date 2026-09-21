@@ -30,7 +30,7 @@ func NewFileStateStore(path string, registry *registry.PluginRegistry) (*FileSta
 }
 
 // Load the previously saved configuration state from the file
-func (fs *FileStateStore) Load() (*State, error) {
+func (fs *FileStateStore) Load() ([]any, error) {
 	if _, err := os.Stat(fs.path); err != nil {
 		return nil, fmt.Errorf("state file does not exist at %s", fs.path)
 	}
@@ -47,59 +47,87 @@ func (fs *FileStateStore) Load() (*State, error) {
 		return nil, fmt.Errorf("unable to deserialize state file at %s: %w", fs.path, err)
 	}
 
-	// Phase 2: Create typed resources and unmarshal into them
+	// Phase 2: Create typed resources and unmarshal into them.
+	//
+	// A record that cannot be understood is reported, never skipped. Dropping
+	// one silently yields a smaller configuration than the file holds, which
+	// then gets written back over the file on the next save, losing whatever
+	// was dropped. Every failure below therefore accumulates into unresolved
+	// and surfaces as one error naming what could not be read
 	resources := []any{}
-	unknownTypes := []string{}
-	for _, rawMsg := range rawMessages {
+	unresolved := []string{}
+
+	record := func(name string) {
+		if !slices.Contains(unresolved, name) {
+			unresolved = append(unresolved, name)
+		}
+	}
+
+	for i, rawMsg := range rawMessages {
+		// entry N is the fallback label for a record too malformed to name
+		// itself, so the error can still point at a position in the file
+		entry := fmt.Sprintf("entry %d", i)
+
 		// Peek at the metadata to get type and name
 		var metadata map[string]any
 		err := json.Unmarshal(*rawMsg, &metadata)
 		if err != nil {
-			// Skip malformed entries
+			record(entry)
 			continue
 		}
 
 		// Extract meta information
 		metaMap, ok := metadata["meta"].(map[string]any)
 		if !ok {
-			// Skip resources without proper metadata
+			record(entry)
 			continue
+		}
+
+		// prefer the record's own identity over its position once there is one
+		if id, ok := metaMap["id"].(string); ok && id != "" {
+			entry = id
 		}
 
 		resourceType, ok := metaMap["type"].(string)
-		if !ok {
-			// Skip resources without type
+		if !ok || resourceType == "" {
+			record(entry)
 			continue
 		}
 
+		// A resource is created from its variety, every other kind from the
+		// kind itself. Both axes are written to state, so read the variety
+		// back where the record carries one
+		if subtype, ok := metaMap["subtype"].(string); ok && subtype != "" {
+			resourceType = subtype
+		}
+
 		resourceName, ok := metaMap["name"].(string)
-		if !ok {
-			// Skip resources without name
+		if !ok || resourceName == "" {
+			record(entry)
 			continue
 		}
 
 		// Create a typed resource reference using the registry
 		typedResource, err := fs.registry.CreateResource(resourceType, resourceName)
 		if err != nil {
-			// collect unknown resource types (plugin or type not registered), a
-			// state without them must never be returned as it would be saved
-			// without them
-			if !slices.Contains(unknownTypes, resourceType) {
-				unknownTypes = append(unknownTypes, resourceType)
-			}
+			// the type is not registered, or the file predates the split and
+			// records a kind that no longer resolves
+			record(resourceType)
 			continue
 		}
 
-		// Re-marshal and unmarshal into the typed reference
+		// Re-marshal and unmarshal into the typed reference. This overwrites
+		// what CreateResource set with what the file holds, so a record
+		// missing an axis keeps whatever the registry derived for it
 		resData, err := json.Marshal(metadata)
 		if err != nil {
-			// Skip if we can't re-marshal
+			record(entry)
 			continue
 		}
 
 		err = json.Unmarshal(resData, typedResource)
 		if err != nil {
-			// Skip if unmarshal into typed resource fails
+			record(entry)
 			continue
 		}
 
@@ -107,15 +135,12 @@ func (fs *FileStateStore) Load() (*State, error) {
 		resources = append(resources, typedResource)
 	}
 
-	if len(unknownTypes) > 0 {
-		slices.Sort(unknownTypes)
-		return nil, UnknownTypesError{Types: unknownTypes}
+	if len(unresolved) > 0 {
+		slices.Sort(unresolved)
+		return nil, UnknownTypesError{Types: unresolved}
 	}
 
-	s := NewState()
-	s.resources = resources
-
-	return s, nil
+	return resources, nil
 }
 
 // Exists checks if the state file exists
@@ -133,8 +158,12 @@ func (fs *FileStateStore) Clear() error {
 }
 
 // Save the current configuration state to the file
-func (fs *FileStateStore) Save(state *State) error {
-	d, err := state.Bytes()
+func (fs *FileStateStore) Save(entities []any) error {
+	if entities == nil {
+		entities = []any{}
+	}
+
+	d, err := json.MarshalIndent(entities, "", "  ")
 	if err != nil {
 		return fmt.Errorf("unable to serialize state: %w", err)
 	}
@@ -160,8 +189,7 @@ func createStateAtPath(path string, registry *registry.PluginRegistry) (*FileSta
 		path:     path,
 		registry: registry,
 	}
-	s := NewState()
-	err := fs.Save(s)
+	err := fs.Save(nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create state file at %s: %w", path, err)
 	}

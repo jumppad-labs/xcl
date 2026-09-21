@@ -292,7 +292,7 @@ func (p *ResourcePrinter) printTable(resource any) error {
 		name  string
 		value interface{}
 	}{
-		{"Type", meta.Type},
+		{"Type", meta.AddressType()},
 		{"Status", meta.Status},
 		{"File", fmt.Sprintf("%s:%d", meta.File, meta.Line)},
 		{"Module", meta.Module},
@@ -564,7 +564,7 @@ func (p *ResourcePrinter) printTree(resource any) error {
 	}
 
 	// Get emoji for resource type
-	emoji := p.getResourceEmoji(meta.Type)
+	emoji := p.getResourceEmoji(meta.AddressType())
 
 	// Print root resource
 	statusColor := color.New(p.getStatusColor(meta.Status))
@@ -579,7 +579,7 @@ func (p *ResourcePrinter) printTree(resource any) error {
 		value interface{}
 		emoji string
 	}{
-		{"Type", meta.Type, "📋"},
+		{"Type", meta.AddressType(), "📋"},
 		{"File", fmt.Sprintf("%s:%d", meta.File, meta.Line), "📁"},
 		{"Module", meta.Module, "📦"},
 	}
@@ -830,8 +830,8 @@ func (p *ResourcePrinter) printCard(resource any) error {
 	}
 
 	// Get emoji and format header
-	emoji := p.getResourceEmoji(meta.Type)
-	resourceType := strings.Title(meta.Type)
+	emoji := p.getResourceEmoji(meta.AddressType())
+	resourceType := strings.Title(meta.AddressType())
 	header := fmt.Sprintf("%s %s: %s", emoji, resourceType, meta.Name)
 	subHeader := meta.ID
 

@@ -801,3 +801,24 @@ func TestValidateAcceptsDisabledRegisteredTypeMissingRequiredAttribute(t *testin
 	err := p.Validate(f)
 	require.NoError(t, err)
 }
+
+func TestApplyRejectsUndefinedReferenceNamingTheResourceThatMadeIt(t *testing.T) {
+	f, pathErr := filepath.Abs("../test_fixtures/config/registered/invalid_reference/main.xcl")
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil, nil)
+
+	_, err := p.Apply(f)
+	require.IsType(t, &errors.ConfigError{}, err)
+
+	ce := err.(*errors.ConfigError)
+	require.Len(t, ce.Errors, 1)
+
+	pe := ce.Errors[0].(*errors.ParserError)
+	require.Equal(t, f, pe.Filename)
+	require.Contains(t, pe.Message, "resource 'resource.database.main'")
+	require.Contains(t, pe.Message, "resource.database.missing")
+}

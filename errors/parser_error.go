@@ -16,6 +16,18 @@ type ParserError struct {
 	Line     int
 	Column   int
 	Message  string
+
+	// Cause is the error this one was raised from, where there was one. It is
+	// kept so the original survives errors.Is and errors.As: formatting an
+	// error into Message renders its text but loses its identity, and a caller
+	// can then only match on the string
+	Cause error
+}
+
+// Unwrap returns the error this one was raised from, or nil when it was raised
+// on its own.
+func (p *ParserError) Unwrap() error {
+	return p.Cause
 }
 
 // Error pretty prints the error message as a string
@@ -76,6 +88,15 @@ func NewParserError(filename string, line, column int, message string) *ParserEr
 		Column:   column,
 		Message:  message,
 	}
+}
+
+// NewParserErrorWrapping creates a ParserError that keeps the error it was
+// raised from, so the original still answers errors.Is and errors.As.
+func NewParserErrorWrapping(filename string, line, column int, cause error, message string) *ParserError {
+	pe := NewParserError(filename, line, column, message)
+	pe.Cause = cause
+
+	return pe
 }
 
 // NewParserErrorFromResource creates a ParserError using metadata from a resource

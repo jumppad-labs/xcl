@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -23,12 +22,12 @@ const (
 	registeredModuleOutputID   = "module.shared.output.location"
 )
 
-// savedIDs returns the ID of every resource in st, in state order.
-func savedIDs(t *testing.T, st *state.State) []string {
+// savedIDs returns the ID of every entity in entities, in state order.
+func savedIDs(t *testing.T, entities []any) []string {
 	t.Helper()
 
 	ids := []string{}
-	for _, resource := range st.GetResources() {
+	for _, resource := range entities {
 		meta, err := types.GetMeta(resource)
 		require.NoError(t, err)
 

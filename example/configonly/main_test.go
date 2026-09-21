@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -461,7 +463,7 @@ func TestConfigOnlyExampleDestroysEverythingItApplied(t *testing.T) {
 
 	saved, err := store.Load()
 	require.NoError(t, err)
-	require.Equal(t, 0, saved.ResourceCount())
+	require.Empty(t, saved)
 }
 
 func TestConfigOnlyExamplePrintsNoResourcesRemaining(t *testing.T) {
@@ -490,4 +492,60 @@ func TestConfigOnlyExampleLogsDestroySuccessWithoutStartAtDebug(t *testing.T) {
 	sort.Strings(ids)
 
 	require.Equal(t, declaredResourceIDs, ids)
+}
+
+// methodFormLookups are the lookups that the configuration also offers as
+// generic methods from Go 1.27, the form an example must not be written in
+var methodFormLookups = []string{"Find", "FindByType", "FindOne", "All"}
+
+// TestConfigOnlyExampleUsesPortableLookupForm asserts the example looks
+// entities up through the package level functions rather than the generic
+// methods of the same name. Generic methods arrived in Go 1.27, so the method
+// form would stop the code a reader copies from compiling on the project's
+// minimum supported version. Entities, EntityCount and Outputs are ordinary
+// methods and are not affected
+func TestConfigOnlyExampleUsesPortableLookupForm(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
+	require.NoError(t, err)
+
+	lookups := 0
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		// a lookup names its type at the call, xcl.Find[T](c, address), so the
+		// function called is the selector wrapped in an index expression
+		fun := call.Fun
+		switch indexed := fun.(type) {
+		case *ast.IndexExpr:
+			fun = indexed.X
+		case *ast.IndexListExpr:
+			fun = indexed.X
+		}
+
+		selector, ok := fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		if !slices.Contains(methodFormLookups, selector.Sel.Name) {
+			return true
+		}
+
+		qualifier, ok := selector.X.(*ast.Ident)
+		require.True(t, ok,
+			"main.go calls %s as a method, which needs Go 1.27, call xcl.%s instead", selector.Sel.Name, selector.Sel.Name)
+
+		require.Equal(t, "xcl", qualifier.Name,
+			"main.go calls the %s method form, which needs Go 1.27, call xcl.%s instead", selector.Sel.Name, selector.Sel.Name)
+
+		lookups++
+
+		return true
+	})
+
+	require.NotZero(t, lookups, "the guard found no lookups in main.go, so it proves nothing")
 }

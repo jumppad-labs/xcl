@@ -19,8 +19,9 @@ func TestTemplateSchemaHCLTagPreservation(t *testing.T) {
 	template := &structs.Template{
 		ResourceBase: types.ResourceBase{
 			Meta: types.Meta{
-				Name: "test",
-				Type: "template",
+				Name:    "test",
+				Type:    types.TypeResource,
+				Subtype: "template",
 			},
 		},
 		Source:      "test source",

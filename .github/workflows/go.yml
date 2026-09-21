@@ -14,12 +14,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
-        go-version: 1.22
+        go-version: '1.27.0'
 
     - name: Build
       run: |
@@ -29,3 +29,37 @@ jobs:
 
     - name: Test
       run: go test -v ./... -race
+
+  # The minimum supported version is what the portable form of the lookup
+  # surface exists for, and nothing else proves it: the newest toolchain
+  # satisfies the go directive, so an ordinary build says nothing about the
+  # floor and a break in it is silent until a consumer on an older Go reports
+  # it. GOTOOLCHAIN pins the version rather than letting Go fetch a newer one.
+  #
+  # This job builds rather than tests, deliberately: plugins/example needs a
+  # binary that a fresh checkout does not produce, so a suite run here would be
+  # red for a reason unrelated to the toolchain and would teach contributors to
+  # ignore the job.
+  build-minimum-go:
+    name: Build on minimum supported Go
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: go1.25.0
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up minimum supported Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25.0'
+
+    - name: Confirm the toolchain really is the minimum
+      run: |
+        go version
+        go version | grep -q 'go1\.25\.0' || { echo "expected go1.25.0"; exit 1; }
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Vet
+      run: go vet ./...

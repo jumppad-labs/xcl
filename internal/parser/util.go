@@ -10,11 +10,12 @@ import (
 
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/convert"
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclparse"
+	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 // canonicalPath resolves a path to an absolute form with any symlinks
@@ -228,7 +229,7 @@ func setContextVariable(ctx *hcl.EvalContext, key string, value cty.Value) {
 
 // setContextVariablesFromList sets context variables for all resources in the values list
 // This is used to populate the evaluation context with linked resource values
-func setContextVariablesFromList(s ResourceProvider, r any, values []string, ctx *hcl.EvalContext) *errors.ParserError {
+func setContextVariablesFromList(s ResourceProvider, addresses *resources.AddressParser, r any, values []string, ctx *hcl.EvalContext) *errors.ParserError {
 	for _, v := range values {
 		rMeta, err := types.GetMeta(r)
 		if err != nil {
@@ -251,7 +252,7 @@ func setContextVariablesFromList(s ResourceProvider, r any, values []string, ctx
 		}
 
 		// Get the value from the linked resource
-		l, err := s.FindRelativeResource(v, rMeta.Module)
+		l, err := findRelative(s, addresses, v, rMeta.Module)
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				r,
@@ -502,7 +503,7 @@ func getNameAndIndex(path []string) (name string, index int, remainingPath []str
 	return path[0], -1, path[1:], nil
 }
 
-func getResourceDependencies(rp ResourceProvider, resource any, resourceMeta *types.Meta) (map[any]bool, error) {
+func getResourceDependencies(rp ResourceProvider, addresses *resources.AddressParser, resource any, resourceMeta *types.Meta) (map[any]bool, error) {
 	deps, err := types.GetDependencies(resource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dependencies for resource %s: %w", resourceMeta.ID, err)
@@ -536,7 +537,7 @@ func getResourceDependencies(rp ResourceProvider, resource any, resourceMeta *ty
 
 			// we ignore the error here as it may be possible that the module depends on
 			// disabled resources
-			deps, _ := rp.FindModuleResources(relFQDN.String(), true)
+			deps, _ := findModule(rp, addresses, relFQDN.String(), true)
 
 			for _, dep := range deps {
 				dependencies[dep] = true
@@ -552,7 +553,7 @@ func getResourceDependencies(rp ResourceProvider, resource any, resourceMeta *ty
 
 			// we ignore the error here as it may be possible that the module depends on
 			// disabled resources
-			dep, _ := rp.FindResource(relFQDN.String())
+			dep, _ := findByAddress(rp, addresses, relFQDN.String())
 
 			dependencies[dep] = true
 		}
@@ -562,7 +563,7 @@ func getResourceDependencies(rp ResourceProvider, resource any, resourceMeta *ty
 	if resourceMeta.Module != "" {
 		fqdnString := fmt.Sprintf("module.%s", resourceMeta.Module)
 
-		d, err := rp.FindResource(fqdnString)
+		d, err := findByAddress(rp, addresses, fqdnString)
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				resource,
@@ -611,4 +612,83 @@ func convertCtyToGo(val cty.Value) any {
 		// This could be further improved based on specific cty types
 		return val.GoString()
 	}
+}
+
+// findByAddress returns the entity rp holds at the address given.
+//
+// Resolving an address is the parser's job, not storage's: it parses against
+// the types the registry knows and matches over the entities it is handed.
+func findByAddress(rp ResourceProvider, addresses *resources.AddressParser, address string) (any, error) {
+	fqrn, err := addresses.Parse(address)
+	if err != nil {
+		return nil, err
+	}
+
+	entity, found := resources.Match(rp.GetResources(), fqrn)
+	if !found {
+		return nil, state.ResourceNotFoundError{Resource: fqrn.StringWithoutAttribute()}
+	}
+
+	return entity, nil
+}
+
+// findRelative returns the entity at an address resolved relative to a parent
+// module.
+func findRelative(rp ResourceProvider, addresses *resources.AddressParser, address, parentModule string) (any, error) {
+	fqrn, err := addresses.Parse(address)
+	if err != nil {
+		return nil, err
+	}
+
+	if parentModule != "" {
+		relative := fqrn.AppendParentModule(parentModule)
+		fqrn = &relative
+	}
+
+	entity, found := resources.Match(rp.GetResources(), fqrn)
+	if !found {
+		return nil, state.ResourceNotFoundError{Resource: fqrn.StringWithoutAttribute()}
+	}
+
+	return entity, nil
+}
+
+// findModule returns the entities declared inside a module.
+func findModule(rp ResourceProvider, addresses *resources.AddressParser, module string, includeSubModules bool) ([]any, error) {
+	fqrn, err := addresses.Parse(module)
+	if err != nil {
+		return nil, err
+	}
+
+	found, err := resources.MatchModule(rp.GetResources(), fqrn, includeSubModules)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(found) == 0 {
+		return nil, state.ResourceNotFoundError{Resource: module}
+	}
+
+	return found, nil
+}
+
+// findByID returns the entity a state holds under the given id.
+//
+// An entity's id is its rendered address, so a lookup by id needs no address
+// parsing at all: it compares what is already recorded on each entity. This is
+// what the lifecycle and the progress tracker want when they ask whether the
+// previous state held something.
+func findByID(entities []any, id string) (any, error) {
+	for _, e := range entities {
+		meta, err := types.GetMeta(e)
+		if err != nil {
+			continue
+		}
+
+		if meta.ID == id {
+			return e, nil
+		}
+	}
+
+	return nil, state.ResourceNotFoundError{Resource: id}
 }

@@ -1,0 +1,5 @@
+# wibble is not a stanza keyword and names no type the registry knows, so the
+# declaration is rejected and the keyword is named in the error
+wibble "thing" {
+  size = 10
+}

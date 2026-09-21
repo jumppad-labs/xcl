@@ -4,10 +4,13 @@ import (
 	"errors"
 	"fmt"
 
+	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/parser"
+	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
+	"github.com/jumppad-labs/xcl/types"
 )
 
 // ErrEmptyConfiguration is returned by Apply when the configuration declares no
@@ -15,15 +18,84 @@ import (
 // remove everything. Check for it with errors.Is.
 var ErrEmptyConfiguration = parser.ErrEmptyConfiguration
 
+// The errors a lookup against a configuration can return. Each is matched by
+// identity with errors.Is, and each is wrapped by the detail type below it,
+// recovered with errors.As.
+//
+// They are re-exported from the project's errors package so that matching one
+// needs no import named errors beside the standard library's.
+//
+// ErrNotFound and ErrNotUnique are ordinary outcomes to handle. The other five
+// mean the question itself had no answer.
+var (
+	// ErrNotFound means no entity is declared at the address given. It is
+	// distinct from plugins.ErrNotFound, which means the real infrastructure
+	// behind a declared entity has gone missing.
+	ErrNotFound = xclerrors.ErrNotFound
+
+	// ErrUnknownType means the leading segment of a query is not a known kind.
+	ErrUnknownType = xclerrors.ErrUnknownType
+
+	// ErrNotTypeable means the query matches entities of more than one Go
+	// type, so the result cannot be typed.
+	ErrNotTypeable = xclerrors.ErrNotTypeable
+
+	// ErrNotRegistered means a Go type has no registered name to derive an
+	// address from, which is always so for a plugin provided type.
+	ErrNotRegistered = xclerrors.ErrNotRegistered
+
+	// ErrTypeMismatch means an entity is not of the Go type asked for.
+	ErrTypeMismatch = xclerrors.ErrTypeMismatch
+
+	// ErrNotAnEntity means a Go type is a block nested inside another
+	// declaration and so has no address of its own.
+	ErrNotAnEntity = xclerrors.ErrNotAnEntity
+
+	// ErrNotUnique means a query expecting exactly one entity matched more
+	// than one. The detail reports how many.
+	ErrNotUnique = xclerrors.ErrNotUnique
+)
+
+// The detail carried by each of the errors above, recovered with errors.As.
+// These are aliases, so a caller names them here without importing a second
+// package called errors.
+type (
+	NotFoundError      = xclerrors.NotFoundError
+	UnknownTypeError   = xclerrors.UnknownTypeError
+	NotTypeableError   = xclerrors.NotTypeableError
+	NotRegisteredError = xclerrors.NotRegisteredError
+	TypeMismatchError  = xclerrors.TypeMismatchError
+	NotAnEntityError   = xclerrors.NotAnEntityError
+	NotUniqueError     = xclerrors.NotUniqueError
+)
+
 // Config defines the stack config
 // It orchestrates high-level operations (Apply, Validate, Destroy)
 // and manages the current state
 type Config struct {
-	currentState   *state.State             // Current state (private)
+	entities       []any                    // what the configuration declares (private)
 	pluginRegistry *registry.PluginRegistry // Config owns plugins
 	stateStore     state.StateStore         // Persistence for state
 	variables      map[string]any           // Variables for HCL parsing
 	eventHandler   EventHandler             // Called for every lifecycle event during Apply and Destroy
+
+	addresses *resources.AddressParser // resolves addresses against the known types
+}
+
+// addressParser returns a parser that resolves addresses against the types the
+// registry knows. A module relative address cannot be split without them: in
+// module.a.b.c, "b" is a module name unless something is registered under it.
+func (c *Config) addressParser() *resources.AddressParser {
+	if c.addresses == nil {
+		var known []types.TypeInfo
+		if c.pluginRegistry != nil {
+			known = c.pluginRegistry.Types()
+		}
+
+		c.addresses = resources.NewAddressParser(known)
+	}
+
+	return c.addresses
 }
 
 // NewConfig creates a new Config with functional options
@@ -31,8 +103,8 @@ type Config struct {
 // resource types and no state
 func NewConfig(opts ...ConfigOption) *Config {
 	c := &Config{
-		currentState: state.NewState(),
-		variables:    map[string]any{},
+		entities:  []any{},
+		variables: map[string]any{},
 	}
 
 	// Apply all options
@@ -48,27 +120,72 @@ func NewConfig(opts ...ConfigOption) *Config {
 }
 
 // GetResources returns all resources in current state
-func (c *Config) GetResources() []any {
-	if c.currentState == nil {
-		return []any{}
-	}
-	return c.currentState.GetResources()
+func (c *Config) Entities() []any {
+	return c.entities
 }
 
 // FindResource finds a resource in current state by FQRN path
 func (c *Config) FindResource(path string) (any, error) {
-	if c.currentState == nil {
-		return nil, state.ResourceNotFoundError{Resource: path}
+	fqrn, err := c.addressParser().Parse(path)
+	if err != nil {
+		return nil, err
 	}
-	return c.currentState.FindResource(path)
+
+	entity, found := resources.Match(c.Entities(), fqrn)
+	if !found {
+		return nil, &xclerrors.NotFoundError{Address: path}
+	}
+
+	return entity, nil
 }
 
 // ResourceCount returns number of resources in current state
+func (c *Config) EntityCount() int {
+	return len(c.entities)
+}
+
+// GetResources returns every entity the configuration declares.
+//
+// Deprecated: use Entities. The configuration declares more than resources —
+// variables, published values and modules are entities too — and the name said
+// otherwise. This returns exactly what Entities returns.
+func (c *Config) GetResources() []any {
+	return c.Entities()
+}
+
+// ResourceCount returns the number of entities the configuration declares.
+//
+// Deprecated: use EntityCount. It counts every kind of declaration, not only
+// resources. This returns exactly what EntityCount returns.
 func (c *Config) ResourceCount() int {
-	if c.currentState == nil {
-		return 0
+	return c.EntityCount()
+}
+
+// Outputs returns every value the configuration publishes, keyed by address.
+//
+// There is one entry per published declaration, and each value is the resolved
+// value rather than the declaration that produced it, exactly as Find returns
+// it for the same address. It is the call FindByType names when asked for
+// published values, which it cannot type because they span whatever the
+// configuration publishes.
+func (c *Config) Outputs() map[string]any {
+	published := map[string]any{}
+
+	for _, e := range c.Entities() {
+		output, ok := e.(*resources.Output)
+		if !ok {
+			continue
+		}
+
+		meta, err := types.GetMeta(output)
+		if err != nil {
+			continue
+		}
+
+		published[meta.ID] = output.Value
 	}
-	return c.currentState.ResourceCount()
+
+	return published
 }
 
 // Validate parses config from the given paths and reports whether it is valid,
@@ -132,12 +249,12 @@ func (c *Config) Apply(paths ...string) error {
 		return err
 	}
 
-	// Adopt the new state
-	c.currentState = newState
+	// Adopt what the parse produced
+	c.entities = newState.GetResources()
 
 	// Save to store
 	if c.stateStore != nil {
-		if saveErr := c.stateStore.Save(c.currentState); saveErr != nil {
+		if saveErr := c.stateStore.Save(c.entities); saveErr != nil {
 			return errors.Join(err, fmt.Errorf("failed to save state: %w", saveErr))
 		}
 	}
@@ -158,7 +275,7 @@ func (c *Config) Apply(paths ...string) error {
 // named in the returned error; calling Destroy again retries it. When nothing
 // has been saved Destroy succeeds and writes nothing.
 func (c *Config) Destroy() error {
-	saved := c.currentState
+	saved := c.entities
 
 	if c.stateStore != nil {
 		if !c.stateStore.Exists() {
@@ -173,7 +290,7 @@ func (c *Config) Destroy() error {
 		saved = loaded
 	}
 
-	if saved == nil || saved.ResourceCount() == 0 {
+	if len(saved) == 0 {
 		return nil
 	}
 
@@ -185,7 +302,9 @@ func (c *Config) Destroy() error {
 	})
 
 	remaining, err := p.Destroy(saved)
-	c.currentState = remaining
+	if remaining != nil {
+		c.entities = remaining.GetResources()
+	}
 
 	return err
 }

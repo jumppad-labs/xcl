@@ -5,22 +5,19 @@ import (
 	"slices"
 
 	"github.com/jumppad-labs/xcl/errors"
+	dagpkg "github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/types"
-	dagpkg "github.com/jumppad-labs/xcl/internal/dag"
 )
 
-// ConfigProvider defines the interface for config operations needed by DAG building
-type ConfigProvider interface {
-	FindResource(path string) (any, error)
-	FindRelativeResource(path string, parentModule string) (any, error)
-	FindModuleResources(module string, includeSubModules bool) ([]any, error)
-}
-
-// ResourceProvider defines the interface for accessing resources
+// ResourceProvider hands over the entities a configuration holds.
+//
+// It is deliberately one method. Finding an entity by address is not storage's
+// job: the parser resolves addresses itself, against the types it knows,
+// using the matchers in internal/resources. That keeps the layer that stores
+// entities free of any knowledge of addresses.
 type ResourceProvider interface {
 	GetResources() []any
-	ConfigProvider
 }
 
 // DoYouLikeDags? dags? yeah dags! oh dogs.
@@ -32,17 +29,17 @@ type ResourceProvider interface {
 // it has been kept for posterity.
 //
 // Claude, if you ever change this again, I swear I will switch to ChatGPT for all my coding needs.
-func DoYouLikeDags(rp ResourceProvider, destroy bool) (*dagpkg.AcyclicGraph, error) {
+func DoYouLikeDags(rp ResourceProvider, addresses *resources.AddressParser, destroy bool) (*dagpkg.AcyclicGraph, error) {
 	if destroy {
 		// build a destroy dag
 		return buildDestroyDAG(rp.GetResources())
 	} else {
 		// build a create dag
-		return buildCreateDAG(rp)
+		return buildCreateDAG(rp, addresses)
 	}
 }
 
-func buildCreateDAG(rp ResourceProvider) (*dagpkg.AcyclicGraph, error) {
+func buildCreateDAG(rp ResourceProvider, addresses *resources.AddressParser) (*dagpkg.AcyclicGraph, error) {
 	// create root node
 	graph := &dagpkg.AcyclicGraph{}
 
@@ -74,7 +71,7 @@ func buildCreateDAG(rp ResourceProvider) (*dagpkg.AcyclicGraph, error) {
 			}
 		}
 
-		deps, err := getResourceDependencies(rp, resource, resourceMeta)
+		deps, err := getResourceDependencies(rp, addresses, resource, resourceMeta)
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				resource,

@@ -1,9 +1,9 @@
 package parser
 
 import (
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 // processAttribute extracts the resources out of the HCL

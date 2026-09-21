@@ -1,23 +1,27 @@
 package parser
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
-	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
 // newTestNetwork builds a network resource with the given name, subnet and
-// status, the way the parser would hold it in memory.
+// status, the way the parser would hold it in memory. The id is set here
+// because the parser assigns it while parsing, it is not derived when the
+// resource is stored.
 func newTestNetwork(name, subnet, status string) *structs.Network {
 	return &structs.Network{
 		ResourceBase: types.ResourceBase{
 			Meta: types.Meta{
-				Name:   name,
-				Type:   structs.TypeNetwork,
-				Status: status,
+				ID:      fmt.Sprintf("resource.%s.%s", structs.TypeNetwork, name),
+				Name:    name,
+				Type:    types.TypeResource,
+				Subtype: structs.TypeNetwork,
+				Status:  status,
 			},
 		},
 		Subnet: subnet,
@@ -25,10 +29,10 @@ func newTestNetwork(name, subnet, status string) *structs.Network {
 }
 
 // newStateWith builds a state holding the given resources.
-func newStateWith(t *testing.T, resources ...any) *state.State {
+func newStateWith(t *testing.T, resources ...any) *State {
 	t.Helper()
 
-	st := state.NewState()
+	st := NewState()
 	for _, r := range resources {
 		err := st.AppendResource(r)
 		require.NoError(t, err)
@@ -40,7 +44,7 @@ func newStateWith(t *testing.T, resources ...any) *state.State {
 func TestBuildStateKeepsReachedResources(t *testing.T) {
 	reached := newTestNetwork("reached", "10.0.0.0/16", types.StatusCreated)
 	current := newStateWith(t, reached)
-	previous := state.NewState()
+	previous := NewState()
 
 	progress := newApplyProgress()
 	progress.record("resource.network.reached", outcome{saved: reached})
@@ -50,7 +54,7 @@ func TestBuildStateKeepsReachedResources(t *testing.T) {
 
 	require.Equal(t, 1, built.ResourceCount())
 
-	saved, err := built.FindResource("resource.network.reached")
+	saved, err := findByID(built.GetResources(), "resource.network.reached")
 	require.NoError(t, err)
 
 	network := saved.(*structs.Network)
@@ -74,7 +78,7 @@ func TestBuildStateKeepsFailedResourceAsFailed(t *testing.T) {
 
 	require.Equal(t, 1, built.ResourceCount())
 
-	saved, err := built.FindResource("resource.network.broken")
+	saved, err := findByID(built.GetResources(), "resource.network.broken")
 	require.NoError(t, err)
 
 	network := saved.(*structs.Network)
@@ -98,7 +102,7 @@ func TestBuildStateKeepsPreviousEntryForUnreachedExistingResource(t *testing.T) 
 
 	require.Equal(t, 1, built.ResourceCount())
 
-	saved, err := built.FindResource("resource.network.unreached")
+	saved, err := findByID(built.GetResources(), "resource.network.unreached")
 	require.NoError(t, err)
 
 	network := saved.(*structs.Network)
@@ -111,7 +115,7 @@ func TestBuildStateOmitsUnreachedNewResource(t *testing.T) {
 	reached := newTestNetwork("reached", "10.0.0.0/16", types.StatusCreated)
 	unreached := newTestNetwork("new", "10.1.0.0/16", "")
 	current := newStateWith(t, reached, unreached)
-	previous := state.NewState()
+	previous := NewState()
 
 	progress := newApplyProgress()
 	progress.record("resource.network.reached", outcome{saved: reached})
@@ -121,9 +125,9 @@ func TestBuildStateOmitsUnreachedNewResource(t *testing.T) {
 
 	require.Equal(t, 1, built.ResourceCount())
 
-	_, err = built.FindResource("resource.network.new")
+	_, err = findByID(built.GetResources(), "resource.network.new")
 	require.Error(t, err)
 
-	_, err = built.FindResource("resource.network.reached")
+	_, err = findByID(built.GetResources(), "resource.network.reached")
 	require.NoError(t, err)
 }

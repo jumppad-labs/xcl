@@ -9,6 +9,8 @@ import (
 
 	"github.com/hashicorp/errwrap"
 	"github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/cty/function"
+	"github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/functions"
 	"github.com/jumppad-labs/xcl/internal/modules"
 	"github.com/jumppad-labs/xcl/internal/resources"
@@ -20,8 +22,6 @@ import (
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
-	"github.com/jumppad-labs/xcl/internal/dag"
-	"github.com/jumppad-labs/xcl/internal/cty/function"
 )
 
 type ResourceTypeNotExistError struct {
@@ -134,7 +134,25 @@ type Parser struct {
 	pluginRegistry   *registry.PluginRegistry
 	providerResolver ProviderResolver
 	typeRegistry     TypeRegistry
-	parsedResources  *parsed // Working storage during parsing
+	addresses        *resources.AddressParser // resolves addresses against the known types
+	parsedResources  *parsed                  // Working storage during parsing
+}
+
+// addressParser returns a parser that resolves addresses against the types the
+// registry knows. A module relative address cannot be split without them:
+// in module.a.b.c, "b" is a module name unless something is registered under
+// it. The set does not change during a parse, so it is built once.
+func (p *Parser) addressParser() *resources.AddressParser {
+	if p.addresses == nil {
+		var known []types.TypeInfo
+		if p.pluginRegistry != nil {
+			known = p.pluginRegistry.Types()
+		}
+
+		p.addresses = resources.NewAddressParser(known)
+	}
+
+	return p.addresses
 }
 
 // NewParser creates a new parser with the given options
@@ -210,7 +228,7 @@ func NewParser(options *ParserOptions) *Parser {
 // failed resource with status "failed", and the previous entry of resources
 // that existed before but were not reached. Parse and validation failures
 // return a nil State.
-func (p *Parser) Apply(paths ...string) (*state.State, error) {
+func (p *Parser) Apply(paths ...string) (*State, error) {
 	currentState, previousState, err := p.parseAndValidate(paths...)
 	if err != nil {
 		return nil, err
@@ -228,7 +246,7 @@ func (p *Parser) Apply(paths ...string) (*state.State, error) {
 	// replacements
 	removed := removedResources(currentState, previousState)
 	if len(removed) > 0 {
-		working := state.NewState()
+		working := NewState()
 		for _, r := range previousState.GetResources() {
 			if err := working.AppendResource(r); err != nil {
 				ce.AppendError(err)
@@ -298,16 +316,14 @@ func (p *Parser) Apply(paths ...string) (*state.State, error) {
 // Destroy returns what is left, which is empty when everything was destroyed,
 // together with an error naming every resource that failed. The returned state
 // is never nil.
-func (p *Parser) Destroy(saved *state.State) (*state.State, error) {
-	if saved == nil {
-		saved = state.NewState()
-	}
-
-	working := state.NewState()
-	for _, r := range saved.GetResources() {
-		err := working.AppendResource(r)
-		if err != nil {
-			return saved, err
+// Destroy removes the entities given, children before their parents. It takes
+// plain entities rather than a container, because that is what a state store
+// hands back and what a caller holds.
+func (p *Parser) Destroy(saved []any) (*State, error) {
+	working := NewState()
+	for _, r := range saved {
+		if err := working.AppendResource(r); err != nil {
+			return working, err
 		}
 	}
 
@@ -329,7 +345,7 @@ func (p *Parser) Destroy(saved *state.State) (*state.State, error) {
 
 // removedResources returns the resources in previous that are no longer in
 // current
-func removedResources(current, previous *state.State) []any {
+func removedResources(current, previous *State) []any {
 	if previous == nil {
 		return nil
 	}
@@ -341,7 +357,7 @@ func removedResources(current, previous *state.State) []any {
 			continue
 		}
 
-		if _, err := current.FindResource(meta.ID); err != nil {
+		if _, err := findByID(current.GetResources(), meta.ID); err != nil {
 			removed = append(removed, r)
 		}
 	}
@@ -365,26 +381,34 @@ func (p *Parser) Validate(paths ...string) error {
 // stored state, or every problem found. A configuration that does not parse is
 // never validated, and a configuration that does not validate is never returned,
 // so a caller that receives no error holds a configuration worth acting on.
-func (p *Parser) parseAndValidate(paths ...string) (*state.State, *state.State, error) {
+func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 	if len(paths) == 0 {
 		return nil, nil, fmt.Errorf("at least one path is required")
 	}
 
 	// Load previous state from store (for comparison during Create/Update)
-	var previousState *state.State
+	var previousState *State
 	if p.stateStore != nil && p.stateStore.Exists() {
-		var err error
-		previousState, err = p.stateStore.Load()
+		// the store hands back plain entities; the container is this
+		// package's own working shape and is built from them here
+		saved, err := p.stateStore.Load()
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load previous state: %w", err)
 		}
+
+		previousState = NewState()
+		for _, e := range saved {
+			if appendErr := previousState.AppendResource(e); appendErr != nil {
+				return nil, nil, fmt.Errorf("failed to load previous state: %w", appendErr)
+			}
+		}
 	}
 	if previousState == nil {
-		previousState = state.NewState()
+		previousState = NewState()
 	}
 
 	// Create new state for current parse
-	currentState := state.NewState()
+	currentState := NewState()
 
 	// Initialize parsed resources container
 	p.parsedResources = &parsed{
@@ -537,15 +561,50 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 			resourceType, resourceID := blockResource(b, module)
 			fireParseEvent(&p.options, resourceType, resourceID, file, err)
 		default:
-			de := errors.NewParserError(
-				file,
-				b.TypeRange.Start.Line,
-				b.TypeRange.Start.Column,
-				fmt.Sprintf("unable to process stanza '%s' in file %s at %d,%d , only 'variable', 'resource', 'module', and 'output' are valid stanza blocks", b.Type, file, b.Range().Start.Line, b.Range().Start.Column),
-			)
+			// not one of the four stanza keywords, so it is only valid when it
+			// names a type registered in the bare form. A type is registered
+			// under one form or the other, never both, so leading with the
+			// keyword of a kind led type is an error rather than an alias for it
+			info, known := types.TypeInfo{}, false
+			if p.pluginRegistry != nil {
+				info, known = p.pluginRegistry.Type(b.Type)
+			}
 
-			fireParseEvent(&p.options, "", "", file, de)
-			blockErrors = append(blockErrors, de)
+			if !known {
+				de := errors.NewParserError(
+					file,
+					b.TypeRange.Start.Line,
+					b.TypeRange.Start.Column,
+					fmt.Sprintf("unable to process stanza '%s' in file %s at %d,%d , '%s' is not a known type", b.Type, file, b.Range().Start.Line, b.Range().Start.Column, b.Type),
+				)
+
+				fireParseEvent(&p.options, "", "", file, de)
+				blockErrors = append(blockErrors, de)
+
+				continue
+			}
+
+			if !info.Bare {
+				de := errors.NewParserError(
+					file,
+					b.TypeRange.Start.Line,
+					b.TypeRange.Start.Column,
+					fmt.Sprintf("'%s' is declared with the resource keyword, i.e. 'resource \"%s\" \"name\" {}', not as '%s \"name\" {}'", b.Type, b.Type, b.Type),
+				)
+
+				fireParseEvent(&p.options, "", "", file, de)
+				blockErrors = append(blockErrors, de)
+
+				continue
+			}
+
+			err := p.parseResource(file, b, module)
+			if err != nil {
+				blockErrors = append(blockErrors, err)
+			}
+
+			resourceType, resourceID := blockResource(b, module)
+			fireParseEvent(&p.options, resourceType, resourceID, file, err)
 		}
 	}
 
@@ -566,15 +625,17 @@ func blockResource(b *hclsyntax.Block, module string) (string, string) {
 
 	switch {
 	case b.Type == types.TypeResource && len(b.Labels) == 2:
-		fqrn.Type = b.Labels[0]
+		fqrn.Subtype = b.Labels[0]
 		fqrn.Resource = b.Labels[1]
 	case b.Type != types.TypeResource && len(b.Labels) == 1:
+		// covers the single label builtins and the bare declaration form
+		// alike: the keyword is the kind and there is no variety
 		fqrn.Resource = b.Labels[0]
 	default:
 		return "", ""
 	}
 
-	return fqrn.Type + "." + fqrn.Resource, fqrn.String()
+	return fqrn.AddressType() + "." + fqrn.Resource, fqrn.String()
 }
 
 func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName string) error {
@@ -606,13 +667,25 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 			return de
 		}
 
-		// Create resource type using plugin registry
-		rt, err = p.pluginRegistry.CreateResource(b.Labels[0], name)
-		if err != nil {
-			de := errors.NewParserError(
+		// a type registered in the bare form is declared by its own keyword,
+		// so it is not reachable through the resource keyword
+		if info, known := p.pluginRegistry.Type(b.Labels[0]); known && info.Bare {
+			return errors.NewParserError(
 				file,
 				b.TypeRange.Start.Line,
 				b.TypeRange.Start.Column,
+				fmt.Sprintf("'%s' is declared by its own keyword, i.e. '%s \"%s\" {}', not with the resource keyword", b.Labels[0], b.Labels[0], name),
+			)
+		}
+
+		// Create resource type using plugin registry
+		rt, err = p.pluginRegistry.CreateResource(b.Labels[0], name)
+		if err != nil {
+			de := errors.NewParserErrorWrapping(
+				file,
+				b.TypeRange.Start.Line,
+				b.TypeRange.Start.Column,
+				err,
 				fmt.Sprintf("unable to create resource '%s' of type '%s': %s", name, b.Labels[0], err),
 			)
 			return de
@@ -648,6 +721,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 			de.Column = b.TypeRange.Start.Column
 			de.Filename = file
 			de.Message = fmt.Sprintf(`unable to create output, this error should never happen %s`, err)
+			de.Cause = err
 
 			return de
 		}
@@ -681,6 +755,45 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 			de.Column = b.TypeRange.Start.Column
 			de.Filename = file
 			de.Message = fmt.Sprintf(`unable to create variable, this error should never happen %s`, err)
+			de.Cause = err
+
+			return de
+		}
+
+	default:
+		// a declaration led by its own type keyword, i.e. container "nics".
+		// It carries one label, the name, and is a different type from the
+		// kind led resource "container" "nics" rather than a spelling of it
+		if len(b.Labels) != 1 {
+			de := &errors.ParserError{}
+			de.Line = b.TypeRange.Start.Line
+			de.Column = b.TypeRange.Start.Column
+			de.Filename = file
+			de.Message = fmt.Sprintf(`invalid format for '%s', a resource declared by its type has only a name, i.e. '%s "name" {}'`, b.Type, b.Type)
+
+			return de
+		}
+
+		name := b.Labels[0]
+		if err := validateResourceName(name); err != nil {
+			de := &errors.ParserError{}
+			de.Line = b.TypeRange.Start.Line
+			de.Column = b.TypeRange.Start.Column
+			de.Filename = file
+			de.Message = err.Error()
+
+			return de
+		}
+
+		rt, err = p.pluginRegistry.CreateResource(b.Type, name)
+		if err != nil {
+			de := errors.NewParserErrorWrapping(
+				file,
+				b.TypeRange.Start.Line,
+				b.TypeRange.Start.Column,
+				err,
+				fmt.Sprintf("unable to create resource '%s' of type '%s': %s", name, b.Type, err),
+			)
 
 			return de
 		}
@@ -694,6 +807,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 		de.Column = b.TypeRange.Start.Column
 		de.Filename = file
 		de.Message = fmt.Sprintf("unable to get resource meta for resource %s: %s", b.Labels[0], err)
+		de.Cause = err
 		return de
 	}
 
@@ -715,6 +829,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 		de.Column = b.TypeRange.Start.Column
 		de.Filename = file
 		de.Message = fmt.Sprintf("error creating resource '%s' in file %s: %s", b.Labels[0], file, err)
+		de.Cause = err
 		return de
 	}
 
@@ -796,6 +911,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 		de.Column = b.TypeRange.Start.Column
 		de.Filename = file
 		de.Message = fmt.Sprintf(`unable to create module, this error should never happen %s`, err)
+		de.Cause = err
 
 		return fail(de)
 	}
@@ -808,6 +924,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 		de.Column = b.TypeRange.Start.Column
 		de.Filename = file
 		de.Message = fmt.Sprintf("unable to get resource meta for resource %s: %s", b.Labels[0], err)
+		de.Cause = err
 		return fail(de)
 	}
 
@@ -831,6 +948,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 		de.Column = b.TypeRange.Start.Column
 		de.Filename = file
 		de.Message = fmt.Sprintf("error creating resource '%s' in file %s: %s", b.Labels[0], file, err)
+		de.Cause = err
 		return fail(de)
 	}
 
@@ -879,6 +997,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 		de.Column = b.TypeRange.Start.Column
 		de.Filename = file
 		de.Message = fmt.Sprintf(`unable to obtain contents for module '%s' source '%s': %s`, name, sourceDir, err)
+		de.Cause = err
 		return fail(de)
 	}
 
@@ -903,6 +1022,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 		de.Column = b.TypeRange.Start.Column
 		de.Filename = file
 		de.Message = fmt.Sprintf(`unable to discover files for module '%s' source '%s': %s`, name, sourceDir, err)
+		de.Cause = err
 		return fail(de)
 	}
 
@@ -954,7 +1074,7 @@ func (p *Parser) getUniqueResourceLinks(resource any, b *hclsyntax.Block) error 
 		// depends on is a slice of string
 		dependsOnSlice := dependsOnVal.AsValueSlice()
 		for _, d := range dependsOnSlice {
-			fqdn, err := resources.ParseFQRN(d.AsString())
+			fqdn, err := p.addressParser().Parse(d.AsString())
 			if err != nil {
 				return fmt.Errorf("invalid dependency %s, %s", d.AsString(), err)
 			}
@@ -1025,7 +1145,7 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block) ([]stri
 
 				// Check if the dependency's links contain a reference back to us
 				for _, cdep := range depMeta.Links {
-					fqrn, err := resources.ParseFQRN(cdep)
+					fqrn, err := p.addressParser().Parse(cdep)
 					if err != nil {
 						continue
 					}
@@ -1034,6 +1154,7 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block) ([]stri
 					// Check for direct cycle
 					if rMeta.Name == fqrn.Resource &&
 						rMeta.Type == fqrn.Type &&
+						rMeta.Subtype == fqrn.Subtype &&
 						rMeta.Module == fqrn.Module {
 						return nil, errors.NewParserError(
 							b.Body.SrcRange.Filename,
@@ -1111,9 +1232,9 @@ func processDisabled(bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (b
 // and calls the provider lifecycle for each resource
 //
 // It returns the progress of the walk, which is nil when the walk did not start.
-func (p *Parser) walk(currentState, previousState *state.State, functions functionsForFile) (*applyProgress, []error) {
+func (p *Parser) walk(currentState, previousState *State, functions functionsForFile) (*applyProgress, []error) {
 	// Build the DAG using currentState (implements ResourceProvider)
-	d, err := DoYouLikeDags(currentState, false)
+	d, err := DoYouLikeDags(currentState, p.addressParser(), false)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -1141,7 +1262,7 @@ func (p *Parser) walk(currentState, previousState *state.State, functions functi
 		progress: newApplyProgress(),
 	}
 
-	w.Callback = walkCallback(p.parsedResources, currentState, lifecycle, &p.options, functions)
+	w.Callback = walkCallback(p.parsedResources, currentState, p.addressParser(), lifecycle, &p.options, functions)
 	w.Reverse = false
 
 	// Update the dag and process the nodes
