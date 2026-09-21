@@ -1,3 +1,6 @@
+schema: 3
+written_by: 0.15.1
+skills_version: 0.15.1
 name: xclconfig
 command: spektacular
 agent: claude
@@ -8,15 +11,21 @@ spec:
     provider: file
     id_method: timestamp
     config:
-        directory: .spektacular/specs
+        directory: specs
 plan:
     provider: file
     config:
-        directory: .spektacular/plans
+        directory: plans
 changelog:
     provider: file
     config:
-        directory: .spektacular/changelog
+        directory: changelog
+design:
+    sources:
+        - name: design
+          provider: file
+          config:
+            location: design
 repos:
     - name: xclconfig
       location: .

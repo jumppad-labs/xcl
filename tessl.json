@@ -10,5 +10,11 @@
     "tessl/golang-google-golang-org--protobuf": {
       "version": "1.36.0"
     }
-  }
+  },
+  "agents": [
+    "claude-code",
+    "codex",
+    "copilot",
+    "copilot-vscode"
+  ]
 }
