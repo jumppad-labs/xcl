@@ -1,6 +1,8 @@
 ---
 created_date: "2026-09-20"
 document_status: draft
+specs:
+    - 20260921093100-query-api-v2
 ---
 
 # Query API v2: consuming a parsed configuration
