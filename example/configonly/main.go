@@ -139,6 +139,12 @@ func printDeployments(out io.Writer, c *xcl.Config) error {
 		return err
 	}
 
+	// Go 1.27 version with method generics
+	// deployments, err = c.FindByType[resources.Deployment]("resource", "deployment")
+	// if err != nil {
+	// 	return err
+	// }
+
 	fmt.Fprintln(out, "## Deployments")
 	for _, d := range deployments {
 		fmt.Fprintf(out, "  %s replicas=%d\n", d.Meta.ID, d.Replicas)
