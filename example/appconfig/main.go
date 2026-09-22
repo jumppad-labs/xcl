@@ -27,8 +27,7 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/appconfig/resources"
-	"github.com/jumppad-labs/xcl/example/eventlog"
-	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 )
@@ -46,7 +45,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, err = run(os.Stdout, logger.NewStdOutLogger(), dir, filepath.Join(stateDir, "state.json"))
+	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv()), dir, filepath.Join(stateDir, "state.json"))
 	os.RemoveAll(stateDir)
 
 	if err != nil {
@@ -58,9 +57,9 @@ func main() {
 // run applies the configuration in dir with the application type registered,
 // keeping the state in a file at statePath, writes the configuration to out
 // as a tree and as JSON, and returns the application it parsed. Every event
-// xcl fires is logged to log.
-func run(out io.Writer, log logger.Logger, dir string, statePath string) (*resources.Application, error) {
-	r := registry.NewPluginRegistry(log)
+// xcl produces goes to handler, a nil handler leaves xcl silent.
+func run(out io.Writer, handler xcl.EventHandler, dir string, statePath string) (*resources.Application, error) {
+	r := registry.NewPluginRegistry()
 
 	// One block type, one Go type. Everything nested inside it is reached
 	// through the fields of that type.
@@ -76,7 +75,7 @@ func run(out io.Writer, log logger.Logger, dir string, statePath string) (*resou
 	c := xcl.NewConfig(
 		xcl.WithPluginRegistry(r),
 		xcl.WithStateStore(store),
-		xcl.WithEventHandler(eventlog.Handler(log)),
+		xcl.WithEventHandler(handler),
 	)
 
 	if err := c.Apply(dir); err != nil {

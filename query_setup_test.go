@@ -7,7 +7,6 @@ import (
 
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/stretchr/testify/mock"
@@ -28,9 +27,7 @@ func setupQueryConfig(t *testing.T) *Config {
 		os.Setenv("HOME", home)
 	})
 
-	log := logger.NewTestLogger(t)
-
-	pr := registry.NewPluginRegistry(log)
+	pr := registry.NewPluginRegistry()
 
 	err := pr.RegisterType(registered.TypeDatabase, &registered.Database{})
 	require.NoError(t, err)

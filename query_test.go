@@ -8,7 +8,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -31,7 +30,7 @@ func setupFindConfig(t *testing.T) *Config {
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	reg := registry.NewPluginRegistry()
 
 	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
 	require.NoError(t, err)

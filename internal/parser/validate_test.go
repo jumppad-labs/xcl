@@ -27,7 +27,7 @@ func TestValidateReferencesReturnsConfigErrorWhenResourceIsNotDefined(t *testing
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -48,7 +48,7 @@ func TestValidateReferencesReturnsConfigErrorWhenVariableIsNotDefined(t *testing
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -69,7 +69,7 @@ func TestValidateReferencesReturnsConfigErrorWhenOutputIsNotDefined(t *testing.T
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -90,7 +90,7 @@ func TestValidateReferencesReturnsConfigErrorWhenModuleIsNotDefined(t *testing.T
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -111,7 +111,7 @@ func TestValidateReferencesReportsEveryUndefinedReferenceAcrossFiles(t *testing.
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -152,7 +152,7 @@ func TestValidateReferencesAcceptsReferenceToResourceDeclaredInAnotherFile(t *te
 	// container.xcl refers to a network declared in network.xcl. A reference
 	// that crosses files is ordinary and must be accepted, otherwise an
 	// implementation that reported everything as missing would look correct.
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.NoError(t, err)
 }
 
@@ -164,7 +164,7 @@ func TestValidateReferencesAcceptsSimpleFixture(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -176,7 +176,7 @@ func TestValidateReferencesAcceptsModulesFixture(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -188,7 +188,7 @@ func TestValidateReferencesAcceptsInterpolationFixture(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -200,7 +200,7 @@ func TestValidateReferencesAcceptsCyclicalPassFixture(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -271,7 +271,7 @@ func TestValidateReferencesReturnsConfigErrorWhenModuleDoesNotDeclareOutput(t *t
 	// the module itself is obtainable, so parsing succeeds and reference
 	// validation is reached. The output the reference names is not one the
 	// module declares, so it must be reported and named.
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -292,7 +292,7 @@ func TestParseReturnsConfigErrorWhenModuleContentsCannotBeObtained(t *testing.T)
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -318,7 +318,7 @@ func TestParseDoesNotReportReferencesIntoModuleWhoseContentsCannotBeObtained(t *
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -348,7 +348,7 @@ func TestParseReturnsConfigErrorWhenModuleSourceIsNotOnTheLocalFilesystem(t *tes
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -389,7 +389,7 @@ func TestValidatePropertiesReturnsConfigErrorWhenPropertyDoesNotExist(t *testing
 	// the reference selects a volume by position and then names `destnation`,
 	// a misspelling of a property those volumes do have. The resource and the
 	// reference are both sound, so only the property is wrong.
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -410,7 +410,7 @@ func TestValidatePropertiesReportsEveryPropertyProblemAcrossFiles(t *testing.T) 
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -452,7 +452,7 @@ func TestValidatePropertiesAcceptsSelectionsFollowedByRealProperties(t *testing.
 	// position within a list and then a property of that member, and a key
 	// within a map whose members are scalars. Every one of them is ordinary
 	// configuration and must be accepted.
-	_, err := p.Apply(dir)
+	_, err := p.Apply(context.Background(), dir)
 	require.NoError(t, err)
 }
 
@@ -490,7 +490,7 @@ func TestValidatePropertiesAcceptsSimpleFixture(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -505,7 +505,7 @@ func TestValidatePropertiesAcceptsInterpolationFixture(t *testing.T) {
 	// this fixture reaches a volume by position as `volume.0.source` and every
 	// volume at once as `volume.*.destination`, both followed by properties
 	// those volumes really have.
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -522,7 +522,7 @@ func TestValidatePropertiesAcceptsModulesFixture(t *testing.T) {
 	// names the value that output holds rather than a field of the declaration,
 	// so checking `combined_map` against the Output struct would reject this
 	// whole fixture.
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -534,7 +534,7 @@ func TestValidatePropertiesAcceptsCyclicalPassFixture(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -549,7 +549,7 @@ func TestValidateRejectsConfiguredComputedField(t *testing.T) {
 
 	p, testPlugin := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -574,7 +574,7 @@ func TestValidateRejectsConfiguredNestedComputedField(t *testing.T) {
 
 	p, testPlugin := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -596,7 +596,7 @@ func TestValidateReportsConfiguredComputedFieldAtAttributePosition(t *testing.T)
 
 	p, _ := setupParser(t)
 
-	err := p.Validate(f)
+	err := p.Validate(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -618,7 +618,7 @@ func TestValidateAcceptsUnsetComputedField(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -689,14 +689,14 @@ func TestValidateRejectsNonOptionalComputedField(t *testing.T) {
 
 	o := testOptions(t)
 	o.StateStore = ms
-	o.PluginRegistry = registry.NewPluginRegistry(logger.NewTestLogger(t))
+	o.PluginRegistry = registry.NewPluginRegistry()
 
 	err := o.PluginRegistry.RegisterPlugin(&badComputedPlugin{})
 	require.NoError(t, err)
 
 	p, _ := setupParser(t, o)
 
-	err = p.Validate(f)
+	err = p.Validate(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -719,9 +719,9 @@ func TestValidateRejectsUnknownAttributeOnRegisteredType(t *testing.T) {
 	}
 
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	err := p.Validate(f)
+	err := p.Validate(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -742,7 +742,7 @@ func TestValidateRejectsUnknownAttributeOnPluginType(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	err := p.Validate(f)
+	err := p.Validate(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -762,9 +762,9 @@ func TestValidateRejectsUndefinedReferenceFromRegisteredType(t *testing.T) {
 	}
 
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	err := p.Validate(f)
+	err := p.Validate(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -783,9 +783,9 @@ func TestValidateAcceptsValidRegisteredTypeConfiguration(t *testing.T) {
 	}
 
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	err := p.Validate(f)
+	err := p.Validate(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -796,9 +796,9 @@ func TestValidateAcceptsDisabledRegisteredTypeMissingRequiredAttribute(t *testin
 	}
 
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	err := p.Validate(f)
+	err := p.Validate(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -809,9 +809,9 @@ func TestApplyRejectsUndefinedReferenceNamingTheResourceThatMadeIt(t *testing.T)
 	}
 
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)

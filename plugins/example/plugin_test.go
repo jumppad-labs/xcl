@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 
 func testSetup(t *testing.T) (logger.Logger, plugins.State) {
 	// Create a test logger and state
-	logger := logger.NewTestLogger(t)
+	logger := logger.Nop()
 	state := mocks.NewMockState(t)
 	return logger, state
 }
@@ -49,6 +50,6 @@ func TestPluginCreateCallsTheProviderWithAConcreteType(t *testing.T) {
 	require.NoError(t, err)
 
 	// Call the plugin's Create method
-	_, err = p.Create("resource", "person", personJSON)
+	_, err = p.Create(context.Background(), "resource", "person", personJSON)
 	require.NoError(t, err)
 }

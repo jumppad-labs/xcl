@@ -12,7 +12,6 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -45,7 +44,7 @@ func testRegistry(t *testing.T) *registry.PluginRegistry {
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	reg := registry.NewPluginRegistry()
 
 	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
 	require.NoError(t, err)

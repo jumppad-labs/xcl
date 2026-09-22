@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -47,16 +48,16 @@ var dependentParents = map[string][]string{
 }
 
 // destroyAll loads the state the harness store last saved and destroys it with
-// a fresh Parser, just as a separate destroy run would. onEvent may be nil.
-func destroyAll(t *testing.T, h *lifecycleHarness, onEvent func(ParserEvent)) (*State, error) {
+// a fresh Parser, just as a separate destroy run would. emit may be nil.
+func destroyAll(t *testing.T, h *lifecycleHarness, emit events.Emit) (*State, error) {
 	t.Helper()
 
-	p := h.newParser(t, onEvent)
+	p := h.newParser(t, emit)
 
 	loaded, err := h.store.Load()
 	require.NoError(t, err)
 
-	return p.Destroy(loaded)
+	return p.Destroy(context.Background(), loaded)
 }
 
 // destroyCalls returns the IDs the provider was asked to destroy, in order.
@@ -169,7 +170,6 @@ func destroyRecordingSaves(t *testing.T, h *lifecycleHarness) [][]byte {
 	recording := &recordingStore{store: h.store}
 
 	options := testOptions(t)
-	options.Logger = logger.NewTestLogger(t)
 	options.PluginRegistry = h.registry
 	options.StateStore = recording
 
@@ -178,7 +178,7 @@ func destroyRecordingSaves(t *testing.T, h *lifecycleHarness) [][]byte {
 	loaded, err := h.store.Load()
 	require.NoError(t, err)
 
-	remaining, err := p.Destroy(loaded)
+	remaining, err := p.Destroy(context.Background(), loaded)
 	require.NoError(t, err)
 	require.Equal(t, 0, remaining.ResourceCount())
 
@@ -407,7 +407,7 @@ func TestDestroyNeverCallsProviderForBuiltinAndRegisteredBlocks(t *testing.T) {
 	options := testOptions(t)
 	options.PluginRegistry = h.registry
 	options.StateStore = h.store
-	options.OnParserEvent = collector.collect
+	options.Emit = collector.collect
 	// no expectations, any provider lookup fails the test
 	options.ProviderResolver = mocks.NewMockProviderResolver(t)
 
@@ -417,7 +417,7 @@ func TestDestroyNeverCallsProviderForBuiltinAndRegisteredBlocks(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, loaded, 7)
 
-	remaining, err := p.Destroy(loaded)
+	remaining, err := p.Destroy(context.Background(), loaded)
 	require.NoError(t, err)
 	require.Equal(t, 0, remaining.ResourceCount())
 
@@ -448,7 +448,7 @@ func TestDestroyNeverCallsProviderForDisabledRegisteredBlock(t *testing.T) {
 	options := testOptions(t)
 	options.PluginRegistry = h.registry
 	options.StateStore = h.store
-	options.OnParserEvent = collector.collect
+	options.Emit = collector.collect
 	// no expectations, any provider lookup fails the test
 	options.ProviderResolver = mocks.NewMockProviderResolver(t)
 
@@ -458,7 +458,7 @@ func TestDestroyNeverCallsProviderForDisabledRegisteredBlock(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{registeredDisabledID}, stateIDs(t, loaded))
 
-	remaining, err := p.Destroy(loaded)
+	remaining, err := p.Destroy(context.Background(), loaded)
 	require.NoError(t, err)
 	require.Equal(t, 0, remaining.ResourceCount())
 
@@ -553,7 +553,7 @@ func TestDestroyWithEmptyStateCallsNoProvider(t *testing.T) {
 	h := setupLifecycle(t)
 	p := h.newParser(t, nil)
 
-	remaining, err := p.Destroy(nil)
+	remaining, err := p.Destroy(context.Background(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, remaining)
 	require.Equal(t, 0, remaining.ResourceCount())
@@ -565,7 +565,7 @@ func TestDestroyWithNilStateCallsNoProvider(t *testing.T) {
 	h := setupLifecycle(t)
 	p := h.newParser(t, nil)
 
-	remaining, err := p.Destroy(nil)
+	remaining, err := p.Destroy(context.Background(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, remaining)
 	require.Equal(t, 0, remaining.ResourceCount())

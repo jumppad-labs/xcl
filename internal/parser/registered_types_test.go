@@ -1,16 +1,17 @@
 package parser
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -56,7 +57,7 @@ func setupRegisteredTypes(t *testing.T) *registeredHarness {
 		os.Setenv("HOME", home)
 	})
 
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	reg := registry.NewPluginRegistry()
 
 	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
 	require.NoError(t, err)
@@ -82,18 +83,14 @@ func setupRegisteredTypes(t *testing.T) *registeredHarness {
 }
 
 // newParser builds a fresh Parser that shares the harness registry and state
-// store. log and onEvent may be nil.
-func (h *registeredHarness) newParser(t *testing.T, log logger.Logger, onEvent func(ParserEvent)) *Parser {
+// store. emit may be nil.
+func (h *registeredHarness) newParser(t *testing.T, emit events.Emit) *Parser {
 	t.Helper()
 
 	options := testOptions(t)
-	if log != nil {
-		options.Logger = log
-	}
-
 	options.PluginRegistry = h.registry
 	options.StateStore = h.store
-	options.OnParserEvent = onEvent
+	options.Emit = emit
 
 	return NewParser(options)
 }
@@ -103,9 +100,9 @@ func (h *registeredHarness) newParser(t *testing.T, log logger.Logger, onEvent f
 func (h *registeredHarness) applyAndSave(t *testing.T, path string) *State {
 	t.Helper()
 
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(path)
+	st, err := p.Apply(context.Background(), path)
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
@@ -144,9 +141,9 @@ func requireDatabase(t *testing.T, entities []any, id string) *registered.Databa
 
 func TestApplyRegisteredTypesSucceedsWithoutProvider(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
@@ -160,9 +157,9 @@ func TestApplyRegisteredTypesSucceedsWithoutProvider(t *testing.T) {
 
 func TestApplyRegisteredTypeDecodesValuesAndNestedBlock(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	db := requireDatabase(t, st.GetResources(), registeredDatabaseID)
@@ -176,9 +173,9 @@ func TestApplyRegisteredTypeDecodesValuesAndNestedBlock(t *testing.T) {
 
 func TestApplyRegisteredTypeReturnsRegisteredGoType(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	r, err := findByID(st.GetResources(), registeredDatabaseID)
@@ -199,9 +196,9 @@ func TestApplyRegisteredTypeReturnsRegisteredGoType(t *testing.T) {
 
 func TestApplyRegisteredTypeResolvesReferences(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	r, err := findByID(st.GetResources(), registeredAppID)
@@ -223,9 +220,9 @@ func TestApplyRegisteredTypeResolvesReferences(t *testing.T) {
 
 func TestApplyRegisteredTypeReadsModuleOutput(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	r, err := findByID(st.GetResources(), registeredAppID)
@@ -242,8 +239,8 @@ func TestApplyProcessesDependentAfterRegisteredType(t *testing.T) {
 	// events fire from the walker's parallel goroutines
 	var mu sync.Mutex
 	created := []string{}
-	onEvent := func(e ParserEvent) {
-		if e.Operation != "create" || e.Phase != "success" {
+	onEvent := func(e events.Event) {
+		if e.Operation != events.OperationCreate || e.Phase != events.PhaseSuccess {
 			return
 		}
 
@@ -252,9 +249,9 @@ func TestApplyProcessesDependentAfterRegisteredType(t *testing.T) {
 		created = append(created, e.ResourceID)
 	}
 
-	p := h.newParser(t, nil, onEvent)
+	p := h.newParser(t, onEvent)
 
-	_, err := p.Apply(registeredBasicConfig)
+	_, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	mu.Lock()
@@ -269,9 +266,9 @@ func TestReapplyRegisteredTypesSucceedsWithoutProvider(t *testing.T) {
 
 	h.applyAndSave(t, registeredBasicConfig)
 
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
@@ -286,9 +283,9 @@ func TestApplyAfterRemovingRegisteredBlockSucceedsWithoutProvider(t *testing.T) 
 	first := h.applyAndSave(t, registeredRemovedBeforeConfig)
 	requireDatabase(t, first.GetResources(), registeredRemovedID)
 
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredRemovedAfterConfig)
+	st, err := p.Apply(context.Background(), registeredRemovedAfterConfig)
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
@@ -318,7 +315,7 @@ func TestApplyAfterRemovingRegisteredBlockNeverCallsProvider(t *testing.T) {
 
 	p := NewParser(options)
 
-	st, err := p.Apply(registeredRemovedAfterConfig)
+	st, err := p.Apply(context.Background(), registeredRemovedAfterConfig)
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
@@ -328,9 +325,9 @@ func TestApplyAfterRemovingRegisteredBlockNeverCallsProvider(t *testing.T) {
 
 func TestApplyRegisteredTypeInModuleIsStoredUnderModulePath(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	db := requireDatabase(t, st.GetResources(), registeredModuleDatabaseID)
@@ -352,9 +349,9 @@ func TestApplyMarksDisabledRegisteredTypeDisabled(t *testing.T) {
 
 	var mu sync.Mutex
 	eventIDs := []string{}
-	onEvent := func(e ParserEvent) {
+	onEvent := func(e events.Event) {
 		// a disabled resource is still parsed, only the walk skips it
-		if e.Operation == "parse" {
+		if e.Operation == events.OperationParse {
 			return
 		}
 
@@ -363,9 +360,9 @@ func TestApplyMarksDisabledRegisteredTypeDisabled(t *testing.T) {
 		eventIDs = append(eventIDs, e.ResourceID)
 	}
 
-	p := h.newParser(t, nil, onEvent)
+	p := h.newParser(t, onEvent)
 
-	st, err := p.Apply(registeredDisabledConfig)
+	st, err := p.Apply(context.Background(), registeredDisabledConfig)
 	require.NoError(t, err)
 
 	r, err := findByID(st.GetResources(), registeredDisabledID)
@@ -388,13 +385,13 @@ func TestApplyMarksDisabledRegisteredTypeDisabled(t *testing.T) {
 func TestApplyRegisteredTypeWithComputedFieldLogsNoWarning(t *testing.T) {
 	h := setupRegisteredTypes(t)
 
-	log := &recordingLogger{}
-	p := h.newParser(t, log, nil)
+	collector := &eventCollector{}
+	p := h.newParser(t, collector.collect)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
-	require.Empty(t, log.warnings())
+	require.Empty(t, collector.warnings(changedConfiguredValueWarning))
 
 	db := requireDatabase(t, st.GetResources(), registeredDatabaseID)
 	require.Equal(t, "", db.ConnectionString)
@@ -460,6 +457,7 @@ func TestDestroyWalkSkipsProviderForRegisteredType(t *testing.T) {
 	require.NoError(t, err)
 
 	d := &destroyer{
+		ctx:      context.Background(),
 		working:  working,
 		resolver: resolver,
 		types:    h.registry,
@@ -480,9 +478,9 @@ func TestDestroyWalkSkipsProviderForRegisteredType(t *testing.T) {
 
 func TestApplyReportsResourceKindAndVarietyOnSeparateAxes(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	meta := requireMeta(t, st.GetResources(), registeredDatabaseID)
@@ -494,9 +492,9 @@ func TestApplyReportsResourceKindAndVarietyOnSeparateAxes(t *testing.T) {
 
 func TestApplyReportsVariableKindWithoutAVariety(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	meta := requireMeta(t, st.GetResources(), registeredVariableID)
@@ -508,9 +506,9 @@ func TestApplyReportsVariableKindWithoutAVariety(t *testing.T) {
 
 func TestApplyReportsOutputKindWithoutAVariety(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	meta := requireMeta(t, st.GetResources(), registeredModuleOutputID)
@@ -522,9 +520,9 @@ func TestApplyReportsOutputKindWithoutAVariety(t *testing.T) {
 
 func TestApplyReportsModuleKindWithoutAVariety(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	meta := requireMeta(t, st.GetResources(), registeredSharedModuleID)
@@ -540,9 +538,9 @@ func TestApplyReportsModuleKindWithoutAVariety(t *testing.T) {
 
 func TestApplyGivesResourceTheFieldValuesOfAnotherResource(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	r, err := findByID(st.GetResources(), registeredAppID)
@@ -566,9 +564,9 @@ func TestApplyGivesResourceTheFieldValuesOfAnotherResource(t *testing.T) {
 
 func TestApplyGivesResourceTheValueOfAVariable(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	r, err := findByID(st.GetResources(), registeredAppID)
@@ -582,9 +580,9 @@ func TestApplyGivesResourceTheValueOfAVariable(t *testing.T) {
 
 func TestApplyGivesResourceTheValueOfAModuleOutput(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	// the module output reads a resource declared inside the module
@@ -619,7 +617,7 @@ func TestApplyNeverLooksUpAProviderForRegisteredOrBuiltinBlocks(t *testing.T) {
 
 	p := NewParser(options)
 
-	st, err := p.Apply(registeredBasicConfig)
+	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 	require.Equal(t, 7, st.ResourceCount())
 }
@@ -631,18 +629,18 @@ func TestApplyNeverLooksUpAProviderForRegisteredOrBuiltinBlocks(t *testing.T) {
 
 func TestParseBareDeclarationParsesWithoutError(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBareConfig)
+	st, err := p.Apply(context.Background(), registeredBareConfig)
 	require.NoError(t, err)
 	require.NotNil(t, st)
 }
 
 func TestParseBareDeclarationReportsKeywordAsKindWithoutAVariety(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBareConfig)
+	st, err := p.Apply(context.Background(), registeredBareConfig)
 	require.NoError(t, err)
 
 	meta := requireMeta(t, st.GetResources(), registeredCacheID)
@@ -655,9 +653,9 @@ func TestParseBareDeclarationReportsKeywordAsKindWithoutAVariety(t *testing.T) {
 
 func TestParseGivesEachDeclarationFormItsOwnAddress(t *testing.T) {
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, nil)
+	p := h.newParser(t, nil)
 
-	st, err := p.Apply(registeredBareConfig)
+	st, err := p.Apply(context.Background(), registeredBareConfig)
 	require.NoError(t, err)
 
 	// both declarations name "main", only the form they are declared in

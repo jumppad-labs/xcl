@@ -9,7 +9,6 @@ import (
 
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -17,7 +16,7 @@ import (
 
 func testCreateState(t *testing.T) (StateStore, string, *registry.PluginRegistry) {
 	p := path.Join(t.TempDir(), "state.json")
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	reg := registry.NewPluginRegistry()
 
 	ss, err := NewFileStateStore(p, reg)
 

@@ -1,13 +1,13 @@
 package parser
 
 import (
+	"context"
 	"fmt"
-	"io"
-	"log"
 	"sync"
 
 	"github.com/hashicorp/errwrap"
 	"github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -20,6 +20,10 @@ import (
 // The saved state is therefore correct at every step, and an interrupted
 // destroy resumes from it.
 type destroyer struct {
+	// ctx is the operation's context, once it is cancelled no new provider
+	// call starts and the resources not yet reached stay in the state
+	ctx context.Context
+
 	// working is the state being changed, it starts as the saved state and
 	// ends holding what survives the destroy
 	working *State
@@ -47,6 +51,7 @@ func (d *destroyer) destroy(targets []any) error {
 
 	graph, err := buildDestroyDAG(targets)
 	if err != nil {
+		emitOperationError(d.options, events.OperationDestroy, err)
 		return err
 	}
 
@@ -55,7 +60,9 @@ func (d *destroyer) destroy(targets []any) error {
 
 	err = graph.Validate()
 	if err != nil {
-		return fmt.Errorf("unable to validate destroy dependency graph: %w", err)
+		err = fmt.Errorf("unable to validate destroy dependency graph: %w", err)
+		emitOperationError(d.options, events.OperationDestroy, err)
+		return err
 	}
 
 	// the graph runs parent to child like the create graph, walking it in
@@ -66,11 +73,13 @@ func (d *destroyer) destroy(targets []any) error {
 		Reverse:  true,
 	}
 
-	log.SetOutput(io.Discard)
-
 	w.Update(graph)
 	diags := w.Wait()
 	if !diags.HasErrors() {
+		if d.ctx.Err() != nil {
+			return fmt.Errorf("destroy stopped before every resource was reached: %w", d.ctx.Err())
+		}
+
 		return nil
 	}
 

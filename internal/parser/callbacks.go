@@ -1,13 +1,14 @@
 package parser
 
 import (
-	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"time"
 
 	"github.com/creasty/defaults"
 	"github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/resources"
@@ -50,6 +51,12 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 			return nil
 		}
 
+		// once the operation is cancelled nothing more is reached, the
+		// resource keeps its previous entry in the state
+		if lifecycle.ctx.Err() != nil {
+			return nil
+		}
+
 		// Skip disabled resources, resources could already be disabled if they are
 		// part of a module that is disabled
 		disabled, err := types.GetDisabled(r)
@@ -76,6 +83,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 				r,
 				fmt.Sprintf("failed to build resource context: %s", err),
 			)
+			emitWalkError(options, rMeta, pe)
 			return diags.Append(pe)
 		}
 
@@ -85,6 +93,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		// resource that does not exist, or is disabled.
 		isDisabled, err := processDisabled(bdy, ctx, r)
 		if err != nil {
+			emitWalkError(options, rMeta, err)
 			return diags.Append(err)
 		}
 
@@ -119,6 +128,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 				fmt.Sprintf(`unable to decode body: %s`, diag.Error()),
 			)
 
+			emitWalkError(options, rMeta, pe)
 			return diags.Append(pe)
 		}
 
@@ -143,6 +153,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 						r,
 						fmt.Sprintf(`unable to evaluate 'variables' for module: %s`, valDiags.Error()),
 					)
+					emitWalkError(options, rMeta, pe)
 					return diags.Append(pe)
 				}
 				suppliedVars = val
@@ -156,12 +167,21 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 			}
 		}
 
-		// Call provider lifecycle methods
-		if err := lifecycle.apply(r); err != nil {
+		// Call provider lifecycle methods, a step skipped because the operation
+		// was cancelled leaves the resource as never reached
+		err = lifecycle.apply(r)
+		if goerrors.Is(err, errNotReached) {
+			return nil
+		}
+
+		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				r,
 				fmt.Sprintf("provider lifecycle error: %s", err),
 			)
+			// keep the provider's error, so callers can still match it with
+			// errors.Is and errors.As
+			pe.Cause = err
 			return diags.Append(pe)
 		}
 
@@ -199,22 +219,30 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 			return nil
 		}
 
+		// once the operation is cancelled no new provider call starts, the
+		// resource is left in the state untouched
+		if d.ctx.Err() != nil {
+			return nil
+		}
+
 		resourceID := rMeta.ID
-		rType := resourceType(rMeta)
 
 		disabled, err := types.GetDisabled(r)
 		if err != nil {
-			return diags.Append(errors.NewParserErrorFromResource(r, err.Error()))
+			pe := errors.NewParserErrorFromResource(r, err.Error())
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil)
+			return diags.Append(pe)
 		}
 
 		// Skip disabled, builtin and registered resource types, they never
 		// reach a provider
 		if disabled || handledWithoutProvider(d.types, rMeta) {
 			// Fire destroy events for provider-less types (always succeed with 0 time)
-			fireParserEvent(d.options, "destroy", rType, resourceID, "success", 0, nil, nil)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseSuccess, 0, nil, nil)
 
 			err := d.destroyed(r)
 			if err != nil {
+				emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, err, nil)
 				return diags.Append(err)
 			}
 
@@ -228,6 +256,7 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 				r,
 				fmt.Sprintf("no provider found for resource type %s", rMeta.AddressType()),
 			)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil)
 			diags = diags.Append(pe)
 
 			if saveErr := d.failedToDestroy(r); saveErr != nil {
@@ -244,6 +273,7 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 				r,
 				fmt.Sprintf("failed to serialize resource for destroy: %s", err),
 			)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil)
 			diags = diags.Append(pe)
 
 			if saveErr := d.failedToDestroy(r); saveErr != nil {
@@ -254,13 +284,15 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 		}
 
 		// Call destroy on the provider
-		fireParserEvent(d.options, "destroy", rType, resourceID, "start", 0, nil, resourceJSON)
+		// the provider is given a context that is never cancelled, so a
+		// destroy already running always finishes
+		emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseStart, 0, nil, resourceJSON)
 		start := time.Now()
-		err = adapter.Destroy(context.Background(), resourceJSON, false)
+		err = adapter.Destroy(providerContext(d.ctx, d.options, rMeta, events.OperationDestroy), resourceJSON, false)
 		duration := time.Since(start)
 
 		if err != nil {
-			fireParserEvent(d.options, "destroy", rType, resourceID, "error", duration, err, resourceJSON)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, duration, err, resourceJSON)
 
 			pe := errors.NewParserErrorFromResource(
 				r,
@@ -275,13 +307,21 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 			return diags
 		}
 
-		fireParserEvent(d.options, "destroy", rType, resourceID, "success", duration, nil, resourceJSON)
+		emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseSuccess, duration, nil, resourceJSON)
 
 		err = d.destroyed(r)
 		if err != nil {
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, err, nil)
 			return diags.Append(err)
 		}
 
 		return nil
 	}
+}
+
+// emitWalkError emits an error event for a resource that failed in the walk
+// before any provider call, such as a body that does not decode. The event's
+// operation is apply, the step being worked towards.
+func emitWalkError(options *ParserOptions, meta *types.Meta, err error) {
+	emitLifecycle(options, meta, events.OperationApply, events.PhaseError, 0, err, nil)
 }

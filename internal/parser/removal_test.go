@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
@@ -150,7 +151,7 @@ func TestApplyRejectsEmptyConfiguration(t *testing.T) {
 
 	p := h.newParser(t, nil)
 
-	st, err := p.Apply(emptyConfigDir)
+	st, err := p.Apply(context.Background(), emptyConfigDir)
 	require.Error(t, err)
 	require.True(t, stderrors.Is(err, ErrEmptyConfiguration), "unexpected error: %v", err)
 	require.Nil(t, st)

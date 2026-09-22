@@ -301,7 +301,7 @@ All tests follow the project conventions: testify `require`, no table-driven tes
 
 **Validation point**: The root-level event, delivery, ordering, blocking, panic-shutdown and global-logger tests pass with the in-process test plugin. The slog adapter test shows an "info" logger receiving lifecycle events but no debug log events. The static scan finds no stdlib `log` usage or `log.SetOutput` in library code. The full test suite passes.
 
-#### - [ ] Phase 1.1: One event shape and a ready-made slog adapter
+#### - [x] Phase 1.1: One event shape and a ready-made slog adapter
 **Repo:** xclconfig
 
 This phase introduces a small shared package that defines the single flat event every part of xcl will use. The event gains a time, a source and a details map, and the package publishes the reserved detail names and the standard level, phase and operation names. The package also ships the adapter that connects the stream to a standard-library `slog` logger. The root package's `Event` and `EventHandler` become aliases of the new types, so existing receivers keep compiling. The logger package gains an implementation that turns each log call into a log event. The old implementations are left in place until Milestone 2 so that nothing breaks in between.
@@ -309,12 +309,12 @@ This phase introduces a small shared package that defines the single flat event 
 *Technical detail:* [context.md#phase-11](./context.md#phase-11-one-event-shape-and-a-ready-made-slog-adapter)
 
 **Acceptance criteria**:
-- [ ] Application code that uses `xcl.Event` and `xcl.WithEventHandler` compiles unchanged, and its events now carry a time, a source and a details map.
-- [ ] A log message written with severity, text and details becomes one event with phase `log`. The severity and text are under the published reserved names and the details keep their names, and a caller detail named `level` or `message` cannot overwrite them.
-- [ ] An adapter connected to an "info" `slog` logger writes info, warn and error log events plus lifecycle events, and writes no debug log events.
-- [ ] The new package depends only on the standard library.
+- [x] Application code that uses `xcl.Event` and `xcl.WithEventHandler` compiles unchanged, and its events now carry a time, a source and a details map.
+- [x] A log message written with severity, text and details becomes one event with phase `log`. The severity and text are under the published reserved names and the details keep their names, and a caller detail named `level` or `message` cannot overwrite them.
+- [x] An adapter connected to an "info" `slog` logger writes info, warn and error log events plus lifecycle events, and writes no debug log events.
+- [x] The new package depends only on the standard library.
 
-#### - [ ] Phase 1.2: Bounded, ordered, fire-and-forget delivery
+#### - [x] Phase 1.2: Bounded, ordered, fire-and-forget delivery
 **Repo:** xclconfig
 
 This phase builds the internal delivery queue used by one operation. Emitting never waits for the receiver. It waits only when the configured limit of undelivered events is reached, and never drops an event. One stretch of waiting is announced by a single "blocked" event that states how long it lasted and never takes a queue slot. The receiver is called one event at a time and in order, from a drain loop that the caller runs. A discard mode releases waiting emitters during an emergency shutdown.
@@ -322,13 +322,13 @@ This phase builds the internal delivery queue used by one operation. Emitting ne
 *Technical detail:* [context.md#phase-12](./context.md#phase-12-bounded-ordered-fire-and-forget-delivery)
 
 **Acceptance criteria**:
-- [ ] With room in the buffer, emitting returns immediately even when the receiver is slow.
-- [ ] With a limit of 1 and a slow receiver, every emitted event is delivered.
-- [ ] A stretch of blocked emitting produces exactly one "blocked" event carrying its duration.
-- [ ] Events arrive in the order they were emitted, and the receiver is never entered concurrently.
-- [ ] Every event has a time and a source, and the source defaults to `core`.
+- [x] With room in the buffer, emitting returns immediately even when the receiver is slow.
+- [x] With a limit of 1 and a slow receiver, every emitted event is delivered.
+- [x] A stretch of blocked emitting produces exactly one "blocked" event carrying its duration.
+- [x] Events arrive in the order they were emitted, and the receiver is never entered concurrently.
+- [x] Every event has a time and a source, and the source defaults to `core`.
 
-#### - [ ] Phase 1.3: The parser emits events, reports every failure, and can be cancelled
+#### - [x] Phase 1.3: The parser emits events, reports every failure, and can be cancelled
 **Repo:** xclconfig
 
 This phase replaces the parser's private event type, callback and logger with the shared emitter. Every event it produces then carries a time, a source, and the resource's type, identity and file. Failures that are returned today without any event now also emit an error event. These are a missing provider, serialisation and decode problems, and validation problems. The configured-value warning becomes a warn log event bound to the resource and step. The walks take an operation context, and once it is cancelled no new provider call starts; calls already running are not interrupted. The walks also stop silencing the application's standard logger.
@@ -336,13 +336,13 @@ This phase replaces the parser's private event type, callback and logger with th
 *Technical detail:* [context.md#phase-13](./context.md#phase-13-the-parser-emits-events-reports-every-failure-and-can-be-cancelled)
 
 **Acceptance criteria**:
-- [ ] Parse, create, read, changed, update and destroy events reach the emitter with the same operations and phases as before, plus time, source `core` and the declaring file.
-- [ ] Every error the parser returns from a walk or from validation has a matching error event.
-- [ ] When a provider changes a configured value, one warn log event names the resource, the field and the step, and nothing is printed.
-- [ ] Once the operation's context is cancelled, no further provider call starts, calls already running finish normally, and resources already created are still recorded.
-- [ ] A message written with the standard library logger after a walk appears at its original destination.
+- [x] Parse, create, read, changed, update and destroy events reach the emitter with the same operations and phases as before, plus time, source `core` and the declaring file.
+- [x] Every error the parser returns from a walk or from validation has a matching error event.
+- [x] When a provider changes a configured value, one warn log event names the resource, the field and the step, and nothing is printed.
+- [x] Once the operation's context is cancelled, no further provider call starts, calls already running finish normally, and resources already created are still recorded.
+- [x] A message written with the standard library logger after a walk appears at its original destination.
 
-#### - [ ] Phase 1.4: One operation runner with graceful receiver-panic shutdown
+#### - [x] Phase 1.4: One operation runner with graceful receiver-panic shutdown
 **Repo:** xclconfig
 
 This phase routes `Validate`, `Apply` and `Destroy` through one runner. The runner emits operation-level start and finish events and does the work on a worker goroutine while the caller delivers events to the receiver. Everything is delivered before the call returns, and the buffer limit can be set with a new option. If the receiver panics, the runner stops new provider calls, lets running ones finish and saves state. It then lets the receiver's own panic continue, with its original value and stack. With no receiver, the work runs directly and xcl is silent, and the default registry no longer carries a stdout logger.
@@ -350,12 +350,12 @@ This phase routes `Validate`, `Apply` and `Destroy` through one runner. The runn
 *Technical detail:* [context.md#phase-14](./context.md#phase-14-one-operation-runner-with-graceful-receiver-panic-shutdown)
 
 **Acceptance criteria**:
-- [ ] When validate, apply or destroy returns, including with an error, the receiver has already received every event for that call, including the operation's error event.
-- [ ] With a one-second receiver and a large buffer, provider calls finish well before the receiver has processed every event, and apply still returns only after the last one is handled.
-- [ ] A receiver that panics on its third event makes apply panic with that same value. The recovered stack trace contains the receiver's code, state holds exactly the resources whose create finished, and no provider call starts after the panic.
-- [ ] A failing provider stops dependants and returns the same error with or without a receiver, and a slow receiver or one that ignores events does not change the outcome.
-- [ ] An application can set the buffer limit, and leaving it unset uses the documented default.
-- [ ] With no receiver set, an apply with the in-process test plugin writes nothing to standard output or standard error.
+- [x] When validate, apply or destroy returns, including with an error, the receiver has already received every event for that call, including the operation's error event.
+- [x] With a one-second receiver and a large buffer, provider calls finish well before the receiver has processed every event, and apply still returns only after the last one is handled.
+- [x] A receiver that panics on its third event makes apply panic with that same value. The recovered stack trace contains the receiver's code, state holds exactly the resources whose create finished, and no provider call starts after the panic.
+- [x] A failing provider stops dependants and returns the same error with or without a receiver, and a slow receiver or one that ignores events does not change the outcome.
+- [x] An application can set the buffer limit, and leaving it unset uses the documented default.
+- [x] With no receiver set, an apply with the in-process test plugin writes nothing to standard output or standard error.
 
 ### Milestone 2: Plugins log into the stream with resource context, and load when first needed
 
@@ -363,7 +363,7 @@ This phase routes `Validate`, `Apply` and `Destroy` through one runner. The runn
 
 **Validation point**: The in-process and external symmetry tests pass: same severity, message, details and context, with only the source differing. So do the lazy-load, load-once, per-Config routing, deferred-clash and discovery-event tests, and the full no-output test with both plugin kinds and no receiver. The static scan confirms that no logger implementation exists outside the `logger` package. The full test suite passes, including the external plugin e2e tests.
 
-#### - [ ] Phase 2.1: Plugin authors log from the call's context
+#### - [x] Phase 2.1: Plugin authors log from the call's context
 **Repo:** xclconfig
 
 This phase finishes turning the logger package into a pure event builder: the stdout, text-formatting and test loggers are removed, so nothing in the library can print. Provider calls now carry a context all the way through the plugin base and the in-process host. Before each call, the parser binds a logger to the resource and step, and the host stamps the plugin's name as its source. Plugin authors fetch that logger from the context with one call. The per-call re-initialisation and the duplicate "calling provider" message are removed. The in-process test plugins switch to the new style.
@@ -371,13 +371,13 @@ This phase finishes turning the logger package into a pure event builder: the st
 *Technical detail:* [context.md#phase-21](./context.md#phase-21-plugin-authors-log-from-the-calls-context)
 
 **Acceptance criteria**:
-- [ ] An in-process provider that logs "something happened" at info with `remote_id=213` during create produces one event carrying that severity, text and detail. The event is sourced to the plugin and names the resource ID, type, file and the step `create`. The same holds for read.
-- [ ] For a provider that logs during create, the receiver sees create start, then that log event marked as create, then create success.
-- [ ] Applying one resource gives exactly one create start event and no log event restating it.
-- [ ] Log messages at debug, info, warn and error all reach the receiver with their severity.
-- [ ] No library package contains a logger that writes anywhere other than the event stream.
+- [x] An in-process provider that logs "something happened" at info with `remote_id=213` during create produces one event carrying that severity, text and detail. The event is sourced to the plugin and names the resource ID, type, file and the step `create`. The same holds for read.
+- [x] For a provider that logs during create, the receiver sees create start, then that log event marked as create, then create success.
+- [x] Applying one resource gives exactly one create start event and no log event restating it.
+- [x] Log messages at debug, info, warn and error all reach the receiver with their severity.
+- [x] No library package contains a logger that writes anywhere other than the event stream.
 
-#### - [ ] Phase 2.2: The plugin registry records plugins and loads them on first use
+#### - [x] Phase 2.2: The plugin registry records plugins and loads them on first use
 **Repo:** xclconfig
 
 This phase removes the logger from the plugin registry and splits registration from loading. Registering a plugin, a plugin path or a discovery directory only records it. On the first validate, apply or destroy, the registry discovers, starts and clash-checks plugins, once for every Config that shares it. It reports discovery, loading and rejection as events to that operation. Registering a type that clashes with a builtin or already-registered type still fails immediately, and clashes with plugin types surface when plugins load. A plugin that fails to load fails the operation with an error that names it.
@@ -385,13 +385,13 @@ This phase removes the logger from the plugin registry and splits registration f
 *Technical detail:* [context.md#phase-22](./context.md#phase-22-the-plugin-registry-records-plugins-and-loads-them-on-first-use)
 
 **Acceptance criteria**:
-- [ ] A registry can be created, have plugins registered and have discovery directories added without any logger.
-- [ ] Registering an external plugin path that does not exist returns no error. The first validate fails with an error naming the plugin, and no plugin process runs before that call.
-- [ ] Two Configs sharing one registry and each validated start each external plugin process only once.
-- [ ] A type named like a builtin or an already-registered type is rejected at registration. A type named like a plugin's type is accepted at registration, and the first validate fails with a clash error.
-- [ ] Validating with a discovery directory holding one valid and one invalid plugin gives the receiver events for the discovery, the successful load and the rejection.
+- [x] A registry can be created, have plugins registered and have discovery directories added without any logger.
+- [x] Registering an external plugin path that does not exist returns no error. The first validate fails with an error naming the plugin, and no plugin process runs before that call.
+- [x] Two Configs sharing one registry and each validated start each external plugin process only once.
+- [x] A type named like a builtin or an already-registered type is rejected at registration. A type named like a plugin's type is accepted at registration, and the first validate fails with a clash error.
+- [x] Validating with a discovery directory holding one valid and one invalid plugin gives the receiver events for the discovery, the successful load and the rejection.
 
-#### - [ ] Phase 2.3: The same logging across the plugin process boundary
+#### - [x] Phase 2.3: The same logging across the plugin process boundary
 **Repo:** xclconfig
 
 This phase brings plugins that run as separate processes up to the same behaviour as in-process ones. Each provider call carries a call identifier to the plugin, so log messages the plugin writes during that call come back labelled with it. The host then attributes each message to the right resource, step and configuration. go-plugin's own messages and the plugin's initialisation logs become events on the stream of the operation currently running, instead of being written anywhere. The context is threaded through the gRPC client and server, which no longer re-initialise providers on every call.
@@ -399,10 +399,10 @@ This phase brings plugins that run as separate processes up to the same behaviou
 *Technical detail:* [context.md#phase-23](./context.md#phase-23-the-same-logging-across-the-plugin-process-boundary)
 
 **Acceptance criteria**:
-- [ ] The same provider logic run in-process and as an external plugin produces log events with the same severity, message, detail names, detail values as text, resource context and step. Only the source differs.
-- [ ] With two Configs sharing a registry, each with its own receiver, each receiver gets only the plugin log events for its own operations.
-- [ ] Validating, applying and destroying with an in-process and an external plugin and no receiver writes nothing to standard output or standard error, and creates no log files.
-- [ ] With a receiver set, every message the external plugin logs appears in the receiver and nothing appears anywhere else.
+- [x] The same provider logic run in-process and as an external plugin produces log events with the same severity, message, detail names, detail values as text, resource context and step. Only the source differs.
+- [x] With two Configs sharing a registry, each with its own receiver, each receiver gets only the plugin log events for its own operations.
+- [x] Validating, applying and destroying with an in-process and an external plugin and no receiver writes nothing to standard output or standard error, and creates no log files.
+- [x] With a receiver set, every message the external plugin logs appears in the receiver and nothing appears anywhere else.
 
 ### Milestone 3: Examples and documentation show the new way to watch xcl
 
@@ -410,7 +410,7 @@ This phase brings plugins that run as separate processes up to the same behaviou
 
 **Validation point**: The example tests and the static example check pass. Running each example shows styled lines with severity, source, and resource and step where relevant, which is confirmed by hand. The docs site type-checks and builds, and a search of both repositories finds no `NewPluginRegistry(` call with a logger argument.
 
-#### - [ ] Phase 3.1: A styled example receiver used by every example
+#### - [x] Phase 3.1: A styled example receiver used by every example
 **Repo:** xclconfig
 
 This phase replaces the example event logger with a styled terminal receiver built on the slog adapter and a charmbracelet handler. Every example program sets it up in one line and no longer builds or passes a logger. The example plugins log from the call's context without adding resource details themselves. The example tests are rewritten to assert on recorded events, and source checks lock in the "silent library" and "one receiver per example" success metrics.
@@ -418,13 +418,13 @@ This phase replaces the example event logger with a styled terminal receiver bui
 *Technical detail:* [context.md#phase-31](./context.md#phase-31-a-styled-example-receiver-used-by-every-example)
 
 **Acceptance criteria**:
-- [ ] Running any example shows its lifecycle events, plugin log messages and errors through the styled receiver, each line showing severity, source, and resource and step where relevant.
-- [ ] No example program builds a logger or passes one to the plugin registry, and each sets up its receiver in one line.
-- [ ] Every log event from the example plugins carries resource context that the plugin code does not pass itself.
-- [ ] The library's own packages still do not import the charmbracelet logger.
-- [ ] Across the full example suite, xcl writes nothing to standard output or standard error when no receiver is set.
+- [x] Running any example shows its lifecycle events, plugin log messages and errors through the styled receiver, each line showing severity, source, and resource and step where relevant.
+- [x] No example program builds a logger or passes one to the plugin registry, and each sets up its receiver in one line.
+- [x] Every log event from the example plugins carries resource context that the plugin code does not pass itself.
+- [x] The library's own packages still do not import the charmbracelet logger.
+- [x] Across the full example suite, xcl writes nothing to standard output or standard error when no receiver is set.
 
-#### - [ ] Phase 3.2: Library documentation describes the event stream
+#### - [x] Phase 3.2: Library documentation describes the event stream
 **Repo:** xclconfig
 
 This phase updates the README, the docs folder, the plugin test-helper notes and the changelog. They now describe the event stream and its fields, the slog adapter and the buffer option, logging from a plugin through the call's context, and the lazy registration and loading model. All mention of passing a logger to the registry, and of the old log line format, is removed.
@@ -432,11 +432,11 @@ This phase updates the README, the docs folder, the plugin test-helper notes and
 *Technical detail:* [context.md#phase-32](./context.md#phase-32-library-documentation-describes-the-event-stream)
 
 **Acceptance criteria**:
-- [ ] A reader of the README and docs can connect xcl to a slog logger, write a log message from a plugin, and understand when plugins load, without reading code.
-- [ ] No library document references passing a logger to the plugin registry, the stdout logger, or the "calling provider" message.
-- [ ] The changelog records the breaking API changes.
+- [x] A reader of the README and docs can connect xcl to a slog logger, write a log message from a plugin, and understand when plugins load, without reading code.
+- [x] No library document references passing a logger to the plugin registry, the stdout logger, or the "calling provider" message.
+- [x] The changelog records the breaking API changes.
 
-#### - [ ] Phase 3.3: The documentation site covers events, logging and plugin loading
+#### - [x] Phase 3.3: The documentation site covers events, logging and plugin loading
 **Repo:** xcl-website
 
 This phase adds pages to xcl.dev for the event stream and connecting it to a logger, and for logging from a plugin and plugin registration and lazy loading. It links the new pages from the navigation. It updates the home page and the three example pages to the new API and output. No page mentions passing a logger to the registry any more.
@@ -444,10 +444,10 @@ This phase adds pages to xcl.dev for the event stream and connecting it to a log
 *Technical detail:* [context.md#phase-33](./context.md#phase-33-the-documentation-site-covers-events-logging-and-plugin-loading)
 
 **Acceptance criteria**:
-- [ ] The site has pages covering the event stream and its contents, connecting it to a logger, logging from a plugin, and plugin registration and lazy loading, all reachable from the navigation.
-- [ ] Code shown on the example pages matches the example programs, and the sample output matches the styled receiver.
-- [ ] No page references passing a logger to the plugin registry.
-- [ ] The site type-checks and builds.
+- [x] The site has pages covering the event stream and its contents, connecting it to a logger, logging from a plugin, and plugin registration and lazy loading, all reachable from the navigation.
+- [x] Code shown on the example pages matches the example programs, and the sample output matches the styled receiver.
+- [x] No page references passing a logger to the plugin registry.
+- [x] The site type-checks and builds.
 
 ## Open Questions
 
@@ -467,3 +467,222 @@ This phase adds pages to xcl.dev for the event stream and connecting it to a log
 - **The unused resource printer in the logger package** (`ResourcePrinter`). It is not logging and only prints when called explicitly. It is left untouched, and a later clean-up can remove it.
 - **Structured, typed values over gRPC**, for example changing `LogRequest.args` to a typed or JSON payload. Only a call ID is added to the wire contract.
 - **A line number on events.** Resource context is ID, type and declaring file, as the spec asks.
+
+## Changelog
+
+### 2026-09-22 — Phase 1.1: One event shape and a ready-made slog adapter
+
+**What was done**: Added the stdlib-only `events` package: the flat `Event` (with `Time`, `Source` and `Meta` added), `Handler`, `Emit`, the reserved key, level, phase, operation and source constants, and `SlogHandler`. It writes log events at their own level and lifecycle events at info (error at error, blocked at warn). `xcl.Event` and `xcl.EventHandler` are now aliases. The logger package gained `New`/`Nop`, an event-building logger whose reserved `level`/`message` keys always win, and `WithTag` now takes an `any` value and turns a `resource` tag into `ResourceID` on event loggers.
+
+**Deviations**: None. `Nop()` is an event logger with a nil emit, so `WithTag` works on it without a special case.
+
+**Files changed**:
+- `xclconfig: events/events.go`
+- `xclconfig: events/slog.go`
+- `xclconfig: events/slog_test.go`
+- `xclconfig: events/imports_test.go`
+- `xclconfig: events.go`
+- `xclconfig: config_event_fields_test.go`
+- `xclconfig: logger/logger.go`
+- `xclconfig: logger/emit.go`
+- `xclconfig: logger/emit_test.go`
+- `xclconfig: logger/tagged.go`
+
+**Discoveries**: `parserEventHandler` in root `events.go` now stamps `Time` and `Source: core`, as a bridge until Phase 1.3 deletes it. The old text `taggedLogger`, `StdOutLogger` and `TestLogger` still use `interface{}` because Phase 2.1 deletes them.
+
+### 2026-09-22 — Phase 1.2: Bounded, ordered, fire-and-forget delivery
+
+**What was done**: Added `internal/eventstream`, the per-operation delivery queue. `Emit` stamps a default time and the `core` source, returns at once when there is room, and otherwise waits without dropping. It announces each blocked stretch with a single `events`/`blocked` event held in a one-slot side channel. `Drain` runs on the caller's goroutine, delivers one event at a time in order, and returns once `done` is closed and the queue is empty. `Discard` releases waiting emitters and drops later events.
+
+**Deviations**: `Discard` starts no goroutine to empty the queue. Emit's fast path is a non-blocking send, and its slow path also waits on the discard channel, so no emitter can block once `Discard` is called.
+
+**Files changed**:
+- `xclconfig: internal/eventstream/stream.go`
+- `xclconfig: internal/eventstream/stream_test.go`
+
+**Discoveries**: A blocked stretch lasts only while at least one emitter is waiting. A single emitter feeding a limit-1 queue therefore produces one stretch per full-queue wait, so several `blocked` events per run are expected in that setup. The blocked announcement is delivered ahead of events still queued, so it is not in strict emit order.
+
+### 2026-09-22 — Phase 1.3: The parser emits events, reports every failure, and can be cancelled
+
+**What was done**:
+- The parser's `ParserEvent`, its fire helpers, `OnParserEvent` and the `Logger` option are replaced by `ParserOptions.Emit`, with emit helpers that stamp resource type, ID and file.
+- `Parser.Validate/Apply/Destroy` take an operation `ctx`. Once it is cancelled no new provider call starts, in-flight calls get `context.WithoutCancel`, and unreached resources are left out of (or keep their previous entry in) state.
+- Every walk and validate failure now emits an error event.
+- The configured-value warning is a warn log event bound to the resource and step.
+- Both `log.SetOutput(io.Discard)` calls are gone.
+- Root `Config` uses a temporary `emitFor()` that stamps Time/Source and calls the handler directly.
+
+**Deviations**:
+- An unexported `reportedError` wrapper marks errors already emitted. `lifecycle.apply` then emits an `apply`/`error` event only for failures outside a provider call, such as serialisation or state lookup.
+- Graph-build failures emit operation-level error events.
+- A cancelled apply with no other error returns the partial state plus an error wrapping `ctx.Err()`; a cancelled destroy returns a wrapped `ctx.Err()`.
+- The interim default registries use `NewPluginRegistry(logger.Nop())` instead of `nil`, because the plugin hosts call methods on the logger.
+- `static_output_test.go` allows `plugins/hclog_adapter.go` to import `log`, because `hclog.Logger.StandardLogger` must return a `*log.Logger`. The adapter builds a private logger and never touches the global one.
+
+**Files changed**:
+- `xclconfig: internal/parser/events.go`
+- `xclconfig: internal/parser/errors.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/callbacks.go`
+- `xclconfig: internal/parser/destroy.go`
+- `xclconfig: internal/parser/configured_check.go`
+- `xclconfig: internal/parser/*_test.go` (updated to events; new `error_events_test.go`, `cancellation_test.go`; `recording_logger_test.go` deleted)
+- `xclconfig: config.go`
+- `xclconfig: events.go`
+- `xclconfig: config_global_logger_test.go`
+- `xclconfig: static_output_test.go`
+- `xclconfig: plugins/example/apply_test.go`
+
+**Discoveries**:
+- Tests that build a `destroyer` directly must set its `ctx`, or they panic on a nil context.
+- Not yet covered by tests: marshal-failure and graph-build error events, destroy's missing-provider event, and the read/destroy step naming for a missing provider.
+
+### 2026-09-22 — Phase 1.4: One operation runner with graceful receiver-panic shutdown
+
+**What was done**: `Validate`, `Apply` and `Destroy` now run their work through `Config.run`. With no handler the work runs inline and silently. With a handler, it emits the operation start event, runs the work on a worker goroutine emitting into an `eventstream.Stream`, and drains the stream into the handler on the caller's goroutine. The success or error event comes last, and everything is delivered before the call returns. If the handler panics, a non-recovering deferred shutdown cancels the operation context, discards the stream and waits for the worker to finish in-flight calls and save state. The panic then continues with its original value and stack. `WithEventBufferSize` and `DefaultEventBufferSize = 1024` were added, and the interim `emitFor` is removed.
+
+**Deviations**:
+- The walk's "provider lifecycle error" `ParserError` now keeps the provider's error as its `Cause`, so the error `Apply` returns matches the injected failure with `errors.Is`. That was needed for the "same failure" criterion.
+- The "panics on its third event" test panics on the third *create start* event, because the literal third event is a parse event that comes before any provider call.
+- Two example tests now skip the destroy operation's own events, which have an empty resource ID.
+
+**Files changed**:
+- `xclconfig: config.go`
+- `xclconfig: options.go`
+- `xclconfig: internal/parser/callbacks.go`
+- `xclconfig: internal/parser/test_plugin.go` (test hooks: `GetCallTimes`, `SetCreateHook`)
+- `xclconfig: config_delivery_test.go`
+- `xclconfig: config_panic_test.go`
+- `xclconfig: config_events_test.go`
+- `xclconfig: example/configonly/main_test.go`
+- `xclconfig: example/plugin/main_test.go`
+
+**Discoveries**:
+- Operation-level events share their operation name with per-resource events (`destroy`, for example) and have an empty `ResourceID`, so tests that filter by operation must also filter by resource.
+- `ParserError` word-wraps its message at 80 columns, so `ErrorContains` checks against long messages can fail. Prefer `errors.Is`.
+
+### 2026-09-22 — Phase 2.1: Plugin authors log from the call's context
+
+**What was done**:
+- The logger package is now a pure event builder. The stdout, text-event and test loggers are deleted, `WithTag` only tags event loggers, and `WithSource` was added.
+- `plugins.Logger(ctx)`/`plugins.WithLogger` carry a per-call logger. The parser binds it before every provider call (`providerContext`: resource ID/type/file, step, non-cancelling ctx), and the in-process host stamps the plugin's name as the Source.
+- `ctx` is threaded through `PluginEntityProvider`, `PluginHost`, `PluginBase`, the gRPC wrapper, adapter and server.
+- `SetLogger` and the per-RPC re-init are removed, as is the adapter's "calling provider" log.
+- Host constructors take an `events.Emit` and emit a `load` success event. The hclog adapter tags `component=go-plugin`.
+- The test helpers moved to `WithEmit` variants, and mocks were regenerated.
+
+**Deviations**:
+- The `plugins.Logger` *type alias* (`plugins/interfaces.go`) is deleted: Go can't have it alongside the planned `plugins.Logger(ctx)` function. Code inside `plugins` uses `logger.Logger`.
+- The registry hands the parser each in-process plugin's own adapters, bypassing the host's methods. So `DirectPluginHost` wraps them in a `sourcedAdapter` that re-sources the ctx logger.
+- The external example plugin (`example/plugin/external/main.go`) was switched to `plugins.Logger(ctx)` now rather than in 3.1. It stored its Init logger, which is nil in the plugin process without the per-RPC `SetLogger`, and it panicked.
+- `TestPlugin.Init` still resets calls (harmless).
+- The static logger-implementation check matches on the `(msg string, args ...any)` signature, so gRPC callback servers with Debug/Info/Warn/Error RPCs aren't flagged.
+
+**Files changed**:
+- `xclconfig: logger/emit.go`, `logger/tagged.go` (deleted: `logger/stdout_logger.go`, `logger/event.go`, `logger/event_test.go`, `logger/test_logger.go`, `logger/test_logger_test.go`)
+- `xclconfig: plugins/context.go` (new), `plugins/plugin.go`, `plugins/plugin_host.go`, `plugins/adapter.go`, `plugins/direct_plugin_host.go`, `plugins/grpc_plugin_host.go`, `plugins/grpc_resource_adapter.go`, `plugins/grpc_server.go`, `plugins/grpc_plugin.go`, `plugins/grpc_clients.go`, `plugins/grpc_host_callback.go`, `plugins/hclog_adapter.go`, `plugins/provider.go`, `plugins/datasource.go` (deleted: `plugins/interfaces.go`)
+- `xclconfig: plugins/mocks/mock_provider_adapter.go` (regenerated)
+- `xclconfig: plugins/testing/helpers.go`
+- `xclconfig: plugins/registry/plugin_registry.go`
+- `xclconfig: plugins/example/pkg/person/provider.go`
+- `xclconfig: internal/parser/events.go`, `internal/parser/lifecycle.go`, `internal/parser/callbacks.go`, `internal/parser/test_plugin.go`
+- `xclconfig: example/*/main.go`, `example/plugin/external/main.go`
+- `xclconfig: tests: logger/tagged_test.go, plugins/context_test.go, plugins/direct_plugin_host_test.go, plugins/adapter_test.go, plugins/changed_test.go, plugins/hclog_adapter_test.go, plugins/example/e2e_test.go, plugins/example/plugin_test.go, config_plugin_logging_test.go, static_output_test.go, config_destroy_test.go and logger.Nop() swaps across root/internal/parser/state/example tests`
+
+**Discoveries**:
+- An external plugin's `Init` runs in the plugin process with a nil logger (`GRPCPlugin.GRPCServer` calls `Init(nil, nil)`). Any provider that stores its Init logger will panic until 2.3 passes a real plugin-scoped logger.
+- Six example-plugin log tests are `t.Skip`ped ("restored as an event assertion in phase 2.2/3.1"). They depend on registry-emitted load events and on the example providers moving to `plugins.Logger(ctx)`.
+- `plugins/registry/plugin_discovery.go` still passes `"event","discover"` args, which become a literal Meta detail. 2.2 removes them.
+
+### 2026-09-22 — Phase 2.2: The plugin registry records plugins and loads them on first use
+
+**What was done**: `registry.NewPluginRegistry()` takes no logger. `RegisterPlugin`, `RegisterPluginWithPath` and the new `DiscoverPlugins(dirs, pattern)`, which replaces `DiscoverAndLoadPlugins`, only record. `Load(emit)` discovers, starts and clash-checks plugins once per registry and caches the result, including a failure. It emits `discover` and `load` start/success/error events. A registered plugin that fails to load is a `*PluginLoadError`, matching `ErrPluginLoad`, which is re-exported from `xcl`. A discovered plugin that fails is rejected with `Meta{rejected: true}`. `Activate(emit)` routes out-of-call plugin logs to the current operation. Every read takes a read lock. `Config` activates and loads before each operation's work, and the parser also calls the cached `Load`. `Config.addressParser` isn't cached until the plugins have loaded.
+
+**Deviations**:
+- The registry, not the hosts, emits the load events, so a clash found after a plugin starts isn't reported as success followed by error.
+- During `Load`, plugin-scoped logs go to the loading operation's emitter.
+- `plugins.PluginName`, `PluginBinaryName` and `ResourceTypeNames` are exported for the registry.
+- `TestPlugin.Init` now only fills in unset configuration, because Init runs at the first operation, after tests have configured the plugin.
+- The parser also loads plugins, so standalone parser use keeps working.
+
+**Files changed**:
+- `xclconfig: errors/plugin_load_error.go` (new)
+- `xclconfig: config.go`
+- `xclconfig: plugins/registry/plugin_registry.go`, `plugins/registry/plugin_discovery.go`, `plugins/registry/errors.go`
+- `xclconfig: plugins/direct_plugin_host.go`, `plugins/grpc_plugin_host.go`
+- `xclconfig: internal/parser/parser.go`, `internal/parser/test_plugin.go`
+- `xclconfig: example/*/main.go`
+- `xclconfig: tests: plugins/registry/*_test.go (new testutils_events_test.go), plugins/direct_plugin_host_test.go, plugins/example/e2e_test.go, config_plugin_loading_test.go (new), config_delivery_test.go, config_events_test.go, config_validate_test.go, query_setup_test.go, internal/parser/{computed,parser_plugin,lifecycle,parse}_test.go, example/plugin/main_test.go, and NewPluginRegistry() call sites across tests`
+
+**Discoveries**:
+- Providers that keep their Init logger now report later messages as `load` log events, because the plugin-scoped logger's base Operation is `load`. The messages still reach the right operation. Phase 3.1 moves the example providers to `plugins.Logger(ctx)`.
+- `example/plugin/main.go`'s "build it with make build" hint wraps `RegisterPluginWithPath`, which can no longer fail. 3.1 must move the hint to the `ErrPluginLoad` returned by `Apply`.
+- Five `example/plugin` log tests remain skipped ("restored in phase 3.1").
+
+### 2026-09-22 — Phase 2.3: The same logging across the plugin process boundary
+
+**What was done**: `LogRequest` gained `call_id` and the protos were regenerated; the stale `plugins/protos/plugin.proto` is deleted. For every provider call, the host's gRPC wrapper registers the call's bound logger, re-sourced to the plugin binary's name, under a fresh call ID, and sends the ID as `xcl-call-id` metadata. The plugin server builds a per-RPC `GRPCLogger` carrying that ID, and the host callback server resolves the ID back to the call's logger. Unknown or empty IDs fall back to the plugin-scoped logger, which goes to the registry's active or loading emitter. An external plugin's `Init` now gets a working plugin-scoped logger.
+
+**Deviations**:
+- Inside the plugin process, the plugin-scoped logger (`asyncLogger`) sends each message from a goroutine. go-plugin calls `GRPCServer`/`Init` before the handshake, while the host is not yet connected, so a synchronous dial would block plugin start-up until the broker times out.
+- Resolution of the plan's open question, decided by the user: go-plugin v1.6.3 writes `[ERR] plugin: plugin acceptAndServe error: broker closed` through the standard library's global logger (`grpc_broker.go:382`) when an external plugin is stopped within milliseconds of starting. It can't be routed without patching go-plugin or changing the global logger. The user accepted it as a documented exception ("Go-plugin is not within our control, it is an external tool"). The host-level test asserting silence in that case was removed. The no-output tests through `Config` (validate/apply/destroy with both plugin kinds, with and without a receiver) pass.
+
+**Files changed**:
+- `xclconfig: plugins/plugin.proto`, `plugins/proto/plugin.pb.go` (regenerated); deleted `plugins/protos/plugin.proto`
+- `xclconfig: plugins/grpc_calls.go` (new), `plugins/grpc_plugin_host.go`, `plugins/grpc_host_callback.go`, `plugins/grpc_server.go`, `plugins/grpc_clients.go`, `plugins/grpc_plugin.go`
+- `xclconfig: example/plugin/external/main.go`
+- `xclconfig: tests: config_plugin_boundary_test.go (new), plugins/grpc_calls_test.go (new), plugins/example/e2e_test.go, example/plugin/main_test.go`
+
+**Discoveries**:
+- External provider logs reach the receiver only when the call's ctx carries a bound logger. Calling a host directly with `context.Background()` drops them silently, by design.
+- The go-plugin stderr line above must be listed as a known exception in the library docs (3.2) and on the docs site (3.3).
+
+### 2026-09-22 — Phase 3.1: A styled example receiver used by every example
+
+**What was done**: `example/eventlog` is replaced by `example/prettylog`: `Handler(w, level)`, which is `events.SlogHandler` over a charmbracelet/log handler with styled `source`, `resource` and `operation` keys, plus `LevelFromEnv()` (`XCL_LOG_LEVEL`, default info). Every example's `run` takes an `xcl.EventHandler`, and `main` sets it up with one `prettylog.Handler(os.Stderr, prettylog.LevelFromEnv())` call. `NewPluginRegistry()` takes no arguments and the examples import no logger. The example plugins log at info through `plugins.Logger(ctx)` with no resource or event arguments, and no longer store a logger. Plugin and provider `Init` log at debug through the plugin-scoped logger. The example tests assert on recorded events, and none are skipped any more. New static tests cover the examples (one handler, one prettylog call, no logger import, no-arg registry, no resource/event details in plugin logs) and the library's dependencies (`go list -deps` finds no charmbracelet package outside the examples).
+
+**Deviations**: The plugin example's "build it with `make build`" hint wraps the `ErrPluginLoad` returned by `Apply` inside `run` rather than in `main`, so its test sees it. `lipgloss` became a direct `go.mod` requirement at the same pinned v1.1.0. The unused `BUILD_DIR` was removed from the configonly Makefile. I confirmed the styled output by running `example/plugin`.
+
+**Files changed**:
+- `xclconfig: example/prettylog/prettylog.go` (new), `example/prettylog/prettylog_test.go` (new); deleted `example/eventlog/eventlog.go`
+- `xclconfig: example/plugin/main.go`, `example/configonly/main.go`, `example/appconfig/main.go`
+- `xclconfig: example/plugin/internal/plugin.go`, `example/plugin/external/main.go`
+- `xclconfig: example/configonly/Makefile`
+- `xclconfig: example/*/main_test.go`
+- `xclconfig: static_examples_test.go` (new), `static_dependencies_test.go` (new)
+- `xclconfig: go.mod`
+
+**Discoveries**: In-process provider `Init` messages arrive as `load`-operation log events during the registry's `Load`, with the `provider=<block type>` detail and no resource.
+
+### 2026-09-22 — Phase 3.2: Library documentation describes the event stream
+
+**What was done**: The README gains an "Events and logging" section that replaces "Lifecycle events". It covers the Event fields and reserved keys, operation events, delivery guarantees, `WithEventBufferSize`, blocked events, receiver panics, the one-line `events.SlogHandler`, logging from a provider with `plugins.Logger(ctx)`, and the go-plugin exception. It also gains a "Registering plugins" section on lazy loading, `DiscoverPlugins`, `ErrPluginLoad` and clash timing, and its example descriptions now use `prettylog`. `docs/README.md`, `docs/parser-lifecycle.md` (Emit, the operation context, the runner), `docs/plugins.md` (plugin logging, the gRPC boundary, the lazy registry), `docs/plugin-developer-guide.md` (a "Logging from a provider" section) and `plugins/README_test_helpers.md` (the `WithEmit` helpers) are updated. `CHANGELOG.md` has a new top entry listing the breaking changes.
+
+**Deviations**: The phase ran alongside the 3.1 test step, on disjoint files. The docs note that the `provider=<block type>` detail on `Init` loggers applies to in-process plugins only: inside an external plugin process the `Init` logger is the gRPC one, which `WithTag` leaves unchanged.
+
+**Files changed**:
+- `xclconfig: README.md`
+- `xclconfig: docs/README.md`, `docs/parser-lifecycle.md`, `docs/plugins.md`, `docs/plugin-developer-guide.md`
+- `xclconfig: plugins/README_test_helpers.md`
+- `xclconfig: CHANGELOG.md`
+
+**Discoveries**: External plugins' `Init` loggers don't carry the `provider` detail. That's a small asymmetry with in-process plugins, left as documented behaviour.
+
+### 2026-09-22 — Phase 3.3: The documentation site covers events, logging and plugin loading
+
+**What was done**: Two new pages on xcl.dev. `/events/` covers the event stream, its fields, operations and phases, sources, delivery guarantees, receiver panics, the one-line slog adapter, the pretty receiver and the go-plugin exception. `/plugin-logging/` covers `plugins.Logger(ctx)`, automatic resource and step context, in-process vs external plugins, the plugin-scoped Init logger, lazy registration and loading, `ErrPluginLoad` and clash timing. Both are linked from a new "Guides" dropdown in the navigation and from the site README's Pages table. The home page registry snippet and the events feature card are updated. The three example pages quote the current example code and show real output captured from runs of the examples.
+
+**Deviations**: The plugins example page's config block was brought up to the full `main.xcl`; it had been missing `db_password` and `web_database`. A "the the" typo in a quoted snippet was fixed. Some quotes on the configuration-only and application-config pages were already condensed before this change and were left as they were. `logger.Logger` still appears in quoted `Init` signatures, which is the current API.
+
+**Files changed**:
+- `xcl-website: src/pages/events.mdx` (new)
+- `xcl-website: src/pages/plugin-logging.mdx` (new)
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: README.md`
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+- `xcl-website: src/pages/examples/configuration-only.mdx`
+- `xcl-website: src/pages/examples/application-config.mdx`
+
+**Discoveries**: `astro check` passes with 0 errors and 0 warnings (one existing hint in Shell.astro), and `npm run build` builds all 6 pages.

@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
-	"github.com/jumppad-labs/xcl/internal/xcl"
-	"github.com/jumppad-labs/xcl/logger"
+	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 	pluginmocks "github.com/jumppad-labs/xcl/plugins/mocks"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
@@ -45,7 +45,6 @@ func findResource[T any](t *testing.T, entities []any, path string) *T {
 // or the users home folder
 func testOptions(t *testing.T) *ParserOptions {
 	o := DefaultOptions()
-	o.Logger = logger.NewTestLogger(t)
 	o.ModuleCache = filepath.Join(t.TempDir(), ConfigDirectory, "cache")
 
 	return o
@@ -73,12 +72,9 @@ func setupParser(t *testing.T, options ...*ParserOptions) (*Parser, *TestPlugin)
 		o.StateStore = ms
 	}
 
-	// Always use TestLogger for all parser tests (override default StdOutLogger)
-	o.Logger = logger.NewTestLogger(t)
-
 	// Create a plugin registry for the parser (Config normally owns this, but for standalone parser tests we create one)
 	if o.PluginRegistry == nil {
-		o.PluginRegistry = registry.NewPluginRegistry(o.Logger)
+		o.PluginRegistry = registry.NewPluginRegistry()
 	}
 
 	p := NewParser(o)
@@ -98,7 +94,6 @@ func TestNewParserWithOptions(t *testing.T) {
 		Variables:      map[string]string{"foo": "bar"},
 		VariablesFiles: []string{"./myfile.txt"},
 		ModuleCache:    "./modules",
-		Logger:         logger.NewTestLogger(t),
 	}
 
 	p := NewParser(&options)
@@ -117,7 +112,7 @@ func TestParseFileProcessesResources(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	// check variable has been interpolated
@@ -147,7 +142,7 @@ func TestParseFileSetsLinks(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	// check variable has been interpolated
@@ -179,7 +174,7 @@ func TestParseResolvesArrayReferences(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	// check variable has been interpolated
@@ -204,7 +199,7 @@ func TestParseSetsDefaultValues(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.default")
@@ -228,7 +223,7 @@ func TestLoadsVariableFilesInOptionsOverridingVariableDefaults(t *testing.T) {
 
 	p, _ := setupParser(t, o)
 
-	c, err := p.Apply(filepath.Join(absoluteFolderPath, "container.xcl"))
+	c, err := p.Apply(context.Background(), filepath.Join(absoluteFolderPath, "container.xcl"))
 	require.NoError(t, err)
 
 	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
@@ -249,7 +244,7 @@ func TestLoadsVariablesInEnvVarOverridingVariableDefaults(t *testing.T) {
 		os.Unsetenv("HCL_VAR_cpu_resources")
 	})
 
-	c, err := p.Apply(filepath.Join(absoluteFolderPath, "container.xcl"))
+	c, err := p.Apply(context.Background(), filepath.Join(absoluteFolderPath, "container.xcl"))
 	require.NoError(t, err)
 
 	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
@@ -264,7 +259,7 @@ func TestLoadsVariableFilesInDirectoryOverridingVariableDefaults(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
@@ -279,7 +274,7 @@ func TestLoadsVariablesFilesOverridingVariableDefaults(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
@@ -296,7 +291,7 @@ func TestResourceReferencesInExpressionsAreEvaluated(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	require.Len(t, c.GetResources(), 10)
@@ -339,7 +334,7 @@ func TestResourceReferencesInExpressionStringsAreEvaluated(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	con := findResource[structs.Container](t, c.GetResources(), "resource.container.container4")
@@ -354,7 +349,7 @@ func TestParseModuleCreatesResources(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	require.Len(t, c.GetResources(), 41)
@@ -386,7 +381,7 @@ func TestParseModuleDoesNotCacheLocalFiles(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 	require.NotNil(t, c)
 
@@ -403,7 +398,7 @@ func TestParseModuleCreatesOutputs(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	require.Len(t, c.GetResources(), 41)
@@ -461,7 +456,7 @@ func TestDoesNotLoadsVariablesFilesFromInsideModules(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	// check variable has been interpolated
@@ -477,7 +472,7 @@ func TestModuleDisabledCanBeOverriden(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	// test disabled overrides are set
@@ -509,7 +504,7 @@ func TestParseContainerWithNoNameReturnsError(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err = p.Apply(absoluteFolderPath)
+	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.Error(t, err)
 }
 
@@ -521,7 +516,7 @@ func TestParseContainerWithNoTypeReturnsError(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err = p.Apply(absoluteFolderPath)
+	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.Error(t, err)
 }
 
@@ -538,7 +533,7 @@ func TestApplyRejectsTheBareFormOfAKindLedType(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err = p.Apply(absoluteFolderPath)
+	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.Error(t, err)
 
 	// container is provided by a plugin, so it is declared with the resource
@@ -559,7 +554,7 @@ func TestApplyUnknownLeadingKeywordReturnsErrorNamingTheKeyword(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err = p.Apply(absoluteFolderPath)
+	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "wibble")
 	require.Contains(t, err.Error(), "is not a known type")
@@ -573,7 +568,7 @@ func TestParseDoesNotProcessDisabledResources(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 	require.Equal(t, 5, c.ResourceCount())
 
@@ -602,7 +597,7 @@ func TestParseDoesNotProcessDisabledResourcesWhenModuleDisabled(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	r, err := findByID(c.GetResources(), "module.disabled.resource.container.enabled")
@@ -750,8 +745,8 @@ func TestParserProcessesResourcesInCorrectOrder(t *testing.T) {
 	calls := []string{}
 	var callsMu sync.Mutex // the walker fires events from parallel goroutines
 
-	o.OnParserEvent = func(event ParserEvent) {
-		if event.Operation == "create" && event.Phase == "success" {
+	o.Emit = func(event events.Event) {
+		if event.Operation == events.OperationCreate && event.Phase == events.PhaseSuccess {
 			callsMu.Lock()
 			defer callsMu.Unlock()
 			calls = append(calls, event.ResourceID)
@@ -760,7 +755,7 @@ func TestParserProcessesResourcesInCorrectOrder(t *testing.T) {
 
 	p, _ := setupParser(t, o)
 
-	_, err = p.Apply(absoluteFolderPath)
+	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	// check the order, should be ...
@@ -823,7 +818,7 @@ func TestParserErrorsOnPluginCreateError(t *testing.T) {
 	// ensure an error is returned when creating a resource
 	tp.SetCreateError("resource.container.base", fmt.Errorf("test error"))
 
-	_, err = p.Apply(absoluteFolderPath)
+	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.Error(t, err)
 
 	cr := tp.GetCreatedResources()
@@ -879,7 +874,7 @@ func TestParserCyclicalReferenceReturnsError(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.Error(t, err)
 
 	require.ErrorContains(t, err, "'resource.container.one' depends on 'resource.network.two'")
@@ -893,7 +888,7 @@ func TestParserNoCyclicalReferenceReturns(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 }
 
@@ -905,7 +900,7 @@ func TestParseDirectoryReturnsConfigErrorWhenParseDirectoryFails(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -920,7 +915,7 @@ func TestParseDirectoryReturnsConfigErrorWhenResourceProcessError(t *testing.T) 
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -945,7 +940,7 @@ func TestParseFileReturnsConfigErrorWhenParseDirectoryFails(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -960,7 +955,7 @@ func TestParseFileReturnsConfigErrorWhenResourceBadlyFormed(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -980,7 +975,7 @@ func TestParseFileReturnsConfigErrorWhenFunctionError(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -996,7 +991,7 @@ func TestParseFileReturnsConfigErrorWhenResourceInterpolationError(t *testing.T)
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1021,7 +1016,7 @@ func TestParseFileReturnsConfigErrorWhenInvalidFileFails(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1035,34 +1030,34 @@ func TestParserEventCallback(t *testing.T) {
 	}
 
 	// Track all events
-	var events []ParserEvent
-	var eventsMu sync.Mutex // the walker fires events from parallel goroutines
+	var recorded []events.Event
+	var recordedMu sync.Mutex // the walker fires events from parallel goroutines
 
 	// Setup parser with event callback
 	options := testOptions(t)
-	options.Logger = logger.NewTestLogger(t)
-	options.OnParserEvent = func(event ParserEvent) {
-		eventsMu.Lock()
-		defer eventsMu.Unlock()
-		events = append(events, event)
+	options.Emit = func(event events.Event) {
+		recordedMu.Lock()
+		defer recordedMu.Unlock()
+		recorded = append(recorded, event)
 	}
 
 	p, _ := setupParser(t, options)
 
 	// Parse the file - this should trigger create events
-	_, err = p.Apply(absoluteFolderPath)
+	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	// Verify events were fired
-	require.NotEmpty(t, events, "Expected parser events to be fired")
+	require.NotEmpty(t, recorded, "Expected parser events to be fired")
 
 	// Check that we have start and success events for any operation
-	var startEvents []ParserEvent
-	var successEvents []ParserEvent
+	var startEvents []events.Event
+	var successEvents []events.Event
 
-	for _, event := range events {
-		// parse events are not provider operations, they have tests of their own
-		if event.Operation == "parse" {
+	for _, event := range recorded {
+		// parse and plugin load events are not provider operations, they
+		// have tests of their own
+		if event.Operation == events.OperationParse || event.Operation == events.OperationLoad {
 			continue
 		}
 
@@ -1083,6 +1078,8 @@ func TestParserEventCallback(t *testing.T) {
 		require.Equal(t, "success", event.Phase)
 		require.Contains(t, event.ResourceType, ".", "Expected resource type to contain a dot")
 		require.NotEmpty(t, event.ResourceID, "Expected resource ID to be set")
+		require.Equal(t, events.SourceCore, event.Source)
+		require.NotEmpty(t, event.File, "Expected the resource's file to be set")
 
 		// Builtin types (variables, outputs, locals, modules, root) have 0 duration
 		if strings.Contains(event.ResourceType, "variable.") ||
@@ -1110,14 +1107,14 @@ func TestParserCreateEventErrorCallback(t *testing.T) {
 	absoluteFolderPath, err := filepath.Abs("../test_fixtures/config/modules/modules.xcl")
 	require.NoError(t, err)
 
-	var events []ParserEvent
-	var eventsMu sync.Mutex // the walker fires events from parallel goroutines
+	var recorded []events.Event
+	var recordedMu sync.Mutex // the walker fires events from parallel goroutines
 
 	options := testOptions(t)
-	options.OnParserEvent = func(event ParserEvent) {
-		eventsMu.Lock()
-		defer eventsMu.Unlock()
-		events = append(events, event)
+	options.Emit = func(event events.Event) {
+		recordedMu.Lock()
+		defer recordedMu.Unlock()
+		recorded = append(recorded, event)
 	}
 
 	p, tp := setupParser(t, options)
@@ -1125,15 +1122,15 @@ func TestParserCreateEventErrorCallback(t *testing.T) {
 	// nothing exists in state, so the resource is created
 	tp.SetCreateError("resource.container.base", fmt.Errorf("test create error"))
 
-	_, err = p.Apply(absoluteFolderPath)
+	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.Error(t, err)
 
 	// create event with start phase is fired before the plugins Create method is called
-	requireEvent(t, events, "create", "start", "resource.container.base")
+	requireEvent(t, recorded, "create", "start", "resource.container.base")
 
 	// create event with error phase is fired when an error is returned during the
 	// plugin Create method
-	event := requireEvent(t, events, "create", "error", "resource.container.base")
+	event := requireEvent(t, recorded, "create", "error", "resource.container.base")
 	require.ErrorContains(t, event.Error, "test create error")
 	require.Greater(t, event.Duration, time.Duration(0))
 	require.NotEmpty(t, event.Data)
@@ -1152,11 +1149,11 @@ func TestParserReadEventErrorCallback(t *testing.T) {
 
 	firstParser, _ := setupParser(t, firstOptions)
 
-	previousState, err := firstParser.Apply(absoluteFolderPath)
+	previousState, err := firstParser.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
-	var events []ParserEvent
-	var eventsMu sync.Mutex // the walker fires events from parallel goroutines
+	var recorded []events.Event
+	var recordedMu sync.Mutex // the walker fires events from parallel goroutines
 
 	secondStore := &statemocks.MockStateStore{}
 	secondStore.On("Exists").Return(true)
@@ -1164,10 +1161,10 @@ func TestParserReadEventErrorCallback(t *testing.T) {
 
 	secondOptions := testOptions(t)
 	secondOptions.StateStore = secondStore
-	secondOptions.OnParserEvent = func(event ParserEvent) {
-		eventsMu.Lock()
-		defer eventsMu.Unlock()
-		events = append(events, event)
+	secondOptions.Emit = func(event events.Event) {
+		recordedMu.Lock()
+		defer recordedMu.Unlock()
+		recorded = append(recorded, event)
 	}
 
 	secondParser, tp := setupParser(t, secondOptions)
@@ -1175,12 +1172,12 @@ func TestParserReadEventErrorCallback(t *testing.T) {
 	// the resource exists in state, so it is read rather than created
 	tp.SetReadError("resource.container.base", fmt.Errorf("test read error"))
 
-	_, err = secondParser.Apply(absoluteFolderPath)
+	_, err = secondParser.Apply(context.Background(), absoluteFolderPath)
 	require.Error(t, err)
 
-	requireEvent(t, events, "read", "start", "resource.container.base")
+	requireEvent(t, recorded, "read", "start", "resource.container.base")
 
-	event := requireEvent(t, events, "read", "error", "resource.container.base")
+	event := requireEvent(t, recorded, "read", "error", "resource.container.base")
 	require.ErrorContains(t, event.Error, "test read error")
 	require.Greater(t, event.Duration, time.Duration(0))
 	require.NotEmpty(t, event.Data)
@@ -1193,33 +1190,32 @@ func TestParserEventForVariablesOutputsLocals(t *testing.T) {
 	}
 
 	// Track all events
-	var events []ParserEvent
-	var eventsMu sync.Mutex // the walker fires events from parallel goroutines
+	var recorded []events.Event
+	var recordedMu sync.Mutex // the walker fires events from parallel goroutines
 
 	// Setup parser with event callback
 	options := testOptions(t)
-	options.Logger = logger.NewTestLogger(t)
-	options.OnParserEvent = func(event ParserEvent) {
-		eventsMu.Lock()
-		defer eventsMu.Unlock()
-		events = append(events, event)
+	options.Emit = func(event events.Event) {
+		recordedMu.Lock()
+		defer recordedMu.Unlock()
+		recorded = append(recorded, event)
 	}
 
 	p, _ := setupParser(t, options)
 
 	// Parse the file - this should trigger events for variables, outputs, and locals
-	_, err = p.Apply(absoluteFolderPath)
+	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	// Verify events were fired
-	require.NotEmpty(t, events, "Expected parser events to be fired")
+	require.NotEmpty(t, recorded, "Expected parser events to be fired")
 
 	// Check for variable, output, and module events
-	var variableEvents []ParserEvent
-	var outputEvents []ParserEvent
-	var moduleEvents []ParserEvent
+	var variableEvents []events.Event
+	var outputEvents []events.Event
+	var moduleEvents []events.Event
 
-	for _, event := range events {
+	for _, event := range recorded {
 		if event.Operation == "create" && event.Phase == "success" {
 			if strings.Contains(event.ResourceType, "variable.") {
 				variableEvents = append(variableEvents, event)
@@ -1257,13 +1253,13 @@ func TestParserEventForVariablesOutputsLocals(t *testing.T) {
 	}
 }
 
-// requireEvent fails the test unless events contains an event with the given
+// requireEvent fails the test unless recorded contains an event with the given
 // operation, phase and resource ID, and returns the first one that matches.
-func requireEvent(t *testing.T, events []ParserEvent, operation, phase, resourceID string) ParserEvent {
+func requireEvent(t *testing.T, recorded []events.Event, operation, phase, resourceID string) events.Event {
 	t.Helper()
 
 	fired := []string{}
-	for _, event := range events {
+	for _, event := range recorded {
 		if event.Operation == operation && event.Phase == phase && event.ResourceID == resourceID {
 			return event
 		}
@@ -1272,7 +1268,7 @@ func requireEvent(t *testing.T, events []ParserEvent, operation, phase, resource
 	}
 
 	require.FailNow(t, fmt.Sprintf("expected %s %s event for %s. events: %v", operation, phase, resourceID, fired))
-	return ParserEvent{}
+	return events.Event{}
 }
 
 func requireBefore(t *testing.T, first, second string, list []string) {
@@ -1301,7 +1297,7 @@ func TestParseFileReportsEveryMalformedBlockInFile(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1332,7 +1328,7 @@ func TestParseFileReportsEveryDiagnosticForSingleMalformation(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1361,7 +1357,7 @@ func TestParseFileReportsMalformedBlockAsErrorNotWarning(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1383,7 +1379,7 @@ func TestParseFileReportsFileAndPositionForMalformedBlock(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1406,7 +1402,7 @@ func TestParseFileToleratesUninterpolatableValue(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1430,7 +1426,7 @@ func TestParseCreatesNothingWhenConfigurationIsRejected(t *testing.T) {
 
 	// the provider lifecycle always runs, so the only thing that can stop the
 	// walk is the gate that runs before resources reach state
-	s, err := p.Apply(f)
+	s, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 	require.Nil(t, s)
 
@@ -1461,7 +1457,7 @@ resource "container" {
 
 	p, testPlugin := setupParser(t)
 
-	s, err := p.Apply(dir)
+	s, err := p.Apply(context.Background(), dir)
 	require.IsType(t, &errors.ConfigError{}, err)
 	require.Nil(t, s)
 
@@ -1478,7 +1474,7 @@ func TestParseResourceReturnsConfigErrorWhenTypeIsNotRegistered(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1506,7 +1502,7 @@ func TestParseResourceWithUnregisteredTypeReportsWhereItAppears(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1536,7 +1532,7 @@ func TestParseModuleReturnsConfigErrorWhenModuleSourcesItself(t *testing.T) {
 
 	done := make(chan parseResult, 1)
 	go func() {
-		_, err := p.Apply(f)
+		_, err := p.Apply(context.Background(), f)
 		done <- parseResult{err: err}
 	}()
 
@@ -1577,7 +1573,7 @@ func TestParseModuleReturnsConfigErrorWhenModulesIncludeEachOther(t *testing.T) 
 
 	done := make(chan parseResult, 1)
 	go func() {
-		_, err := p.Apply(f)
+		_, err := p.Apply(context.Background(), f)
 		done <- parseResult{err: err}
 	}()
 
@@ -1610,7 +1606,7 @@ func TestParseModuleReturnsConfigErrorWhenSourceDoesNotExist(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	_, err := p.Apply(f)
+	_, err := p.Apply(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
@@ -1634,7 +1630,7 @@ func TestParseModuleParsesSameSourceUsedTwiceAsSiblings(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	c, err := p.Apply(f)
+	c, err := p.Apply(context.Background(), f)
 	require.NoError(t, err)
 	require.NotNil(t, c)
 

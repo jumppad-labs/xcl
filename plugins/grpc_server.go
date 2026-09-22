@@ -4,19 +4,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/proto"
 )
 
 // GRPCServer wraps PluginBase and implements the gRPC PluginService
 type GRPCServer struct {
 	proto.UnimplementedPluginServiceServer
-	plugin       Plugin
-	broker       *plugin.GRPCBroker
-	logger       Logger
-	state        State
-	cachedLogger Logger // cached logger instance
+	plugin Plugin
+	broker *plugin.GRPCBroker
+	state  State
+
+	// mu guards callbackClient, RPCs are served concurrently
+	mu             sync.Mutex
+	callbackClient proto.HostCallbackServiceClient // the connection to the host, dialled once
 }
 
 // NewGRPCServer creates a new gRPC server with provided logger and state
@@ -40,13 +44,6 @@ func (s *GRPCServer) getRegisteredType(entityType, entitySubType string) *Regist
 }
 
 func (s *GRPCServer) GetTypes(ctx context.Context, req *proto.GetTypesRequest) (*proto.GetTypesResponse, error) {
-	l, err := s.getLogger()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get logger: %w", err)
-	}
-
-	// set the logger for the plugin
-	s.plugin.SetLogger(l)
 
 	types := s.plugin.GetTypes()
 	protoTypes := make([]*proto.RegisteredType, len(types))
@@ -63,26 +60,20 @@ func (s *GRPCServer) GetTypes(ctx context.Context, req *proto.GetTypesRequest) (
 }
 
 func (s *GRPCServer) Validate(ctx context.Context, req *proto.ValidateRequest) (*proto.ValidateResponse, error) {
-	l, err := s.getLogger()
+	ctx, err := s.withLogger(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get logger: %w", err)
+		return nil, err
 	}
 
-	// set the logger for the plugin
-	s.plugin.SetLogger(l)
-
-	err = s.plugin.Validate(req.EntityType, req.EntitySubType, req.EntityData)
+	err = s.plugin.Validate(ctx, req.EntityType, req.EntitySubType, req.EntityData)
 	return &proto.ValidateResponse{Error: errorToString(err)}, nil
 }
 
 func (s *GRPCServer) Create(ctx context.Context, req *proto.CreateRequest) (*proto.CreateResponse, error) {
-	l, err := s.getLogger()
+	ctx, err := s.withLogger(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get logger: %w", err)
+		return nil, err
 	}
-
-	// set the logger for the plugin
-	s.plugin.SetLogger(l)
 
 	// Get the registered type to access its adapter
 	rt := s.getRegisteredType(req.EntityType, req.EntitySubType)
@@ -99,26 +90,20 @@ func (s *GRPCServer) Create(ctx context.Context, req *proto.CreateRequest) (*pro
 }
 
 func (s *GRPCServer) Destroy(ctx context.Context, req *proto.DestroyRequest) (*proto.DestroyResponse, error) {
-	l, err := s.getLogger()
+	ctx, err := s.withLogger(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get logger: %w", err)
+		return nil, err
 	}
 
-	// set the logger for the plugin
-	s.plugin.SetLogger(l)
-
-	err = s.plugin.Destroy(req.EntityType, req.EntitySubType, req.EntityData)
+	err = s.plugin.Destroy(ctx, req.EntityType, req.EntitySubType, req.EntityData)
 	return &proto.DestroyResponse{Error: errorToString(err)}, nil
 }
 
 func (s *GRPCServer) Read(ctx context.Context, req *proto.ReadRequest) (*proto.ReadResponse, error) {
-	l, err := s.getLogger()
+	ctx, err := s.withLogger(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get logger: %w", err)
+		return nil, err
 	}
-
-	// set the logger for the plugin
-	s.plugin.SetLogger(l)
 
 	// Get the registered type to access its adapter
 	rt := s.getRegisteredType(req.EntityType, req.EntitySubType)
@@ -136,13 +121,10 @@ func (s *GRPCServer) Read(ctx context.Context, req *proto.ReadRequest) (*proto.R
 }
 
 func (s *GRPCServer) Update(ctx context.Context, req *proto.UpdateRequest) (*proto.UpdateResponse, error) {
-	l, err := s.getLogger()
+	ctx, err := s.withLogger(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get logger: %w", err)
+		return nil, err
 	}
-
-	// set the logger for the plugin
-	s.plugin.SetLogger(l)
 
 	// Get the registered type to access its adapter
 	rt := s.getRegisteredType(req.EntityType, req.EntitySubType)
@@ -159,36 +141,56 @@ func (s *GRPCServer) Update(ctx context.Context, req *proto.UpdateRequest) (*pro
 }
 
 func (s *GRPCServer) Changed(ctx context.Context, req *proto.ChangedRequest) (*proto.ChangedResponse, error) {
-	l, err := s.getLogger()
+	ctx, err := s.withLogger(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get logger: %w", err)
+		return nil, err
 	}
 
-	// set the logger for the plugin
-	s.plugin.SetLogger(l)
-
-	changed, err := s.plugin.Changed(req.EntityType, req.EntitySubType, req.OldEntityData, req.NewEntityData)
+	changed, err := s.plugin.Changed(ctx, req.EntityType, req.EntitySubType, req.OldEntityData, req.NewEntityData)
 	return &proto.ChangedResponse{
 		Changed: changed,
 		Error:   errorToString(err),
 	}, nil
 }
 
-func (s *GRPCServer) getLogger() (Logger, error) {
-	// Return cached logger if already created
-	if s.cachedLogger != nil {
-		return s.cachedLogger, nil
+// withLogger returns ctx carrying the logger that sends the provider's log
+// messages back to the host, see Logger. Each message carries the ID of the
+// call the host sent in ctx, so the host gives it the call's resource and
+// step.
+func (s *GRPCServer) withLogger(ctx context.Context) (context.Context, error) {
+	client, err := s.hostClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get logger: %w", err)
 	}
 
-	// Try to connect to logger service
+	return WithLogger(ctx, &GRPCLogger{client: client, callID: callIDFromContext(ctx)}), nil
+}
+
+// pluginLogger returns the plugin scoped logger, for messages the plugin
+// writes outside a provider call. It connects to the host when a message is
+// first written, which may be before the host has connected, so it never
+// waits for the host.
+func (s *GRPCServer) pluginLogger() logger.Logger {
+	return &asyncLogger{client: s.hostClient}
+}
+
+// hostClient returns the client of the host callback service, connecting to
+// it on first use
+func (s *GRPCServer) hostClient() (proto.HostCallbackServiceClient, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.callbackClient != nil {
+		return s.callbackClient, nil
+	}
+
 	hostConn, err := s.broker.Dial(HostCallbackServiceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to host callback service: %w", err)
 	}
 
-	// Cache the logger for future use
-	s.cachedLogger = &GRPCLogger{client: proto.NewHostCallbackServiceClient(hostConn)}
-	return s.cachedLogger, nil
+	s.callbackClient = proto.NewHostCallbackServiceClient(hostConn)
+	return s.callbackClient, nil
 }
 
 // Helper function to convert error to string

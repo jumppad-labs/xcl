@@ -1,15 +1,16 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/schema"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
@@ -23,13 +24,14 @@ const (
 	otherPersonID = "resource.person.other_person"
 )
 
-// applyEventCollector gathers parser events; the walker fires them in parallel
+// applyEventCollector gathers the events the parser emits; the walker fires
+// them in parallel
 type applyEventCollector struct {
 	mu     sync.Mutex
-	events []parser.ParserEvent
+	events []events.Event
 }
 
-func (c *applyEventCollector) collect(event parser.ParserEvent) {
+func (c *applyEventCollector) collect(event events.Event) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.events = append(c.events, event)
@@ -43,7 +45,7 @@ func (c *applyEventCollector) successfulResources(operation string) []string {
 
 	ids := []string{}
 	for _, event := range c.events {
-		if event.Operation == operation && event.Phase == "success" && strings.HasPrefix(event.ResourceID, "resource.") {
+		if event.Operation == operation && event.Phase == events.PhaseSuccess && strings.HasPrefix(event.ResourceID, "resource.") {
 			ids = append(ids, event.ResourceID)
 		}
 	}
@@ -60,15 +62,14 @@ func applyPeople(t *testing.T, reg *registry.PluginRegistry, store *state.FileSt
 	collector := &applyEventCollector{}
 
 	options := parser.DefaultOptions()
-	options.Logger = logger.NewTestLogger(t)
 	options.ModuleCache = filepath.Join(t.TempDir(), parser.ConfigDirectory, "cache")
 	options.PluginRegistry = reg
 	options.StateStore = store
-	options.OnParserEvent = collector.collect
+	options.Emit = collector.collect
 
 	p := parser.NewParser(options)
 
-	st, err := p.Apply(peopleConfig)
+	st, err := p.Apply(context.Background(), peopleConfig)
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
@@ -111,7 +112,7 @@ func TestExampleProviderSecondApplyMakesNoCreateOrUpdate(t *testing.T) {
 		os.Setenv("HOME", home)
 	})
 
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	reg := registry.NewPluginRegistry()
 	err := reg.RegisterPlugin(&PersonPlugin{})
 	require.NoError(t, err)
 

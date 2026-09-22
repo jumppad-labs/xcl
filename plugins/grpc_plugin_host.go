@@ -9,36 +9,48 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/proto"
+	"google.golang.org/grpc/metadata"
 )
 
 // GRPCPluginHost manages external plugin processes via gRPC and provides host services
 type GRPCPluginHost struct {
-	logger      Logger
+	emit        events.Emit
 	state       State
 	client      *plugin.Client
 	plugin      PluginEntityProvider
 	cachedTypes []RegisteredType // cached types with adapters
 	typesCached bool             // flag to track if types have been cached
+
+	// calls maps the ID of each provider call in progress to its logger,
+	// so the plugin's log messages reach the right resource and receiver
+	calls *callLoggers
 }
 
-// NewGRPCPluginHost creates a new gRPC plugin host for external plugin binaries
-func NewGRPCPluginHost(logger Logger, state State) *GRPCPluginHost {
+// NewGRPCPluginHost creates a new gRPC plugin host for external plugin
+// binaries. The plugin's log messages, and go-plugin's own, are emitted to
+// emit naming the plugin binary as their Source. A nil emit is silent.
+func NewGRPCPluginHost(emit events.Emit, state State) *GRPCPluginHost {
 	return &GRPCPluginHost{
-		logger: logger,
-		state:  state,
+		emit:  emit,
+		state: state,
+		calls: newCallLoggers(),
 	}
 }
 
 // Start initializes and starts the external plugin process. The plugin's logs
-// reach the host logger with every message tagged plugin=<binary file name>,
-// so they can be told apart from the host's.
+// are emitted as events naming the binary's file name as their Source, so
+// they can be told apart from the host's. A message written during a provider
+// call carries that call's resource and step, one written outside a call,
+// and go-plugin's own messages, go to emit.
 func (h *GRPCPluginHost) Start(pluginPath string) error {
-	pluginLogger := logger.WithTag(h.logger, "plugin", pluginBinaryName(pluginPath))
+	name := PluginBinaryName(pluginPath)
+	pluginLogger := logger.New(h.emit, events.Event{Source: name, Operation: events.OperationLoad})
 
 	var PluginMap = map[string]plugin.Plugin{
-		"plugin": &GRPCPlugin{logger: pluginLogger},
+		"plugin": &GRPCPlugin{logger: pluginLogger, calls: h.calls},
 	}
 
 	// Create the plugin client
@@ -48,9 +60,9 @@ func (h *GRPCPluginHost) Start(pluginPath string) error {
 		Cmd:              exec.Command(pluginPath),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		// go-plugin logs how it starts and talks to the plugin process, and
-		// passes on what the process writes to stderr. Log it all through the
-		// host's logger, tagged with the plugin, rather than go-plugin's
-		// default logger which writes straight to stderr.
+		// passes on what the process writes to stderr. Emit it all as events
+		// sourced to the plugin, rather than through go-plugin's default
+		// logger which writes straight to stderr.
 		Logger: newHCLogAdapter(pluginLogger),
 	})
 
@@ -68,18 +80,15 @@ func (h *GRPCPluginHost) Start(pluginPath string) error {
 
 	// Cast to gRPC client and wrap it
 	grpcClient := raw.(proto.PluginServiceClient)
-	h.plugin = &grpcPluginWrapper{client: grpcClient}
-
-	if pluginLogger != nil {
-		pluginLogger.Debug("plugin loaded", "event", "load", "block_types", resourceTypeNames(h.GetTypes()))
-	}
+	h.plugin = &grpcPluginWrapper{client: grpcClient, name: name, calls: h.calls}
 
 	return nil
 }
 
-// pluginBinaryName returns the file name of the plugin binary without a
-// Windows .exe extension, i.e. xcl-plugin-person for /plugins/xcl-plugin-person
-func pluginBinaryName(pluginPath string) string {
+// PluginBinaryName returns the name an external plugin is known by, the file
+// name of its binary without a Windows .exe extension, i.e. xcl-plugin-person
+// for /plugins/xcl-plugin-person. It is the Source of the plugin's log events.
+func PluginBinaryName(pluginPath string) string {
 	return strings.TrimSuffix(filepath.Base(pluginPath), ".exe")
 }
 
@@ -93,6 +102,24 @@ func (h *GRPCPluginHost) Stop() {
 // grpcPluginWrapper wraps a gRPC client to implement PluginEntityProvider
 type grpcPluginWrapper struct {
 	client proto.PluginServiceClient
+
+	// name is the plugin's name, the Source of its log messages
+	name string
+
+	// calls records the logger of each call in progress
+	calls *callLoggers
+}
+
+// callContext registers the logger in ctx, sourced to the plugin, under a new
+// call ID and returns ctx carrying the ID as outgoing gRPC metadata, with a
+// function to call once the call returns
+func (w *grpcPluginWrapper) callContext(ctx context.Context) (context.Context, func()) {
+	if w.calls == nil {
+		return ctx, func() {}
+	}
+
+	id, done := w.calls.register(logger.WithSource(Logger(ctx), w.name))
+	return metadata.AppendToOutgoingContext(ctx, callIDKey, id), done
 }
 
 func (w *grpcPluginWrapper) GetTypes() []RegisteredType {
@@ -114,8 +141,11 @@ func (w *grpcPluginWrapper) GetTypes() []RegisteredType {
 	return types
 }
 
-func (w *grpcPluginWrapper) Validate(entityType, entitySubType string, entityData []byte) error {
-	resp, err := w.client.Validate(context.Background(), &proto.ValidateRequest{
+func (w *grpcPluginWrapper) Validate(ctx context.Context, entityType, entitySubType string, entityData []byte) error {
+	ctx, done := w.callContext(ctx)
+	defer done()
+
+	resp, err := w.client.Validate(ctx, &proto.ValidateRequest{
 		EntityType:    entityType,
 		EntitySubType: entitySubType,
 		EntityData:    entityData,
@@ -131,8 +161,11 @@ func (w *grpcPluginWrapper) Validate(entityType, entitySubType string, entityDat
 	return nil
 }
 
-func (w *grpcPluginWrapper) Create(entityType, entitySubType string, entityData []byte) ([]byte, error) {
-	resp, err := w.client.Create(context.Background(), &proto.CreateRequest{
+func (w *grpcPluginWrapper) Create(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
+	ctx, done := w.callContext(ctx)
+	defer done()
+
+	resp, err := w.client.Create(ctx, &proto.CreateRequest{
 		EntityType:    entityType,
 		EntitySubType: entitySubType,
 		EntityData:    entityData,
@@ -148,8 +181,11 @@ func (w *grpcPluginWrapper) Create(entityType, entitySubType string, entityData 
 	return resp.MutatedEntityData, nil
 }
 
-func (w *grpcPluginWrapper) Destroy(entityType, entitySubType string, entityData []byte) error {
-	resp, err := w.client.Destroy(context.Background(), &proto.DestroyRequest{
+func (w *grpcPluginWrapper) Destroy(ctx context.Context, entityType, entitySubType string, entityData []byte) error {
+	ctx, done := w.callContext(ctx)
+	defer done()
+
+	resp, err := w.client.Destroy(ctx, &proto.DestroyRequest{
 		EntityType:    entityType,
 		EntitySubType: entitySubType,
 		EntityData:    entityData,
@@ -166,6 +202,9 @@ func (w *grpcPluginWrapper) Destroy(entityType, entitySubType string, entityData
 }
 
 func (w *grpcPluginWrapper) Read(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) ([]byte, error) {
+	ctx, done := w.callContext(ctx)
+	defer done()
+
 	resp, err := w.client.Read(ctx, &proto.ReadRequest{
 		EntityType:    entityType,
 		EntitySubType: entitySubType,
@@ -189,8 +228,11 @@ func (w *grpcPluginWrapper) Read(ctx context.Context, entityType, entitySubType 
 	return resp.EntityData, nil
 }
 
-func (w *grpcPluginWrapper) Update(entityType, entitySubType string, entityData []byte) ([]byte, error) {
-	resp, err := w.client.Update(context.Background(), &proto.UpdateRequest{
+func (w *grpcPluginWrapper) Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
+	ctx, done := w.callContext(ctx)
+	defer done()
+
+	resp, err := w.client.Update(ctx, &proto.UpdateRequest{
 		EntityType:    entityType,
 		EntitySubType: entitySubType,
 		EntityData:    entityData,
@@ -206,8 +248,11 @@ func (w *grpcPluginWrapper) Update(entityType, entitySubType string, entityData 
 	return resp.UpdatedEntityData, nil
 }
 
-func (w *grpcPluginWrapper) Changed(entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error) {
-	resp, err := w.client.Changed(context.Background(), &proto.ChangedRequest{
+func (w *grpcPluginWrapper) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error) {
+	ctx, done := w.callContext(ctx)
+	defer done()
+
+	resp, err := w.client.Changed(ctx, &proto.ChangedRequest{
 		EntityType:    entityType,
 		EntitySubType: entitySubType,
 		OldEntityData: oldEntityData,
@@ -265,27 +310,27 @@ func (h *GRPCPluginHost) GetTypes() []RegisteredType {
 }
 
 // Validate validates the given entity data
-func (h *GRPCPluginHost) Validate(entityType, entitySubType string, entityData []byte) error {
+func (h *GRPCPluginHost) Validate(ctx context.Context, entityType, entitySubType string, entityData []byte) error {
 	if h.plugin == nil {
 		return fmt.Errorf("plugin not initialized")
 	}
-	return h.plugin.Validate(entityType, entitySubType, entityData)
+	return h.plugin.Validate(ctx, entityType, entitySubType, entityData)
 }
 
 // Create creates a new entity
-func (h *GRPCPluginHost) Create(entityType, entitySubType string, entityData []byte) ([]byte, error) {
+func (h *GRPCPluginHost) Create(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
 	if h.plugin == nil {
 		return nil, fmt.Errorf("plugin not initialized")
 	}
-	return h.plugin.(*grpcPluginWrapper).Create(entityType, entitySubType, entityData)
+	return h.plugin.(*grpcPluginWrapper).Create(ctx, entityType, entitySubType, entityData)
 }
 
 // Destroy deletes an existing entity
-func (h *GRPCPluginHost) Destroy(entityType, entitySubType string, entityData []byte) error {
+func (h *GRPCPluginHost) Destroy(ctx context.Context, entityType, entitySubType string, entityData []byte) error {
 	if h.plugin == nil {
 		return fmt.Errorf("plugin not initialized")
 	}
-	return h.plugin.Destroy(entityType, entitySubType, entityData)
+	return h.plugin.Destroy(ctx, entityType, entitySubType, entityData)
 }
 
 // Read reports the real entity, given its saved and configured copies
@@ -297,17 +342,17 @@ func (h *GRPCPluginHost) Read(ctx context.Context, entityType, entitySubType str
 }
 
 // Update updates an existing entity
-func (h *GRPCPluginHost) Update(entityType, entitySubType string, entityData []byte) ([]byte, error) {
+func (h *GRPCPluginHost) Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
 	if h.plugin == nil {
 		return nil, fmt.Errorf("plugin not initialized")
 	}
-	return h.plugin.(*grpcPluginWrapper).Update(entityType, entitySubType, entityData)
+	return h.plugin.(*grpcPluginWrapper).Update(ctx, entityType, entitySubType, entityData)
 }
 
 // Changed checks if the entity has changed by comparing old and new
-func (h *GRPCPluginHost) Changed(entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error) {
+func (h *GRPCPluginHost) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error) {
 	if h.plugin == nil {
 		return false, fmt.Errorf("plugin not initialized")
 	}
-	return h.plugin.Changed(entityType, entitySubType, oldEntityData, newEntityData)
+	return h.plugin.Changed(ctx, entityType, entitySubType, oldEntityData, newEntityData)
 }

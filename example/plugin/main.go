@@ -23,16 +23,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/example/eventlog"
 	"github.com/jumppad-labs/xcl/example/plugin/internal"
 	"github.com/jumppad-labs/xcl/example/plugin/resources"
-	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -56,7 +56,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, err = run(os.Stdout, logger.NewStdOutLogger(), dir, externalPlugin, filepath.Join(stateDir, "state.json"))
+	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv()), dir, externalPlugin, filepath.Join(stateDir, "state.json"))
 	os.RemoveAll(stateDir)
 
 	if err != nil {
@@ -69,10 +69,10 @@ func main() {
 // the external plugin binary at externalPlugin registered, keeping the state
 // in a file at statePath. It writes the resources and query results to out,
 // then destroys everything through the providers and returns the resources
-// that were applied. The plugins log to log, and every lifecycle event is
-// logged to it too.
-func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, statePath string) ([]any, error) {
-	r := registry.NewPluginRegistry(log)
+// that were applied. Every event xcl produces, including the plugins' log
+// messages, goes to handler, a nil handler leaves xcl silent.
+func run(out io.Writer, handler xcl.EventHandler, dir string, externalPlugin string, statePath string) ([]any, error) {
+	r := registry.NewPluginRegistry()
 
 	// The external plugin runs as a separate process, stop it when done
 	defer func() {
@@ -82,15 +82,15 @@ func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, st
 	}()
 
 	// Register the in-process plugin, which provides every block type it
-	// registered in Init
+	// registers in Init. Registering only records the plugin, it is loaded
+	// by the first Apply.
 	if err := r.RegisterPlugin(&internal.ExamplePlugin{}); err != nil {
 		return nil, err
 	}
 
-	// Start the external plugin binary and register the block types it
-	// provides
+	// Register the external plugin binary, it is started by the first Apply
 	if err := r.RegisterPluginWithPath(externalPlugin); err != nil {
-		return nil, fmt.Errorf("%w, build it with `make build` in example/plugin", err)
+		return nil, err
 	}
 
 	// Keep the state in a file, Destroy works from it alone
@@ -102,10 +102,16 @@ func run(out io.Writer, log logger.Logger, dir string, externalPlugin string, st
 	c := xcl.NewConfig(
 		xcl.WithPluginRegistry(r),
 		xcl.WithStateStore(store),
-		xcl.WithEventHandler(eventlog.Handler(log)),
+		xcl.WithEventHandler(handler),
 	)
 
 	if err := c.Apply(dir); err != nil {
+		// a plugin that fails to load is reported by the first operation,
+		// the likeliest cause is an external plugin that was not built
+		if errors.Is(err, xcl.ErrPluginLoad) {
+			return nil, fmt.Errorf("%w, build it with `make build` in example/plugin", err)
+		}
+
 		return nil, err
 	}
 

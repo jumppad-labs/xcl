@@ -8,7 +8,6 @@ import (
 
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/parser"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/jumppad-labs/xcl/types"
@@ -33,9 +32,7 @@ func setupConfig(t *testing.T) (*Config, *parser.TestPlugin, *statemocks.MockSta
 		os.Setenv("HOME", home)
 	})
 
-	log := logger.NewTestLogger(t)
-
-	pr := registry.NewPluginRegistry(log)
+	pr := registry.NewPluginRegistry()
 
 	testPlugin := &parser.TestPlugin{}
 	err := pr.RegisterPlugin(testPlugin)

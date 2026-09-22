@@ -3,57 +3,122 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/schema"
+	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
+	"github.com/jumppad-labs/xcl/plugins/registry"
 	plugintesting "github.com/jumppad-labs/xcl/plugins/testing"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
-// loggedMessage is one call to a recordingLogger
-type loggedMessage struct {
-	level string
-	msg   string
-	args  []any
+// eventRecorder records every event emitted to it, so a test can assert what
+// a plugin reported and logged. An external plugin logs from gRPC handler
+// goroutines, so recording is guarded by a mutex.
+type eventRecorder struct {
+	mu     sync.Mutex
+	events []events.Event
 }
 
-// recordingLogger records every message logged to it, so a test can assert
-// what a plugin logged. An external plugin logs from gRPC handler goroutines,
-// so recording is guarded by a mutex.
-type recordingLogger struct {
-	mu       sync.Mutex
-	messages []loggedMessage
+func (r *eventRecorder) emit(e events.Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.events = append(r.events, e)
 }
 
-func (l *recordingLogger) record(level, msg string, args []any) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// logsWithMessage returns every recorded log event with the given level and
+// message
+func (r *eventRecorder) logsWithMessage(level, msg string) []events.Event {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	l.messages = append(l.messages, loggedMessage{level: level, msg: msg, args: args})
-}
-
-func (l *recordingLogger) Info(msg string, args ...any)  { l.record("info", msg, args) }
-func (l *recordingLogger) Debug(msg string, args ...any) { l.record("debug", msg, args) }
-func (l *recordingLogger) Warn(msg string, args ...any)  { l.record("warn", msg, args) }
-func (l *recordingLogger) Error(msg string, args ...any) { l.record("error", msg, args) }
-
-// withMessage returns every recorded message with the given level and text
-func (l *recordingLogger) withMessage(level, msg string) []loggedMessage {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	found := []loggedMessage{}
-	for _, m := range l.messages {
-		if m.level == level && m.msg == msg {
-			found = append(found, m)
+	found := []events.Event{}
+	for _, e := range r.events {
+		if e.Phase == events.PhaseLog && e.Meta[events.KeyLevel] == level && e.Meta[events.KeyMessage] == msg {
+			found = append(found, e)
 		}
 	}
 
 	return found
+}
+
+// messages returns the message of every recorded log event, whatever its
+// level
+func (r *eventRecorder) messages() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	found := []string{}
+	for _, e := range r.events {
+		if e.Phase == events.PhaseLog {
+			found = append(found, fmt.Sprint(e.Meta[events.KeyMessage]))
+		}
+	}
+
+	return found
+}
+
+// infoMessages returns the message of every recorded info log event
+func (r *eventRecorder) infoMessages() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	found := []string{}
+	for _, e := range r.events {
+		if e.Phase == events.PhaseLog && e.Meta[events.KeyLevel] == events.LevelInfo {
+			found = append(found, fmt.Sprint(e.Meta[events.KeyMessage]))
+		}
+	}
+
+	return found
+}
+
+// loadEvents returns every recorded load success event
+func (r *eventRecorder) loadEvents() []events.Event {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	found := []events.Event{}
+	for _, e := range r.events {
+		if e.Operation == events.OperationLoad && e.Phase == events.PhaseSuccess {
+			found = append(found, e)
+		}
+	}
+
+	return found
+}
+
+// createContext returns a context carrying the logger xcl binds for the
+// create of resource.person.john, emitting to recorder
+func createContext(recorder *eventRecorder) context.Context {
+	callLogger := logger.New(recorder.emit, events.Event{
+		Source:       events.SourceCore,
+		Operation:    events.OperationCreate,
+		ResourceType: "person.john",
+		ResourceID:   "resource.person.john",
+	})
+
+	return plugins.WithLogger(context.Background(), callLogger)
+}
+
+// destroyContext returns a context carrying the logger xcl binds for the
+// destroy of resource.person.john, emitting to recorder
+func destroyContext(recorder *eventRecorder) context.Context {
+	callLogger := logger.New(recorder.emit, events.Event{
+		Source:       events.SourceCore,
+		Operation:    events.OperationDestroy,
+		ResourceType: "person.john",
+		ResourceID:   "resource.person.john",
+	})
+
+	return plugins.WithLogger(context.Background(), callLogger)
 }
 
 // loggingTestPerson is the person created by the logging tests
@@ -133,7 +198,7 @@ func TestInProcessPluginValidate(t *testing.T) {
 	// Test each person individually
 	for i, personJSON := range peopleData {
 		// Call Validate on the plugin
-		err := ph.Validate("resource", "person", personJSON)
+		err := ph.Validate(context.Background(), "resource", "person", personJSON)
 		require.NoError(t, err, "Should validate person %d", i)
 	}
 }
@@ -149,7 +214,7 @@ func TestInProcessPluginCreate(t *testing.T) {
 	// Test each person individually
 	for i, personJSON := range peopleData {
 		// Call Create on the plugin
-		_, err := ph.Create("resource", "person", personJSON)
+		_, err := ph.Create(context.Background(), "resource", "person", personJSON)
 		require.NoError(t, err, "Should create person %d", i)
 	}
 }
@@ -165,7 +230,7 @@ func TestInProcessPluginChanged(t *testing.T) {
 	// Test each person individually
 	for i, personJSON := range peopleData {
 		// Call Changed on the plugin
-		changed, err := ph.Changed("resource", "person", personJSON, personJSON)
+		changed, err := ph.Changed(context.Background(), "resource", "person", personJSON, personJSON)
 		require.NoError(t, err, "Should check changed status for person %d", i)
 		require.False(t, changed, "Person %d should not have changed", i)
 	}
@@ -182,7 +247,7 @@ func TestInProcessPluginDestroy(t *testing.T) {
 	// Test each person individually
 	for i, personJSON := range peopleData {
 		// Call Destroy on the plugin
-		err := ph.Destroy("resource", "person", personJSON)
+		err := ph.Destroy(context.Background(), "resource", "person", personJSON)
 		require.NoError(t, err, "Should destroy person %d", i)
 	}
 }
@@ -223,20 +288,20 @@ func TestExternalPluginCRUDOperations(t *testing.T) {
 	// Test each person individually
 	for i, personJSON := range peopleData {
 		// Test Validate
-		err := ph.Validate("resource", "person", personJSON)
+		err := ph.Validate(context.Background(), "resource", "person", personJSON)
 		require.NoError(t, err, "Should validate person %d", i)
 
 		// Test Create
-		_, err = ph.Create("resource", "person", personJSON)
+		_, err = ph.Create(context.Background(), "resource", "person", personJSON)
 		require.NoError(t, err, "Should create person %d", i)
 
 		// Test Changed
-		changed, err := ph.Changed("resource", "person", personJSON, personJSON)
+		changed, err := ph.Changed(context.Background(), "resource", "person", personJSON, personJSON)
 		require.NoError(t, err, "Should check changed status for person %d", i)
 		require.False(t, changed, "Person %d should not have changed", i)
 
 		// Test Destroy
-		err = ph.Destroy("resource", "person", personJSON)
+		err = ph.Destroy(context.Background(), "resource", "person", personJSON)
 		require.NoError(t, err, "Should destroy person %d", i)
 	}
 }
@@ -357,7 +422,7 @@ var fullPersonJSON = []byte(`{"meta":{"id":"resource.person.full","type":"resour
 func TestInProcessPluginCreateLeavesConfiguredFieldsAlone(t *testing.T) {
 	ph := setupInProcessPlugin(t)
 
-	result, err := ph.Create("resource", "person", fullPersonJSON)
+	result, err := ph.Create(context.Background(), "resource", "person", fullPersonJSON)
 	require.NoError(t, err, "Should create successfully")
 
 	createdPerson := person.Person{}
@@ -398,7 +463,7 @@ func TestInProcessPluginReadLeavesConfiguredFieldsAlone(t *testing.T) {
 func TestInProcessPluginUpdateLeavesConfiguredFieldsAlone(t *testing.T) {
 	ph := setupInProcessPlugin(t)
 
-	result, err := ph.Update("resource", "person", fullPersonJSON)
+	result, err := ph.Update(context.Background(), "resource", "person", fullPersonJSON)
 	require.NoError(t, err, "Should update successfully")
 
 	updatedPerson := person.Person{}
@@ -421,7 +486,7 @@ func TestInProcessPluginChangedReportsNoChangeForIdenticalData(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 
-	changed, err := ph.Changed("resource", "person", oldData, newData)
+	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
 	require.NoError(t, err, "Should check changed status")
 	require.False(t, changed, "Identical data should not be reported as changed")
 }
@@ -434,7 +499,7 @@ func TestInProcessPluginChangedReportsChangeWhenFieldDiffers(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":31,"email":"test@example.com"}`)
 
-	changed, err := ph.Changed("resource", "person", oldData, newData)
+	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
 	require.NoError(t, err, "Should check changed status")
 	require.True(t, changed, "A different age should be reported as changed")
 }
@@ -447,7 +512,7 @@ func TestInProcessPluginChangedIgnoresMetadata(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test","file":"old.hcl","line":1},"first_name":"Test","last_name":"User","age":30}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test","file":"new.hcl","line":42},"first_name":"Test","last_name":"User","age":30}`)
 
-	changed, err := ph.Changed("resource", "person", oldData, newData)
+	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
 	require.NoError(t, err, "Should check changed status")
 	require.False(t, changed, "Differences only in meta should not be reported as changed")
 }
@@ -486,7 +551,7 @@ func TestExternalPluginChangedReportsChangeWhenFieldDiffers(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":31,"email":"test@example.com"}`)
 
-	changed, err := ph.Changed("resource", "person", oldData, newData)
+	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
 	require.NoError(t, err, "Should check changed status")
 	require.True(t, changed, "A different age should be reported as changed")
 }
@@ -503,133 +568,253 @@ func TestExternalPluginChangedReportsNoChangeForIdenticalData(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 
-	changed, err := ph.Changed("resource", "person", oldData, newData)
+	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
 	require.NoError(t, err, "Should check changed status")
 	require.False(t, changed, "Identical data should not be reported as changed")
 }
 
-// TestInProcessPluginLogsToHostLogger tests that a provider running in process
-// logs to the logger the host was set up with
-func TestInProcessPluginLogsToHostLogger(t *testing.T) {
-	log := &recordingLogger{}
-	ph := plugintesting.InProcessPluginSetupWithLogger(t, &PersonPlugin{}, log)
+// TestInProcessPluginProviderLogsNameThePluginAsSource tests that a provider
+// running in process logs through the call's logger, with the plugin's Go
+// type as the Source and the call's resource binding kept
+func TestInProcessPluginProviderLogsNameThePluginAsSource(t *testing.T) {
+	recorder := &eventRecorder{}
+	ph := plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.emit)
 
-	_, err := ph.Create("resource", "person", loggingTestPerson(t))
+	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	// xcl leads the message with the provider's event, then tags it with the
-	// plugin's Go type and the provider's block type
-	created := log.withMessage("info", "event=create plugin=PersonPlugin provider=person Creating person")
+	created := recorder.logsWithMessage(events.LevelInfo, "Creating person")
 	require.Len(t, created, 1, "Provider should log the create once")
-	require.Equal(t, []any{"resource", "test-person", "name", "John Doe"}, created[0].args)
+	require.Equal(t, "PersonPlugin", created[0].Source)
+	require.Equal(t, events.OperationCreate, created[0].Operation)
+	require.Equal(t, "resource.person.john", created[0].ResourceID)
+	require.Equal(t, map[string]any{
+		"level":   "info",
+		"message": "Creating person",
+		"name":    "John Doe",
+	}, created[0].Meta)
 }
 
-// TestExternalPluginLogsToHostLogger tests that a provider running in an
-// external plugin process logs across the process boundary to the logger the
-// host was set up with
-func TestExternalPluginLogsToHostLogger(t *testing.T) {
-	// Build the plugin first
-	buildCmd := plugintesting.BuildPlugin(t, ".")
-	require.NoError(t, buildCmd, "Plugin should build successfully")
+// TestInProcessPluginHostEmitsNoLoadEvent tests that setting up the host of
+// an in-process plugin emits no load event, the registry reports loads
+func TestInProcessPluginHostEmitsNoLoadEvent(t *testing.T) {
+	recorder := &eventRecorder{}
+	plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.emit)
 
-	log := &recordingLogger{}
-	ph := plugintesting.ExternalPluginSetupWithLogger(t, "./build/example", log)
+	require.Empty(t, recorder.loadEvents())
+}
 
-	_, err := ph.Create("resource", "person", loggingTestPerson(t))
+// TestInProcessPluginLoadedByARegistryEmitsALoadEvent tests that loading an
+// in-process plugin through a registry emits a load success event naming the
+// plugin and its block types
+func TestInProcessPluginLoadedByARegistryEmitsALoadEvent(t *testing.T) {
+	recorder := &eventRecorder{}
+	r := registry.NewPluginRegistry()
+
+	err := r.RegisterPlugin(&PersonPlugin{})
 	require.NoError(t, err)
 
-	// xcl leads the message with the provider's event, then tags it with the
-	// plugin's binary name and the provider's block type, the event and
-	// provider tag are added inside the plugin process
-	created := log.withMessage("info", "event=create plugin=example provider=person Creating person")
-	require.Len(t, created, 1, "Provider should log the create once")
-	require.Equal(t, []any{"resource", "test-person", "name", "John Doe"}, created[0].args)
-}
-
-// TestExternalPluginFrameworkLogsReachHostLogger tests that go-plugin, which
-// starts and connects to the external plugin, logs through the host's logger
-// tagged with the plugin, instead of writing straight to stderr
-func TestExternalPluginFrameworkLogsReachHostLogger(t *testing.T) {
-	// Build the plugin first
-	buildCmd := plugintesting.BuildPlugin(t, ".")
-	require.NoError(t, buildCmd, "Plugin should build successfully")
-
-	log := &recordingLogger{}
-	plugintesting.ExternalPluginSetupWithLogger(t, "./build/example", log)
-
-	started := log.withMessage("debug", "event=go-plugin plugin=example starting plugin")
-	require.Len(t, started, 1, "go-plugin should log that it started the plugin")
-	require.Equal(t, []any{"path", "./build/example", "args", []string{"./build/example"}}, started[0].args)
-}
-
-// infoMessages returns the text of every info message recorded
-func (l *recordingLogger) infoMessages() []string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	messages := []string{}
-	for _, m := range l.messages {
-		if m.level == "info" {
-			messages = append(messages, m.msg)
-		}
-	}
-
-	return messages
-}
-
-// TestInProcessPluginLogsFrameworkMessagesAtDebug tests that xcl logs loading
-// an in-process plugin and calling its provider at debug, the same messages
-// it logs for an external plugin
-func TestInProcessPluginLogsFrameworkMessagesAtDebug(t *testing.T) {
-	log := &recordingLogger{}
-	ph := plugintesting.InProcessPluginSetupWithLogger(t, &PersonPlugin{}, log)
-
-	_, err := ph.Create("resource", "person", loggingTestPerson(t))
+	err = r.Load(recorder.emit)
 	require.NoError(t, err)
 
-	loaded := log.withMessage("debug", "event=load plugin=PersonPlugin plugin loaded")
+	loaded := recorder.loadEvents()
 	require.Len(t, loaded, 1)
-	require.Equal(t, []any{"block_types", "person"}, loaded[0].args)
-
-	called := log.withMessage("debug", "event=create plugin=PersonPlugin provider=person calling provider")
-	require.Len(t, called, 1)
-	require.Equal(t, []any{"resource", "test-person"}, called[0].args)
+	require.Equal(t, events.SourceCore, loaded[0].Source)
+	require.Equal(t, map[string]any{"plugin": "PersonPlugin", "block_types": "person"}, loaded[0].Meta)
 }
 
-// TestExternalPluginLogsFrameworkMessagesAtDebug tests that xcl logs loading
-// an external plugin and calling its provider at debug, the same messages it
-// logs for an in-process plugin
-func TestExternalPluginLogsFrameworkMessagesAtDebug(t *testing.T) {
-	// Build the plugin first
-	buildCmd := plugintesting.BuildPlugin(t, ".")
-	require.NoError(t, buildCmd, "Plugin should build successfully")
+// TestInProcessPluginLogsNoCallingProviderMessage tests that xcl no longer
+// logs a message of its own when it calls an in-process provider
+func TestInProcessPluginLogsNoCallingProviderMessage(t *testing.T) {
+	recorder := &eventRecorder{}
+	ph := plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.emit)
 
-	log := &recordingLogger{}
-	ph := plugintesting.ExternalPluginSetupWithLogger(t, "./build/example", log)
-
-	_, err := ph.Create("resource", "person", loggingTestPerson(t))
+	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	loaded := log.withMessage("debug", "event=load plugin=example plugin loaded")
-	require.Len(t, loaded, 1)
-	require.Equal(t, []any{"block_types", "person"}, loaded[0].args)
-
-	// args from an external plugin cross gRPC as strings
-	called := log.withMessage("debug", "event=create plugin=example provider=person calling provider")
-	require.Len(t, called, 1)
-	require.Equal(t, []any{"resource", "test-person"}, called[0].args)
+	require.NotContains(t, recorder.messages(), "calling provider")
 }
 
 // TestInProcessPluginLogsOnlyProviderMessagesAtInfo tests that xcl logs
 // nothing at info for an in-process plugin, only what its provider logs
 func TestInProcessPluginLogsOnlyProviderMessagesAtInfo(t *testing.T) {
-	log := &recordingLogger{}
-	ph := plugintesting.InProcessPluginSetupWithLogger(t, &PersonPlugin{}, log)
+	recorder := &eventRecorder{}
+	ph := plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.emit)
 
-	_, err := ph.Create("resource", "person", loggingTestPerson(t))
+	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	require.Equal(t, []string{"event=create plugin=PersonPlugin provider=person Creating person"}, log.infoMessages())
+	require.Equal(t, []string{"Creating person"}, recorder.infoMessages())
+}
+
+// TestExternalPluginProviderLogsReachTheHostsEmit tests that a provider
+// running in an external plugin process logs across the process boundary to
+// the call's logger, naming the plugin binary as the Source
+func TestExternalPluginProviderLogsReachTheHostsEmit(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	recorder := &eventRecorder{}
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+
+	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
+	require.NoError(t, err)
+
+	created := recorder.logsWithMessage(events.LevelInfo, "Creating person")
+	require.Len(t, created, 1, "Provider should log the create once")
+	require.Equal(t, "example", created[0].Source)
+	require.Equal(t, "John Doe", created[0].Meta["name"])
+}
+
+// TestExternalPluginProviderLogsCarryTheCallsResourceAndStep tests that a
+// provider log written in an external plugin process arrives bound to the
+// resource and lifecycle step of the call it was written during
+func TestExternalPluginProviderLogsCarryTheCallsResourceAndStep(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	recorder := &eventRecorder{}
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+
+	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
+	require.NoError(t, err)
+
+	created := recorder.logsWithMessage(events.LevelInfo, "Creating person")
+	require.Len(t, created, 1, "Provider should log the create once")
+	require.Equal(t, events.OperationCreate, created[0].Operation)
+	require.Equal(t, "resource.person.john", created[0].ResourceID)
+	require.Equal(t, "person.john", created[0].ResourceType)
+	require.Equal(t, map[string]any{
+		"level":   "info",
+		"message": "Creating person",
+		"name":    "John Doe",
+	}, created[0].Meta)
+}
+
+// TestExternalPluginDestroyLogCarriesTheDestroyStep tests that the log a
+// provider writes during a destroy in an external plugin process arrives as a
+// destroy log for the call's resource, its boolean detail re-typed from text
+func TestExternalPluginDestroyLogCarriesTheDestroyStep(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	recorder := &eventRecorder{}
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+
+	err := ph.Destroy(destroyContext(recorder), "resource", "person", loggingTestPerson(t))
+	require.NoError(t, err)
+
+	destroyed := recorder.logsWithMessage(events.LevelInfo, "Destroying person")
+	require.Len(t, destroyed, 1, "Provider should log the destroy once")
+	require.Equal(t, "example", destroyed[0].Source)
+	require.Equal(t, events.OperationDestroy, destroyed[0].Operation)
+	require.Equal(t, "resource.person.john", destroyed[0].ResourceID)
+	require.Equal(t, map[string]any{
+		"level":   "info",
+		"message": "Destroying person",
+		"name":    "John Doe",
+		"force":   false,
+	}, destroyed[0].Meta)
+}
+
+// TestExternalPluginProviderLogsWithoutCallLoggerAreDropped tests that a
+// provider log written during a call whose context carries no logger emits
+// nothing, the same as plugins.Logger for an in-process provider
+func TestExternalPluginProviderLogsWithoutCallLoggerAreDropped(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	recorder := &eventRecorder{}
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+
+	_, err := ph.Create(context.Background(), "resource", "person", loggingTestPerson(t))
+	require.NoError(t, err)
+
+	require.Empty(t, recorder.logsWithMessage(events.LevelInfo, "Creating person"))
+}
+
+// TestExternalPluginFrameworkLogsReachTheHostsEmit tests that go-plugin,
+// which starts and connects to the external plugin, logs through the host's
+// plugin scoped logger, instead of writing straight to stderr
+func TestExternalPluginFrameworkLogsReachTheHostsEmit(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	recorder := &eventRecorder{}
+	plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+
+	started := recorder.logsWithMessage(events.LevelDebug, "starting plugin")
+	require.Len(t, started, 1, "go-plugin should log that it started the plugin")
+	require.Equal(t, "example", started[0].Source)
+	require.Equal(t, map[string]any{
+		"level":     "debug",
+		"message":   "starting plugin",
+		"component": "go-plugin",
+		"path":      "./build/example",
+		"args":      []string{"./build/example"},
+	}, started[0].Meta)
+}
+
+// TestExternalPluginHostEmitsNoLoadEvent tests that starting the host of an
+// external plugin emits no load event, the registry reports loads
+func TestExternalPluginHostEmitsNoLoadEvent(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	recorder := &eventRecorder{}
+	plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+
+	require.Empty(t, recorder.loadEvents())
+}
+
+// TestExternalPluginLoadedByARegistryEmitsALoadEvent tests that loading an
+// external plugin through a registry emits a load success event naming the
+// plugin binary and its block types
+func TestExternalPluginLoadedByARegistryEmitsALoadEvent(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	recorder := &eventRecorder{}
+	r := registry.NewPluginRegistry()
+	t.Cleanup(func() {
+		for _, host := range r.GetPluginHosts() {
+			host.Stop()
+		}
+	})
+
+	err := r.RegisterPluginWithPath("./build/example")
+	require.NoError(t, err)
+
+	err = r.Load(recorder.emit)
+	require.NoError(t, err)
+
+	loaded := recorder.loadEvents()
+	require.Len(t, loaded, 1)
+	require.Equal(t, events.SourceCore, loaded[0].Source)
+	require.Equal(t, map[string]any{"plugin": "example", "block_types": "person"}, loaded[0].Meta)
+}
+
+// TestExternalPluginLogsNoCallingProviderMessage tests that xcl no longer
+// logs a message of its own when it calls a provider in an external plugin
+func TestExternalPluginLogsNoCallingProviderMessage(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	recorder := &eventRecorder{}
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+
+	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
+	require.NoError(t, err)
+
+	require.NotContains(t, recorder.messages(), "calling provider")
 }
 
 // TestExternalPluginLogsOnlyProviderMessagesAtInfo tests that xcl logs
@@ -640,11 +825,11 @@ func TestExternalPluginLogsOnlyProviderMessagesAtInfo(t *testing.T) {
 	buildCmd := plugintesting.BuildPlugin(t, ".")
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
-	log := &recordingLogger{}
-	ph := plugintesting.ExternalPluginSetupWithLogger(t, "./build/example", log)
+	recorder := &eventRecorder{}
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
 
-	_, err := ph.Create("resource", "person", loggingTestPerson(t))
+	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
 
-	require.Equal(t, []string{"event=create plugin=example provider=person Creating person"}, log.infoMessages())
+	require.Equal(t, []string{"Creating person"}, recorder.infoMessages())
 }

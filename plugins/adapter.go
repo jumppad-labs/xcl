@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/jumppad-labs/xcl/logger"
-	"github.com/jumppad-labs/xcl/types"
 )
 
 // ProviderAdapter defines a common interface for all providers regardless of their concrete type.
@@ -23,7 +22,7 @@ import (
 // Without this adapter, the plugin system would need to use reflection or type assertions
 // to convert between []byte and concrete types, making the code complex and error-prone.
 type ProviderAdapter interface {
-	Init(state State, functions ProviderFunctions, logger Logger) error
+	Init(state State, functions ProviderFunctions, logger logger.Logger) error
 	Validate(ctx context.Context, entityData []byte) error
 	Create(ctx context.Context, entityData []byte) ([]byte, error)
 	Destroy(ctx context.Context, entityData []byte, force bool) error
@@ -65,10 +64,9 @@ type TypedProviderAdapter[T any] struct {
 	concreteType T
 	state        State
 	functions    ProviderFunctions
-	logger       Logger
 
-	// name is the block type the provider handles, when set the logger passed
-	// to the provider tags every message with provider=<name>
+	// name is the block type the provider handles, when set the plugin
+	// scoped logger passed to the provider adds the detail provider=<name>
 	name string
 }
 
@@ -80,35 +78,17 @@ func NewTypedProviderAdapter[T any](provider ResourceProvider[T], concreteType T
 	}
 }
 
-// Init initializes the provider. When the adapter was registered for a block
-// type, the provider's logger tags every message with provider=<block type>,
-// so its logs can be told apart from the host's.
-func (a *TypedProviderAdapter[T]) Init(state State, functions ProviderFunctions, log Logger) error {
+// Init initializes the provider with the plugin scoped logger, for messages
+// written outside a provider call. When the adapter was registered for a
+// block type, that logger adds the detail provider=<block type>.
+func (a *TypedProviderAdapter[T]) Init(state State, functions ProviderFunctions, log logger.Logger) error {
 	if a.name != "" {
 		log = logger.WithTag(log, "provider", a.name)
 	}
 
 	a.state = state
 	a.functions = functions
-	a.logger = log
 	return a.provider.Init(state, functions, log)
-}
-
-// debugCall logs, at debug, that the provider is about to be called for
-// operation on resource. It runs on both sides of every plugin: in the host for
-// an in-process plugin, in the plugin process for an external one, so every
-// plugin logs the same calls.
-func (a *TypedProviderAdapter[T]) debugCall(operation string, resource any) {
-	if a.logger == nil {
-		return
-	}
-
-	if meta, err := types.GetMeta(resource); err == nil {
-		a.logger.Debug("calling provider", "event", operation, "resource", meta.ID)
-		return
-	}
-
-	a.logger.Debug("calling provider", "event", operation)
 }
 
 func (a *TypedProviderAdapter[T]) Validate(ctx context.Context, entityData []byte) error {
@@ -138,7 +118,6 @@ func (a *TypedProviderAdapter[T]) Create(ctx context.Context, entityData []byte)
 
 	// Call the provider's Create method with the concrete type
 	// (provider was already initialized during registration)
-	a.debugCall("create", resource)
 	mutatedResource, err := a.provider.Create(ctx, resource)
 	if err != nil {
 		return nil, err
@@ -164,7 +143,6 @@ func (a *TypedProviderAdapter[T]) Destroy(ctx context.Context, entityData []byte
 
 	// Call the provider's Destroy method with the concrete type
 	// (provider was already initialized during registration)
-	a.debugCall("destroy", resource)
 	return a.provider.Destroy(ctx, resource, force)
 }
 
@@ -187,7 +165,6 @@ func (a *TypedProviderAdapter[T]) Read(ctx context.Context, oldEntityData []byte
 
 	// Call the provider's Read method with the concrete types, the error is
 	// returned unwrapped so that callers can check for ErrNotFound
-	a.debugCall("read", newResource)
 	readResource, err := a.provider.Read(ctx, oldResource, newResource)
 	if err != nil {
 		return nil, err
@@ -212,7 +189,6 @@ func (a *TypedProviderAdapter[T]) Update(ctx context.Context, entityData []byte)
 	}
 
 	// Call the provider's Update method with the concrete type
-	a.debugCall("update", resource)
 	updatedResource, err := a.provider.Update(ctx, resource)
 	if err != nil {
 		return nil, err
@@ -242,6 +218,5 @@ func (a *TypedProviderAdapter[T]) Changed(ctx context.Context, oldEntityData []b
 	}
 
 	// Call the provider's Changed method with both resources
-	a.debugCall("changed", newResource)
 	return a.provider.Changed(ctx, oldResource, newResource)
 }

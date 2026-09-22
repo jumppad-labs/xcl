@@ -8,8 +8,10 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
+	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -19,6 +21,10 @@ import (
 // resource. One is built per walk and shared by every walk callback goroutine,
 // it holds no per-resource state of its own.
 type resourceLifecycle struct {
+	// ctx is the operation's context, once it is cancelled no new provider
+	// call starts
+	ctx context.Context
+
 	// previous is the state saved by the last apply, it is never nil
 	previous *State
 	resolver ProviderResolver
@@ -52,9 +58,19 @@ func (l *resourceLifecycle) apply(r any) error {
 	}
 
 	err = l.run(r)
+	if errors.Is(err, errNotReached) {
+		return err
+	}
+
 	if err != nil {
 		if meta.Status == types.StatusFailed || meta.Status == types.StatusDestroyFailed {
 			l.progress.record(meta.ID, outcome{failed: true, saved: r})
+		}
+
+		// a failure outside a provider call, such as a resource that does
+		// not serialize, has no event yet
+		if !reported(err) {
+			emitWalkError(l.options, meta, err)
 		}
 
 		return err
@@ -73,13 +89,15 @@ func (l *resourceLifecycle) run(r any) error {
 
 	// builtin and registered resource types have no provider, they always succeed
 	if handledWithoutProvider(l.types, meta) {
-		fireParserEvent(l.options, "create", resourceType(meta), meta.ID, "success", 0, nil, nil)
+		emitLifecycle(l.options, meta, events.OperationCreate, events.PhaseSuccess, 0, nil, nil)
 		return nil
 	}
 
 	adapter := l.resolver.GetProviderForResource(r)
 	if adapter == nil {
-		return fmt.Errorf("no provider found for resource type %s", meta.AddressType())
+		err := fmt.Errorf("no provider found for resource type %s", meta.AddressType())
+		emitLifecycle(l.options, meta, l.firstStep(meta), events.PhaseError, 0, err, nil)
+		return reportedError{err}
 	}
 
 	old, err := findByID(l.previous.GetResources(), meta.ID)
@@ -117,15 +135,19 @@ func (l *resourceLifecycle) create(r any, adapter plugins.ProviderAdapter) error
 		return fmt.Errorf("unable to serialize resource %s: %w", meta.ID, err)
 	}
 
-	err = l.callProvider("create", r, data, func() ([]byte, error) {
-		return adapter.Create(context.Background(), data)
+	err = l.callProvider(events.OperationCreate, r, data, func(ctx context.Context) ([]byte, error) {
+		return adapter.Create(ctx, data)
 	})
+	if errors.Is(err, errNotReached) {
+		return err
+	}
+
 	if err != nil {
 		meta.Status = types.StatusFailed
 		return err
 	}
 
-	l.warnChangedConfiguredValues(r, data)
+	l.warnChangedConfiguredValues(events.OperationCreate, r, data)
 
 	meta.Status = types.StatusCreated
 	return nil
@@ -170,8 +192,8 @@ func (l *resourceLifecycle) read(r any, old any, adapter plugins.ProviderAdapter
 		return fmt.Errorf("unable to serialize resource %s: %w", meta.ID, err)
 	}
 
-	err = l.callProvider("read", r, newData, func() ([]byte, error) {
-		return adapter.Read(context.Background(), oldData, newData)
+	err = l.callProvider(events.OperationRead, r, newData, func(ctx context.Context) ([]byte, error) {
+		return adapter.Read(ctx, oldData, newData)
 	})
 	if errors.Is(err, plugins.ErrNotFound) {
 		// the real resource is gone, its computed values went with it
@@ -180,6 +202,10 @@ func (l *resourceLifecycle) read(r any, old any, adapter plugins.ProviderAdapter
 		}
 
 		return l.create(r, adapter)
+	}
+
+	if errors.Is(err, errNotReached) {
+		return err
 	}
 
 	if err != nil {
@@ -192,14 +218,18 @@ func (l *resourceLifecycle) read(r any, old any, adapter plugins.ProviderAdapter
 		return fmt.Errorf("unable to serialize read resource %s: %w", meta.ID, err)
 	}
 
-	l.warnChangedConfiguredValues(r, newData)
+	l.warnChangedConfiguredValues(events.OperationRead, r, newData)
 
 	changed := false
-	err = l.callProvider("changed", r, readData, func() ([]byte, error) {
+	err = l.callProvider(events.OperationChanged, r, readData, func(ctx context.Context) ([]byte, error) {
 		var changedErr error
-		changed, changedErr = adapter.Changed(context.Background(), oldData, readData)
+		changed, changedErr = adapter.Changed(ctx, oldData, readData)
 		return nil, changedErr
 	})
+	if errors.Is(err, errNotReached) {
+		return err
+	}
+
 	if err != nil {
 		meta.Status = types.StatusFailed
 		return err
@@ -211,15 +241,19 @@ func (l *resourceLifecycle) read(r any, old any, adapter plugins.ProviderAdapter
 		return nil
 	}
 
-	err = l.callProvider("update", r, readData, func() ([]byte, error) {
-		return adapter.Update(context.Background(), readData)
+	err = l.callProvider(events.OperationUpdate, r, readData, func(ctx context.Context) ([]byte, error) {
+		return adapter.Update(ctx, readData)
 	})
+	if errors.Is(err, errNotReached) {
+		return err
+	}
+
 	if err != nil {
 		meta.Status = types.StatusFailed
 		return err
 	}
 
-	l.warnChangedConfiguredValues(r, readData)
+	l.warnChangedConfiguredValues(events.OperationUpdate, r, readData)
 
 	meta.Status = types.StatusUpdated
 	return nil
@@ -242,9 +276,13 @@ func (l *resourceLifecycle) rebuild(r any, old any, adapter plugins.ProviderAdap
 		return fmt.Errorf("unable to serialize previous resource %s: %w", meta.ID, err)
 	}
 
-	err = l.callProvider("destroy", r, oldData, func() ([]byte, error) {
-		return nil, adapter.Destroy(context.Background(), oldData, false)
+	err = l.callProvider(events.OperationDestroy, r, oldData, func(ctx context.Context) ([]byte, error) {
+		return nil, adapter.Destroy(ctx, oldData, false)
 	})
+	if errors.Is(err, errNotReached) {
+		return err
+	}
+
 	if err != nil {
 		// keep the saved copy, it holds the identity needed to destroy it later
 		if keepErr := replaceValues(r, oldData); keepErr != nil {
@@ -298,10 +336,15 @@ func carryComputedValues(r any, savedData []byte) error {
 	return nil
 }
 
-// warnChangedConfiguredValues logs a warning for every configured value the
-// provider changed. before is the resource as sent to the provider, the
-// resource now holds what it returned.
-func (l *resourceLifecycle) warnChangedConfiguredValues(r any, before []byte) {
+// warnChangedConfiguredValues emits a warn log event for every configured value
+// the provider changed during operation, bound to the resource and the step.
+// before is the resource as sent to the provider, the resource now holds what
+// it returned.
+func (l *resourceLifecycle) warnChangedConfiguredValues(operation string, r any, before []byte) {
+	if !emitting(l.options) {
+		return
+	}
+
 	meta, err := types.GetMeta(r)
 	if err != nil {
 		return
@@ -312,41 +355,72 @@ func (l *resourceLifecycle) warnChangedConfiguredValues(r any, before []byte) {
 		return
 	}
 
-	warnChangedConfiguredValues(l.options.Logger, meta.ID, l.bodies[meta.ID], reflect.TypeOf(r), before, after)
+	log := logger.New(l.options.Emit, lifecycleEvent(meta, operation, "", 0, nil, nil))
+	warnChangedConfiguredValues(log, meta.ID, l.bodies[meta.ID], reflect.TypeOf(r), before, after)
 }
 
 // callProvider wraps a single provider call. It fires the start event, times the
 // call, fires the success or error event and, on success, decodes a non-empty
 // result into the resource. data is the serialized resource sent with the events.
-func (l *resourceLifecycle) callProvider(operation string, r any, data []byte, call func() ([]byte, error)) error {
+//
+// No call starts once the operation's context is cancelled, errNotReached is
+// returned instead and no event is fired. The call is given a copy of the
+// context that is never cancelled, so a call already running always finishes,
+// carrying a logger bound to the resource and the step, see plugins.Logger.
+func (l *resourceLifecycle) callProvider(operation string, r any, data []byte, call func(ctx context.Context) ([]byte, error)) error {
 	meta, err := types.GetMeta(r)
 	if err != nil {
 		return err
 	}
 
-	id := meta.ID
-	rType := resourceType(meta)
+	if l.ctx.Err() != nil {
+		return errNotReached
+	}
 
-	fireParserEvent(l.options, operation, rType, id, "start", 0, nil, data)
+	id := meta.ID
+
+	emitLifecycle(l.options, meta, operation, events.PhaseStart, 0, nil, data)
 	start := time.Now()
-	result, err := call()
+	result, err := call(providerContext(l.ctx, l.options, meta, operation))
 	duration := time.Since(start)
 
 	if err != nil {
-		fireParserEvent(l.options, operation, rType, id, "error", duration, err, data)
-		return fmt.Errorf("%s failed for %s: %w", operation, id, err)
+		emitLifecycle(l.options, meta, operation, events.PhaseError, duration, err, data)
+		return reportedError{fmt.Errorf("%s failed for %s: %w", operation, id, err)}
 	}
 
 	if len(result) > 0 {
 		if err := json.Unmarshal(result, r); err != nil {
 			decodeErr := fmt.Errorf("unable to decode %s result: %w", operation, err)
-			fireParserEvent(l.options, operation, rType, id, "error", duration, decodeErr, data)
-			return fmt.Errorf("%s failed for %s: %w", operation, id, decodeErr)
+			emitLifecycle(l.options, meta, operation, events.PhaseError, duration, decodeErr, data)
+			return reportedError{fmt.Errorf("%s failed for %s: %w", operation, id, decodeErr)}
 		}
 	}
 
-	fireParserEvent(l.options, operation, rType, id, "success", duration, nil, data)
+	emitLifecycle(l.options, meta, operation, events.PhaseSuccess, duration, nil, data)
 	return nil
+}
+
+// firstStep is the provider step that would run first for a resource: create
+// when it has no entry in the previous state, read when it was created or
+// updated, and destroy for a rebuild
+func (l *resourceLifecycle) firstStep(meta *types.Meta) string {
+	old, err := findByID(l.previous.GetResources(), meta.ID)
+	if err != nil {
+		return events.OperationCreate
+	}
+
+	oldMeta, err := types.GetMeta(old)
+	if err != nil {
+		return events.OperationCreate
+	}
+
+	switch oldMeta.Status {
+	case types.StatusCreated, types.StatusUpdated:
+		return events.OperationRead
+	default:
+		return events.OperationDestroy
+	}
 }
 
 // handledWithoutProvider returns true for resource types that have no

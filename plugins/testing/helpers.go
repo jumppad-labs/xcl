@@ -7,16 +7,16 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclparse"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/plugins/mocks"
 	"github.com/stretchr/testify/require"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 // TestPluginHost provides a convenient interface for testing plugins
@@ -25,17 +25,19 @@ type TestPluginHost struct {
 	t                  *testing.T
 }
 
-// InProcessPluginSetup creates an in-process plugin host for testing
+// InProcessPluginSetup creates an in-process plugin host for testing, the
+// events the host and plugin emit are discarded
 func InProcessPluginSetup(t *testing.T, plugin plugins.Plugin) *TestPluginHost {
-	return InProcessPluginSetupWithLogger(t, plugin, logger.NewTestLogger(t))
+	return InProcessPluginSetupWithEmit(t, plugin, nil)
 }
 
-// InProcessPluginSetupWithLogger creates an in-process plugin host for testing
-// that passes log to the plugin, so a test can assert what the plugin logs
-func InProcessPluginSetupWithLogger(t *testing.T, plugin plugins.Plugin, log plugins.Logger) *TestPluginHost {
+// InProcessPluginSetupWithEmit creates an in-process plugin host for testing
+// that emits the host's and the plugin's events to emit, so a test can assert
+// what the plugin reports and logs
+func InProcessPluginSetupWithEmit(t *testing.T, plugin plugins.Plugin, emit events.Emit) *TestPluginHost {
 	state := mocks.NewMockState(t)
 
-	ph, err := plugins.NewDirectPluginHost(log, state, plugin)
+	ph, err := plugins.NewDirectPluginHost(emit, state, plugin)
 	require.NoError(t, err, "In-process plugin should initialize without error")
 
 	t.Cleanup(func() {
@@ -48,16 +50,17 @@ func InProcessPluginSetupWithLogger(t *testing.T, plugin plugins.Plugin, log plu
 	}
 }
 
-// ExternalPluginSetup creates an external process plugin host for testing
+// ExternalPluginSetup creates an external process plugin host for testing,
+// the events the host and plugin emit are discarded
 func ExternalPluginSetup(t *testing.T, binaryPath string) *TestPluginHost {
-	return ExternalPluginSetupWithLogger(t, binaryPath, logger.NewTestLogger(t))
+	return ExternalPluginSetupWithEmit(t, binaryPath, nil)
 }
 
-// ExternalPluginSetupWithLogger creates an external process plugin host for
-// testing that receives the plugin's logs on log, so a test can assert what
-// the plugin logs across the process boundary
-func ExternalPluginSetupWithLogger(t *testing.T, binaryPath string, log plugins.Logger) *TestPluginHost {
-	ph := plugins.NewGRPCPluginHost(log, nil)
+// ExternalPluginSetupWithEmit creates an external process plugin host for
+// testing that emits the host's and the plugin's events to emit, so a test
+// can assert what the plugin logs across the process boundary
+func ExternalPluginSetupWithEmit(t *testing.T, binaryPath string, emit events.Emit) *TestPluginHost {
+	ph := plugins.NewGRPCPluginHost(emit, nil)
 
 	err := ph.Start(binaryPath)
 	require.NoError(t, err, "External plugin should start without error")
@@ -109,7 +112,7 @@ func (ops *TestPluginOperations) TestValidate(entityType, entitySubType string, 
 		dataJSON, err := json.Marshal(obj)
 		require.NoError(ops.host.t, err, "Should marshal test data to JSON for object %d", i)
 
-		err = ops.host.Validate(entityType, entitySubType, dataJSON)
+		err = ops.host.Validate(context.Background(), entityType, entitySubType, dataJSON)
 		require.NoError(ops.host.t, err, "Should validate object %d", i)
 	}
 }
@@ -128,7 +131,7 @@ func (ops *TestPluginOperations) TestCreate(entityType, entitySubType string, hc
 		dataJSON, err := json.Marshal(obj)
 		require.NoError(ops.host.t, err, "Should marshal test data to JSON for object %d", i)
 
-		_, err = ops.host.Create(entityType, entitySubType, dataJSON)
+		_, err = ops.host.Create(context.Background(), entityType, entitySubType, dataJSON)
 		require.NoError(ops.host.t, err, "Should create object %d", i)
 	}
 }
@@ -147,7 +150,7 @@ func (ops *TestPluginOperations) TestChanged(entityType, entitySubType string, h
 		dataJSON, err := json.Marshal(obj)
 		require.NoError(ops.host.t, err, "Should marshal test data to JSON for object %d", i)
 
-		changed, err := ops.host.Changed(entityType, entitySubType, dataJSON, dataJSON)
+		changed, err := ops.host.Changed(context.Background(), entityType, entitySubType, dataJSON, dataJSON)
 		require.NoError(ops.host.t, err, "Should check for changes without error for object %d", i)
 		require.False(ops.host.t, changed, "Newly created object %d should not be changed", i)
 	}
@@ -176,7 +179,7 @@ func (ops *TestPluginOperations) TestDestroy(entityType, entitySubType string, h
 		dataJSON, err := json.Marshal(obj)
 		require.NoError(ops.host.t, err, "Should marshal test data to JSON for object %d", i)
 
-		err = ops.host.Destroy(entityType, entitySubType, dataJSON)
+		err = ops.host.Destroy(context.Background(), entityType, entitySubType, dataJSON)
 		require.NoError(ops.host.t, err, "Should destroy object %d", i)
 	}
 }
@@ -188,20 +191,20 @@ func (ops *TestPluginOperations) TestCRUDOperations(entityType, entitySubType st
 	require.NoError(ops.host.t, err, "Should marshal test data to JSON")
 
 	// Test Validate with valid data
-	err = ops.host.Validate(entityType, entitySubType, dataJSON)
+	err = ops.host.Validate(context.Background(), entityType, entitySubType, dataJSON)
 	require.NoError(ops.host.t, err, "Should validate valid data")
 
 	// Test Create
-	_, err = ops.host.Create(entityType, entitySubType, dataJSON)
+	_, err = ops.host.Create(context.Background(), entityType, entitySubType, dataJSON)
 	require.NoError(ops.host.t, err, "Should create resource successfully")
 
 	// Test Changed
-	changed, err := ops.host.Changed(entityType, entitySubType, dataJSON, dataJSON)
+	changed, err := ops.host.Changed(context.Background(), entityType, entitySubType, dataJSON, dataJSON)
 	require.NoError(ops.host.t, err, "Should check for changes without error")
 	require.False(ops.host.t, changed, "Newly created resource should not be changed")
 
 	// Test Destroy
-	err = ops.host.Destroy(entityType, entitySubType, dataJSON)
+	err = ops.host.Destroy(context.Background(), entityType, entitySubType, dataJSON)
 	require.NoError(ops.host.t, err, "Should destroy resource successfully")
 }
 
@@ -209,7 +212,7 @@ func (ops *TestPluginOperations) TestCRUDOperations(entityType, entitySubType st
 func (ops *TestPluginOperations) TestInvalidValidation(entityType, entitySubType string) {
 	// Test with malformed JSON
 	invalidJSON := []byte(`{"invalid": "data", missing quote}`)
-	err := ops.host.Validate(entityType, entitySubType, invalidJSON)
+	err := ops.host.Validate(context.Background(), entityType, entitySubType, invalidJSON)
 	require.Error(ops.host.t, err, "Should fail validation with invalid data")
 }
 
@@ -220,11 +223,11 @@ func (ops *TestPluginOperations) TestBasicOperations(entityType, entitySubType s
 	require.NoError(ops.host.t, err, "Should marshal test data to JSON")
 
 	// Test Validate
-	err = ops.host.Validate(entityType, entitySubType, dataJSON)
+	err = ops.host.Validate(context.Background(), entityType, entitySubType, dataJSON)
 	require.NoError(ops.host.t, err, "Should validate data")
 
 	// Test Create (if this works, we know the basic plugin functionality is working)
-	_, err = ops.host.Create(entityType, entitySubType, dataJSON)
+	_, err = ops.host.Create(context.Background(), entityType, entitySubType, dataJSON)
 	require.NoError(ops.host.t, err, "Should create resource")
 }
 

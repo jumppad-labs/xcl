@@ -5,9 +5,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
-	"github.com/jumppad-labs/xcl/internal/xcl"
+	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
+	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -235,31 +237,50 @@ func TestChangedConfiguredValuesIgnoresMetadata(t *testing.T) {
 	require.Empty(t, changed)
 }
 
-func TestWarnChangedConfiguredValuesLogsEventResourceAndField(t *testing.T) {
+func TestWarnChangedConfiguredValuesEmitsWarnLogEventNamingTheField(t *testing.T) {
 	body := parseResourceBody(t, `subnet = "10.0.0.0/16"`)
-	log := &recordingLogger{}
+	collector := &eventCollector{}
+
+	base := events.Event{
+		Source:       events.SourceCore,
+		Operation:    events.OperationCreate,
+		ResourceType: "network.one",
+		ResourceID:   "resource.network.one",
+		File:         "one.xcl",
+	}
+	log := logger.New(collector.collect, base)
 
 	before := &structs.Network{Subnet: "10.0.0.0/16"}
 	after := &structs.Network{Subnet: "10.9.0.0/16"}
 
 	warnChangedConfiguredValues(log, "resource.network.one", body, networkType, toJSON(t, before), toJSON(t, after))
 
-	require.Equal(t, []loggedMessage{
-		{
-			msg:  "provider changed a configured value",
-			args: []any{"event", "configured_value_changed", "resource", "resource.network.one", "field", "subnet"},
-		},
-	}, log.warnings())
+	recorded := collector.all()
+	require.Len(t, recorded, 1)
+
+	warning := recorded[0]
+	require.Equal(t, events.SourceCore, warning.Source)
+	require.Equal(t, events.OperationCreate, warning.Operation)
+	require.Equal(t, events.PhaseLog, warning.Phase)
+	require.Equal(t, "network.one", warning.ResourceType)
+	require.Equal(t, "resource.network.one", warning.ResourceID)
+	require.Equal(t, "one.xcl", warning.File)
+	require.Equal(t, map[string]any{
+		events.KeyLevel:   events.LevelWarn,
+		events.KeyMessage: "provider changed a configured value",
+		"field":           "subnet",
+	}, warning.Meta)
 }
 
-func TestWarnChangedConfiguredValuesLogsNothingWhenUnchanged(t *testing.T) {
+func TestWarnChangedConfiguredValuesEmitsNothingWhenUnchanged(t *testing.T) {
 	body := parseResourceBody(t, `subnet = "10.0.0.0/16"`)
-	log := &recordingLogger{}
+	collector := &eventCollector{}
+	log := logger.New(collector.collect, events.Event{ResourceID: "resource.network.one"})
 
 	before := &structs.Network{Subnet: "10.0.0.0/16"}
 	after := &structs.Network{Subnet: "10.0.0.0/16", ProviderID: "id-one"}
 
 	warnChangedConfiguredValues(log, "resource.network.one", body, networkType, toJSON(t, before), toJSON(t, after))
 
-	require.Empty(t, log.warnings())
+	require.Empty(t, collector.all())
 }

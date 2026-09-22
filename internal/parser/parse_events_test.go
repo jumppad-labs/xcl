@@ -1,10 +1,12 @@
 package parser
 
 import (
+	"context"
 	"path/filepath"
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,28 +14,28 @@ import (
 // not recorded. Parsing modules recurses, and the walk fires events from
 // concurrent goroutines, so recording is guarded by a mutex.
 type parseEventRecorder struct {
-	mu     sync.Mutex
-	events []ParserEvent
+	mu       sync.Mutex
+	recorded []events.Event
 }
 
-func (r *parseEventRecorder) record(e ParserEvent) {
-	if e.Operation != "parse" {
+func (r *parseEventRecorder) record(e events.Event) {
+	if e.Operation != events.OperationParse {
 		return
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.events = append(r.events, e)
+	r.recorded = append(r.recorded, e)
 }
 
 // withPhase returns the recorded parse events with the given phase
-func (r *parseEventRecorder) withPhase(phase string) []ParserEvent {
+func (r *parseEventRecorder) withPhase(phase string) []events.Event {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	found := []ParserEvent{}
-	for _, e := range r.events {
+	found := []events.Event{}
+	for _, e := range r.recorded {
 		if e.Phase == phase {
 			found = append(found, e)
 		}
@@ -49,15 +51,16 @@ func TestApplyFiresParseEventForEveryResourceWithItsFile(t *testing.T) {
 
 	recorder := &parseEventRecorder{}
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, recorder.record)
+	p := h.newParser(t, recorder.record)
 
-	_, err = p.Apply(mainFile)
+	_, err = p.Apply(context.Background(), mainFile)
 	require.NoError(t, err)
 
 	files := map[string]string{}
 	resourceTypes := map[string]string{}
 	for _, e := range recorder.withPhase("success") {
 		require.NoError(t, e.Error)
+		require.Equal(t, events.SourceCore, e.Source)
 		files[e.ResourceID] = e.File
 		resourceTypes[e.ResourceID] = e.ResourceType
 	}
@@ -81,9 +84,9 @@ func TestApplyFiresParseEventForEveryResourceWithItsFile(t *testing.T) {
 func TestParseEventHasNoStartPhase(t *testing.T) {
 	recorder := &parseEventRecorder{}
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, recorder.record)
+	p := h.newParser(t, recorder.record)
 
-	_, err := p.Apply(registeredBasicConfig)
+	_, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	require.Empty(t, recorder.withPhase("start"))
@@ -92,9 +95,9 @@ func TestParseEventHasNoStartPhase(t *testing.T) {
 func TestValidateFiresParseEvents(t *testing.T) {
 	recorder := &parseEventRecorder{}
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, recorder.record)
+	p := h.newParser(t, recorder.record)
 
-	err := p.Validate(registeredBasicConfig)
+	err := p.Validate(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	require.Len(t, recorder.withPhase("success"), 7)
@@ -106,10 +109,10 @@ func TestParseEventReportsResourceThatFailsToParse(t *testing.T) {
 
 	recorder := &parseEventRecorder{}
 	options := testOptions(t)
-	options.OnParserEvent = recorder.record
+	options.Emit = recorder.record
 	p, _ := setupParser(t, options)
 
-	_, err = p.Apply(file)
+	_, err = p.Apply(context.Background(), file)
 	require.Error(t, err)
 
 	failed := recorder.withPhase("error")
@@ -126,10 +129,10 @@ func TestParseEventReportsResourcesThatParseAlongsideOneThatFails(t *testing.T) 
 
 	recorder := &parseEventRecorder{}
 	options := testOptions(t)
-	options.OnParserEvent = recorder.record
+	options.Emit = recorder.record
 	p, _ := setupParser(t, options)
 
-	_, err = p.Apply(file)
+	_, err = p.Apply(context.Background(), file)
 	require.Error(t, err)
 
 	parsed := recorder.withPhase("success")
@@ -144,10 +147,10 @@ func TestParseEventReportsFileWithInvalidSyntax(t *testing.T) {
 
 	recorder := &parseEventRecorder{}
 	options := testOptions(t)
-	options.OnParserEvent = recorder.record
+	options.Emit = recorder.record
 	p, _ := setupParser(t, options)
 
-	_, err = p.Apply(file)
+	_, err = p.Apply(context.Background(), file)
 	require.Error(t, err)
 
 	failed := recorder.withPhase("error")
@@ -164,9 +167,9 @@ func TestParseEventReportsFileWithInvalidSyntax(t *testing.T) {
 func TestParseEventForModuleComesBeforeItsResources(t *testing.T) {
 	recorder := &parseEventRecorder{}
 	h := setupRegisteredTypes(t)
-	p := h.newParser(t, nil, recorder.record)
+	p := h.newParser(t, recorder.record)
 
-	_, err := p.Apply(registeredBasicConfig)
+	_, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
 	order := map[string]int{}
@@ -184,10 +187,10 @@ func TestParseEventReportsModuleWhoseSourceIsMissing(t *testing.T) {
 
 	recorder := &parseEventRecorder{}
 	options := testOptions(t)
-	options.OnParserEvent = recorder.record
+	options.Emit = recorder.record
 	p, _ := setupParser(t, options)
 
-	_, err = p.Apply(file)
+	_, err = p.Apply(context.Background(), file)
 	require.Error(t, err)
 
 	failed := recorder.withPhase("error")

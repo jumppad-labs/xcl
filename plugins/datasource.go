@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"context"
+	"github.com/jumppad-labs/xcl/logger"
 )
 
 // DataSourceProvider defines the generic interface that all data source providers must implement.
@@ -15,7 +16,7 @@ type DataSourceProvider[T any] interface {
 	// The state parameter provides access to the current state of resources.
 	// The functions parameter provides access to provider-defined functions.
 	// The logger parameter is the logger instance for all logging operations.
-	Init(state State, functions ProviderFunctions, logger Logger) error
+	Init(state State, functions ProviderFunctions, logger logger.Logger) error
 
 	// Refresh fetches external data and returns it as a typed resource.
 	// This method is called to retrieve the latest data from the external source.

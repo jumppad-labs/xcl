@@ -25,8 +25,7 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
-	"github.com/jumppad-labs/xcl/example/eventlog"
-	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -45,7 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, err = run(os.Stdout, logger.NewStdOutLogger(), dir, filepath.Join(stateDir, "state.json"))
+	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv()), dir, filepath.Join(stateDir, "state.json"))
 	os.RemoveAll(stateDir)
 
 	if err != nil {
@@ -57,9 +56,10 @@ func main() {
 // run applies the configuration in dir with the example types registered,
 // keeping the state in a file at statePath, writes the resources and query
 // results to out, then destroys everything and returns the resources that were
-// applied. Every event xcl fires is logged to log.
-func run(out io.Writer, log logger.Logger, dir string, statePath string) ([]any, error) {
-	r := registry.NewPluginRegistry(log)
+// applied. Every event xcl produces goes to handler, a nil handler leaves xcl
+// silent.
+func run(out io.Writer, handler xcl.EventHandler, dir string, statePath string) ([]any, error) {
+	r := registry.NewPluginRegistry()
 
 	// Register each Go type under the block type name used in configuration.
 	// A registered type needs nothing else: no plugin, no provider, no schema
@@ -89,7 +89,7 @@ func run(out io.Writer, log logger.Logger, dir string, statePath string) ([]any,
 	c := xcl.NewConfig(
 		xcl.WithPluginRegistry(r),
 		xcl.WithStateStore(store),
-		xcl.WithEventHandler(eventlog.Handler(log)),
+		xcl.WithEventHandler(handler),
 	)
 
 	if err := c.Apply(dir); err != nil {

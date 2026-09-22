@@ -1,14 +1,15 @@
 package parser
 
 import (
+	"context"
+	stderrors "errors"
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/hashicorp/errwrap"
 	"github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/cty/function"
 	"github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/functions"
@@ -18,7 +19,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclparse"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -62,9 +62,6 @@ type ParserOptions struct {
 	// credentials to use with the registries
 	RegistryCredentials map[string]string
 
-	// Logger function for plugin discovery logging (optional)
-	Logger logger.Logger
-
 	// ModuleRegistry is the registry of modules to use for this parser
 	// when downloading modules.
 	ModuleRegistry *modules.ModuleRegistry
@@ -88,9 +85,11 @@ type ParserOptions struct {
 	// and saving new state.
 	StateStore state.StateStore
 
-	// OnParserEvent is an optional callback function that is called when parser events occur.
-	// This can be used for metrics collection, logging, debugging, or other monitoring purposes.
-	OnParserEvent func(ParserEvent)
+	// Emit receives every event the parser produces: parse, lifecycle and
+	// validation events, their errors, and log messages such as the warning
+	// for a configured value a provider changed. It may be called from
+	// several goroutines at once. A nil Emit is silent.
+	Emit events.Emit
 
 	CustomFunctions map[string]function.Function
 }
@@ -116,13 +115,10 @@ func DefaultOptions() *ParserOptions {
 
 	cacheDir := filepath.Join(homeDir, ConfigDirectory, "cache")
 
-	logger := logger.NewStdOutLogger()
-
 	return &ParserOptions{
 		ModuleCache:       cacheDir,
 		VariableEnvPrefix: "HCL_VAR_",
-		Logger:            logger,
-		PluginRegistry:    registry.NewPluginRegistry(logger),
+		PluginRegistry:    registry.NewPluginRegistry(),
 	}
 }
 
@@ -161,11 +157,6 @@ func NewParser(options *ParserOptions) *Parser {
 	o := options
 	if o == nil {
 		o = DefaultOptions()
-	}
-
-	// Create logger if there is not one set
-	if o.Logger == nil {
-		o.Logger = &logger.StdOutLogger{}
 	}
 
 	p := &Parser{
@@ -228,7 +219,12 @@ func NewParser(options *ParserOptions) *Parser {
 // failed resource with status "failed", and the previous entry of resources
 // that existed before but were not reached. Parse and validation failures
 // return a nil State.
-func (p *Parser) Apply(paths ...string) (*State, error) {
+//
+// ctx is the operation's context. Once it is cancelled no new provider call
+// starts, calls already running are left to finish, and Apply returns the
+// partial State of what was reached together with ctx's error. Providers are
+// given a copy of ctx that is never cancelled.
+func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
 	currentState, previousState, err := p.parseAndValidate(paths...)
 	if err != nil {
 		return nil, err
@@ -255,6 +251,7 @@ func (p *Parser) Apply(paths ...string) (*State, error) {
 		}
 
 		d := &destroyer{
+			ctx:      ctx,
 			working:  working,
 			store:    p.stateStore,
 			resolver: p.providerResolver,
@@ -278,7 +275,14 @@ func (p *Parser) Apply(paths ...string) (*State, error) {
 
 	// Always walk the DAG to decode resources (fills in their fields from HCL)
 	// This decodes interpolations and resolves dependencies regardless of plugin execution
-	progress, errs := p.walk(currentState, previousState, functions)
+	progress, errs := p.walk(ctx, currentState, previousState, functions)
+
+	// a cancelled walk skipped the resources it had not reached, keep only
+	// the progress it made
+	if len(errs) == 0 && ctx.Err() != nil {
+		errs = append(errs, fmt.Errorf("apply stopped before every resource was reached: %w", ctx.Err()))
+	}
+
 	if len(errs) > 0 {
 		for _, e := range errs {
 			ce.AppendError(e)
@@ -319,8 +323,17 @@ func (p *Parser) Apply(paths ...string) (*State, error) {
 // Destroy removes the entities given, children before their parents. It takes
 // plain entities rather than a container, because that is what a state store
 // hands back and what a caller holds.
-func (p *Parser) Destroy(saved []any) (*State, error) {
+//
+// ctx is the operation's context. Once it is cancelled no new provider call
+// starts and calls already running are left to finish. The resources not yet
+// reached stay in the state and Destroy returns ctx's error.
+func (p *Parser) Destroy(ctx context.Context, saved []any) (*State, error) {
 	working := NewState()
+
+	if err := p.loadPlugins(); err != nil {
+		return working, err
+	}
+
 	for _, r := range saved {
 		if err := working.AppendResource(r); err != nil {
 			return working, err
@@ -328,6 +341,7 @@ func (p *Parser) Destroy(saved []any) (*State, error) {
 	}
 
 	d := &destroyer{
+		ctx:      ctx,
 		working:  working,
 		store:    p.stateStore,
 		resolver: p.providerResolver,
@@ -368,7 +382,10 @@ func removedResources(current, previous *State) []any {
 // Validate parses and validates the configuration discovered from paths without
 // resolving it: no body is decoded, no dependency graph is walked and no provider
 // is reached. A nil error means the configuration is valid.
-func (p *Parser) Validate(paths ...string) error {
+//
+// ctx is the operation's context, validation reaches no provider so it is
+// accepted for symmetry with Apply and Destroy.
+func (p *Parser) Validate(ctx context.Context, paths ...string) error {
 	_, _, err := p.parseAndValidate(paths...)
 	return err
 }
@@ -384,6 +401,11 @@ func (p *Parser) Validate(paths ...string) error {
 func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 	if len(paths) == 0 {
 		return nil, nil, fmt.Errorf("at least one path is required")
+	}
+
+	// plugin types are needed to read both the saved state and the files
+	if err := p.loadPlugins(); err != nil {
+		return nil, nil, err
 	}
 
 	// Load previous state from store (for comparison during Create/Update)
@@ -477,6 +499,7 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 	// been decoded, which is what lets validation judge the configuration
 	// without resolving it.
 	for _, e := range p.validate() {
+		p.emitValidateError(e)
 		ce.AppendError(e)
 	}
 
@@ -508,7 +531,7 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 			errs = append(errs, pe)
 
 			// the file is not valid syntax, so no problem is in a resource
-			fireParseEvent(&p.options, "", "", file, pe)
+			emitParse(&p.options, "", "", file, pe)
 		}
 
 		return errs
@@ -535,7 +558,7 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 				fmt.Sprintf("resource '%s' has no name, please specify resources using the syntax 'resource_type \"name\" {}'", b.Type),
 			)
 
-			fireParseEvent(&p.options, "", "", file, de)
+			emitParse(&p.options, "", "", file, de)
 			blockErrors = append(blockErrors, de)
 			continue
 		}
@@ -559,7 +582,7 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 			}
 
 			resourceType, resourceID := blockResource(b, module)
-			fireParseEvent(&p.options, resourceType, resourceID, file, err)
+			emitParse(&p.options, resourceType, resourceID, file, err)
 		default:
 			// not one of the four stanza keywords, so it is only valid when it
 			// names a type registered in the bare form. A type is registered
@@ -578,7 +601,7 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 					fmt.Sprintf("unable to process stanza '%s' in file %s at %d,%d , '%s' is not a known type", b.Type, file, b.Range().Start.Line, b.Range().Start.Column, b.Type),
 				)
 
-				fireParseEvent(&p.options, "", "", file, de)
+				emitParse(&p.options, "", "", file, de)
 				blockErrors = append(blockErrors, de)
 
 				continue
@@ -592,7 +615,7 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 					fmt.Sprintf("'%s' is declared with the resource keyword, i.e. 'resource \"%s\" \"name\" {}', not as '%s \"name\" {}'", b.Type, b.Type, b.Type),
 				)
 
-				fireParseEvent(&p.options, "", "", file, de)
+				emitParse(&p.options, "", "", file, de)
 				blockErrors = append(blockErrors, de)
 
 				continue
@@ -604,7 +627,7 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 			}
 
 			resourceType, resourceID := blockResource(b, module)
-			fireParseEvent(&p.options, resourceType, resourceID, file, err)
+			emitParse(&p.options, resourceType, resourceID, file, err)
 		}
 	}
 
@@ -878,7 +901,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 	// the module block itself goes through it
 	resourceType, resourceID := blockResource(b, parentModule)
 	fail := func(err error) []error {
-		fireParseEvent(&p.options, resourceType, resourceID, file, err)
+		emitParse(&p.options, resourceType, resourceID, file, err)
 		return []error{err}
 	}
 
@@ -1028,7 +1051,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 
 	// the module block itself has parsed, the resources in its source fire
 	// their own parse events as they are parsed
-	fireParseEvent(&p.options, resourceType, resourceID, file, nil)
+	emitParse(&p.options, resourceType, resourceID, file, nil)
 
 	moduleErrors := []error{}
 	for _, childFile := range childFiles {
@@ -1232,10 +1255,11 @@ func processDisabled(bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (b
 // and calls the provider lifecycle for each resource
 //
 // It returns the progress of the walk, which is nil when the walk did not start.
-func (p *Parser) walk(currentState, previousState *State, functions functionsForFile) (*applyProgress, []error) {
+func (p *Parser) walk(ctx context.Context, currentState, previousState *State, functions functionsForFile) (*applyProgress, []error) {
 	// Build the DAG using currentState (implements ResourceProvider)
 	d, err := DoYouLikeDags(currentState, p.addressParser(), false)
 	if err != nil {
+		p.emitOperationError(events.OperationApply, err)
 		return nil, []error{err}
 	}
 
@@ -1245,7 +1269,9 @@ func (p *Parser) walk(currentState, previousState *State, functions functionsFor
 	// Validate the dependency graph is ok
 	err = d.Validate()
 	if err != nil {
-		return nil, []error{fmt.Errorf("unable to validate dependency graph: %w", err)}
+		err = fmt.Errorf("unable to validate dependency graph: %w", err)
+		p.emitOperationError(events.OperationApply, err)
+		return nil, []error{err}
 	}
 
 	// Define the walker callback that will be called for every node in the graph
@@ -1254,6 +1280,7 @@ func (p *Parser) walk(currentState, previousState *State, functions functionsFor
 	// The lifecycle decides the provider calls for each resource from the
 	// state saved by the last apply
 	lifecycle := &resourceLifecycle{
+		ctx:      ctx,
 		previous: previousState,
 		resolver: p.providerResolver,
 		options:  &p.options,
@@ -1266,8 +1293,6 @@ func (p *Parser) walk(currentState, previousState *State, functions functionsFor
 	w.Reverse = false
 
 	// Update the dag and process the nodes
-	log.SetOutput(io.Discard)
-
 	errs := []error{}
 	w.Update(d)
 	diags := w.Wait()
@@ -1302,4 +1327,54 @@ func (p *Parser) getFunctions(file string) map[string]function.Function {
 	}
 
 	return funcs
+}
+
+// emitValidateError emits a validate error event for a problem found by
+// validation, naming the resource declared at the problem's position when
+// there is one, otherwise only its file
+func (p *Parser) emitValidateError(problem error) {
+	if !emitting(&p.options) {
+		return
+	}
+
+	e := events.Event{
+		Source:    events.SourceCore,
+		Operation: events.OperationValidate,
+		Phase:     events.PhaseError,
+		Error:     problem,
+	}
+
+	var pe *errors.ParserError
+	if stderrors.As(problem, &pe) {
+		e.File = pe.Filename
+
+		for _, r := range p.parsedResources.resources {
+			meta, err := types.GetMeta(r)
+			if err != nil || meta.File != pe.Filename || meta.Line != pe.Line || meta.Column != pe.Column {
+				continue
+			}
+
+			e.ResourceID = meta.ID
+			e.ResourceType = resourceType(meta)
+			break
+		}
+	}
+
+	emit(&p.options, e)
+}
+
+// emitOperationError emits an error event for a failure of the operation as a
+// whole, one that belongs to no single resource
+func (p *Parser) emitOperationError(operation string, err error) {
+	emitOperationError(&p.options, operation, err)
+}
+
+// loadPlugins loads the plugin registry's plugins, which happens once per
+// registry, so it is cheap when a Config has already loaded them
+func (p *Parser) loadPlugins() error {
+	if p.pluginRegistry == nil {
+		return nil
+	}
+
+	return p.pluginRegistry.Load(p.options.Emit)
 }

@@ -60,11 +60,32 @@ func TestMyPluginExternal(t *testing.T) {
   - Creates an external process plugin host
   - Automatically handles cleanup via t.Cleanup()
 
-- `plugintesting.InProcessPluginSetupWithLogger(t *testing.T, plugin plugins.Plugin, log plugins.Logger) *TestPluginHost`
-- `plugintesting.ExternalPluginSetupWithLogger(t *testing.T, binaryPath string, log plugins.Logger) *TestPluginHost`
-  - The same as the setup functions above, but the plugin logs to `log`, so a
-    test can assert what the plugin logs. For an external plugin the logs
-    cross the process boundary over gRPC before they reach `log`.
+- `plugintesting.InProcessPluginSetupWithEmit(t *testing.T, plugin plugins.Plugin, emit events.Emit) *TestPluginHost`
+- `plugintesting.ExternalPluginSetupWithEmit(t *testing.T, binaryPath string, emit events.Emit) *TestPluginHost`
+  - The same as the setup functions above, which discard what the host and
+    plugin report, but the host's and plugin's events go to `emit`: what the
+    plugin logs outside a provider call, such as in `Init`, and for an
+    external plugin go-plugin's own messages. Log messages arrive as
+    `events.Event`s with the phase `events.PhaseLog`, the plugin's name as
+    `Source`, and the level and text in `Meta` under `events.KeyLevel` and
+    `events.KeyMessage`. For an external plugin the messages cross the
+    process boundary over gRPC before they reach `emit`, and detail values
+    arrive as text.
+  - What a provider logs during a call through `plugins.Logger(ctx)` goes to
+    the logger in the context passed to the host, as it does under xcl's
+    parser, and is dropped when there is none (the test operations below pass
+    `context.Background()`). To assert on it, call the host with a context
+    carrying a logger bound to the resource and step:
+
+    ```go
+    ctx := plugins.WithLogger(context.Background(), logger.New(recorder.emit, events.Event{
+        Operation:  events.OperationCreate,
+        ResourceID: "resource.person.john",
+    }))
+    _, err := ph.Create(ctx, "resource", "person", data)
+    ```
+
+    The host names the plugin as the `Source` of those messages.
 
 ### Test Operations
 

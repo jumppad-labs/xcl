@@ -8,7 +8,6 @@ import (
 
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/stretchr/testify/require"
 )
@@ -54,7 +53,7 @@ func applyQueryFixtureWithEvents(t *testing.T) *eventRecorder {
 		os.Setenv("HOME", home)
 	})
 
-	pr := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	pr := registry.NewPluginRegistry()
 
 	err := pr.RegisterType(registered.TypeDatabase, &registered.Database{})
 	require.NoError(t, err)
@@ -124,8 +123,9 @@ func TestApplyCallsEventHandlerWhenResourceIsParsed(t *testing.T) {
 }
 
 // TestValidateCallsEventHandlerWhenResourceIsParsed asserts Validate passes
-// the parse events to the handler, and nothing else as Validate creates
-// nothing
+// the parse events to the handler between the validate operation's start and
+// success, after the TestPlugin's load start and success as this is the first
+// operation, and nothing else as Validate creates nothing
 func TestValidateCallsEventHandlerWhenResourceIsParsed(t *testing.T) {
 	home := os.Getenv("HOME")
 	os.Setenv("HOME", t.TempDir())
@@ -134,7 +134,7 @@ func TestValidateCallsEventHandlerWhenResourceIsParsed(t *testing.T) {
 		os.Setenv("HOME", home)
 	})
 
-	pr := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	pr := registry.NewPluginRegistry()
 
 	err := pr.RegisterType(registered.TypeDatabase, &registered.Database{})
 	require.NoError(t, err)
@@ -155,8 +155,24 @@ func TestValidateCallsEventHandlerWhenResourceIsParsed(t *testing.T) {
 	err = c.Validate(file)
 	require.NoError(t, err)
 
-	require.Len(t, recorder.events, 5)
-	for _, e := range recorder.events {
+	// the plugin load and the parse events are wrapped by the validate
+	// operation's start and success
+	require.Len(t, recorder.events, 9)
+
+	first := recorder.events[0]
+	require.Equal(t, "validate", first.Operation)
+	require.Equal(t, "start", first.Phase)
+
+	require.Equal(t, "load", recorder.events[1].Operation)
+	require.Equal(t, "start", recorder.events[1].Phase)
+	require.Equal(t, "load", recorder.events[2].Operation)
+	require.Equal(t, "success", recorder.events[2].Phase)
+
+	last := recorder.events[8]
+	require.Equal(t, "validate", last.Operation)
+	require.Equal(t, "success", last.Phase)
+
+	for _, e := range recorder.events[3:8] {
 		require.Equal(t, "parse", e.Operation)
 		require.Equal(t, "success", e.Phase)
 		require.Equal(t, file, e.File)

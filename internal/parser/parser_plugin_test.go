@@ -15,8 +15,7 @@ import (
 func TestPluginRegistration(t *testing.T) {
 	// Create a new parser with TestLogger and PluginRegistry
 	o := testOptions(t)
-	o.Logger = logger.NewTestLogger(t)
-	o.PluginRegistry = registry.NewPluginRegistry(o.Logger)
+	o.PluginRegistry = registry.NewPluginRegistry()
 
 	parser := NewParser(o)
 
@@ -26,6 +25,10 @@ func TestPluginRegistration(t *testing.T) {
 	// Register the plugin via the PluginRegistry
 	err := o.PluginRegistry.RegisterPlugin(plugin)
 	require.NoError(t, err, "Should register plugin without error")
+
+	// Registering only records the plugin, it is started when plugins load
+	err = o.PluginRegistry.Load(nil)
+	require.NoError(t, err, "Should load plugin without error")
 
 	// Verify the plugin was added to the registry
 	require.Len(t, parser.pluginRegistry.GetPluginHosts(), 1, "Should have one plugin host")
@@ -44,7 +47,6 @@ func TestPluginRegistration(t *testing.T) {
 // TestPluginResourceCreationWithFallback tests plugin creation with fallback to registered types
 func TestPluginResourceCreationWithFallback(t *testing.T) {
 	o := testOptions(t)
-	o.Logger = logger.NewTestLogger(t)
 	parser := NewParser(o)
 
 	// Try to create a resource that doesn't exist in plugins (should fall back to registered types)

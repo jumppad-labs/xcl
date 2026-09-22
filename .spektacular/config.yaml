@@ -1,6 +1,6 @@
 schema: 3
-written_by: 0.15.1
-skills_version: 0.15.1
+written_by: 0.20.0
+skills_version: 0.20.0
 name: xclconfig
 command: spektacular
 agent: claude

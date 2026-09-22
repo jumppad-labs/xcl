@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/stretchr/testify/require"
 )
@@ -17,9 +16,13 @@ import (
 func newTestRegistry(t *testing.T) *registry.PluginRegistry {
 	t.Helper()
 
-	r := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	r := registry.NewPluginRegistry()
 
 	err := r.RegisterPlugin(&TestPlugin{})
+	require.NoError(t, err)
+
+	// the plugin's types are known once plugins have loaded
+	err = r.Load(nil)
 	require.NoError(t, err)
 
 	return r

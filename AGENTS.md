@@ -244,6 +244,13 @@ preference the planner may adapt is technical direction and belongs in the
 spec; only a worked design that would swamp the spec belongs in a document of
 its own. If a one-line steer captures it, it is not a design document.
 
+Note these are three homes for the *content*, not three degrees of how binding
+it is. A design document is settled by definition, so a spec that references
+one records that pointer among its **constraints**, never as technical
+direction: the plan workflow builds on a referenced design, weighs its options
+within the shape it fixes, and raises a disagreement with the user rather than
+designing around it.
+
 A design enters a project in more ways than one, and three of them are easy to
 walk past:
 
@@ -306,6 +313,17 @@ never build a store path by hand. Use `spektacular spec file`,
 `spektacular plan file`, `spektacular changelog file`, `spektacular knowledge`
 and `spektacular design` instead. A write supplies its body with
 `--from <path>`, never on stdin and never as prose on the command line.
+
+Removal is a CLI verb too. Deleting a managed file with `rm`, or with any
+equivalent of your own, is never correct — not for a knowledge entry, not for
+a design document, and not for anything else a store holds. Use
+`spektacular knowledge delete` and `spektacular design delete`, alongside the
+`delete` each of `spektacular spec file`, `spektacular plan file` and
+`spektacular changelog file` already offers. Going around the tool is how a
+spec is left pointing at a design that is not there, and it stops working
+entirely the moment a store is backed by something other than a local
+directory. If a removal is refused, the refusal names what to do instead:
+act on it rather than reaching past it.
 
 Do not use `ls`, `find`, or the `Read` tool to discover what a store holds,
 against `.spektacular/specs/`, `.spektacular/plans/`, or any configured store

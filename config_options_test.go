@@ -17,7 +17,7 @@ func TestNewConfigWithNoOptions(t *testing.T) {
 }
 
 func TestNewConfigWithPluginRegistry(t *testing.T) {
-	pr := registry.NewPluginRegistry(nil)
+	pr := registry.NewPluginRegistry()
 	cfg := NewConfig(WithPluginRegistry(pr))
 	require.NotNil(t, cfg)
 	require.Equal(t, pr, cfg.pluginRegistry)
@@ -33,7 +33,7 @@ func TestNewConfigWithVariables(t *testing.T) {
 }
 
 func TestNewConfigWithMultipleOptions(t *testing.T) {
-	pr := registry.NewPluginRegistry(nil)
+	pr := registry.NewPluginRegistry()
 	vars := map[string]any{"env": "test"}
 
 	cfg := NewConfig(
@@ -47,7 +47,7 @@ func TestNewConfigWithMultipleOptions(t *testing.T) {
 }
 
 func TestNewConfigOptionsAreComposable(t *testing.T) {
-	pr := registry.NewPluginRegistry(nil)
+	pr := registry.NewPluginRegistry()
 	vars := map[string]any{"env": "test"}
 
 	opts := []ConfigOption{
