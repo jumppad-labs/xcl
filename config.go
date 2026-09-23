@@ -65,6 +65,26 @@ var (
 // detail names the plugin.
 var ErrPluginLoad = xclerrors.ErrPluginLoad
 
+// The errors below name every way turning an entity, or an entity's saved
+// data, into configuration text can fail. Check for them with errors.Is, and
+// recover the detail carried alongside each with errors.As.
+var (
+	// ErrUnregisteredType means saved data names a type the registry cannot
+	// create. The UnregisteredTypeError detail names the type. A plugin's
+	// types resolve only once the registry has loaded.
+	ErrUnregisteredType = xclerrors.ErrUnregisteredType
+
+	// ErrInvalidSavedData means the data given is not one saved entity
+	// record. The InvalidSavedDataError detail names the record where it was
+	// readable enough to name itself.
+	ErrInvalidSavedData = xclerrors.ErrInvalidSavedData
+
+	// ErrNotEncodable means a value cannot be written as configuration,
+	// because it is not an entity, it is a builtin such as a variable, output
+	// or module, or it holds a value that has no configuration form.
+	ErrNotEncodable = xclerrors.ErrNotEncodable
+)
+
 // The detail carried by each of the errors above, recovered with errors.As.
 // These are aliases, so a caller names them here without importing a second
 // package called errors.
@@ -77,6 +97,10 @@ type (
 	NotAnEntityError   = xclerrors.NotAnEntityError
 	NotUniqueError     = xclerrors.NotUniqueError
 	PluginLoadError    = xclerrors.PluginLoadError
+
+	UnregisteredTypeError = xclerrors.UnregisteredTypeError
+	InvalidSavedDataError = xclerrors.InvalidSavedDataError
+	NotEncodableError     = xclerrors.NotEncodableError
 )
 
 // Config defines the stack config
@@ -89,6 +113,7 @@ type Config struct {
 	variables       map[string]any           // Variables for HCL parsing
 	eventHandler    EventHandler             // Receives every event of Validate, Apply and Destroy
 	eventBufferSize int                      // Undelivered events held before emitting waits, 0 is the default
+	eventData       events.DataLevel         // What resource data events carry, none by default
 
 	addresses *resources.AddressParser // resolves addresses against the known types
 }
@@ -223,6 +248,7 @@ func (c *Config) Validate(paths ...string) error {
 
 		// Create parser with StateStore
 		p := parser.NewParser(&parser.ParserOptions{
+			EventData:      c.eventData,
 			StateStore:     c.stateStore,
 			PluginRegistry: c.pluginRegistry,
 			Variables:      convertVariablesToStringMap(c.variables),
@@ -254,6 +280,7 @@ func (c *Config) Apply(paths ...string) error {
 
 		// Create parser with StateStore
 		p := parser.NewParser(&parser.ParserOptions{
+			EventData:      c.eventData,
 			StateStore:     c.stateStore,
 			PluginRegistry: c.pluginRegistry,
 			Variables:      convertVariablesToStringMap(c.variables),
@@ -320,6 +347,7 @@ func (c *Config) Destroy() error {
 		// Create parser with StateStore, destroy saves through it after
 		// every resource
 		p := parser.NewParser(&parser.ParserOptions{
+			EventData:      c.eventData,
 			StateStore:     c.stateStore,
 			PluginRegistry: c.pluginRegistry,
 			Emit:           emit,

@@ -1,5 +1,6 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
+// Modifications Copyright (c) Jumppad Labs
 
 package hclwrite
 
@@ -48,4 +49,44 @@ func (a *Attribute) init(name string, expr *Expression) {
 
 func (a *Attribute) Expr() *Expression {
 	return a.expr.content.(*Expression)
+}
+
+// SetLineComment replaces the comment that follows the attribute's value on
+// the same line, writing text after a "# " marker. An empty text removes the
+// comment. text is one line, it must not contain a newline, the attribute
+// writes its own line ending after the comment.
+func (a *Attribute) SetLineComment(text string) {
+	a.lineComments = a.lineComments.ReplaceWith(newComments(commentTokens(text)))
+}
+
+// SetLeadComment replaces the comment written on its own line above the
+// attribute, writing text after a "# " marker. An empty text removes the
+// comment. text is one line and must not contain a newline.
+func (a *Attribute) SetLeadComment(text string) {
+	tokens := commentTokens(text)
+	if len(tokens) > 0 {
+		// a lead comment stands on its own line, so it ends with one
+		tokens = append(tokens, &Token{
+			Type:  hclsyntax.TokenNewline,
+			Bytes: []byte{'\n'},
+		})
+	}
+
+	a.leadComments = a.leadComments.ReplaceWith(newComments(tokens))
+}
+
+// commentTokens builds the tokens for a single line comment, or none at all
+// when there is nothing to say
+func commentTokens(text string) Tokens {
+	if text == "" {
+		return nil
+	}
+
+	return Tokens{
+		{
+			Type:         hclsyntax.TokenComment,
+			Bytes:        []byte("# " + text),
+			SpacesBefore: 1,
+		},
+	}
 }

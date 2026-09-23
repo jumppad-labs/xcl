@@ -44,7 +44,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv()), dir, filepath.Join(stateDir, "state.json"))
+	// the registry is built here so that the event receiver can share it: it
+	// is what types the entity an event carries, which is how the receiver
+	// shows each resource's configuration as it is created
+	r := registry.NewPluginRegistry()
+
+	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), r), r, dir, filepath.Join(stateDir, "state.json"))
 	os.RemoveAll(stateDir)
 
 	if err != nil {
@@ -58,8 +63,7 @@ func main() {
 // results to out, then destroys everything and returns the resources that were
 // applied. Every event xcl produces goes to handler, a nil handler leaves xcl
 // silent.
-func run(out io.Writer, handler xcl.EventHandler, dir string, statePath string) ([]any, error) {
-	r := registry.NewPluginRegistry()
+func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, dir string, statePath string) ([]any, error) {
 
 	// Register each Go type under the block type name used in configuration.
 	// A registered type needs nothing else: no plugin, no provider, no schema
@@ -90,6 +94,10 @@ func run(out io.Writer, handler xcl.EventHandler, dir string, statePath string) 
 		xcl.WithPluginRegistry(r),
 		xcl.WithStateStore(store),
 		xcl.WithEventHandler(handler),
+		// events carry nothing by default, this asks for each resource as
+		// state records it, which is what the receiver turns back into
+		// configuration text
+		xcl.WithEventData(xcl.EventDataProcessed),
 	)
 
 	if err := c.Apply(dir); err != nil {

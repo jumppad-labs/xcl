@@ -464,8 +464,34 @@ shape for all of them:
 | `ResourceType`, `ResourceID`, `File` | the resource the event is about and the file it was declared in |
 | `Duration` | how long a step took, or how long emitting was blocked |
 | `Error` | the failure, for the error phase |
-| `Data` | the serialized resource, lifecycle events only |
+| `Data` | the serialized resource, carried only when you ask for it with `WithEventData`, see below |
 | `Meta` | details; a log message's level and text are under the reserved keys `events.KeyLevel` (`level`) and `events.KeyMessage` (`message`), which caller details never overwrite |
+
+#### Resource data on events
+
+Events carry no resource data by default. A resource's configuration and state
+are not something to push through every receiver by accident, so you ask for
+them:
+
+```go
+c := xcl.NewConfig(
+	xcl.WithEventHandler(handler),
+	xcl.WithEventData(xcl.EventDataProcessed),
+)
+```
+
+| Level | What `Data` carries |
+|---|---|
+| `EventDataNone` | nothing, on any event. The default |
+| `EventDataRaw` | on every lifecycle event, the resource as it was before the provider was called |
+| `EventDataProcessed` | on a success event, the resource as xcl records it in state, including the values the provider filled in and the status it ended with. Other phases carry the same as `EventDataRaw` |
+
+`EventDataProcessed` is byte for byte what state stores, so it goes straight to
+`EncodeSavedEntity` below. This is how the examples show each resource as it is
+created.
+
+If you read `Event.Data` today, add `xcl.WithEventData(xcl.EventDataRaw)` to
+keep what you had.
 
 Each `Validate`, `Apply` and `Destroy` starts with its own `start` event and
 ends with a `success` or an `error` carrying the error it returns. In between
@@ -511,6 +537,87 @@ func (p *provider) Create(ctx context.Context, db *PostgreSQL) (*PostgreSQL, err
 ```
 
 See [docs/plugins.md](./docs/plugins.md) for more.
+
+### Converting to configuration text
+
+`EncodeEntity` turns one entity back into configuration text in xcl's own
+syntax, ready to print or write to a `.xcl` file:
+
+```go
+db, err := xcl.Find[*Postgres](c, "resource.postgres.main")
+if err != nil {
+	return err
+}
+
+text, err := xcl.EncodeEntity(db)
+if err != nil {
+	return err
+}
+
+fmt.Println(string(text))
+```
+
+```hcl
+resource "postgres" "main" {
+  location = "localhost"
+  port     = 5432
+
+  timeouts {
+    connection = 10
+    keep_alive = 60
+  }
+}
+```
+
+`EncodeSavedEntity` does the same from an entity's saved data, in the form
+state stores it and events carry it at `EventDataProcessed`. It needs the
+registry, which is what types the record, and loads its plugins if they are not
+loaded already:
+
+```go
+text, err := xcl.EncodeSavedEntity(registry, event.Data)
+```
+
+Both write exactly one block, so convert several entities by calling once for
+each.
+
+**What is left out.** The text shows what a person wrote. xcl's own bookkeeping
+is not written, and neither is `depends_on`, which by the time a configuration
+is parsed holds the references xcl resolved as well as anything you wrote.
+Values a provider filled in are left out too. Ask for them with
+`IncludeComputed`, and each one is marked so a reader can tell it apart:
+
+```go
+text, err := xcl.EncodeEntity(db, xcl.IncludeComputed())
+```
+
+```hcl
+resource "postgres" "main" {
+  location          = "localhost"
+  port              = 5432
+  connection_string = "postgres://admin@localhost:5432/main" # set by the provider
+}
+```
+
+**This text is for reading, not for reprocessing.** References come out as the
+literal values they resolved to, comments and layout from the original file are
+not kept, and output including provider-filled values does not validate, since
+xcl refuses a configuration that sets them. Values are shown as they are held,
+so anything secret is shown too.
+
+**When it fails** no text is returned, and the error says why:
+
+| Error | Means |
+|---|---|
+| `ErrUnregisteredType` | the saved data names a type the registry does not know. `UnregisteredTypeError` names it |
+| `ErrInvalidSavedData` | the data is not one saved entity record |
+| `ErrNotEncodable` | the value is not an entity, or it is a `variable`, `output` or `module`, which are never written as configuration |
+
+```go
+if errors.Is(err, xcl.ErrUnregisteredType) {
+	// register the type or its plugin
+}
+```
 
 ## Struct Tags
 
@@ -1418,25 +1525,9 @@ with the `Processable` interface on your resource or the `ParseCallback`.
 
 ## Serialization
 
-To save state the `xcl.Config` type can be serialized to JSON using the following
-method.
+xcl saves state itself, through the state store given to `WithStateStore`, see
+[docs/state.md](./docs/state.md).
 
-```go
-d, err := c.ToJSON()
-ioutil.WriteFile("./config.json", d, os.ModePerm)
-```
-## Deserialization
+To turn a single entity back into configuration text, see
+[Converting to configuration text](#converting-to-configuration-text) above.
 
-To deserialize `xcl.Config` that has been serialized with the `ToJSON` method
-you can use the `UnmarshalJSON` method on the `Parser`.
-
-`UnmarshalJSON` will reconstruct the concrete types based on the configured resources.
-
-```go
-d, _ := ioutil.ReadFile("./config.json")
-nc, err := p.UnmarshalJSON(d)
-if err != nil {
-	fmt.Printf("An error occurred unmarshalling the config: %s\n", err)
-	os.Exit(1)
-}
-```

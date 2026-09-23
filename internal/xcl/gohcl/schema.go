@@ -119,6 +119,12 @@ type fieldTags struct {
 	Remain     *int
 	Body       *int
 	Optional   map[string]bool
+
+	// Computed holds the names of the attribute and block fields whose tag
+	// carries the computed option, meaning the field is owned by the provider
+	// rather than written in configuration. The decoder does not act on it,
+	// the encoder leaves such fields out unless asked for them.
+	Computed map[string]bool
 }
 
 type labelField struct {
@@ -131,6 +137,7 @@ func getFieldTags(ty reflect.Type) *fieldTags {
 		Attributes: map[string]int{},
 		Blocks:     map[string]int{},
 		Optional:   map[string]bool{},
+		Computed:   map[string]bool{},
 	}
 
 	ct := ty.NumField()
@@ -147,6 +154,10 @@ func getFieldTags(ty reflect.Type) *fieldTags {
 		}
 
 		name := ft.Name
+		if ft.Computed {
+			ret.Computed[name] = true
+		}
+
 		switch ft.Kind {
 		case tags.KindAttr:
 			ret.Attributes[name] = i

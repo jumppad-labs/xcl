@@ -92,6 +92,24 @@ func setupLifecycle(t *testing.T) *lifecycleHarness {
 
 // newParser builds a fresh Parser that shares the harness registry and state
 // store. emit may be nil, in which case the harness emit, if any, is used.
+// newParserWithEventData is newParser for a test that asserts on Event.Data,
+// which carries nothing unless a level asks for it
+func (h *lifecycleHarness) newParserWithEventData(t *testing.T, emit events.Emit, level events.DataLevel) *Parser {
+	t.Helper()
+
+	options := testOptions(t)
+	options.PluginRegistry = h.registry
+	options.StateStore = h.store
+	options.EventData = level
+
+	options.Emit = emit
+	if options.Emit == nil {
+		options.Emit = h.emit
+	}
+
+	return NewParser(options)
+}
+
 func (h *lifecycleHarness) newParser(t *testing.T, emit events.Emit) *Parser {
 	t.Helper()
 
@@ -803,7 +821,8 @@ func TestRebuildDestroyReceivesSavedCopy(t *testing.T) {
 	failNetworkCreate(t, h)
 
 	collector := &eventCollector{}
-	p := h.newParser(t, collector.collect)
+	// Data is off by default, this test is about what a destroy event carries
+	p := h.newParserWithEventData(t, collector.collect, events.DataRaw)
 
 	_, err := p.Apply(context.Background(), lifecycleOriginalConfig)
 	require.NoError(t, err)

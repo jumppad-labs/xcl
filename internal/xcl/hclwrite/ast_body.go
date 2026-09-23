@@ -7,9 +7,9 @@ package hclwrite
 import (
 	"reflect"
 
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 type Body struct {
@@ -151,7 +151,9 @@ func (b *Body) SetAttributeRaw(name string, tokens Tokens) *Attribute {
 	if attr != nil {
 		attr.expr = attr.expr.ReplaceWith(expr)
 	} else {
-		attr := newAttribute()
+		// upstream shadowed attr here, so a newly created attribute was
+		// never returned and every caller adding an attribute got nil back
+		attr = newAttribute()
 		attr.init(name, expr)
 		b.appendItem(attr)
 	}
@@ -172,7 +174,9 @@ func (b *Body) SetAttributeValue(name string, val cty.Value) *Attribute {
 	if attr != nil {
 		attr.expr = attr.expr.ReplaceWith(expr)
 	} else {
-		attr := newAttribute()
+		// upstream shadowed attr here, so a newly created attribute was
+		// never returned and every caller adding an attribute got nil back
+		attr = newAttribute()
 		attr.init(name, expr)
 		b.appendItem(attr)
 	}
@@ -193,7 +197,9 @@ func (b *Body) SetAttributeTraversal(name string, traversal hcl.Traversal) *Attr
 	if attr != nil {
 		attr.expr = attr.expr.ReplaceWith(expr)
 	} else {
-		attr := newAttribute()
+		// upstream shadowed attr here, so a newly created attribute was
+		// never returned and every caller adding an attribute got nil back
+		attr = newAttribute()
 		attr.init(name, expr)
 		b.appendItem(attr)
 	}

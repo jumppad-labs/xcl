@@ -117,6 +117,30 @@ interrupted, or returns an error, running `Destroy` again picks up with what
 is left. `Destroy` with no saved state, or an empty one, returns nil and
 writes nothing.
 
+## Reading a saved record back as configuration
+
+A saved record can be turned back into configuration text with
+`xcl.EncodeSavedEntity(registry, data)`. The registry is what types the record,
+including the types a plugin provides, so it is passed explicitly and loaded if
+it has not been loaded already.
+
+```go
+text, err := xcl.EncodeSavedEntity(registry, record)
+```
+
+The same record reaches an event receiver when a configuration asks for
+`xcl.EventDataProcessed`, and it is byte for byte what the state file holds, so
+the same call works on either.
+
+The stored format has one reader. Both the file state store's `Load` and
+`EncodeSavedEntity` go through it, so there is a single place that knows how a
+record names its type. A record naming a type the registry does not know fails
+with `xcl.ErrUnregisteredType`, and one that cannot be read at all with
+`xcl.ErrInvalidSavedData`.
+
+The text is for reading rather than for feeding back to xcl; see
+[Converting to configuration text](../README.md#converting-to-configuration-text).
+
 ## `StateStore` — the persistence contract
 
 ```go

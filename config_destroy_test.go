@@ -70,6 +70,9 @@ func setupDestroyConfig(t *testing.T, log logger.Logger) *destroyFixture {
 		WithPluginRegistry(pr),
 		WithStateStore(store),
 		WithEventHandler(recorder.handle),
+		// the destroy tests assert on what events carry, which is nothing
+		// unless a level asks for it
+		WithEventData(EventDataRaw),
 	)
 
 	return &destroyFixture{
@@ -336,7 +339,6 @@ func TestConfigDestroyReportsOnlySuccessForVariable(t *testing.T) {
 
 	succeeded := f.recorder.find("variable.independent_subnet", "destroy", "success")
 	require.Len(t, succeeded, 1)
-	require.Nil(t, succeeded[0].Data)
 }
 
 // TestConfigDestroyReturnsErrorNamingFailedResource asserts a failed destroy

@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -18,6 +21,7 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
+	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -74,7 +78,7 @@ func findResource(t *testing.T, found []any, id string) any {
 func deployment(t *testing.T) *resources.Deployment {
 	t.Helper()
 
-	found, err := run(&bytes.Buffer{}, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	d, ok := findResource(t, found, "resource.deployment.api").(*resources.Deployment)
@@ -86,7 +90,7 @@ func deployment(t *testing.T) *resources.Deployment {
 func TestConfigOnlyExampleFindsDeclaredResources(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	found, err := run(out, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Equal(t, declaredResourceIDs, resourceIDs(t, found))
@@ -96,7 +100,7 @@ func TestConfigOnlyExampleFindsDeclaredResources(t *testing.T) {
 // into the Go type that was registered for it, a registered type is held as
 // itself rather than a type generated from a schema
 func TestConfigOnlyExampleReturnsRegisteredGoTypes(t *testing.T) {
-	found, err := run(&bytes.Buffer{}, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	_, ok := findResource(t, found, "resource.config_map.api").(*resources.ConfigMap)
@@ -189,7 +193,7 @@ func TestConfigOnlyExampleReadsVariables(t *testing.T) {
 // deployment by id and reads its target port out of it, the port coming from
 // a repeated block referenced by position
 func TestConfigOnlyExampleLinksServiceToDeployment(t *testing.T) {
-	found, err := run(&bytes.Buffer{}, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	service, ok := findResource(t, found, "resource.service.api").(*resources.Service)
@@ -203,7 +207,7 @@ func TestConfigOnlyExampleLinksServiceToDeployment(t *testing.T) {
 // TestConfigOnlyExampleLinksIngressToService asserts the ingress rule names
 // the service it routes to by id, and reads its port
 func TestConfigOnlyExampleLinksIngressToService(t *testing.T) {
-	found, err := run(&bytes.Buffer{}, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	ingress, ok := findResource(t, found, "resource.ingress.api").(*resources.Ingress)
@@ -219,7 +223,7 @@ func TestConfigOnlyExampleLinksIngressToService(t *testing.T) {
 func TestConfigOnlyExamplePrintsEveryResource(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	for _, id := range declaredResourceIDs {
@@ -232,7 +236,7 @@ func TestConfigOnlyExamplePrintsEveryResource(t *testing.T) {
 func TestConfigOnlyExamplePrintsNestedBlocks(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Deployments\n")
@@ -252,7 +256,7 @@ func TestConfigOnlyExamplePrintsNestedBlocks(t *testing.T) {
 func TestConfigOnlyExamplePrintsLinkedResources(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Service\n")
@@ -265,7 +269,7 @@ func TestConfigOnlyExamplePrintsLinkedResources(t *testing.T) {
 func TestConfigOnlyExampleFailsForMissingConfig(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, "./does-not-exist", filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), "./does-not-exist", filepath.Join(t.TempDir(), "state.json"))
 	require.Error(t, err)
 }
 
@@ -341,7 +345,7 @@ func runRecordingEvents(t *testing.T) *eventRecorder {
 
 	recorder := &eventRecorder{}
 
-	_, err := run(&bytes.Buffer{}, recorder.handle, configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	return recorder
@@ -445,7 +449,7 @@ func TestConfigOnlyExampleReportsParseErrorWithFile(t *testing.T) {
 
 	recorder := &eventRecorder{}
 
-	_, err = run(&bytes.Buffer{}, recorder.handle, dir, filepath.Join(t.TempDir(), "state.json"))
+	_, err = run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), dir, filepath.Join(t.TempDir(), "state.json"))
 	require.Error(t, err)
 
 	failed := []xcl.Event{}
@@ -467,7 +471,7 @@ func TestConfigOnlyExampleReportsParseErrorWithFile(t *testing.T) {
 func TestConfigOnlyExampleDestroysEverythingItApplied(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
 
-	_, err := run(&bytes.Buffer{}, nil, configDir, statePath)
+	_, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, statePath)
 	require.NoError(t, err)
 
 	reg := registry.NewPluginRegistry()
@@ -487,7 +491,7 @@ func TestConfigOnlyExampleDestroysEverythingItApplied(t *testing.T) {
 func TestConfigOnlyExamplePrintsNoResourcesRemaining(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Destroyed\n  0 resources remaining\n")
@@ -657,11 +661,130 @@ func TestRunWithoutReceiverWritesNothingToStdoutOrStderr(t *testing.T) {
 
 	var runErr error
 	captured := captureStandardStreams(t, func() {
-		_, runErr = run(out, nil, configDir, filepath.Join(t.TempDir(), "state.json"))
+		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, filepath.Join(t.TempDir(), "state.json"))
 	})
 
 	require.NoError(t, runErr)
 	require.Empty(t, captured.stdout)
 	require.Empty(t, captured.stderr)
 	require.Contains(t, out.String(), "## Resources\n")
+}
+
+// renderEvents runs the example with the pretty printer the program itself
+// uses, writing to a buffer rather than the terminal, and returns everything
+// it wrote. The registry is shared with the printer exactly as main shares
+// it, since it is what types the entity an event carries
+func renderEvents(t *testing.T) string {
+	t.Helper()
+
+	r := registry.NewPluginRegistry()
+	rendered := &bytes.Buffer{}
+
+	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, filepath.Join(t.TempDir(), "state.json"))
+	require.NoError(t, err)
+
+	return rendered.String()
+}
+
+// TestConfigOnlyExampleShowsCreatedEntities asserts every registered type the
+// example creates has its configuration written beneath the line announcing
+// it, nested blocks and all
+func TestConfigOnlyExampleShowsCreatedEntities(t *testing.T) {
+	rendered := renderEvents(t)
+
+	// a block is written indented beneath the line that announced it, either
+	// as a resource or under its own keyword
+	require.Regexp(t, `(?m)^\s+(resource "|[a-z_]+ ")`, rendered)
+
+	require.Contains(t, rendered, `resource "config_map" "api" {`)
+	require.Contains(t, rendered, `resource "deployment" "api" {`)
+	require.Contains(t, rendered, `resource "service" "api" {`)
+	require.Contains(t, rendered, `resource "ingress" "api" {`)
+
+	// the nested blocks of the deployment are written too, and the formatter
+	// aligns the equals signs, so the gap before one is matched rather than
+	// written out
+	require.Contains(t, rendered, "container {")
+	require.Regexp(t, `container_port\s+= 8080`, rendered)
+	require.Regexp(t, `target_port\s+= 8080`, rendered)
+}
+
+// stateAtApply captures the state file as it stood when the apply succeeded.
+// The run destroys everything it applied before it returns, which leaves the
+// file holding an empty array, so the records have to be read while they are
+// still there
+type stateAtApply struct {
+	path    string
+	records []json.RawMessage
+	err     error
+}
+
+// handle reads the state file once the apply has succeeded, which is after
+// the state was saved and before the destroy empties it again
+func (s *stateAtApply) handle(e xcl.Event) {
+	if e.Operation != events.OperationApply || e.Phase != events.PhaseSuccess {
+		return
+	}
+
+	data, err := os.ReadFile(s.path)
+	if err != nil {
+		s.err = err
+		return
+	}
+
+	s.err = json.Unmarshal(data, &s.records)
+}
+
+// savedID returns the address a saved record carries, which is how a record
+// is matched to the entity it was written from
+func savedID(t *testing.T, record json.RawMessage) string {
+	t.Helper()
+
+	var envelope struct {
+		Meta struct {
+			ID string `json:"id"`
+		} `json:"meta"`
+	}
+
+	require.NoError(t, json.Unmarshal(record, &envelope))
+	require.NotEmpty(t, envelope.Meta.ID)
+
+	return envelope.Meta.ID
+}
+
+// TestConfigOnlyExampleEntityAndStateAgree asserts the configuration text of a
+// saved record is identical to the text of the entity it was written from,
+// for every record the apply saved. A variable or output is never written as
+// configuration, so those records are skipped
+func TestConfigOnlyExampleEntityAndStateAgree(t *testing.T) {
+	r := registry.NewPluginRegistry()
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	saved := &stateAtApply{path: statePath}
+
+	applied, err := run(&bytes.Buffer{}, saved.handle, r, configDir, statePath)
+	require.NoError(t, err)
+
+	require.NoError(t, saved.err)
+	require.NotEmpty(t, saved.records)
+
+	compared := 0
+
+	for _, record := range saved.records {
+		fromState, err := xcl.EncodeSavedEntity(r, record)
+		if errors.Is(err, xcl.ErrNotEncodable) {
+			continue
+		}
+		require.NoError(t, err)
+
+		id := savedID(t, record)
+
+		fromEntity, err := xcl.EncodeEntity(findResource(t, applied, id))
+		require.NoError(t, err)
+
+		require.Equal(t, string(fromEntity), string(fromState), "the saved record and the entity disagree for %s", id)
+
+		compared++
+	}
+
+	require.NotZero(t, compared, "no record was encodable, so the comparison proves nothing")
 }

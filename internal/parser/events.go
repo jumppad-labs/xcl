@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/jumppad-labs/xcl/events"
@@ -25,6 +26,62 @@ func emitting(options *ParserOptions) bool {
 	return options != nil && options.Emit != nil
 }
 
+// eventData decides what a lifecycle event carries, from the level the
+// configuration asked for and the phase the event sits at. It is the one
+// place that decision is made, so an emission site passes what it holds and
+// never chooses.
+//
+// pre is the resource as it was before the provider was called, where the
+// caller already had to serialize it, and r is the resource itself. At
+// DataNone nothing is serialized at all, so the default costs no work.
+func eventData(options *ParserOptions, phase string, pre []byte, r any) []byte {
+	if options == nil {
+		return nil
+	}
+
+	marshal := func() []byte {
+		if r == nil {
+			return pre
+		}
+
+		data, err := json.Marshal(r)
+		if err != nil {
+			// the resource has already been serialized once to reach a
+			// provider, so this is not a failure worth stopping an operation
+			// for. The event carries what there is
+			return pre
+		}
+
+		return data
+	}
+
+	switch options.EventData {
+	case events.DataRaw:
+		if pre != nil {
+			return pre
+		}
+
+		// a type handled without a provider was never serialized, so the raw
+		// resource is the resource itself
+		return marshal()
+
+	case events.DataProcessed:
+		// only a success has a result to report, every other phase runs
+		// before the provider returned
+		if phase == events.PhaseSuccess {
+			return marshal()
+		}
+
+		if pre != nil {
+			return pre
+		}
+
+		return marshal()
+	}
+
+	return nil
+}
+
 // lifecycleEvent builds an event for a step of a resource's lifecycle, with
 // the resource's type, ID and file taken from its meta
 func lifecycleEvent(meta *types.Meta, operation, phase string, duration time.Duration, err error, data []byte) events.Event {
@@ -41,13 +98,17 @@ func lifecycleEvent(meta *types.Meta, operation, phase string, duration time.Dur
 	}
 }
 
-// emitLifecycle emits a lifecycle event for the resource described by meta
-func emitLifecycle(options *ParserOptions, meta *types.Meta, operation, phase string, duration time.Duration, err error, data []byte) {
+// emitLifecycle emits a lifecycle event for the resource described by meta.
+//
+// pre is the resource as it was before the provider was called, where the
+// caller already holds it, and r is the resource. What the event carries is
+// decided by eventData from the configured level, not by the caller.
+func emitLifecycle(options *ParserOptions, meta *types.Meta, operation, phase string, duration time.Duration, err error, pre []byte, r any) {
 	if !emitting(options) {
 		return
 	}
 
-	emit(options, lifecycleEvent(meta, operation, phase, duration, err, data))
+	emit(options, lifecycleEvent(meta, operation, phase, duration, err, eventData(options, phase, pre, r)))
 }
 
 // emitParse emits a parse event for a block read from file, a success when

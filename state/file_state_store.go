@@ -2,10 +2,13 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
 
+	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
@@ -64,75 +67,30 @@ func (fs *FileStateStore) Load() ([]any, error) {
 	}
 
 	for i, rawMsg := range rawMessages {
-		// entry N is the fallback label for a record too malformed to name
-		// itself, so the error can still point at a position in the file
-		entry := fmt.Sprintf("entry %d", i)
-
-		// Peek at the metadata to get type and name
-		var metadata map[string]any
-		err := json.Unmarshal(*rawMsg, &metadata)
+		resource, err := savedentity.Decode(fs.registry, *rawMsg)
 		if err != nil {
-			record(entry)
-			continue
-		}
+			// a type nobody registered names itself, so the error can say what
+			// to register. Anything else names the record, by its own id where
+			// it had one and otherwise by its position in the file
+			var unregistered *xclerrors.UnregisteredTypeError
+			if errors.As(err, &unregistered) {
+				record(unregistered.Type)
+				continue
+			}
 
-		// Extract meta information
-		metaMap, ok := metadata["meta"].(map[string]any)
-		if !ok {
-			record(entry)
-			continue
-		}
+			var invalid *xclerrors.InvalidSavedDataError
+			if errors.As(err, &invalid) && invalid.ID != "" {
+				record(invalid.ID)
+				continue
+			}
 
-		// prefer the record's own identity over its position once there is one
-		if id, ok := metaMap["id"].(string); ok && id != "" {
-			entry = id
-		}
+			record(fmt.Sprintf("entry %d", i))
 
-		resourceType, ok := metaMap["type"].(string)
-		if !ok || resourceType == "" {
-			record(entry)
-			continue
-		}
-
-		// A resource is created from its variety, every other kind from the
-		// kind itself. Both axes are written to state, so read the variety
-		// back where the record carries one
-		if subtype, ok := metaMap["subtype"].(string); ok && subtype != "" {
-			resourceType = subtype
-		}
-
-		resourceName, ok := metaMap["name"].(string)
-		if !ok || resourceName == "" {
-			record(entry)
-			continue
-		}
-
-		// Create a typed resource reference using the registry
-		typedResource, err := fs.registry.CreateResource(resourceType, resourceName)
-		if err != nil {
-			// the type is not registered, or the file predates the split and
-			// records a kind that no longer resolves
-			record(resourceType)
-			continue
-		}
-
-		// Re-marshal and unmarshal into the typed reference. This overwrites
-		// what CreateResource set with what the file holds, so a record
-		// missing an axis keeps whatever the registry derived for it
-		resData, err := json.Marshal(metadata)
-		if err != nil {
-			record(entry)
-			continue
-		}
-
-		err = json.Unmarshal(resData, typedResource)
-		if err != nil {
-			record(entry)
 			continue
 		}
 
 		// Append the typed resource pointer
-		resources = append(resources, typedResource)
+		resources = append(resources, resource)
 	}
 
 	if len(unresolved) > 0 {

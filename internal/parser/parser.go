@@ -85,6 +85,11 @@ type ParserOptions struct {
 	// and saving new state.
 	StateStore state.StateStore
 
+	// EventData says what resource data lifecycle events carry. The zero
+	// value carries none, so nothing is serialized for an event unless the
+	// configuration asked for it.
+	EventData events.DataLevel
+
 	// Emit receives every event the parser produces: parse, lifecycle and
 	// validation events, their errors, and log messages such as the warning
 	// for a configured value a provider changed. It may be called from

@@ -1035,6 +1035,8 @@ func TestParserEventCallback(t *testing.T) {
 
 	// Setup parser with event callback
 	options := testOptions(t)
+	// Data is off by default, these assertions are about what it carries
+	options.EventData = events.DataRaw
 	options.Emit = func(event events.Event) {
 		recordedMu.Lock()
 		defer recordedMu.Unlock()
@@ -1111,6 +1113,8 @@ func TestParserCreateEventErrorCallback(t *testing.T) {
 	var recordedMu sync.Mutex // the walker fires events from parallel goroutines
 
 	options := testOptions(t)
+	// Data is off by default, these assertions are about what it carries
+	options.EventData = events.DataRaw
 	options.Emit = func(event events.Event) {
 		recordedMu.Lock()
 		defer recordedMu.Unlock()
@@ -1146,6 +1150,8 @@ func TestParserReadEventErrorCallback(t *testing.T) {
 
 	firstOptions := testOptions(t)
 	firstOptions.StateStore = firstStore
+	// Data is off by default, this test asserts on what it carries
+	firstOptions.EventData = events.DataRaw
 
 	firstParser, _ := setupParser(t, firstOptions)
 
@@ -1161,6 +1167,7 @@ func TestParserReadEventErrorCallback(t *testing.T) {
 
 	secondOptions := testOptions(t)
 	secondOptions.StateStore = secondStore
+	secondOptions.EventData = events.DataRaw
 	secondOptions.Emit = func(event events.Event) {
 		recordedMu.Lock()
 		defer recordedMu.Unlock()
@@ -1195,6 +1202,8 @@ func TestParserEventForVariablesOutputsLocals(t *testing.T) {
 
 	// Setup parser with event callback
 	options := testOptions(t)
+	// Data is off by default, these assertions are about what it carries
+	options.EventData = events.DataRaw
 	options.Emit = func(event events.Event) {
 		recordedMu.Lock()
 		defer recordedMu.Unlock()

@@ -1,5 +1,23 @@
 # Changelog
 
+## 20260922132517-hcl-encoding-helpers
+
+An entity can be turned back into configuration text in xcl's own syntax. `xcl.EncodeEntity(entity, options...)` converts one entity you hold, such as one returned by `Find` after an `Apply`, and `xcl.EncodeSavedEntity(registry, data, options...)` converts one entity's saved data, in the form state stores it and events carry it at `EventDataProcessed`. Both return the text of exactly one block, formatted and ready to print or write to a `.xcl` file, and both produce identical text for the same entity. The block is written the way a person writes it: `resource "<variety>" "<name>"` for a resource-kind entity and `<type> "<name>"` for one declared by its own keyword, with configuration names rather than Go field names, and nested and repeated blocks as blocks.
+
+The text shows what a person wrote. xcl's own bookkeeping is left out, at every depth, including inside an attribute whose value is a whole object, and `depends_on` is not written at all, because by the time a configuration is parsed it holds the references xcl resolved as well as anything the author wrote and the two cannot be told apart. Values a provider filled in are left out too; `xcl.IncludeComputed()` writes them and marks each one with a comment saying the provider set it.
+
+**This text is for reading, not for reprocessing.** References come out as the literal values they resolved to, the original comments and layout are not kept, and output including provider-filled values does not validate, because xcl refuses a configuration that sets them. Values are shown as they are held, so a password or other secret is shown too (tracked in jumppad-labs/xcl#1).
+
+Three errors say why a conversion failed, each matched with `errors.Is` and carrying a detail recovered with `errors.As`: `xcl.ErrUnregisteredType` (`*xcl.UnregisteredTypeError` names the type), `xcl.ErrInvalidSavedData` (`*xcl.InvalidSavedDataError`) and `xcl.ErrNotEncodable` (`*xcl.NotEncodableError`), which is what a `variable`, `output` or `module` returns, since those are never written as configuration. A failure returns no text.
+
+Lifecycle events no longer carry resource data unless you ask for it. `xcl.WithEventData(level)` takes `xcl.EventDataNone` (the default, nothing on any event), `xcl.EventDataRaw` (on every lifecycle event, the resource as it was before the provider was called) or `xcl.EventDataProcessed` (on a success event, the resource as state records it, provider-filled values and final status included). Processed data is what state stores, so it can be passed straight to `EncodeSavedEntity`. Registered config-only types and builtins now carry data at both levels, where before they carried none.
+
+The example programs show each entity's configuration beneath the line announcing it was created, provider-filled values included, so a reader sees what was actually made.
+
+**Breaking:**
+- Lifecycle events carry no `Data` by default. Code reading `Event.Data` must add `xcl.WithEventData(xcl.EventDataRaw)` to keep the pre-call resource, or `xcl.EventDataProcessed` for the resource as state records it.
+- `example/prettylog.Handler(w, level)` takes the plugin registry as a third argument, `Handler(w, level, registry)`. Pass `nil` to leave configuration text out. This is an example package, so only the bundled examples are affected.
+
 ## 20260922061954-event-based-logging
 
 xcl no longer writes any output of its own, and no longer calls `log.SetOutput` or otherwise touches the standard library's global logger. Everything it and its plugins report, each lifecycle step, plugin discovery and loading, warnings, errors and the messages plugins log, is one stream of events delivered to the receiver set with `xcl.WithEventHandler`; with no receiver xcl is silent. The event type moved to a new leaf package, `events`, and `xcl.Event` and `xcl.EventHandler` are now aliases of `events.Event` and `events.Handler`. `Event` gains `Time`, `Source` (`core` for xcl, otherwise the plugin's name) and `Meta` (details; a log message's level and text are under the reserved keys `level` and `message`), and new operations (`validate`, `apply`, `discover`, `load`, `events`) and phases (`log`, `blocked`) are defined as constants. `events.SlogHandler(*slog.Logger)` writes the stream to `log/slog` in one line of setup, and `example/prettylog`, a slog handler built on charmbracelet/log, replaces `example/eventlog` in the examples.

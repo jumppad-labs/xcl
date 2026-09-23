@@ -64,3 +64,16 @@ func WithVariables(vars map[string]any) ConfigOption {
 		c.variables = vars
 	}
 }
+
+// WithEventData says what resource data lifecycle events carry.
+//
+// Events carry none by default, so a resource's configuration and state do not
+// travel through an event handler unless an application asks for them.
+// EventDataRaw carries the resource as it was before the provider was called.
+// EventDataProcessed carries, on a success event, the resource as xcl records
+// it in state, which is the form EncodeSavedEntity reads.
+func WithEventData(level EventDataLevel) ConfigOption {
+	return func(c *Config) {
+		c.eventData = level
+	}
+}

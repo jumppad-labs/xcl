@@ -230,7 +230,7 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 		disabled, err := types.GetDisabled(r)
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(r, err.Error())
-			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil, r)
 			return diags.Append(pe)
 		}
 
@@ -238,11 +238,11 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 		// reach a provider
 		if disabled || handledWithoutProvider(d.types, rMeta) {
 			// Fire destroy events for provider-less types (always succeed with 0 time)
-			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseSuccess, 0, nil, nil)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseSuccess, 0, nil, nil, r)
 
 			err := d.destroyed(r)
 			if err != nil {
-				emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, err, nil)
+				emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, err, nil, r)
 				return diags.Append(err)
 			}
 
@@ -256,7 +256,7 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 				r,
 				fmt.Sprintf("no provider found for resource type %s", rMeta.AddressType()),
 			)
-			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil, r)
 			diags = diags.Append(pe)
 
 			if saveErr := d.failedToDestroy(r); saveErr != nil {
@@ -273,7 +273,7 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 				r,
 				fmt.Sprintf("failed to serialize resource for destroy: %s", err),
 			)
-			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil, r)
 			diags = diags.Append(pe)
 
 			if saveErr := d.failedToDestroy(r); saveErr != nil {
@@ -286,13 +286,13 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 		// Call destroy on the provider
 		// the provider is given a context that is never cancelled, so a
 		// destroy already running always finishes
-		emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseStart, 0, nil, resourceJSON)
+		emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseStart, 0, nil, resourceJSON, r)
 		start := time.Now()
 		err = adapter.Destroy(providerContext(d.ctx, d.options, rMeta, events.OperationDestroy), resourceJSON, false)
 		duration := time.Since(start)
 
 		if err != nil {
-			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, duration, err, resourceJSON)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, duration, err, resourceJSON, r)
 
 			pe := errors.NewParserErrorFromResource(
 				r,
@@ -307,11 +307,11 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 			return diags
 		}
 
-		emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseSuccess, duration, nil, resourceJSON)
+		emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseSuccess, duration, nil, resourceJSON, r)
 
 		err = d.destroyed(r)
 		if err != nil {
-			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, err, nil)
+			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, err, nil, r)
 			return diags.Append(err)
 		}
 
@@ -323,5 +323,5 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 // before any provider call, such as a body that does not decode. The event's
 // operation is apply, the step being worked towards.
 func emitWalkError(options *ParserOptions, meta *types.Meta, err error) {
-	emitLifecycle(options, meta, events.OperationApply, events.PhaseError, 0, err, nil)
+	emitLifecycle(options, meta, events.OperationApply, events.PhaseError, 0, err, nil, nil)
 }

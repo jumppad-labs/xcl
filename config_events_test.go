@@ -46,6 +46,14 @@ func (r *eventRecorder) find(id, operation, phase string) []Event {
 func applyQueryFixtureWithEvents(t *testing.T) *eventRecorder {
 	t.Helper()
 
+	return applyQueryFixtureWithEventData(t, EventDataNone)
+}
+
+// applyQueryFixtureWithEventData is applyQueryFixtureWithEvents for a test
+// that asserts on Event.Data, which carries nothing unless a level asks for it
+func applyQueryFixtureWithEventData(t *testing.T, level EventDataLevel) *eventRecorder {
+	t.Helper()
+
 	home := os.Getenv("HOME")
 	os.Setenv("HOME", t.TempDir())
 
@@ -66,6 +74,7 @@ func applyQueryFixtureWithEvents(t *testing.T) *eventRecorder {
 	c := NewConfig(
 		WithPluginRegistry(pr),
 		WithEventHandler(recorder.handle),
+		WithEventData(level),
 	)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/query/main.xcl")
@@ -81,7 +90,7 @@ func applyQueryFixtureWithEvents(t *testing.T) *eventRecorder {
 // receives the start and success of a plugin resource's create, with the
 // serialized resource
 func TestApplyCallsEventHandlerWhenPluginResourceIsCreated(t *testing.T) {
-	recorder := applyQueryFixtureWithEvents(t)
+	recorder := applyQueryFixtureWithEventData(t, EventDataRaw)
 
 	started := recorder.find("resource.network.frontend", "create", "start")
 	require.Len(t, started, 1)
@@ -96,7 +105,8 @@ func TestApplyCallsEventHandlerWhenPluginResourceIsCreated(t *testing.T) {
 
 // TestApplyCallsEventHandlerWhenRegisteredTypeIsApplied asserts the handler
 // receives the success of a registered type, which has no provider and so no
-// start event and no serialized resource
+// start event. It carries no data because no event does at the default level,
+// see TestRegisteredTypeCarriesDataAtRaw for what it carries when asked
 func TestApplyCallsEventHandlerWhenRegisteredTypeIsApplied(t *testing.T) {
 	recorder := applyQueryFixtureWithEvents(t)
 

@@ -2,22 +2,29 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
+
+	"github.com/jumppad-labs/xcl/plugins/registry"
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/example/plugin/resources"
+	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -142,7 +149,7 @@ func runRecordingEvents(t *testing.T) *eventRecorder {
 
 	recorder := &eventRecorder{}
 
-	_, err := run(&bytes.Buffer{}, recorder.handle, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	return recorder
@@ -166,7 +173,7 @@ func resourceIDs(t *testing.T, found []any) []string {
 func TestPluginExampleFindsDeclaredResources(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	found, err := run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Equal(t, declaredResourceIDs, resourceIDs(t, found))
@@ -175,7 +182,7 @@ func TestPluginExampleFindsDeclaredResources(t *testing.T) {
 func TestPluginExamplePrintsEveryResource(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	for _, id := range declaredResourceIDs {
@@ -186,7 +193,7 @@ func TestPluginExamplePrintsEveryResource(t *testing.T) {
 func TestPluginExampleFillsConnectionString(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), `resource.postgres.main location=localhost port=5432 connection_string="postgres://admin@localhost:5432/main"`)
@@ -198,7 +205,7 @@ func TestPluginExampleFillsConnectionString(t *testing.T) {
 func TestPluginExamplePassesConnectionStringToReferencingBlock(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), `resource.app.web database_location=localhost database_user=admin analytics_location=analytics.localhost connection_string="postgres://admin@localhost:5432/main" cache_connection_string="redis://localhost:6379" url="http://web"`)
@@ -210,7 +217,7 @@ func TestPluginExamplePassesConnectionStringToReferencingBlock(t *testing.T) {
 func TestPluginExamplePassesComputedURLToIngress(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), `resource.ingress.web hostname=example.com app_url="http://web"`)
@@ -222,7 +229,7 @@ func TestPluginExamplePassesComputedURLToIngress(t *testing.T) {
 func TestPluginExampleHoldsGeneratedTypes(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	found, err := run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	for _, r := range found {
@@ -243,7 +250,7 @@ func TestPluginExampleHoldsGeneratedTypes(t *testing.T) {
 func TestPluginExampleFailsForMissingConfig(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, "./does-not-exist", externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), "./does-not-exist", externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.Error(t, err)
 }
 
@@ -429,7 +436,7 @@ func TestPluginExampleReportsExternalProviderCreateLogsFromThePluginBinary(t *te
 func TestPluginExampleFailsWithoutExternalPlugin(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, "./does-not-exist", filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, "./does-not-exist", filepath.Join(t.TempDir(), "state.json"))
 	require.Error(t, err)
 	require.ErrorIs(t, err, xcl.ErrPluginLoad)
 	require.Contains(t, err.Error(), "./does-not-exist")
@@ -671,7 +678,7 @@ func TestPluginExampleReportsParseEventWithFile(t *testing.T) {
 func TestPluginExampleDestroysEverythingItApplied(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
 
-	_, err := run(&bytes.Buffer{}, nil, configDir, externalPlugin, statePath)
+	_, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, externalPlugin, statePath)
 	require.NoError(t, err)
 
 	saved, err := os.ReadFile(statePath)
@@ -682,7 +689,7 @@ func TestPluginExampleDestroysEverythingItApplied(t *testing.T) {
 func TestPluginExamplePrintsNoResourcesRemaining(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Destroyed\n  0 resources remaining\n")
@@ -824,7 +831,7 @@ func TestPluginExampleReportsInProcessProviderDestroyLogsBetweenStartAndSuccess(
 func TestPluginExampleRetrievesPublishedValues(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Published\n")
@@ -838,7 +845,7 @@ func TestPluginExampleRetrievesPublishedValues(t *testing.T) {
 func TestPluginExamplePrintsPublishedTotal(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "  2 published in total\n")
@@ -969,11 +976,199 @@ func TestRunWithoutReceiverWritesNothingToStdoutOrStderr(t *testing.T) {
 
 	var runErr error
 	captured := captureStandardStreams(t, func() {
-		_, runErr = run(out, nil, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
 	})
 
 	require.NoError(t, runErr)
 	require.Empty(t, captured.stdout)
 	require.Empty(t, captured.stderr)
 	require.Contains(t, out.String(), "## Resources\n")
+}
+
+// renderEvents runs the example with the pretty printer the program itself
+// uses, writing to a buffer rather than the terminal, and returns everything
+// it wrote. The registry is shared with the printer exactly as main shares
+// it, since it is what types the entity an event carries
+func renderEvents(t *testing.T) string {
+	t.Helper()
+
+	r := registry.NewPluginRegistry()
+	rendered := &bytes.Buffer{}
+
+	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	require.NoError(t, err)
+
+	return rendered.String()
+}
+
+// TestPluginExampleShowsPostgresConfigurationAfterCreate asserts the
+// configuration of a created resource is written beneath the line announcing
+// it, holding the values that were configured, the nested block, and the
+// connection string the provider filled in
+func TestPluginExampleShowsPostgresConfigurationAfterCreate(t *testing.T) {
+	rendered := renderEvents(t)
+
+	created := strings.Index(rendered, "create success source=core operation=create phase=success resource=resource.postgres.main")
+	require.NotEqual(t, -1, created, "the create success of resource.postgres.main was not reported")
+
+	block := strings.Index(rendered, `resource "postgres" "main" {`)
+	require.NotEqual(t, -1, block, "the configuration of resource.postgres.main was not shown")
+
+	require.Greater(t, block, created, "the configuration was shown before the line announcing the create")
+
+	// the formatter aligns the equals signs to the longest name in the block,
+	// so the gap before one is matched rather than written out
+	require.Regexp(t, `port\s+= 5432`, rendered)
+	require.Contains(t, rendered, "timeouts {")
+	require.Regexp(t, `connection_string\s+=\s+"postgres://admin@localhost:5432/main"`, rendered)
+}
+
+// TestPluginExampleShowsEveryCreatedEntity asserts every resource the example
+// creates has its configuration shown, including the one declared inside a
+// module
+func TestPluginExampleShowsEveryCreatedEntity(t *testing.T) {
+	rendered := renderEvents(t)
+
+	require.Contains(t, rendered, `resource "postgres" "main" {`)
+	require.Contains(t, rendered, `resource "postgres" "replica" {`)
+	require.Contains(t, rendered, `resource "postgres" "analytics" {`)
+	require.Contains(t, rendered, `resource "redis" "cache" {`)
+	require.Contains(t, rendered, `resource "app" "web" {`)
+	require.Contains(t, rendered, `resource "ingress" "web" {`)
+}
+
+// TestPluginExampleConvertsExternalPluginTypes asserts a type provided by the
+// external plugin binary, which xcl holds as a type generated from the
+// plugin's schema, is written as configuration just as an in-process type is
+func TestPluginExampleConvertsExternalPluginTypes(t *testing.T) {
+	rendered := renderEvents(t)
+
+	require.Contains(t, rendered, `resource "app" "web" {`)
+	require.Contains(t, rendered, `resource "ingress" "web" {`)
+}
+
+// stateAtApply captures the state file as it stood when the apply succeeded.
+// The run destroys everything it applied before it returns, which leaves the
+// file holding an empty array, so the records have to be read while they are
+// still there
+type stateAtApply struct {
+	path    string
+	records []json.RawMessage
+	err     error
+}
+
+// handle reads the state file once the apply has succeeded, which is after
+// the state was saved and before the destroy empties it again
+func (s *stateAtApply) handle(e xcl.Event) {
+	if e.Operation != events.OperationApply || e.Phase != events.PhaseSuccess {
+		return
+	}
+
+	data, err := os.ReadFile(s.path)
+	if err != nil {
+		s.err = err
+		return
+	}
+
+	s.err = json.Unmarshal(data, &s.records)
+}
+
+// savedID returns the address a saved record carries, which is how a record
+// is matched to the entity it was written from
+func savedID(t *testing.T, record json.RawMessage) string {
+	t.Helper()
+
+	var envelope struct {
+		Meta struct {
+			ID string `json:"id"`
+		} `json:"meta"`
+	}
+
+	require.NoError(t, json.Unmarshal(record, &envelope))
+	require.NotEmpty(t, envelope.Meta.ID)
+
+	return envelope.Meta.ID
+}
+
+// entityWithID returns the entity whose address is id
+func entityWithID(t *testing.T, entities []any, id string) any {
+	t.Helper()
+
+	for _, entity := range entities {
+		meta, err := types.GetMeta(entity)
+		require.NoError(t, err)
+
+		if meta.ID == id {
+			return entity
+		}
+	}
+
+	require.Failf(t, "entity not found", "the run returned no entity with the address %s", id)
+	return nil
+}
+
+// TestPluginExampleEntityAndStateAgree asserts the configuration text of a
+// saved record is identical to the text of the entity it was written from,
+// for every record the apply saved. A variable, output or module is never
+// written as configuration, so those records are skipped
+func TestPluginExampleEntityAndStateAgree(t *testing.T) {
+	r := registry.NewPluginRegistry()
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	saved := &stateAtApply{path: statePath}
+
+	applied, err := run(&bytes.Buffer{}, saved.handle, r, configDir, externalPlugin, statePath)
+	require.NoError(t, err)
+
+	require.NoError(t, saved.err)
+	require.NotEmpty(t, saved.records)
+
+	compared := 0
+
+	for _, record := range saved.records {
+		fromState, err := xcl.EncodeSavedEntity(r, record)
+		if errors.Is(err, xcl.ErrNotEncodable) {
+			continue
+		}
+		require.NoError(t, err)
+
+		id := savedID(t, record)
+
+		fromEntity, err := xcl.EncodeEntity(entityWithID(t, applied, id))
+		require.NoError(t, err)
+
+		require.Equal(t, string(fromEntity), string(fromState), "the saved record and the entity disagree for %s", id)
+
+		compared++
+	}
+
+	require.NotZero(t, compared, "no record was encodable, so the comparison proves nothing")
+}
+
+// TestPluginExampleEveryEntityConverts asserts every entity the run returns
+// either converts to configuration text or is refused as not encodable, which
+// is what a variable, output or module is. No other failure is allowed
+func TestPluginExampleEveryEntityConverts(t *testing.T) {
+	applied, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, externalPlugin, filepath.Join(t.TempDir(), "state.json"))
+	require.NoError(t, err)
+	require.NotEmpty(t, applied)
+
+	converted := 0
+
+	for _, entity := range applied {
+		meta, err := types.GetMeta(entity)
+		require.NoError(t, err)
+
+		text, err := xcl.EncodeEntity(entity)
+		if err != nil {
+			require.ErrorIs(t, err, xcl.ErrNotEncodable, "%s failed for another reason", meta.ID)
+			require.Empty(t, text, "%s returned text with its failure", meta.ID)
+			continue
+		}
+
+		require.NotEmpty(t, text, "%s converted to nothing", meta.ID)
+
+		converted++
+	}
+
+	require.NotZero(t, converted, "nothing converted, so the check proves nothing")
 }

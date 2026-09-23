@@ -98,8 +98,10 @@ type Event struct {
 	// Error is the reason the operation failed, set for the error phase
 	Error error
 
-	// Data is the serialized resource, set only for lifecycle events of
-	// provider backed resources
+	// Data is the serialized resource, set only when the configuration asks
+	// for it with an event data level. It carries nothing by default, so
+	// configuration and state do not travel through event handlers unless an
+	// application opts in. See DataLevel.
 	Data []byte
 
 	// Meta holds the event's details. A log event carries its severity under
@@ -115,3 +117,24 @@ type Handler func(Event)
 // Emit is what every emitter in xcl holds to report an event. A nil Emit is
 // silent, callers check for nil before emitting.
 type Emit func(Event)
+
+// DataLevel says what resource data lifecycle events carry. Resource data is
+// the configuration and state of a thing being created, so it is off by
+// default and an application asks for it deliberately.
+type DataLevel int
+
+const (
+	// DataNone carries no resource data on any event. It is the default.
+	DataNone DataLevel = iota
+
+	// DataRaw carries the resource as it was before the provider was called,
+	// on every lifecycle event. This is the configured resource, without the
+	// values a provider fills in.
+	DataRaw
+
+	// DataProcessed carries, on a success event, the resource as xcl records
+	// it in state, including the values the provider filled in and the status
+	// it ended with. Other phases carry the same data as DataRaw, because no
+	// result exists before the call returns.
+	DataProcessed
+)
