@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,8 +18,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl"
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
-	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -72,7 +78,7 @@ func findResource(t *testing.T, found []any, id string) any {
 func deployment(t *testing.T) *resources.Deployment {
 	t.Helper()
 
-	found, err := run(&bytes.Buffer{}, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	d, ok := findResource(t, found, "resource.deployment.api").(*resources.Deployment)
@@ -84,7 +90,7 @@ func deployment(t *testing.T) *resources.Deployment {
 func TestConfigOnlyExampleFindsDeclaredResources(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	found, err := run(out, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	require.Equal(t, declaredResourceIDs, resourceIDs(t, found))
@@ -94,7 +100,7 @@ func TestConfigOnlyExampleFindsDeclaredResources(t *testing.T) {
 // into the Go type that was registered for it, a registered type is held as
 // itself rather than a type generated from a schema
 func TestConfigOnlyExampleReturnsRegisteredGoTypes(t *testing.T) {
-	found, err := run(&bytes.Buffer{}, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	_, ok := findResource(t, found, "resource.config_map.api").(*resources.ConfigMap)
@@ -187,7 +193,7 @@ func TestConfigOnlyExampleReadsVariables(t *testing.T) {
 // deployment by id and reads its target port out of it, the port coming from
 // a repeated block referenced by position
 func TestConfigOnlyExampleLinksServiceToDeployment(t *testing.T) {
-	found, err := run(&bytes.Buffer{}, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	service, ok := findResource(t, found, "resource.service.api").(*resources.Service)
@@ -201,7 +207,7 @@ func TestConfigOnlyExampleLinksServiceToDeployment(t *testing.T) {
 // TestConfigOnlyExampleLinksIngressToService asserts the ingress rule names
 // the service it routes to by id, and reads its port
 func TestConfigOnlyExampleLinksIngressToService(t *testing.T) {
-	found, err := run(&bytes.Buffer{}, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	ingress, ok := findResource(t, found, "resource.ingress.api").(*resources.Ingress)
@@ -217,7 +223,7 @@ func TestConfigOnlyExampleLinksIngressToService(t *testing.T) {
 func TestConfigOnlyExamplePrintsEveryResource(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	for _, id := range declaredResourceIDs {
@@ -230,7 +236,7 @@ func TestConfigOnlyExamplePrintsEveryResource(t *testing.T) {
 func TestConfigOnlyExamplePrintsNestedBlocks(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Deployments\n")
@@ -250,7 +256,7 @@ func TestConfigOnlyExamplePrintsNestedBlocks(t *testing.T) {
 func TestConfigOnlyExamplePrintsLinkedResources(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Service\n")
@@ -263,7 +269,7 @@ func TestConfigOnlyExamplePrintsLinkedResources(t *testing.T) {
 func TestConfigOnlyExampleFailsForMissingConfig(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, logger.NewTestLogger(t), "./does-not-exist", filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), "./does-not-exist", t.TempDir())
 	require.Error(t, err)
 }
 
@@ -296,59 +302,65 @@ func TestConfigOnlyExampleImportsNoPluginCode(t *testing.T) {
 	}
 }
 
-// loggedMessage is one call to a recordingLogger
-type loggedMessage struct {
-	level string
-	msg   string
-	args  []any
+// eventRecorder records every event the run reports, it is the handler the
+// tests pass in place of the example's pretty printer. The handler is never
+// called concurrently, the mutex guards the reads the tests make
+type eventRecorder struct {
+	mu     sync.Mutex
+	events []xcl.Event
 }
 
-// recordingLogger records every message logged to it, events are fired from
-// concurrent walk goroutines so recording is guarded by a mutex
-type recordingLogger struct {
-	mu       sync.Mutex
-	messages []loggedMessage
+func (r *eventRecorder) handle(e xcl.Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.events = append(r.events, e)
 }
 
-func (l *recordingLogger) record(level, msg string, args []any) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// snapshot returns a copy of every event recorded so far
+func (r *eventRecorder) snapshot() []xcl.Event {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	l.messages = append(l.messages, loggedMessage{level: level, msg: msg, args: args})
+	return append([]xcl.Event{}, r.events...)
 }
 
-func (l *recordingLogger) Info(msg string, args ...any)  { l.record("info", msg, args) }
-func (l *recordingLogger) Debug(msg string, args ...any) { l.record("debug", msg, args) }
-func (l *recordingLogger) Warn(msg string, args ...any)  { l.record("warn", msg, args) }
-func (l *recordingLogger) Error(msg string, args ...any) { l.record("error", msg, args) }
-
-// events returns the args of every event logged at level for operation
-func (l *recordingLogger) events(level, operation string) [][]any {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	found := [][]any{}
-	for _, m := range l.messages {
-		if m.level == level && m.msg == "" && m.args[1] == operation {
-			found = append(found, m.args)
+// withOperation returns every event reported for operation, in the order
+// they were reported
+func (r *eventRecorder) withOperation(operation string) []xcl.Event {
+	found := []xcl.Event{}
+	for _, e := range r.snapshot() {
+		if e.Operation == operation {
+			found = append(found, e)
 		}
 	}
 
 	return found
 }
 
-// TestConfigOnlyExampleLogsParseEventWithFileAtDebug asserts each resource's
-// parse event is logged at debug with the file it was parsed from
-func TestConfigOnlyExampleLogsParseEventWithFileAtDebug(t *testing.T) {
-	log := &recordingLogger{}
+// runRecordingEvents runs the example with a recorder as its event handler
+// and returns the recorder once the run has succeeded
+func runRecordingEvents(t *testing.T) *eventRecorder {
+	t.Helper()
 
-	_, err := run(&bytes.Buffer{}, log, configDir, filepath.Join(t.TempDir(), "state.json"))
+	recorder := &eventRecorder{}
+
+	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
+	return recorder
+}
+
+// TestConfigOnlyExampleReportsParseEventWithFile asserts each resource's
+// parse is reported as a success by core with the file it was parsed from
+func TestConfigOnlyExampleReportsParseEventWithFile(t *testing.T) {
+	recorder := runRecordingEvents(t)
+
 	files := map[string]string{}
-	for _, args := range log.events("debug", "parse") {
-		require.Equal(t, []any{"event", "parse", "resource", args[3], "file", args[5], "phase", "success"}, args)
-		files[args[3].(string)] = filepath.Base(args[5].(string))
+	for _, e := range recorder.withOperation(events.OperationParse) {
+		require.Equal(t, events.SourceCore, e.Source)
+		require.Equal(t, events.PhaseSuccess, e.Phase)
+		files[e.ResourceID] = filepath.Base(e.File)
 	}
 
 	require.Equal(t, map[string]string{
@@ -362,103 +374,113 @@ func TestConfigOnlyExampleLogsParseEventWithFileAtDebug(t *testing.T) {
 	}, files)
 }
 
-// TestConfigOnlyExampleLogsCreateSuccessWithoutStartAtDebug asserts every
-// resource's create is logged at debug as a success only, registered types
-// have no provider so there is nothing to start
-func TestConfigOnlyExampleLogsCreateSuccessWithoutStartAtDebug(t *testing.T) {
-	log := &recordingLogger{}
-
-	_, err := run(&bytes.Buffer{}, log, configDir, filepath.Join(t.TempDir(), "state.json"))
-	require.NoError(t, err)
+// TestConfigOnlyExampleReportsCreateSuccessWithoutStart asserts every
+// resource's create is reported as a success only, registered types have no
+// provider so there is nothing to start
+func TestConfigOnlyExampleReportsCreateSuccessWithoutStart(t *testing.T) {
+	recorder := runRecordingEvents(t)
 
 	ids := []string{}
-	for _, args := range log.events("debug", "create") {
-		require.Equal(t, "success", args[5])
-		ids = append(ids, args[3].(string))
+	for _, e := range recorder.withOperation(events.OperationCreate) {
+		require.Equal(t, events.PhaseSuccess, e.Phase)
+		ids = append(ids, e.ResourceID)
 	}
 	sort.Strings(ids)
 
 	require.Equal(t, declaredResourceIDs, ids)
 }
 
-// TestConfigOnlyExampleLogsNothingAtInfo asserts a successful run logs
-// nothing above debug, only an error would stand out
-func TestConfigOnlyExampleLogsNothingAtInfo(t *testing.T) {
-	log := &recordingLogger{}
+// TestConfigOnlyExampleReportsNoLogEvents asserts a successful run reports no
+// log messages, without plugins there is nothing to write them
+func TestConfigOnlyExampleReportsNoLogEvents(t *testing.T) {
+	recorder := runRecordingEvents(t)
 
-	_, err := run(&bytes.Buffer{}, log, configDir, filepath.Join(t.TempDir(), "state.json"))
-	require.NoError(t, err)
-
-	for _, m := range log.messages {
-		require.Equal(t, "debug", m.level, "unexpected %s message: %s %v", m.level, m.msg, m.args)
+	for _, e := range recorder.snapshot() {
+		require.NotEqual(t, events.PhaseLog, e.Phase, "unexpected log event: %+v", e)
 	}
 }
 
-// hasEvent reports whether a recorded message carries an event, either
-// leading its text, put there by a tagged logger, or as an "event" arg, the
-// way the event log handler logs it
-func hasEvent(m loggedMessage) bool {
-	if strings.HasPrefix(m.msg, "event=") {
-		return true
-	}
+// TestConfigOnlyExampleReportsNoErrors asserts a successful run reports no
+// error event, only an error would stand out
+func TestConfigOnlyExampleReportsNoErrors(t *testing.T) {
+	recorder := runRecordingEvents(t)
 
-	for i := 0; i+1 < len(m.args); i += 2 {
-		if m.args[i] == "event" {
-			return true
-		}
-	}
-
-	return false
-}
-
-// TestConfigOnlyExampleLogsAnEventOnEveryLine asserts every message the run
-// logged carries an event
-func TestConfigOnlyExampleLogsAnEventOnEveryLine(t *testing.T) {
-	log := &recordingLogger{}
-
-	_, err := run(&bytes.Buffer{}, log, configDir, filepath.Join(t.TempDir(), "state.json"))
-	require.NoError(t, err)
-
-	require.NotEmpty(t, log.messages)
-	for _, m := range log.messages {
-		require.True(t, hasEvent(m), "message logged without an event: %q %v", m.msg, m.args)
+	for _, e := range recorder.snapshot() {
+		require.NotEqual(t, events.PhaseError, e.Phase, "unexpected error event: %+v", e)
+		require.NoError(t, e.Error, "unexpected event with an error: %+v", e)
 	}
 }
 
-// TestConfigOnlyExampleLogsParseErrorAtError asserts a block that fails to
-// parse is logged at error, with its file
-func TestConfigOnlyExampleLogsParseErrorAtError(t *testing.T) {
+// TestConfigOnlyExampleReportsEveryEventFromCore asserts every event the run
+// reports comes from xcl itself, the example has no plugins
+func TestConfigOnlyExampleReportsEveryEventFromCore(t *testing.T) {
+	recorder := runRecordingEvents(t)
+
+	recorded := recorder.snapshot()
+	require.NotEmpty(t, recorded)
+
+	for _, e := range recorded {
+		require.Equal(t, events.SourceCore, e.Source, "event from another source: %+v", e)
+	}
+}
+
+// TestConfigOnlyExampleReportsOperationAndPhaseOnEveryEvent asserts every
+// event the run reports says what was being done and where in it the event
+// sits
+func TestConfigOnlyExampleReportsOperationAndPhaseOnEveryEvent(t *testing.T) {
+	recorder := runRecordingEvents(t)
+
+	recorded := recorder.snapshot()
+	require.NotEmpty(t, recorded)
+
+	for _, e := range recorded {
+		require.NotEmpty(t, e.Operation, "event without an operation: %+v", e)
+		require.NotEmpty(t, e.Phase, "event without a phase: %+v", e)
+	}
+}
+
+// TestConfigOnlyExampleReportsParseErrorWithFile asserts a block that fails
+// to parse is reported as a parse error, naming the block and its file
+func TestConfigOnlyExampleReportsParseErrorWithFile(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "main.xcl")
 	err := os.WriteFile(file, []byte(`resource "nosuchtype" "broken" {}`), 0644)
 	require.NoError(t, err)
 
-	log := &recordingLogger{}
+	recorder := &eventRecorder{}
 
-	_, err = run(&bytes.Buffer{}, log, dir, filepath.Join(t.TempDir(), "state.json"))
+	_, err = run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), dir, t.TempDir())
 	require.Error(t, err)
 
-	failed := log.events("error", "parse")
+	failed := []xcl.Event{}
+	for _, e := range recorder.withOperation(events.OperationParse) {
+		if e.Phase == events.PhaseError {
+			failed = append(failed, e)
+		}
+	}
+
 	require.Len(t, failed, 1)
-	require.Equal(t, "resource.nosuchtype.broken", failed[0][3])
-	require.Equal(t, file, failed[0][5])
+	require.Equal(t, events.SourceCore, failed[0].Source)
+	require.Equal(t, "resource.nosuchtype.broken", failed[0].ResourceID)
+	require.Equal(t, file, failed[0].File)
+	require.Error(t, failed[0].Error)
 }
 
 // TestConfigOnlyExampleDestroysEverythingItApplied asserts the state saved after a run is
 // empty, everything that was applied has been destroyed
 func TestConfigOnlyExampleDestroysEverythingItApplied(t *testing.T) {
-	statePath := filepath.Join(t.TempDir(), "state.json")
+	stateDir := t.TempDir()
 
-	_, err := run(&bytes.Buffer{}, logger.NewTestLogger(t), configDir, statePath)
+	_, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, stateDir)
 	require.NoError(t, err)
 
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	reg := registry.NewPluginRegistry()
 	require.NoError(t, reg.RegisterType("config_map", &resources.ConfigMap{}))
 	require.NoError(t, reg.RegisterType("deployment", &resources.Deployment{}))
 	require.NoError(t, reg.RegisterType("service", &resources.Service{}))
 	require.NoError(t, reg.RegisterType("ingress", &resources.Ingress{}))
 
-	store, err := state.NewFileStateStore(statePath, reg)
+	store, err := state.NewFileStateStore(stateDir)
 	require.NoError(t, err)
 
 	saved, err := store.Load()
@@ -469,29 +491,49 @@ func TestConfigOnlyExampleDestroysEverythingItApplied(t *testing.T) {
 func TestConfigOnlyExamplePrintsNoResourcesRemaining(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Destroyed\n  0 resources remaining\n")
 }
 
-// TestConfigOnlyExampleLogsDestroySuccessWithoutStartAtDebug asserts every
-// applied resource's destroy is logged at debug as a success only, registered
-// types have no provider so there is nothing to start
-func TestConfigOnlyExampleLogsDestroySuccessWithoutStartAtDebug(t *testing.T) {
-	log := &recordingLogger{}
-
-	_, err := run(&bytes.Buffer{}, log, configDir, filepath.Join(t.TempDir(), "state.json"))
-	require.NoError(t, err)
+// TestConfigOnlyExampleReportsDestroySuccessWithoutStart asserts every
+// applied resource's destroy is reported as a success only, registered types
+// have no provider so there is nothing to start
+func TestConfigOnlyExampleReportsDestroySuccessWithoutStart(t *testing.T) {
+	recorder := runRecordingEvents(t)
 
 	ids := []string{}
-	for _, args := range log.events("debug", "destroy") {
-		require.Equal(t, "success", args[5])
-		ids = append(ids, args[3].(string))
+	for _, e := range recorder.withOperation(events.OperationDestroy) {
+		// the destroy operation's own start and success concern no resource
+		if e.ResourceID == "" {
+			continue
+		}
+
+		require.Equal(t, events.PhaseSuccess, e.Phase)
+		ids = append(ids, e.ResourceID)
 	}
 	sort.Strings(ids)
 
 	require.Equal(t, declaredResourceIDs, ids)
+}
+
+// TestConfigOnlyExampleReportsDestroyOperationStartAndSuccess asserts the
+// destroy as a whole is reported, starting before any resource and
+// succeeding after every one
+func TestConfigOnlyExampleReportsDestroyOperationStartAndSuccess(t *testing.T) {
+	recorder := runRecordingEvents(t)
+
+	destroy := recorder.withOperation(events.OperationDestroy)
+	require.NotEmpty(t, destroy)
+
+	first := destroy[0]
+	require.Equal(t, events.PhaseStart, first.Phase)
+	require.Empty(t, first.ResourceID)
+
+	last := destroy[len(destroy)-1]
+	require.Equal(t, events.PhaseSuccess, last.Phase)
+	require.Empty(t, last.ResourceID)
 }
 
 // methodFormLookups are the lookups that the configuration also offers as
@@ -548,4 +590,202 @@ func TestConfigOnlyExampleUsesPortableLookupForm(t *testing.T) {
 	})
 
 	require.NotZero(t, lookups, "the guard found no lookups in main.go, so it proves nothing")
+}
+
+// capturedOutput is what was written to the process's standard output and
+// standard error while a function ran
+type capturedOutput struct {
+	stdout string
+	stderr string
+}
+
+// captureStandardStreams runs fn with os.Stdout and os.Stderr redirected to
+// pipes, and returns what was written to each. The streams are restored when
+// fn returns, and again in cleanup should fn fail the test
+func captureStandardStreams(t *testing.T, fn func()) capturedOutput {
+	t.Helper()
+
+	originalStdout := os.Stdout
+	originalStderr := os.Stderr
+
+	restore := func() {
+		os.Stdout = originalStdout
+		os.Stderr = originalStderr
+	}
+	t.Cleanup(restore)
+
+	stdoutReader, stdoutWriter, err := os.Pipe()
+	require.NoError(t, err)
+
+	stderrReader, stderrWriter, err := os.Pipe()
+	require.NoError(t, err)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+
+	var drained sync.WaitGroup
+	drained.Add(2)
+
+	go func() {
+		defer drained.Done()
+		_, _ = io.Copy(stdout, stdoutReader)
+	}()
+
+	go func() {
+		defer drained.Done()
+		_, _ = io.Copy(stderr, stderrReader)
+	}()
+
+	os.Stdout = stdoutWriter
+	os.Stderr = stderrWriter
+
+	fn()
+
+	restore()
+
+	require.NoError(t, stdoutWriter.Close())
+	require.NoError(t, stderrWriter.Close())
+	drained.Wait()
+
+	require.NoError(t, stdoutReader.Close())
+	require.NoError(t, stderrReader.Close())
+
+	return capturedOutput{stdout: stdout.String(), stderr: stderr.String()}
+}
+
+// TestRunWithoutReceiverWritesNothingToStdoutOrStderr asserts xcl writes
+// nothing of its own when no event handler is given, the report the example
+// prints goes to out alone
+func TestRunWithoutReceiverWritesNothingToStdoutOrStderr(t *testing.T) {
+	out := &bytes.Buffer{}
+
+	var runErr error
+	captured := captureStandardStreams(t, func() {
+		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	})
+
+	require.NoError(t, runErr)
+	require.Empty(t, captured.stdout)
+	require.Empty(t, captured.stderr)
+	require.Contains(t, out.String(), "## Resources\n")
+}
+
+// renderEvents runs the example with the pretty printer the program itself
+// uses, writing to a buffer rather than the terminal, and returns everything
+// it wrote. The registry is shared with the printer exactly as main shares
+// it, since it is what types the entity an event carries
+func renderEvents(t *testing.T) string {
+	t.Helper()
+
+	r := registry.NewPluginRegistry()
+	rendered := &bytes.Buffer{}
+
+	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, t.TempDir())
+	require.NoError(t, err)
+
+	return rendered.String()
+}
+
+// TestConfigOnlyExampleShowsCreatedEntities asserts every registered type the
+// example creates has its configuration written beneath the line announcing
+// it, nested blocks and all
+func TestConfigOnlyExampleShowsCreatedEntities(t *testing.T) {
+	rendered := renderEvents(t)
+
+	// a block is written indented beneath the line that announced it, either
+	// as a resource or under its own keyword
+	require.Regexp(t, `(?m)^\s+(resource "|[a-z_]+ ")`, rendered)
+
+	require.Contains(t, rendered, `resource "config_map" "api" {`)
+	require.Contains(t, rendered, `resource "deployment" "api" {`)
+	require.Contains(t, rendered, `resource "service" "api" {`)
+	require.Contains(t, rendered, `resource "ingress" "api" {`)
+
+	// the nested blocks of the deployment are written too, and the formatter
+	// aligns the equals signs, so the gap before one is matched rather than
+	// written out
+	require.Contains(t, rendered, "container {")
+	require.Regexp(t, `container_port\s+= 8080`, rendered)
+	require.Regexp(t, `target_port\s+= 8080`, rendered)
+}
+
+// stateAtApply captures the state file as it stood when the apply succeeded.
+// The run destroys everything it applied before it returns, which leaves the
+// file holding an empty array, so the records have to be read while they are
+// still there
+type stateAtApply struct {
+	path    string
+	records []json.RawMessage
+	err     error
+}
+
+// handle reads the state file once the apply has succeeded, which is after
+// the state was saved and before the destroy empties it again
+func (s *stateAtApply) handle(e xcl.Event) {
+	if e.Operation != events.OperationApply || e.Phase != events.PhaseSuccess {
+		return
+	}
+
+	data, err := os.ReadFile(s.path)
+	if err != nil {
+		s.err = err
+		return
+	}
+
+	s.err = json.Unmarshal(data, &s.records)
+}
+
+// savedID returns the address a saved record carries, which is how a record
+// is matched to the entity it was written from
+func savedID(t *testing.T, record json.RawMessage) string {
+	t.Helper()
+
+	var envelope struct {
+		Meta struct {
+			ID string `json:"id"`
+		} `json:"meta"`
+	}
+
+	require.NoError(t, json.Unmarshal(record, &envelope))
+	require.NotEmpty(t, envelope.Meta.ID)
+
+	return envelope.Meta.ID
+}
+
+// TestConfigOnlyExampleEntityAndStateAgree asserts the configuration text of a
+// saved record is identical to the text of the entity it was written from,
+// for every record the apply saved. A variable or output is never written as
+// configuration, so those records are skipped
+func TestConfigOnlyExampleEntityAndStateAgree(t *testing.T) {
+	r := registry.NewPluginRegistry()
+	stateDir := t.TempDir()
+	statePath := filepath.Join(stateDir, state.StateFileName)
+	saved := &stateAtApply{path: statePath}
+
+	applied, err := run(&bytes.Buffer{}, saved.handle, r, configDir, stateDir)
+	require.NoError(t, err)
+
+	require.NoError(t, saved.err)
+	require.NotEmpty(t, saved.records)
+
+	compared := 0
+
+	for _, record := range saved.records {
+		fromState, err := xcl.EncodeSavedEntity(r, record)
+		if errors.Is(err, xcl.ErrNotEncodable) {
+			continue
+		}
+		require.NoError(t, err)
+
+		id := savedID(t, record)
+
+		fromEntity, err := xcl.EncodeEntity(findResource(t, applied, id))
+		require.NoError(t, err)
+
+		require.Equal(t, string(fromEntity), string(fromState), "the saved record and the entity disagree for %s", id)
+
+		compared++
+	}
+
+	require.NotZero(t, compared, "no record was encodable, so the comparison proves nothing")
 }

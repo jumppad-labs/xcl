@@ -2,12 +2,14 @@ package xcl
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
+	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
@@ -23,6 +25,7 @@ import (
 type destroyFixture struct {
 	config     *Config
 	plugin     *parser.TestPlugin
+	registry   *registry.PluginRegistry
 	store      *state.FileStateStore
 	statePath  string
 	configDir  string
@@ -45,15 +48,16 @@ func setupDestroyConfig(t *testing.T, log logger.Logger) *destroyFixture {
 		os.Setenv("HOME", home)
 	})
 
-	pr := registry.NewPluginRegistry(log)
+	pr := registry.NewPluginRegistry()
 
 	testPlugin := &parser.TestPlugin{}
 	err := pr.RegisterPlugin(testPlugin)
 	require.NoError(t, err)
 
-	statePath := filepath.Join(t.TempDir(), "state.json")
-	store, err := state.NewFileStateStore(statePath, pr)
+	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
+
+	statePath := store.Path()
 
 	contents, err := os.ReadFile("./internal/test_fixtures/config/lifecycle/dependent/dependent.xcl")
 	require.NoError(t, err)
@@ -69,11 +73,15 @@ func setupDestroyConfig(t *testing.T, log logger.Logger) *destroyFixture {
 		WithPluginRegistry(pr),
 		WithStateStore(store),
 		WithEventHandler(recorder.handle),
+		// the destroy tests assert on what events carry, which is nothing
+		// unless a level asks for it
+		WithEventData(EventDataRaw),
 	)
 
 	return &destroyFixture{
 		config:     c,
 		plugin:     testPlugin,
+		registry:   pr,
 		store:      store,
 		statePath:  statePath,
 		configDir:  configDir,
@@ -135,56 +143,29 @@ func eventIndex(r *eventRecorder, id, operation, phase string) int {
 	return -1
 }
 
-// destroyRecordingLogger records the level and message of everything logged
-// to it, plugins may log from concurrent walk goroutines so recording is
-// guarded by a mutex
-type destroyRecordingLogger struct {
-	mu      sync.Mutex
-	entries []string
-}
-
-func (l *destroyRecordingLogger) record(level, msg string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.entries = append(l.entries, level+": "+msg)
-}
-
-func (l *destroyRecordingLogger) Info(msg string, args ...any)  { l.record("info", msg) }
-func (l *destroyRecordingLogger) Debug(msg string, args ...any) { l.record("debug", msg) }
-func (l *destroyRecordingLogger) Warn(msg string, args ...any)  { l.record("warn", msg) }
-func (l *destroyRecordingLogger) Error(msg string, args ...any) { l.record("error", msg) }
-
-// aboveDebug returns every entry logged at info, warn or error
-func (l *destroyRecordingLogger) aboveDebug() []string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// logEventsAboveDebug returns every log event the recorder has received at
+// info, warn or error, as "<level>: <message>"
+func logEventsAboveDebug(r *eventRecorder) []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	found := []string{}
-	for _, e := range l.entries {
-		if len(e) >= 7 && e[:7] == "debug: " {
+	for _, e := range r.events {
+		if e.Phase != events.PhaseLog || e.Meta[events.KeyLevel] == events.LevelDebug {
 			continue
 		}
 
-		found = append(found, e)
+		found = append(found, fmt.Sprintf("%v: %v", e.Meta[events.KeyLevel], e.Meta[events.KeyMessage]))
 	}
 
 	return found
-}
-
-// reset forgets everything logged so far
-func (l *destroyRecordingLogger) reset() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.entries = nil
 }
 
 // TestConfigDestroyDestroysEverythingAndEmptiesState asserts destroying an
 // applied configuration calls each provider-handled resource's destroy exactly
 // once and leaves the saved and in-memory state empty
 func TestConfigDestroyDestroysEverythingAndEmptiesState(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
 
 	err := f.config.Destroy()
@@ -209,7 +190,7 @@ func TestConfigDestroyDestroysEverythingAndEmptiesState(t *testing.T) {
 // TestConfigDestroyNeedsNoConfiguration asserts destroy succeeds and destroys
 // every created resource after the configuration files have been deleted
 func TestConfigDestroyNeedsNoConfiguration(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -236,7 +217,7 @@ func TestConfigDestroyNeedsNoConfiguration(t *testing.T) {
 // the configuration deleted, destroy still removes children before their
 // parents: third, then second, then first
 func TestConfigDestroyOrdersFromSavedStateWithoutConfiguration(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
 
 	err := os.RemoveAll(f.configDir)
@@ -266,7 +247,7 @@ func TestConfigDestroyWithNothingSavedSucceeds(t *testing.T) {
 // TestConfigDestroyWithNoStateStoreAndNothingAppliedSucceeds asserts a Config
 // without a state store that never applied anything destroys nothing
 func TestConfigDestroyWithNoStateStoreAndNothingAppliedSucceeds(t *testing.T) {
-	pr := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	pr := registry.NewPluginRegistry()
 
 	testPlugin := &parser.TestPlugin{}
 	err := pr.RegisterPlugin(testPlugin)
@@ -284,7 +265,7 @@ func TestConfigDestroyWithNoStateStoreAndNothingAppliedSucceeds(t *testing.T) {
 // saved state file exists but holds nothing, destroy succeeds, calls no
 // provider and leaves the file as it was
 func TestConfigDestroyWithEmptySavedStateWritesNothing(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 
 	before, err := os.ReadFile(f.statePath)
 	require.NoError(t, err)
@@ -302,7 +283,7 @@ func TestConfigDestroyWithEmptySavedStateWritesNothing(t *testing.T) {
 // TestConfigDestroyReportsStartThenSuccess asserts a provider-handled resource
 // reports its destroy starting and then succeeding
 func TestConfigDestroyReportsStartThenSuccess(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
 
 	err := f.config.Destroy()
@@ -327,7 +308,7 @@ func TestConfigDestroyReportsStartThenSuccess(t *testing.T) {
 // TestConfigDestroyReportsStartThenErrorWhenDestroyFails asserts a resource
 // whose provider destroy fails reports its destroy starting and then failing
 func TestConfigDestroyReportsStartThenErrorWhenDestroyFails(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
 
 	f.plugin.SetDestroyError("resource.container.second", errors.New("boom"))
@@ -352,7 +333,7 @@ func TestConfigDestroyReportsStartThenErrorWhenDestroyFails(t *testing.T) {
 // TestConfigDestroyReportsOnlySuccessForVariable asserts a variable, which has
 // no provider, reports only a destroy success and never a start
 func TestConfigDestroyReportsOnlySuccessForVariable(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
 
 	err := f.config.Destroy()
@@ -362,14 +343,13 @@ func TestConfigDestroyReportsOnlySuccessForVariable(t *testing.T) {
 
 	succeeded := f.recorder.find("variable.independent_subnet", "destroy", "success")
 	require.Len(t, succeeded, 1)
-	require.Nil(t, succeeded[0].Data)
 }
 
 // TestConfigDestroyReturnsErrorNamingFailedResource asserts a failed destroy
 // returns an error naming the resource, and the saved state keeps it marked
 // destroy_failed along with its parent, which was never visited
 func TestConfigDestroyReturnsErrorNamingFailedResource(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
 
 	f.plugin.SetDestroyError("resource.container.second", errors.New("boom"))
@@ -380,7 +360,11 @@ func TestConfigDestroyReturnsErrorNamingFailedResource(t *testing.T) {
 
 	require.NotContains(t, f.plugin.GetDestroyedResources(), "resource.network.first")
 
-	saved, err := f.store.Load()
+	loaded, err := f.store.Load()
+	require.NoError(t, err)
+
+	// the store hands back raw records, typing them needs the registry
+	saved, err := savedentity.DecodeAll(f.registry, loaded)
 	require.NoError(t, err)
 
 	second, err := entityByID(saved, "resource.container.second")
@@ -405,7 +389,7 @@ func TestConfigDestroyReturnsErrorNamingFailedResource(t *testing.T) {
 // TestConfigDestroyRetriesFailedResources asserts calling destroy again after
 // a failure destroys what was left and empties the saved state
 func TestConfigDestroyRetriesFailedResources(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
 
 	f.plugin.SetDestroyError("resource.container.second", errors.New("boom"))
@@ -437,14 +421,14 @@ func TestConfigDestroyRetriesFailedResources(t *testing.T) {
 // a registry that can not create a saved type fails with an UnknownTypesError,
 // calls no provider and leaves the saved state untouched
 func TestConfigDestroyFailsWhenSavedStateHasUnknownType(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
 
 	before, err := os.ReadFile(f.statePath)
 	require.NoError(t, err)
 
-	emptyRegistry := registry.NewPluginRegistry(logger.NewTestLogger(t))
-	store, err := state.NewFileStateStore(f.statePath, emptyRegistry)
+	emptyRegistry := registry.NewPluginRegistry()
+	store, err := state.NewFileStateStore(filepath.Dir(f.statePath))
 	require.NoError(t, err)
 
 	c := NewConfig(
@@ -467,24 +451,21 @@ func TestConfigDestroyFailsWhenSavedStateHasUnknownType(t *testing.T) {
 	require.Equal(t, before, after)
 }
 
-// TestConfigDestroyLogsNothingAboveDebug asserts a successful destroy logs
-// nothing at info, warn or error through the registry's logger
+// TestConfigDestroyLogsNothingAboveDebug asserts a successful destroy
+// delivers no log event at info, warn or error
 func TestConfigDestroyLogsNothingAboveDebug(t *testing.T) {
-	log := &destroyRecordingLogger{}
-
-	f := setupDestroyConfig(t, log)
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
-
-	log.reset()
 
 	err := f.config.Destroy()
 	require.NoError(t, err)
 
-	require.Empty(t, log.aboveDebug())
+	require.NotEmpty(t, f.recorder.snapshot(), "the destroy delivered no events at all")
+	require.Empty(t, logEventsAboveDebug(f.recorder))
 }
 
 func TestApplyRejectsEmptyConfigurationAndChangesNothing(t *testing.T) {
-	f := setupDestroyConfig(t, logger.NewTestLogger(t))
+	f := setupDestroyConfig(t, logger.Nop())
 	applyDestroyFixture(t, f)
 
 	before, err := os.ReadFile(f.statePath)

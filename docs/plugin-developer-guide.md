@@ -18,7 +18,7 @@ your resource struct:
 
 ```go
 type ResourceProvider[T any] interface {
-    Init(state State, functions ProviderFunctions, logger Logger) error
+    Init(state State, functions ProviderFunctions, logger logger.Logger) error
     Create(ctx context.Context, resource T) (T, error)
     Read(ctx context.Context, old T, new T) (T, error)
     Changed(ctx context.Context, old T, new T) (bool, error)
@@ -28,8 +28,13 @@ type ResourceProvider[T any] interface {
 }
 ```
 
-`Init` is called once when the provider is registered. Use it to keep the
-state, functions and logger it is given and to set up any clients.
+`Init` is called once when the provider is registered, which happens when
+xcl loads the plugin at the start of the first `Validate`, `Apply` or
+`Destroy`. Use it to keep the state and functions it is given and to set up
+any clients. The logger it is given is plugin scoped: it is for messages
+written outside a provider call, such as in `Init` itself. Don't keep it for
+the lifecycle methods; log from those through the call's context (see
+[Logging from a provider](#logging-from-a-provider)).
 `Functions` returns the functions the provider exposes to other providers.
 The rest of this guide is about the lifecycle methods.
 
@@ -306,12 +311,15 @@ onto the wrong attachment.
 derived fields. After each of these calls, xcl compares what went in with
 what came back
 ([`internal/parser/configured_check.go`](../internal/parser/configured_check.go)).
-For every non-computed field the provider changed, it logs a warning with
-the message `provider changed a configured value` and the resource and field
-as attributes (the layout depends on the logger):
+For every non-computed field the provider changed, it emits a warn log event
+to the application's event receiver: `Phase` `log`, `Source` `core`, the
+resource in `ResourceID`, the call in `Operation` (`create`, `read` or
+`update`), and in `Meta` the level `warn`, the message
+`provider changed a configured value` and the field path under `field`.
+Written by `events.SlogHandler`, it reads:
 
 ```
-provider changed a configured value  resource=resource.container.web  field=image
+level=WARN msg="provider changed a configured value" source=core operation=create phase=log resource=resource.container.web type=container.web file=... field=image
 ```
 
 The apply continues. Fields whose configuration references another resource
@@ -389,12 +397,42 @@ for a resource only after everything that depends on it has been destroyed,
 so it is never called for a parent once a child's destroy has failed.
 Resources that don't depend on each other are destroyed in parallel.
 
+## Logging from a provider
+
+A provider writes no output. Log through `plugins.Logger(ctx)`, the logger
+xcl puts in each call's context:
+
+```go
+func (p *ContainerProvider) Create(ctx context.Context, c *Container) (*Container, error) {
+    log := plugins.Logger(ctx)
+
+    id, err := p.client.Run(ctx, c.Image)
+    if err != nil {
+        return nil, err
+    }
+
+    log.Info("started container", "container_id", id)
+    c.ContainerID = id
+
+    return c, nil
+}
+```
+
+Each message becomes a log event on the application's event stream. xcl has
+already bound the logger to the resource, its type, the file it was declared
+in and the step, and names your plugin as the event's `Source`, so pass only
+the details of the message itself. The same code works in-process and in an
+external plugin; for an external plugin, detail values cross the process
+boundary as text. Outside a provider call, `plugins.Logger(ctx)` emits
+nothing; use the plugin scoped logger from `Init` there. See
+[Plugin logging](plugins.md#plugin-logging).
+
 ## Events
 
-Each provider call fires a `start` event and then a `success` or `error`
-event, with the operation name `create`, `read`, `changed`, `update` or
-`destroy`. See
-[Parser & Resource Lifecycle](parser-lifecycle.md#instrumentation-parserevent).
+Each provider call fires a `start` event, a `log` event for each message the
+provider logs during it, and then a `success` or `error` event, with the
+operation name `create`, `read`, `changed`, `update` or `destroy`. See
+[Parser & Resource Lifecycle](parser-lifecycle.md#events-parseroptionsemit).
 
 ## The example provider
 

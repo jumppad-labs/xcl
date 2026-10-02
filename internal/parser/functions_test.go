@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,7 +33,7 @@ func TestApplyProcessesDefaultFunctionsWithFile(t *testing.T) {
 	t.Setenv("MYENV", "myvalue")
 
 	p, _ := setupParser(t)
-	c, err := p.Apply(absoluteFilePath)
+	c, err := p.Apply(context.Background(), absoluteFilePath)
 	require.NoError(t, err)
 
 	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.default")
@@ -61,7 +62,7 @@ func TestApplyProcessesDefaultFunctionsWithDirectory(t *testing.T) {
 	t.Setenv("MYENV", "myvalue")
 
 	p, _ := setupParser(t, constantNumberOptions(t))
-	c, err := p.Apply(absoluteFolderPath)
+	c, err := p.Apply(context.Background(), absoluteFolderPath)
 	require.NoError(t, err)
 
 	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.default")
@@ -89,7 +90,7 @@ func TestApplyProcessesCustomFunctions(t *testing.T) {
 	require.NoError(t, err)
 
 	p, _ := setupParser(t, constantNumberOptions(t))
-	c, err := p.Apply(absoluteFilePath)
+	c, err := p.Apply(context.Background(), absoluteFilePath)
 	require.NoError(t, err)
 
 	cont := findResource[structs.Container](t, c.GetResources(), "resource.container.custom")

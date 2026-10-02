@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/logger"
 )
 
@@ -23,7 +24,7 @@ type readRecordingProvider struct {
 	readError  error
 }
 
-func (p *readRecordingProvider) Init(state State, functions ProviderFunctions, logger Logger) error {
+func (p *readRecordingProvider) Init(state State, functions ProviderFunctions, log logger.Logger) error {
 	return nil
 }
 
@@ -70,11 +71,10 @@ type readTestPlugin struct {
 	provider *readRecordingProvider
 }
 
-func (p *readTestPlugin) Init(logger Logger, state State) error {
-	p.SetLogger(logger)
+func (p *readTestPlugin) Init(log logger.Logger, state State) error {
 	p.SetState(state)
 
-	return RegisterResourceProvider(&p.PluginBase, logger, state, "resource", "test", &testResource{}, p.provider)
+	return RegisterResourceProvider(&p.PluginBase, log, state, "resource", "test", &testResource{}, p.provider)
 }
 
 func TestTypedProviderAdapterReadPassesOldAndNewToProvider(t *testing.T) {
@@ -166,7 +166,7 @@ func TestDirectPluginHostReadPassesOldAndNewToProvider(t *testing.T) {
 	}
 	plugin := &readTestPlugin{provider: provider}
 
-	host, err := NewDirectPluginHost(logger.NewTestLogger(t), emptyState{}, plugin)
+	host, err := NewDirectPluginHost(nil, emptyState{}, plugin)
 	require.NoError(t, err)
 
 	oldData := []byte(`{"name":"web","count":1}`)
@@ -192,7 +192,7 @@ func TestDirectPluginHostReadReturnsErrNotFoundFromProvider(t *testing.T) {
 	}
 	plugin := &readTestPlugin{provider: provider}
 
-	host, err := NewDirectPluginHost(logger.NewTestLogger(t), emptyState{}, plugin)
+	host, err := NewDirectPluginHost(nil, emptyState{}, plugin)
 	require.NoError(t, err)
 
 	oldData := []byte(`{"name":"web","count":1}`)
@@ -200,4 +200,17 @@ func TestDirectPluginHostReadReturnsErrNotFoundFromProvider(t *testing.T) {
 
 	_, err = host.Read(context.Background(), "resource", "test", oldData, newData)
 	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestTypedProviderAdapterCreateEmitsNoLogEventsOfItsOwn(t *testing.T) {
+	recorder := &eventRecorder{}
+	provider := &readRecordingProvider{}
+	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+
+	ctx := WithLogger(context.Background(), logger.New(recorder.emit, events.Event{Source: "core", ResourceID: "resource.test.web"}))
+
+	_, err := adapter.Create(ctx, []byte(`{"name":"web","count":1}`))
+	require.NoError(t, err)
+
+	require.Empty(t, recorder.recorded())
 }

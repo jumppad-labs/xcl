@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl"
+	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -45,7 +45,7 @@ func testRegistry(t *testing.T) *registry.PluginRegistry {
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	reg := registry.NewPluginRegistry()
 
 	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
 	require.NoError(t, err)
@@ -67,10 +67,10 @@ func testApplyToStateFile(t *testing.T) (string, *registry.PluginRegistry) {
 
 	reg := testRegistry(t)
 
-	statePath := filepath.Join(t.TempDir(), "state.json")
-
-	store, err := state.NewFileStateStore(statePath, reg)
+	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
+
+	statePath := store.Path()
 
 	c := xcl.NewConfig(
 		xcl.WithPluginRegistry(reg),
@@ -84,16 +84,20 @@ func testApplyToStateFile(t *testing.T) (string, *registry.PluginRegistry) {
 }
 
 // testLoadSavedState opens a fresh store at path, as a later run would, and
-// loads the saved entities from it
+// loads the saved entities from it, typed with reg
 func testLoadSavedState(t *testing.T, path string, reg *registry.PluginRegistry) []any {
 	t.Helper()
 
-	store, err := state.NewFileStateStore(path, reg)
+	store, err := state.NewFileStateStore(filepath.Dir(path))
 	require.NoError(t, err)
 
-	s, err := store.Load()
+	loaded, err := store.Load()
 	require.NoError(t, err)
-	require.NotNil(t, s)
+	require.NotNil(t, loaded)
+
+	// the store hands back raw records, typing them needs the registry
+	s, err := savedentity.DecodeAll(reg, loaded)
+	require.NoError(t, err)
 
 	return s
 }

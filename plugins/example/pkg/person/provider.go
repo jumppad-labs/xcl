@@ -17,23 +17,22 @@ type ExampleProvider struct {
 
 	state     plugins.State
 	functions plugins.ProviderFunctions
-	logger    logger.Logger
 }
 
 // Compile-time check to ensure ExampleProvider implements ResourceProvider[*Person]
 var _ plugins.ResourceProvider[*Person] = (*ExampleProvider)(nil)
 
+// Init keeps the state and functions. The plugin scoped logger is not kept,
+// during a call the provider logs through plugins.Logger(ctx), which is bound
+// to the resource and step being worked on.
 func (p *ExampleProvider) Init(state plugins.State, functions plugins.ProviderFunctions, logger logger.Logger) error {
 	p.state = state
 	p.functions = functions
-	p.logger = logger
 	return nil
 }
 
 func (p *ExampleProvider) Create(ctx context.Context, person *Person) (*Person, error) {
-	if p.logger != nil {
-		p.logger.Info("Creating person", "event", "create", "resource", person.Meta.ID, "name", person.FirstName+" "+person.LastName)
-	}
+	plugins.Logger(ctx).Info("Creating person", "name", person.FirstName+" "+person.LastName)
 
 	// Check for context cancellation
 	select {
@@ -50,9 +49,7 @@ func (p *ExampleProvider) Create(ctx context.Context, person *Person) (*Person, 
 }
 
 func (p *ExampleProvider) Destroy(ctx context.Context, person *Person, force bool) error {
-	if p.logger != nil {
-		p.logger.Info("Destroying person", "event", "destroy", "resource", person.Meta.ID, "name", person.FirstName+" "+person.LastName, "force", force)
-	}
+	plugins.Logger(ctx).Info("Destroying person", "name", person.FirstName+" "+person.LastName, "force", force)
 
 	// Check for context cancellation
 	select {
@@ -72,9 +69,7 @@ func (p *ExampleProvider) Destroy(ctx context.Context, person *Person, force boo
 const MissingPersonEmail = "missing@example.com"
 
 func (p *ExampleProvider) Read(ctx context.Context, old *Person, new *Person) (*Person, error) {
-	if p.logger != nil {
-		p.logger.Info("Reading person", "event", "read", "resource", new.Meta.ID, "name", new.FirstName+" "+new.LastName)
-	}
+	plugins.Logger(ctx).Info("Reading person", "name", new.FirstName+" "+new.LastName)
 
 	// Check for context cancellation
 	select {
@@ -98,15 +93,11 @@ func (p *ExampleProvider) Read(ctx context.Context, old *Person, new *Person) (*
 func (p *ExampleProvider) Update(ctx context.Context, person *Person) (*Person, error) {
 	// Handle nil person (when no entity data is provided)
 	if person == nil {
-		if p.logger != nil {
-			p.logger.Info("Updating person with no entity data", "event", "update")
-		}
+		plugins.Logger(ctx).Info("Updating person with no entity data")
 		return nil, nil
 	}
 
-	if p.logger != nil {
-		p.logger.Info("Updating person", "event", "update", "resource", person.Meta.ID, "name", person.FirstName+" "+person.LastName)
-	}
+	plugins.Logger(ctx).Info("Updating person", "name", person.FirstName+" "+person.LastName)
 
 	// Check for context cancellation
 	select {

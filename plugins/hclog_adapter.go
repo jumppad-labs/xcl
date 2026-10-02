@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"github.com/jumppad-labs/xcl/logger"
 	"io"
 	"log"
 	"strings"
@@ -9,7 +10,7 @@ import (
 )
 
 // hclogAdapter lets go-plugin, which starts external plugins and connects to
-// them, log through xcl's Logger instead of its own default logger, which
+// them, log through xcl's logger.Logger instead of its own default logger, which
 // writes straight to stderr. go-plugin logs how it starts and talks to the
 // plugin process, and passes on what the plugin process writes to stderr.
 //
@@ -22,7 +23,7 @@ import (
 // go-plugin's debug message for the end of the plugin's stdio stream is
 // dropped too, see buriedMessages.
 type hclogAdapter struct {
-	logger Logger
+	logger logger.Logger
 	name   string
 	args   []interface{}
 	level  hclog.Level
@@ -44,7 +45,7 @@ var _ hclog.Logger = (*hclogAdapter)(nil)
 
 // newHCLogAdapter returns an hclog.Logger that writes to l. A nil l returns a
 // logger that discards everything.
-func newHCLogAdapter(l Logger) hclog.Logger {
+func newHCLogAdapter(l logger.Logger) hclog.Logger {
 	if l == nil {
 		return hclog.NewNullLogger()
 	}
@@ -66,8 +67,9 @@ func (a *hclogAdapter) Log(level hclog.Level, msg string, args ...interface{}) {
 		args = append(append([]interface{}{}, a.args...), args...)
 	}
 
-	// every line leads with an event, go-plugin's own logs are one kind
-	args = append([]interface{}{"event", "go-plugin"}, args...)
+	// go-plugin's own messages are marked so a receiver can tell them apart
+	// from the plugin's
+	args = append([]interface{}{"component", "go-plugin"}, args...)
 
 	switch {
 	case level >= hclog.Error:

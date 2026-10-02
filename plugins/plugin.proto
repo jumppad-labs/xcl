@@ -112,6 +112,10 @@ message ChangedResponse {
 message LogRequest {
   string message = 1;
   repeated string args = 2;
+  // call_id names the provider call the message was written during, the
+  // host sent it as the xcl-call-id metadata of that call. It is empty for a
+  // message written outside a provider call.
+  string call_id = 3;
 }
 
 message LogResponse {}

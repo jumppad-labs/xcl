@@ -135,13 +135,13 @@ external `app` provider computed, so a value moves between two plugins and
 between two types of the same plugin. The configuration also uses a module,
 [`plugin/config/modules/db`](./example/plugin/config/modules/db).
 
-Their providers log from each lifecycle method, and the example logs every
-event with `xcl.WithEventHandler`. Everything a plugin logs is tagged by
-xcl with the plugin, and with the provider for provider logs, i.e.
-`DEBU event=create plugin=ExamplePlugin provider=postgres resource=resource.postgres.main`.
-Every line leads with its event, `event=log` when a message has none.
-Everything in the example logs at debug except a failure, which logs at
-error.
+Their providers log from each lifecycle method with
+`plugins.Logger(ctx).Info("created database", "connection_string", ...)`,
+passing no resource details. xcl binds that logger to the resource, its type,
+the file it was declared in and the step, and names the plugin as the
+message's source, so the in-process and the external plugin read the same in
+the output:
+`INFO created database source=ExamplePlugin operation=create phase=log resource=resource.postgres.main ...`.
 
 ### Application configuration
 
@@ -204,10 +204,12 @@ resource as JSON, which is the document this configuration replaces.
 
 Every example keeps its state in a file, applies the configuration and prints
 the resources it parsed. The plugin example then `Destroy`s everything through
-the providers and prints what is left under `## Destroyed`. They all log every
-event xcl fires, parse and destroy events included, through the shared
-[`example/eventlog`](./example/eventlog) handler, at debug unless something
-fails.
+the providers and prints what is left under `## Destroyed`. Each sends
+everything xcl reports, lifecycle events, plugin log messages and errors, to
+the shared [`example/prettylog`](./example/prettylog) receiver, set up in one
+line, which writes styled lines to standard error. It shows info and above;
+set `XCL_LOG_LEVEL=debug` to see plugin loading and `Init` messages too. The
+program's own report goes to standard output.
 
 Run any of them from its directory with `make run`. For `plugin` this builds
 the external plugin into `build/` first, and it has the extra Makefile targets
@@ -245,7 +247,7 @@ destroyed, register its Go type on the plugin registry with `RegisterType`.
 No plugin or provider is needed.
 
 ```go
-r := registry.NewPluginRegistry(logger.NewStdOutLogger())
+r := registry.NewPluginRegistry()
 
 // the name is the block type used in configuration: resource "postgres" "main" {}
 err := r.RegisterType("postgres", &PostgreSQL{})
@@ -260,9 +262,31 @@ state. They are never passed to a provider. `RegisterType` takes a pointer to
 a struct that embeds `types.ResourceBase`.
 
 Every type name must be unique across builtin blocks (`variable`, `output`,
-`module`, `root`), registered types and plugin types. Registering a type or a
-plugin whose type name is already taken fails with a
-`*registry.TypeNameClashError` that names the type.
+`module`, `root`), registered types and plugin types. Registering a type whose
+name a builtin or another registered type already has fails straight away with
+a `*registry.TypeNameClashError` that names the type. A clash with a type a
+plugin provides is reported when the plugins load, see below.
+
+### Registering plugins
+
+The registry needs no logger. Registering a plugin only records it:
+
+```go
+r := registry.NewPluginRegistry()
+
+err := r.RegisterPlugin(&MyPlugin{})                  // an in-process plugin
+err = r.RegisterPluginWithPath("./bin/xcl-plugin-x") // an external plugin binary
+r.DiscoverPlugins([]string{"~/.xcl/plugins"}, "")    // directories to search
+```
+
+Plugins load when they are first needed, at the start of the first
+`Validate`, `Apply` or `Destroy`, and only once per registry however many
+Configs share it. Discovery, loading and the rejection of a discovered binary
+that is not a plugin are reported as `discover` and `load` events. A
+registered plugin that fails to load, such as a path that does not exist,
+fails that first operation with an error matching `xcl.ErrPluginLoad`, whose
+`*xcl.PluginLoadError` detail names the plugin. A plugin type whose name
+clashes with a known type fails it with a `*registry.TypeNameClashError`.
 
 ### Querying a configuration
 
@@ -379,7 +403,8 @@ configuration: it destroys everything in the saved state, dependents before
 what they depend on.
 
 ```go
-store, err := state.NewFileStateStore("./state.json", r)
+// keeps state in ./.xcl/state.json, creating the directory and file if needed
+store, err := state.NewFileStateStore("./.xcl")
 
 c := xcl.NewConfig(
 	xcl.WithPluginRegistry(r),
@@ -403,31 +428,196 @@ before anything is created or changed. Applying a configuration with no
 blocks fails with `xcl.ErrEmptyConfiguration` and changes nothing, use
 `Destroy` to remove everything.
 
-Register every type and plugin before loading state: saved resources of a
-type the registry does not know fail the load with `state.UnknownTypesError`
-rather than being dropped.
+Register every type and plugin before the first operation: saved resources
+of a type the registry does not know fail the load with
+`state.UnknownTypesError` rather than being dropped. Config loads the plugins
+before it loads state; code that loads a state store directly should call the
+registry's `Load` first.
 
-### Lifecycle events
+### Events and logging
 
-`WithEventHandler` is called for every step of the resource lifecycle during
-`Apply` and `Destroy`. First a `parse` event for each block as it is read, a `success` or
-an `error`, with the `File` it was read from. A block that can not be tied to
-a resource, such as a file that is not valid syntax, gets a parse `error`
-with an empty `ResourceID`. Then a `start` before each provider call (create,
-read, changed, update, destroy), and a `success` or an `error` when it
-returns. Builtin and registered types, and disabled blocks on destroy, have
-no provider, they only get a `success`. `Validate` passes the parse events to the handler too. Resources
-that don't depend on each other are processed concurrently, so the handler
-may be called from several goroutines at once.
+xcl writes no output of its own. Everything it and its plugins report, each
+step of the resource lifecycle, plugin loading, warnings, errors and the log
+messages plugins write, is one stream of events delivered to the receiver set
+with `WithEventHandler`. With no receiver xcl is silent.
+
+The quickest way to see them is the shipped adapter to the standard
+library's `log/slog`, set up in one line. It writes log messages at their own
+level, lifecycle and loading events at info, failures at error, and filters
+by the slog handler's level:
 
 ```go
 c := xcl.NewConfig(
 	xcl.WithPluginRegistry(r),
-	xcl.WithEventHandler(func(e xcl.Event) {
-		// logs: DEBU event=create resource=resource.postgres.main phase=start
-		log.Debug("", "event", e.Operation, "resource", e.ResourceID, "phase", e.Phase)
-	}),
+	xcl.WithEventHandler(events.SlogHandler(slog.Default())),
 )
+```
+
+Every event is an `xcl.Event` (the same type as `events.Event`), one flat
+shape for all of them:
+
+| Field | Meaning |
+|---|---|
+| `Time` | when it happened |
+| `Source` | `core` for xcl itself, otherwise the plugin's name |
+| `Operation` | `validate`, `apply`, `destroy`, `parse`, `create`, `read`, `changed`, `update`, `discover`, `load`, or `events` for a blocked announcement |
+| `Phase` | `start`, `success`, `error`, `log` for a log message, `blocked` |
+| `ResourceType`, `ResourceID`, `File` | the resource the event is about and the file it was declared in |
+| `Duration` | how long a step took, or how long emitting was blocked |
+| `Error` | the failure, for the error phase |
+| `Data` | the serialized resource, carried only when you ask for it with `WithEventData`, see below |
+| `Meta` | details; a log message's level and text are under the reserved keys `events.KeyLevel` (`level`) and `events.KeyMessage` (`message`), which caller details never overwrite |
+
+#### Resource data on events
+
+Events carry no resource data by default. A resource's configuration and state
+are not something to push through every receiver by accident, so you ask for
+them:
+
+```go
+c := xcl.NewConfig(
+	xcl.WithEventHandler(handler),
+	xcl.WithEventData(xcl.EventDataProcessed),
+)
+```
+
+| Level | What `Data` carries |
+|---|---|
+| `EventDataNone` | nothing, on any event. The default |
+| `EventDataRaw` | on every lifecycle event, the resource as it was before the provider was called |
+| `EventDataProcessed` | on a success event, the resource as xcl records it in state, including the values the provider filled in and the status it ended with. Other phases carry the same as `EventDataRaw` |
+
+`EventDataProcessed` is byte for byte what state stores, so it goes straight to
+`EncodeSavedEntity` below. This is how the examples show each resource as it is
+created.
+
+If you read `Event.Data` today, add `xcl.WithEventData(xcl.EventDataRaw)` to
+keep what you had.
+
+Each `Validate`, `Apply` and `Destroy` starts with its own `start` event and
+ends with a `success` or an `error` carrying the error it returns. In between
+come the `parse` events, and for each resource a `start` before each provider
+call, then any log messages the provider writes during that call, with the
+call's step as their operation, then a `success` or an `error`. Every failure
+that is returned is also emitted as an error event.
+
+Delivery guarantees:
+
+- The receiver is called one event at a time, in the order the events were
+  emitted, never concurrently.
+- Emitting never waits for the receiver. Undelivered events are held in a
+  bounded buffer, `WithEventBufferSize` (default
+  `xcl.DefaultEventBufferSize`, 1024). When it is full, emitting waits
+  rather than dropping an event, and once it can continue the receiver is
+  sent one `blocked` event saying how long it waited.
+- Every event of a call has been delivered before the call returns, whether
+  it succeeds or fails.
+- A panic in the receiver is not recovered. xcl starts no new provider call,
+  lets the calls in progress finish and saves state, then the panic continues
+  from `Validate`, `Apply` or `Destroy` with its original value and stack.
+- xcl never changes the standard library's global logger.
+
+One known exception to silence comes from go-plugin, which xcl uses to run
+external plugins: when an external plugin is stopped within milliseconds of
+starting, go-plugin writes `[ERR] plugin: plugin acceptAndServe error: broker
+closed` to standard error through the standard library logger. It is outside
+xcl's control.
+
+The [`example/prettylog`](./example/prettylog) receiver shows the adapter in
+use with a styled terminal handler.
+
+Plugin authors log from a provider with the logger in the call's context,
+which xcl has already bound to the resource and the step, so they pass none
+of it themselves. It works the same in an in-process and an external plugin:
+
+```go
+func (p *provider) Create(ctx context.Context, db *PostgreSQL) (*PostgreSQL, error) {
+	plugins.Logger(ctx).Info("created database", "remote_id", id)
+	return db, nil
+}
+```
+
+See [docs/plugins.md](./docs/plugins.md) for more.
+
+### Converting to configuration text
+
+`EncodeEntity` turns one entity back into configuration text in xcl's own
+syntax, ready to print or write to a `.xcl` file:
+
+```go
+db, err := xcl.Find[*Postgres](c, "resource.postgres.main")
+if err != nil {
+	return err
+}
+
+text, err := xcl.EncodeEntity(db)
+if err != nil {
+	return err
+}
+
+fmt.Println(string(text))
+```
+
+```hcl
+resource "postgres" "main" {
+  location = "localhost"
+  port     = 5432
+
+  timeouts {
+    connection = 10
+    keep_alive = 60
+  }
+}
+```
+
+`EncodeSavedEntity` does the same from an entity's saved data, in the form
+state stores it and events carry it at `EventDataProcessed`. It needs the
+registry, which is what types the record, and loads its plugins if they are not
+loaded already:
+
+```go
+text, err := xcl.EncodeSavedEntity(registry, event.Data)
+```
+
+Both write exactly one block, so convert several entities by calling once for
+each.
+
+**What is left out.** The text shows what a person wrote. xcl's own bookkeeping
+is not written, and neither is `depends_on`, which by the time a configuration
+is parsed holds the references xcl resolved as well as anything you wrote.
+Values a provider filled in are left out too. Ask for them with
+`IncludeComputed`, and each one is marked so a reader can tell it apart:
+
+```go
+text, err := xcl.EncodeEntity(db, xcl.IncludeComputed())
+```
+
+```hcl
+resource "postgres" "main" {
+  location          = "localhost"
+  port              = 5432
+  connection_string = "postgres://admin@localhost:5432/main" # set by the provider
+}
+```
+
+**This text is for reading, not for reprocessing.** References come out as the
+literal values they resolved to, comments and layout from the original file are
+not kept, and output including provider-filled values does not validate, since
+xcl refuses a configuration that sets them. Values are shown as they are held,
+so anything secret is shown too.
+
+**When it fails** no text is returned, and the error says why:
+
+| Error | Means |
+|---|---|
+| `ErrUnregisteredType` | the saved data names a type the registry does not know. `UnregisteredTypeError` names it |
+| `ErrInvalidSavedData` | the data is not one saved entity record |
+| `ErrNotEncodable` | the value is not an entity, or it is a `variable`, `output` or `module`, which are never written as configuration |
+
+```go
+if errors.Is(err, xcl.ErrUnregisteredType) {
+	// register the type or its plugin
+}
 ```
 
 ## Struct Tags
@@ -1336,25 +1526,9 @@ with the `Processable` interface on your resource or the `ParseCallback`.
 
 ## Serialization
 
-To save state the `xcl.Config` type can be serialized to JSON using the following
-method.
+xcl saves state itself, through the state store given to `WithStateStore`, see
+[docs/state.md](./docs/state.md).
 
-```go
-d, err := c.ToJSON()
-ioutil.WriteFile("./config.json", d, os.ModePerm)
-```
-## Deserialization
+To turn a single entity back into configuration text, see
+[Converting to configuration text](#converting-to-configuration-text) above.
 
-To deserialize `xcl.Config` that has been serialized with the `ToJSON` method
-you can use the `UnmarshalJSON` method on the `Parser`.
-
-`UnmarshalJSON` will reconstruct the concrete types based on the configured resources.
-
-```go
-d, _ := ioutil.ReadFile("./config.json")
-nc, err := p.UnmarshalJSON(d)
-if err != nil {
-	fmt.Printf("An error occurred unmarshalling the config: %s\n", err)
-	os.Exit(1)
-}
-```

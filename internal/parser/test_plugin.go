@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/logger"
@@ -17,6 +18,25 @@ type ReadCall struct {
 	ID  string
 	Old []byte
 	New []byte
+}
+
+// CallTime records when a provider call started and when it returned. Call
+// is formatted "<operation> <id>" like Calls, and Err is what the call
+// returned.
+type CallTime struct {
+	Call     string
+	Started  time.Time
+	Finished time.Time
+	Err      error
+}
+
+// LogMessage is a log message a TestPlugin provider writes during a call
+// through plugins.Logger(ctx). Level is "debug", "info", "warn" or "error",
+// Args are its key/value details.
+type LogMessage struct {
+	Level   string
+	Message string
+	Args    []any
 }
 
 // TestPlugin provides test resource types for testing the parser.
@@ -37,6 +57,25 @@ type TestPlugin struct {
 
 	// ReadCalls records the copies passed to every Read
 	ReadCalls []ReadCall
+
+	// CallTimes records when every Create, Destroy, Read and Update started
+	// and returned, in the order they returned
+	CallTimes []CallTime
+
+	// createHook, when set, is called by Create with the resource ID once
+	// the call's start time is taken and before anything else is done,
+	// without holding mu, so a test can hold a create in progress or learn
+	// that it has started. Set it with SetCreateHook.
+	createHook func(id string)
+
+	// logOnCreate and logOnRead are written by every Create and Read through
+	// the call's logger, set them with SetLogOnCreate and SetLogOnRead
+	logOnCreate []LogMessage
+	logOnRead   []LogMessage
+
+	// logOnInit is written by Init through the logger Init is given, set it
+	// with SetLogOnInit
+	logOnInit []LogMessage
 
 	// Error configuration maps
 	CreateErrors  map[string]error // Maps resource ID to error for Create operations
@@ -110,6 +149,75 @@ func (p *TestPlugin) GetReadCalls() []ReadCall {
 	return append([]ReadCall{}, p.ReadCalls...)
 }
 
+// GetCallTimes returns when every Create, Destroy, Read and Update started
+// and returned
+func (p *TestPlugin) GetCallTimes() []CallTime {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]CallTime{}, p.CallTimes...)
+}
+
+// SetLogOnCreate makes every Create write messages through the logger in the
+// call's context, plugins.Logger(ctx), without passing any resource details
+func (p *TestPlugin) SetLogOnCreate(messages ...LogMessage) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.logOnCreate = messages
+}
+
+// SetLogOnRead makes every Read write messages through the logger in the
+// call's context, plugins.Logger(ctx), without passing any resource details
+func (p *TestPlugin) SetLogOnRead(messages ...LogMessage) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.logOnRead = messages
+}
+
+// SetLogOnInit makes Init write messages through the logger it is given,
+// Init runs when plugins load, so set it before the first operation
+func (p *TestPlugin) SetLogOnInit(messages ...LogMessage) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.logOnInit = messages
+}
+
+// writeLogs writes messages through the logger in ctx
+func writeLogs(ctx context.Context, messages []LogMessage) {
+	writeLogsTo(plugins.Logger(ctx), messages)
+}
+
+// writeLogsTo writes messages through log
+func writeLogsTo(log logger.Logger, messages []LogMessage) {
+	for _, m := range messages {
+		switch m.Level {
+		case "debug":
+			log.Debug(m.Message, m.Args...)
+		case "warn":
+			log.Warn(m.Message, m.Args...)
+		case "error":
+			log.Error(m.Message, m.Args...)
+		default:
+			log.Info(m.Message, m.Args...)
+		}
+	}
+}
+
+// SetCreateHook sets a function Create calls with the resource ID once the
+// call has started, before the create is done and without holding the
+// plugin's lock. Create waits for the function to return, so a test can use it
+// to hold a create in progress or to learn that one has started. A nil hook
+// removes it.
+func (p *TestPlugin) SetCreateHook(hook func(id string)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.createHook = hook
+}
+
+// recordCallTime records a returned provider call, the caller must hold mu
+func (p *TestPlugin) recordCallTime(call string, started time.Time, err error) {
+	p.CallTimes = append(p.CallTimes, CallTime{Call: call, Started: started, Finished: time.Now(), Err: err})
+}
+
 // ResetCalls clears the recorded calls, leaving the configuration in place
 func (p *TestPlugin) ResetCalls() {
 	p.mu.Lock()
@@ -122,6 +230,7 @@ func (p *TestPlugin) ResetCalls() {
 	p.ChangedCalls = []string{}
 	p.Calls = []string{}
 	p.ReadCalls = []ReadCall{}
+	p.CallTimes = []CallTime{}
 }
 
 // SetCreateError configures an error to be returned when creating a resource with the given ID
@@ -243,18 +352,41 @@ func (p *TestPlugin) ClearErrors() {
 
 // Init initializes the test plugin with test resource types
 func (p *TestPlugin) Init(logger logger.Logger, state plugins.State) error {
-	// Initialize all tracking slices and error maps
-	p.ResetCalls()
-	p.ClearErrors()
-
-	// Initialize scenario configuration
+	// Init runs when plugins load, on the first operation, so a test may
+	// already have configured the plugin: only fill in what is unset
 	p.mu.Lock()
-	p.ReadNotFound = make(map[string]bool)
-	p.ReadObserved = make(map[string]string)
-	p.ChangedResults = make(map[string]bool)
-	p.MutateConfigured = make(map[string]string)
+	if p.CreateErrors == nil {
+		p.CreateErrors = make(map[string]error)
+	}
+	if p.DestroyErrors == nil {
+		p.DestroyErrors = make(map[string]error)
+	}
+	if p.UpdateErrors == nil {
+		p.UpdateErrors = make(map[string]error)
+	}
+	if p.ReadErrors == nil {
+		p.ReadErrors = make(map[string]error)
+	}
+	if p.ChangedErrors == nil {
+		p.ChangedErrors = make(map[string]error)
+	}
+	if p.ReadNotFound == nil {
+		p.ReadNotFound = make(map[string]bool)
+	}
+	if p.ReadObserved == nil {
+		p.ReadObserved = make(map[string]string)
+	}
+	if p.ChangedResults == nil {
+		p.ChangedResults = make(map[string]bool)
+	}
+	if p.MutateConfigured == nil {
+		p.MutateConfigured = make(map[string]string)
+	}
 	p.CreateSetsID = true
+	initLogs := p.logOnInit
 	p.mu.Unlock()
+
+	writeLogsTo(logger, initLogs)
 
 	// Register Container resource
 	containerResource := &structs.Container{}
@@ -343,14 +475,28 @@ func (p *TestResourceProvider[T]) Init(state plugins.State, functions plugins.Pr
 }
 
 // Create tracks the resource name for testing and sets the network's ProviderID
-func (p *TestResourceProvider[T]) Create(ctx context.Context, resource T) (T, error) {
+func (p *TestResourceProvider[T]) Create(ctx context.Context, resource T) (result T, err error) {
+	started := time.Now()
+
 	meta, err := types.GetMeta(resource)
 	if err != nil {
 		return resource, err
 	}
 
 	p.plugin.mu.Lock()
+	hook := p.plugin.createHook
+	logs := p.plugin.logOnCreate
+	p.plugin.mu.Unlock()
+
+	if hook != nil {
+		hook(meta.ID)
+	}
+
+	writeLogs(ctx, logs)
+
+	p.plugin.mu.Lock()
 	defer p.plugin.mu.Unlock()
+	defer func() { p.plugin.recordCallTime("create "+meta.ID, started, err) }()
 
 	p.plugin.CreatedResources = append(p.plugin.CreatedResources, meta.ID)
 	p.plugin.Calls = append(p.plugin.Calls, "create "+meta.ID)
@@ -376,7 +522,9 @@ func (p *TestResourceProvider[T]) Create(ctx context.Context, resource T) (T, er
 }
 
 // Destroy tracks the resource name for testing
-func (p *TestResourceProvider[T]) Destroy(ctx context.Context, resource T, force bool) error {
+func (p *TestResourceProvider[T]) Destroy(ctx context.Context, resource T, force bool) (err error) {
+	started := time.Now()
+
 	meta, err := types.GetMeta(resource)
 	if err != nil {
 		return err
@@ -384,6 +532,7 @@ func (p *TestResourceProvider[T]) Destroy(ctx context.Context, resource T, force
 
 	p.plugin.mu.Lock()
 	defer p.plugin.mu.Unlock()
+	defer func() { p.plugin.recordCallTime("destroy "+meta.ID, started, err) }()
 
 	p.plugin.DestroyedResources = append(p.plugin.DestroyedResources, meta.ID)
 	p.plugin.Calls = append(p.plugin.Calls, "destroy "+meta.ID)
@@ -398,7 +547,9 @@ func (p *TestResourceProvider[T]) Destroy(ctx context.Context, resource T, force
 // Read tracks the copies it receives and returns the configured copy, with the
 // network's observed value set when one is configured. It adds nothing else: the
 // computed values saved by the last apply are carried over by the parser.
-func (p *TestResourceProvider[T]) Read(ctx context.Context, old T, resource T) (T, error) {
+func (p *TestResourceProvider[T]) Read(ctx context.Context, old T, resource T) (result T, err error) {
+	started := time.Now()
+
 	meta, err := types.GetMeta(resource)
 	if err != nil {
 		return resource, err
@@ -415,7 +566,14 @@ func (p *TestResourceProvider[T]) Read(ctx context.Context, old T, resource T) (
 	}
 
 	p.plugin.mu.Lock()
+	logs := p.plugin.logOnRead
+	p.plugin.mu.Unlock()
+
+	writeLogs(ctx, logs)
+
+	p.plugin.mu.Lock()
 	defer p.plugin.mu.Unlock()
+	defer func() { p.plugin.recordCallTime("read "+meta.ID, started, err) }()
 
 	p.plugin.ReadResources = append(p.plugin.ReadResources, meta.ID)
 	p.plugin.Calls = append(p.plugin.Calls, "read "+meta.ID)
@@ -441,7 +599,9 @@ func (p *TestResourceProvider[T]) Read(ctx context.Context, old T, resource T) (
 }
 
 // Update tracks the resource name for testing
-func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T) (T, error) {
+func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T) (result T, err error) {
+	started := time.Now()
+
 	meta, err := types.GetMeta(resource)
 	if err != nil {
 		return resource, err
@@ -449,6 +609,7 @@ func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T) (T, er
 
 	p.plugin.mu.Lock()
 	defer p.plugin.mu.Unlock()
+	defer func() { p.plugin.recordCallTime("update "+meta.ID, started, err) }()
 
 	p.plugin.UpdatedResources = append(p.plugin.UpdatedResources, meta.ID)
 	p.plugin.Calls = append(p.plugin.Calls, "update "+meta.ID)

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/resources"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,7 +14,7 @@ import (
 // keyword, a bare one and a builtin lead their own declaration.
 
 func TestTypePathReturnsTheResourcePathForAKindLedRegistration(t *testing.T) {
-	r := NewPluginRegistry(logger.NewTestLogger(t))
+	r := NewPluginRegistry()
 
 	err := r.RegisterType("thing", &Thing{})
 	require.NoError(t, err)
@@ -26,7 +25,7 @@ func TestTypePathReturnsTheResourcePathForAKindLedRegistration(t *testing.T) {
 }
 
 func TestTypePathReturnsTheBarePathForABareRegistration(t *testing.T) {
-	r := NewPluginRegistry(logger.NewTestLogger(t))
+	r := NewPluginRegistry()
 
 	err := r.RegisterBareType("thing", &Thing{})
 	require.NoError(t, err)
@@ -37,7 +36,7 @@ func TestTypePathReturnsTheBarePathForABareRegistration(t *testing.T) {
 }
 
 func TestTypePathReturnsTheBuiltinPathForABuiltinType(t *testing.T) {
-	r := NewPluginRegistry(logger.NewTestLogger(t))
+	r := NewPluginRegistry()
 
 	path, ok := r.TypePath(reflect.TypeFor[resources.Variable]())
 	require.True(t, ok)
@@ -45,7 +44,7 @@ func TestTypePathReturnsTheBuiltinPathForABuiltinType(t *testing.T) {
 }
 
 func TestTypePathResolvesAPointerAndANonPointerAlike(t *testing.T) {
-	r := NewPluginRegistry(logger.NewTestLogger(t))
+	r := NewPluginRegistry()
 
 	err := r.RegisterType("thing", &Thing{})
 	require.NoError(t, err)
@@ -65,7 +64,7 @@ func TestTypePathResolvesAPointerAndANonPointerAlike(t *testing.T) {
 // the kind.
 
 func TestTypePathRejectsATypeThatWasNeverRegistered(t *testing.T) {
-	r := NewPluginRegistry(logger.NewTestLogger(t))
+	r := NewPluginRegistry()
 
 	path, ok := r.TypePath(reflect.TypeFor[Gadget]())
 	require.False(t, ok)
@@ -73,12 +72,15 @@ func TestTypePathRejectsATypeThatWasNeverRegistered(t *testing.T) {
 }
 
 func TestTypePathRejectsAPluginProvidedType(t *testing.T) {
-	r := NewPluginRegistry(logger.NewTestLogger(t))
+	r := NewPluginRegistry()
 
 	err := r.RegisterPlugin(&thingPlugin{})
 	require.NoError(t, err)
 
-	// the registry knows the name, because the plugin declares it
+	err = r.Load(nil)
+	require.NoError(t, err)
+
+	// the registry knows the name, because the loaded plugin declares it
 	require.True(t, r.KnownType("thing"))
 
 	// but the type exists host side only as a schema, so there is nothing to
@@ -89,7 +91,7 @@ func TestTypePathRejectsAPluginProvidedType(t *testing.T) {
 }
 
 func TestTypePathRejectsANilType(t *testing.T) {
-	r := NewPluginRegistry(logger.NewTestLogger(t))
+	r := NewPluginRegistry()
 
 	path, ok := r.TypePath(nil)
 	require.False(t, ok)

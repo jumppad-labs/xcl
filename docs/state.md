@@ -117,21 +117,47 @@ interrupted, or returns an error, running `Destroy` again picks up with what
 is left. `Destroy` with no saved state, or an empty one, returns nil and
 writes nothing.
 
+## Reading a saved record back as configuration
+
+A saved record can be turned back into configuration text with
+`xcl.EncodeSavedEntity(registry, data)`. The registry is what types the record,
+including the types a plugin provides, so it is passed explicitly and loaded if
+it has not been loaded already.
+
+```go
+text, err := xcl.EncodeSavedEntity(registry, record)
+```
+
+The same record reaches an event receiver when a configuration asks for
+`xcl.EventDataProcessed`, and it is byte for byte what the state file holds, so
+the same call works on either.
+
+The stored format has one reader. Both the file state store's `Load` and
+`EncodeSavedEntity` go through it, so there is a single place that knows how a
+record names its type. A record naming a type the registry does not know fails
+with `xcl.ErrUnregisteredType`, and one that cannot be read at all with
+`xcl.ErrInvalidSavedData`.
+
+The text is for reading rather than for feeding back to xcl; see
+[Converting to configuration text](../README.md#converting-to-configuration-text).
+
 ## `StateStore` — the persistence contract
 
 ```go
 // state/state_store.go
 type StateStore interface {
-    Load() ([]any, error)      // nil if nothing was saved (first run)
+    Load() ([]any, error)      // entities or raw records; nil if nothing was saved
     Save(entities []any) error
     Exists() bool
     Clear() error
 }
 ```
 
-The contract exchanges plain entities deliberately. Storing them is all it
-does: how they are searched is the configuration object's concern, not a
-store's. Writing one needs no library type — `state/custom_store_test.go` has a
+The contract exchanges plain values deliberately. Storing them is all it
+does: how they are typed and searched is the configuration's concern, not a
+store's. `Load` may hand back the entities it was given, or the raw records it
+saved them as; the parser types raw records with its own registry, so a store
+never needs one. Writing one needs no library type — `state/custom_store_test.go` has a
 twenty-line in-memory implementation that round-trips a real apply, written
 against the public API alone.
 
@@ -157,38 +183,45 @@ bare mock with no expectation set panics on the first call.
 ## `FileStateStore` — the on-disk implementation
 
 [`state/file_state_store.go`](../state/file_state_store.go) is the only
-`StateStore` implementation in this repo. Three things worth knowing:
+`StateStore` implementation in this repo. Four things worth knowing:
 
-**Loading requires a `*registry.PluginRegistry`.** State is persisted as a
-flat JSON array of resources with no compiled-in type information on the
-Go side, so `Load()` ([`file_state_store.go:33`](../state/file_state_store.go#L33))
-does a two-phase decode:
+**The store only reads and writes records.** It knows nothing about types and
+needs no registry. `Load()` ([`file_state_store.go`](../state/file_state_store.go))
+unmarshals the top-level array and returns each record as the
+`json.RawMessage` it was saved as. A record whose type nobody registered
+loads like any other; a file that is not a JSON array fails the load.
 
-1. Unmarshal the top-level array into `[]*json.RawMessage` — defers
-   decoding each resource, preserving its raw JSON shape.
-2. For each raw message, peek at `meta.type`/`meta.name` via an untyped
-   `map[string]any` decode, call `registry.CreateResource(type, name)` to
-   get a correctly-typed *empty* instance, then re-marshal/unmarshal the
-   raw JSON into that instance.
+**Typing happens where state is consumed.** The parser, when it reads the
+previous state for `Apply`/`Validate` and at the start of `Destroy`, passes
+what the store loaded through
+[`savedentity.DecodeAll`](../internal/savedentity/savedentity.go) with its
+plugin registry. A `json.RawMessage`, `[]byte` or `map[string]any` is a saved
+record and is decoded: peek at `meta.type`/`meta.subtype`/`meta.name`, call
+`registry.CreateResource(type, name)` to get a correctly-typed *empty*
+instance, then unmarshal the record into it. Anything else is taken to be an
+entity already and passes through unchanged, which is why a store that keeps
+entities in memory needs no decoding.
 
-**A type that is not registered fails the load.** When a saved entry's type
+**A type that is not registered fails the load.** When a saved record's type
 can't be created by the registry (e.g. a plugin that's no longer loaded, or
-a type that hasn't been registered yet), `Load()` returns
-[`state.UnknownTypesError`](../state/errors.go#L30) naming every such type,
-sorted and unique, instead of dropping the entries — a state returned
+a type that hasn't been registered yet), decoding returns
+[`state.UnknownTypesError`](../state/errors.go) naming every such type,
+sorted and unique, instead of dropping the records — a state returned
 without them would be saved without them, erasing resources that still
-exist. This affects `Apply` and `Destroy` alike (`Destroy` wraps it as
-`failed to load state: ...`), so register every type and plugin before
-loading state. Entries that are malformed, or missing `meta`, `meta.type` or
-`meta.name`, are still skipped (`continue`).
+exist. Records that are malformed, or missing `meta`, `meta.type` or
+`meta.name`, are reported in the same error by their id, or by their
+position as `entry N`. This affects `Apply` and `Destroy` alike, so register
+every type and plugin before loading state.
 
-**`Save` is not atomic.** ([`file_state_store.go:136`](../state/file_state_store.go#L136))
+**`Save` is not atomic.** ([`file_state_store.go`](../state/file_state_store.go))
 It removes the existing file, then writes the new one — not a
 write-to-temp-then-rename. A crash between the remove and the write would
 lose the state file. Worth keeping in mind if this is ever hardened for
 production use.
 
-`NewFileStateStore(path, registry)` creates an empty state file
-automatically if `path` doesn't exist yet (`createStateAtPath`,
-[`file_state_store.go:158`](../state/file_state_store.go#L158)) — callers
-don't need to special-case "first run."
+`NewFileStateStore(dir)` takes a directory, not a file. It keeps state in
+`state.StateFileName` (`state.json`) inside it, creating the directory and an
+empty state file automatically if they don't exist yet (`createStateAtPath`,
+[`file_state_store.go`](../state/file_state_store.go)) — callers don't need to
+special-case "first run." An existing state file is kept as it is.
+`store.Path()` returns the file's full path.

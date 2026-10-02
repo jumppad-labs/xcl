@@ -4,32 +4,47 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"slices"
-
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"path/filepath"
 )
 
+// StateFileName is the name of the file a FileStateStore keeps state in,
+// inside the directory it is given
+const StateFileName = "state.json"
+
+// FileStateStore keeps state in a JSON file. It reads and writes the records
+// and nothing more: Load returns each saved record as raw JSON, and turning a
+// record back into a typed entity is left to whoever consumes the state.
 type FileStateStore struct {
-	path     string
-	registry *registry.PluginRegistry
+	path string
 }
 
-func NewFileStateStore(path string, registry *registry.PluginRegistry) (*FileStateStore, error) {
-	// Check if the file exists
-	// If not, create an empty state file
-	// Else, load the state from the file
+// NewFileStateStore returns a store that keeps state in StateFileName inside
+// dir. The directory is created when it does not exist, and an empty state
+// file is created in it when there is none, so a first run needs no setup.
+func NewFileStateStore(dir string) (*FileStateStore, error) {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("unable to create state directory at %s: %w", dir, err)
+	}
+
+	path := filepath.Join(dir, StateFileName)
+
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return createStateAtPath(path, registry)
+		return createStateAtPath(path)
 	}
 
 	fss := &FileStateStore{
-		path:     path,
-		registry: registry,
+		path: path,
 	}
 	return fss, nil
 }
 
-// Load the previously saved configuration state from the file
+// Path returns the path of the file the store keeps state in
+func (fs *FileStateStore) Path() string {
+	return fs.path
+}
+
+// Load reads the previously saved state from the file. Each entity comes back
+// as the json.RawMessage it was saved as, in the order it was saved.
 func (fs *FileStateStore) Load() ([]any, error) {
 	if _, err := os.Stat(fs.path); err != nil {
 		return nil, fmt.Errorf("state file does not exist at %s", fs.path)
@@ -40,107 +55,18 @@ func (fs *FileStateStore) Load() ([]any, error) {
 		return nil, fmt.Errorf("unable to read state file at %s: %w", fs.path, err)
 	}
 
-	// Phase 1: Unmarshal to raw messages to preserve JSON structure
-	var rawMessages []*json.RawMessage
-	err = json.Unmarshal(data, &rawMessages)
+	var records []json.RawMessage
+	err = json.Unmarshal(data, &records)
 	if err != nil {
 		return nil, fmt.Errorf("unable to deserialize state file at %s: %w", fs.path, err)
 	}
 
-	// Phase 2: Create typed resources and unmarshal into them.
-	//
-	// A record that cannot be understood is reported, never skipped. Dropping
-	// one silently yields a smaller configuration than the file holds, which
-	// then gets written back over the file on the next save, losing whatever
-	// was dropped. Every failure below therefore accumulates into unresolved
-	// and surfaces as one error naming what could not be read
-	resources := []any{}
-	unresolved := []string{}
-
-	record := func(name string) {
-		if !slices.Contains(unresolved, name) {
-			unresolved = append(unresolved, name)
-		}
+	entities := make([]any, 0, len(records))
+	for _, record := range records {
+		entities = append(entities, record)
 	}
 
-	for i, rawMsg := range rawMessages {
-		// entry N is the fallback label for a record too malformed to name
-		// itself, so the error can still point at a position in the file
-		entry := fmt.Sprintf("entry %d", i)
-
-		// Peek at the metadata to get type and name
-		var metadata map[string]any
-		err := json.Unmarshal(*rawMsg, &metadata)
-		if err != nil {
-			record(entry)
-			continue
-		}
-
-		// Extract meta information
-		metaMap, ok := metadata["meta"].(map[string]any)
-		if !ok {
-			record(entry)
-			continue
-		}
-
-		// prefer the record's own identity over its position once there is one
-		if id, ok := metaMap["id"].(string); ok && id != "" {
-			entry = id
-		}
-
-		resourceType, ok := metaMap["type"].(string)
-		if !ok || resourceType == "" {
-			record(entry)
-			continue
-		}
-
-		// A resource is created from its variety, every other kind from the
-		// kind itself. Both axes are written to state, so read the variety
-		// back where the record carries one
-		if subtype, ok := metaMap["subtype"].(string); ok && subtype != "" {
-			resourceType = subtype
-		}
-
-		resourceName, ok := metaMap["name"].(string)
-		if !ok || resourceName == "" {
-			record(entry)
-			continue
-		}
-
-		// Create a typed resource reference using the registry
-		typedResource, err := fs.registry.CreateResource(resourceType, resourceName)
-		if err != nil {
-			// the type is not registered, or the file predates the split and
-			// records a kind that no longer resolves
-			record(resourceType)
-			continue
-		}
-
-		// Re-marshal and unmarshal into the typed reference. This overwrites
-		// what CreateResource set with what the file holds, so a record
-		// missing an axis keeps whatever the registry derived for it
-		resData, err := json.Marshal(metadata)
-		if err != nil {
-			record(entry)
-			continue
-		}
-
-		err = json.Unmarshal(resData, typedResource)
-		if err != nil {
-			record(entry)
-			continue
-		}
-
-		// Append the typed resource pointer
-		resources = append(resources, typedResource)
-	}
-
-	if len(unresolved) > 0 {
-		slices.Sort(unresolved)
-		return nil, UnknownTypesError{Types: unresolved}
-	}
-
-	return resources, nil
+	return entities, nil
 }
 
 // Exists checks if the state file exists
@@ -184,10 +110,9 @@ func (fs *FileStateStore) Save(entities []any) error {
 	return nil
 }
 
-func createStateAtPath(path string, registry *registry.PluginRegistry) (*FileStateStore, error) {
+func createStateAtPath(path string) (*FileStateStore, error) {
 	fs := &FileStateStore{
-		path:     path,
-		registry: registry,
+		path: path,
 	}
 	err := fs.Save(nil)
 	if err != nil {

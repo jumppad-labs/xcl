@@ -8,7 +8,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
@@ -28,7 +27,7 @@ func setupBareTypeConfig(t *testing.T) *Config {
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	reg := registry.NewPluginRegistry()
 
 	err := reg.RegisterBareType(registered.TypeCache, &registered.Cache{})
 	require.NoError(t, err)
@@ -36,7 +35,7 @@ func setupBareTypeConfig(t *testing.T) *Config {
 	err = reg.RegisterType(registered.TypeDatabase, &registered.Database{})
 	require.NoError(t, err)
 
-	store, err := state.NewFileStateStore(filepath.Join(t.TempDir(), "state.json"), reg)
+	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	c := NewConfig(

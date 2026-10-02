@@ -10,22 +10,22 @@ type PluginHost interface {
 	GetTypes() []RegisteredType
 
 	// Validate validates the given entity data
-	Validate(entityType, entitySubType string, entityData []byte) error
+	Validate(ctx context.Context, entityType, entitySubType string, entityData []byte) error
 
 	// Create creates a new entity
-	Create(entityType, entitySubType string, entityData []byte) ([]byte, error)
+	Create(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
 
 	// Destroy deletes an existing entity
-	Destroy(entityType, entitySubType string, entityData []byte) error
+	Destroy(ctx context.Context, entityType, entitySubType string, entityData []byte) error
 
 	// Read reports the real entity, given its saved and configured copies
 	Read(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) ([]byte, error)
 
 	// Update updates an existing entity
-	Update(entityType, entitySubType string, entityData []byte) ([]byte, error)
+	Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
 
 	// Changed checks if the entity has changed by comparing old and new
-	Changed(entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error)
+	Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error)
 
 	// Stop shuts down the plugin host and cleans up resources
 	Stop()

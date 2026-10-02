@@ -2,24 +2,23 @@ package state
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
 func testCreateState(t *testing.T) (StateStore, string, *registry.PluginRegistry) {
-	p := path.Join(t.TempDir(), "state.json")
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	dir := t.TempDir()
+	p := filepath.Join(dir, StateFileName)
+	reg := registry.NewPluginRegistry()
 
-	ss, err := NewFileStateStore(p, reg)
+	ss, err := NewFileStateStore(dir)
 
 	require.NoError(t, err)
 	require.NotNil(t, ss)
@@ -48,24 +47,6 @@ func testSaveState(t *testing.T) (StateStore, string, *registry.PluginRegistry) 
 	return ss, p, reg
 }
 
-// entityByID returns the entity the given slice holds under the given id.
-// Storage answers no questions about addresses, so a test that wants one
-// entity back scans what was loaded and compares the id each entity records
-func entityByID(entities []any, id string) (any, error) {
-	for _, e := range entities {
-		meta, err := types.GetMeta(e)
-		if err != nil {
-			continue
-		}
-
-		if meta.ID == id {
-			return e, nil
-		}
-	}
-
-	return nil, ResourceNotFoundError{Resource: id}
-}
-
 func testNewStateAtExistingPath(t *testing.T) (StateStore, string, *registry.PluginRegistry) {
 	_, p, reg := testSaveState(t)
 
@@ -73,7 +54,7 @@ func testNewStateAtExistingPath(t *testing.T) (StateStore, string, *registry.Plu
 	err := os.WriteFile(p, []byte("{}"), 0644)
 	require.NoError(t, err)
 
-	ss, err := NewFileStateStore(p, reg)
+	ss, err := NewFileStateStore(filepath.Dir(p))
 
 	require.NoError(t, err)
 	require.NotNil(t, ss)
@@ -108,281 +89,46 @@ func TestLoadStateContainsResources(t *testing.T) {
 
 	s, err := ss.Load()
 	require.NoError(t, err)
-	require.NotNil(t, s)
+	require.Len(t, s, 1)
 
-	_, err = entityByID(s, "variable.example")
-	require.NoError(t, err)
+	record, ok := s[0].(json.RawMessage)
+	require.True(t, ok, "a saved entity loads as its raw record, got %T", s[0])
+	require.Equal(t, "variable.example", recordID(t, record))
 }
 
-// stateWithUnknownTypes is a saved state holding a known variable alongside
-// resources whose types nothing registers: two postgres databases and a redis
-// cache.
-const stateWithUnknownTypes = `[
-  {
-    "meta": {"id": "variable.example", "type": "variable", "name": "example"}
-  },
-  {
-    "meta": {"id": "resource.redis.cache", "type": "resource", "subtype": "redis", "name": "cache"}
-  },
-  {
-    "meta": {"id": "resource.postgres.main", "type": "resource", "subtype": "postgres", "name": "main"}
-  },
-  {
-    "meta": {"id": "resource.postgres.replica", "type": "resource", "subtype": "postgres", "name": "replica"}
-  }
-]`
-
-// stateWithUnknownType is a saved state holding a known variable alongside a
-// postgres resource whose type nothing registers.
-const stateWithUnknownType = `[
-  {
-    "meta": {"id": "variable.example", "type": "variable", "name": "example"}
-  },
-  {
-    "meta": {"id": "resource.postgres.main", "type": "resource", "subtype": "postgres", "name": "main"}
-  }
-]`
-
-// Loading a state holding a type nobody registered fails naming that type,
-// rather than returning a state that silently drops the resource.
-func TestLoadFailsWhenStateHoldsUnknownType(t *testing.T) {
+// The store reads and writes records and nothing more, so a record whose type
+// nothing registers loads like any other. Whether it can be typed is decided
+// by whoever consumes the state.
+func TestLoadReturnsRecordsOfUnregisteredTypes(t *testing.T) {
 	ss, p, _ := testCreateState(t)
 
-	err := os.WriteFile(p, []byte(stateWithUnknownType), 0644)
+	err := os.WriteFile(p, []byte(`[
+  {"meta": {"id": "variable.example", "type": "variable", "name": "example"}},
+  {"meta": {"id": "resource.postgres.main", "type": "resource", "subtype": "postgres", "name": "main"}}
+]`), 0644)
 	require.NoError(t, err)
 
 	s, err := ss.Load()
-	require.Error(t, err)
-	require.Nil(t, s)
-
-	unknown := UnknownTypesError{}
-	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"postgres"}, unknown.Types)
-	require.Contains(t, err.Error(), "postgres")
+	require.NoError(t, err)
+	require.Len(t, s, 2)
+	require.Equal(t, "resource.postgres.main", recordID(t, s[1].(json.RawMessage)))
 }
 
-// Every unknown type is named once, in sorted order, however many resources
-// of that type the state holds.
-func TestLoadNamesEachUnknownTypeOnceInSortedOrder(t *testing.T) {
+// A state file that is not a JSON array of records can not be read at all.
+func TestLoadFailsWhenStateFileIsNotAnArray(t *testing.T) {
 	ss, p, _ := testCreateState(t)
 
-	err := os.WriteFile(p, []byte(stateWithUnknownTypes), 0644)
+	err := os.WriteFile(p, []byte(`{"meta": {}}`), 0644)
 	require.NoError(t, err)
 
 	s, err := ss.Load()
-	require.Error(t, err)
+	require.ErrorContains(t, err, "unable to deserialize state file")
 	require.Nil(t, s)
-
-	unknown := UnknownTypesError{}
-	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"postgres", "redis"}, unknown.Types)
 }
 
-// stateWithRecordMissingMeta is a saved state whose second record carries no
-// meta object at all, so nothing in it can name the record but its position.
-const stateWithRecordMissingMeta = `[
-  {
-    "meta": {"id": "variable.example", "type": "variable", "name": "example"}
-  },
-  {
-    "location": "us-east"
-  }
-]`
-
-// stateWithRecordMissingType is a saved state whose second record has a meta
-// object that does not say which kind declared it.
-const stateWithRecordMissingType = `[
-  {
-    "meta": {"id": "variable.example", "type": "variable", "name": "example"}
-  },
-  {
-    "meta": {"id": "resource.database.main", "subtype": "database", "name": "main"}
-  }
-]`
-
-// stateWithRecordEmptyType is a saved state whose second record has a meta
-// object holding an empty kind.
-const stateWithRecordEmptyType = `[
-  {
-    "meta": {"id": "variable.example", "type": "variable", "name": "example"}
-  },
-  {
-    "meta": {"id": "resource.database.main", "type": "", "subtype": "database", "name": "main"}
-  }
-]`
-
-// stateWithRecordMissingName is a saved state whose second record has a meta
-// object that does not say what the entity is called.
-const stateWithRecordMissingName = `[
-  {
-    "meta": {"id": "variable.example", "type": "variable", "name": "example"}
-  },
-  {
-    "meta": {"id": "variable.broken", "type": "variable"}
-  }
-]`
-
-// stateWithRecordEmptyName is a saved state whose second record has a meta
-// object holding an empty name.
-const stateWithRecordEmptyName = `[
-  {
-    "meta": {"id": "variable.example", "type": "variable", "name": "example"}
-  },
-  {
-    "meta": {"id": "variable.broken", "type": "variable", "name": ""}
-  }
-]`
-
-// stateWithMalformedRecord is a saved state whose second record is not an
-// object, so there is no meta to read and nothing to name it but its position.
-const stateWithMalformedRecord = `[
-  {
-    "meta": {"id": "variable.example", "type": "variable", "name": "example"}
-  },
-  "not a record"
-]`
-
-// stateWithSeveralUnreadableRecords holds one of every way a record can fail
-// to be understood: a record that is not an object, two records naming the
-// same entity that both lack a name, a record whose type nothing registers,
-// and a record with no meta at all.
-const stateWithSeveralUnreadableRecords = `[
-  "not a record",
-  {
-    "meta": {"id": "variable.broken", "type": "variable"}
-  },
-  {
-    "meta": {"id": "variable.broken", "type": "variable", "name": ""}
-  },
-  {
-    "meta": {"id": "resource.postgres.main", "type": "resource", "subtype": "postgres", "name": "main"}
-  },
-  {
-    "location": "us-east"
-  }
-]`
-
-// A record with no meta at all is reported by its position in the file, and
-// the load returns nothing rather than a configuration missing that record.
-func TestLoadFailsWhenRecordHasNoMeta(t *testing.T) {
-	ss, p, _ := testCreateState(t)
-
-	err := os.WriteFile(p, []byte(stateWithRecordMissingMeta), 0644)
-	require.NoError(t, err)
-
-	s, err := ss.Load()
-	require.Error(t, err)
-	require.Nil(t, s)
-
-	unknown := UnknownTypesError{}
-	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"entry 1"}, unknown.Types)
-}
-
-// A record that does not say which kind declared it is reported by its id, and
-// the load returns nothing rather than a configuration missing that record.
-func TestLoadFailsWhenRecordHasNoType(t *testing.T) {
-	ss, p, _ := testCreateState(t)
-
-	err := os.WriteFile(p, []byte(stateWithRecordMissingType), 0644)
-	require.NoError(t, err)
-
-	s, err := ss.Load()
-	require.Error(t, err)
-	require.Nil(t, s)
-
-	unknown := UnknownTypesError{}
-	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"resource.database.main"}, unknown.Types)
-}
-
-// An empty kind is reported in the same way as a missing one.
-func TestLoadFailsWhenRecordHasEmptyType(t *testing.T) {
-	ss, p, _ := testCreateState(t)
-
-	err := os.WriteFile(p, []byte(stateWithRecordEmptyType), 0644)
-	require.NoError(t, err)
-
-	s, err := ss.Load()
-	require.Error(t, err)
-	require.Nil(t, s)
-
-	unknown := UnknownTypesError{}
-	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"resource.database.main"}, unknown.Types)
-}
-
-// A record that does not say what the entity is called is reported by its id,
-// and the load returns nothing rather than a configuration missing it.
-func TestLoadFailsWhenRecordHasNoName(t *testing.T) {
-	ss, p, _ := testCreateState(t)
-
-	err := os.WriteFile(p, []byte(stateWithRecordMissingName), 0644)
-	require.NoError(t, err)
-
-	s, err := ss.Load()
-	require.Error(t, err)
-	require.Nil(t, s)
-
-	unknown := UnknownTypesError{}
-	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"variable.broken"}, unknown.Types)
-}
-
-// An empty name is reported in the same way as a missing one.
-func TestLoadFailsWhenRecordHasEmptyName(t *testing.T) {
-	ss, p, _ := testCreateState(t)
-
-	err := os.WriteFile(p, []byte(stateWithRecordEmptyName), 0644)
-	require.NoError(t, err)
-
-	s, err := ss.Load()
-	require.Error(t, err)
-	require.Nil(t, s)
-
-	unknown := UnknownTypesError{}
-	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"variable.broken"}, unknown.Types)
-}
-
-// A record that is not an object at all is reported by its position, and the
-// load returns nothing rather than a configuration missing that record.
-func TestLoadFailsWhenRecordIsMalformed(t *testing.T) {
-	ss, p, _ := testCreateState(t)
-
-	err := os.WriteFile(p, []byte(stateWithMalformedRecord), 0644)
-	require.NoError(t, err)
-
-	s, err := ss.Load()
-	require.Error(t, err)
-	require.Nil(t, s)
-
-	unknown := UnknownTypesError{}
-	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"entry 1"}, unknown.Types)
-}
-
-// Every record that can not be understood is named once, in sorted order,
-// whichever way each of them failed.
-func TestLoadNamesEveryUnreadableRecordOnceInSortedOrder(t *testing.T) {
-	ss, p, _ := testCreateState(t)
-
-	err := os.WriteFile(p, []byte(stateWithSeveralUnreadableRecords), 0644)
-	require.NoError(t, err)
-
-	s, err := ss.Load()
-	require.Error(t, err)
-	require.Nil(t, s)
-
-	unknown := UnknownTypesError{}
-	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"entry 0", "entry 4", "postgres", "variable.broken"}, unknown.Types)
-}
-
-// A store exchanges plain entities: a slice goes in and the same entities come
-// back, each carrying both of the axes state records, the kind that declared
-// it and the variety it names where it has one.
-func TestSaveAndLoadRoundTripsEntitiesWithBothAxes(t *testing.T) {
+// Saving entities records both of their axes, the kind that declared each one
+// and the variety it names where it has one, so a reader can type the record.
+func TestSaveRecordsBothAxesOfEachEntity(t *testing.T) {
 	ss, _, reg := testCreateState(t)
 
 	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
@@ -391,43 +137,42 @@ func TestSaveAndLoadRoundTripsEntitiesWithBothAxes(t *testing.T) {
 	database, err := reg.CreateResource(registered.TypeDatabase, "main")
 	require.NoError(t, err)
 
-	// the parser assigns an entity its id while parsing, storage records what
-	// it is handed, so the id is set here the way a parse sets it
 	databaseMeta, err := types.GetMeta(database)
 	require.NoError(t, err)
 	databaseMeta.ID = "resource.database.main"
 
-	variable, err := reg.CreateResource(resources.TypeVariable, "environment")
-	require.NoError(t, err)
-
-	variableMeta, err := types.GetMeta(variable)
-	require.NoError(t, err)
-	variableMeta.ID = "variable.environment"
-
-	err = ss.Save([]any{database, variable})
+	err = ss.Save([]any{database})
 	require.NoError(t, err)
 
 	loaded, err := ss.Load()
 	require.NoError(t, err)
-	require.Len(t, loaded, 2)
+	require.Len(t, loaded, 1)
 
-	loadedDatabase, err := entityByID(loaded, "resource.database.main")
-	require.NoError(t, err)
+	var record struct {
+		Meta struct {
+			Type    string `json:"type"`
+			Subtype string `json:"subtype"`
+			Name    string `json:"name"`
+		} `json:"meta"`
+	}
+	require.NoError(t, json.Unmarshal(loaded[0].(json.RawMessage), &record))
+	require.Equal(t, types.TypeResource, record.Meta.Type)
+	require.Equal(t, registered.TypeDatabase, record.Meta.Subtype)
+	require.Equal(t, "main", record.Meta.Name)
+}
 
-	loadedDatabaseMeta, err := types.GetMeta(loadedDatabase)
-	require.NoError(t, err)
-	require.Equal(t, types.TypeResource, loadedDatabaseMeta.Type)
-	require.Equal(t, registered.TypeDatabase, loadedDatabaseMeta.Subtype)
-	require.Equal(t, "main", loadedDatabaseMeta.Name)
+// recordID returns the id a raw saved record carries in its meta
+func recordID(t *testing.T, record json.RawMessage) string {
+	t.Helper()
 
-	loadedVariable, err := entityByID(loaded, "variable.environment")
-	require.NoError(t, err)
+	var saved struct {
+		Meta struct {
+			ID string `json:"id"`
+		} `json:"meta"`
+	}
+	require.NoError(t, json.Unmarshal(record, &saved))
 
-	loadedVariableMeta, err := types.GetMeta(loadedVariable)
-	require.NoError(t, err)
-	require.Equal(t, resources.TypeVariable, loadedVariableMeta.Type)
-	require.Empty(t, loadedVariableMeta.Subtype)
-	require.Equal(t, "environment", loadedVariableMeta.Name)
+	return saved.Meta.ID
 }
 
 // Saving nothing writes an empty state rather than failing, which is what
@@ -451,4 +196,45 @@ func TestLoadReturnsNoEntitiesForAnEmptyState(t *testing.T) {
 	loaded, err := ss.Load()
 	require.NoError(t, err)
 	require.Empty(t, loaded)
+}
+
+// A directory that does not exist yet is created along with the state file in
+// it, so a first run needs no setup.
+func TestNewFileStateStoreCreatesMissingDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "nested", "state")
+
+	ss, err := NewFileStateStore(dir)
+	require.NoError(t, err)
+
+	require.DirExists(t, dir)
+	require.FileExists(t, filepath.Join(dir, StateFileName))
+	require.Equal(t, filepath.Join(dir, StateFileName), ss.Path())
+
+	loaded, err := ss.Load()
+	require.NoError(t, err)
+	require.Empty(t, loaded)
+}
+
+// A state file already in the directory is kept, not replaced with an empty
+// one, so a later run reads what an earlier one saved.
+func TestNewFileStateStoreKeepsExistingStateFile(t *testing.T) {
+	_, p, _ := testSaveState(t)
+
+	ss, err := NewFileStateStore(filepath.Dir(p))
+	require.NoError(t, err)
+
+	loaded, err := ss.Load()
+	require.NoError(t, err)
+	require.Len(t, loaded, 1)
+	require.Equal(t, "variable.example", recordID(t, loaded[0].(json.RawMessage)))
+}
+
+// A path that is a file, not a directory, can not hold the state file.
+func TestNewFileStateStoreFailsWhenDirectoryIsAFile(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "not-a-directory")
+	require.NoError(t, os.WriteFile(file, []byte("x"), 0644))
+
+	ss, err := NewFileStateStore(file)
+	require.ErrorContains(t, err, "unable to create state directory")
+	require.Nil(t, ss)
 }

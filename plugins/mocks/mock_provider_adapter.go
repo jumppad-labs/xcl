@@ -7,6 +7,7 @@ package mocks
 import (
 	"context"
 
+	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -251,16 +252,16 @@ func (_c *MockProviderAdapter_Destroy_Call) RunAndReturn(run func(ctx context.Co
 }
 
 // Init provides a mock function for the type MockProviderAdapter
-func (_mock *MockProviderAdapter) Init(state plugins.State, functions plugins.ProviderFunctions, logger plugins.Logger) error {
-	ret := _mock.Called(state, functions, logger)
+func (_mock *MockProviderAdapter) Init(state plugins.State, functions plugins.ProviderFunctions, logger1 logger.Logger) error {
+	ret := _mock.Called(state, functions, logger1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Init")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(plugins.State, plugins.ProviderFunctions, plugins.Logger) error); ok {
-		r0 = returnFunc(state, functions, logger)
+	if returnFunc, ok := ret.Get(0).(func(plugins.State, plugins.ProviderFunctions, logger.Logger) error); ok {
+		r0 = returnFunc(state, functions, logger1)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -275,12 +276,12 @@ type MockProviderAdapter_Init_Call struct {
 // Init is a helper method to define mock.On call
 //   - state plugins.State
 //   - functions plugins.ProviderFunctions
-//   - logger plugins.Logger
-func (_e *MockProviderAdapter_Expecter) Init(state any, functions any, logger any) *MockProviderAdapter_Init_Call {
-	return &MockProviderAdapter_Init_Call{Call: _e.mock.On("Init", state, functions, logger)}
+//   - logger1 logger.Logger
+func (_e *MockProviderAdapter_Expecter) Init(state any, functions any, logger1 any) *MockProviderAdapter_Init_Call {
+	return &MockProviderAdapter_Init_Call{Call: _e.mock.On("Init", state, functions, logger1)}
 }
 
-func (_c *MockProviderAdapter_Init_Call) Run(run func(state plugins.State, functions plugins.ProviderFunctions, logger plugins.Logger)) *MockProviderAdapter_Init_Call {
+func (_c *MockProviderAdapter_Init_Call) Run(run func(state plugins.State, functions plugins.ProviderFunctions, logger1 logger.Logger)) *MockProviderAdapter_Init_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 plugins.State
 		if args[0] != nil {
@@ -290,9 +291,9 @@ func (_c *MockProviderAdapter_Init_Call) Run(run func(state plugins.State, funct
 		if args[1] != nil {
 			arg1 = args[1].(plugins.ProviderFunctions)
 		}
-		var arg2 plugins.Logger
+		var arg2 logger.Logger
 		if args[2] != nil {
-			arg2 = args[2].(plugins.Logger)
+			arg2 = args[2].(logger.Logger)
 		}
 		run(
 			arg0,
@@ -308,7 +309,7 @@ func (_c *MockProviderAdapter_Init_Call) Return(err error) *MockProviderAdapter_
 	return _c
 }
 
-func (_c *MockProviderAdapter_Init_Call) RunAndReturn(run func(state plugins.State, functions plugins.ProviderFunctions, logger plugins.Logger) error) *MockProviderAdapter_Init_Call {
+func (_c *MockProviderAdapter_Init_Call) RunAndReturn(run func(state plugins.State, functions plugins.ProviderFunctions, logger1 logger.Logger) error) *MockProviderAdapter_Init_Call {
 	_c.Call.Return(run)
 	return _c
 }

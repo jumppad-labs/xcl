@@ -3,144 +3,191 @@ package logger
 import (
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/stretchr/testify/require"
 )
 
-type loggedCall struct {
-	level string
-	msg   string
-	args  []interface{}
-}
+// plainLogger is a Logger that is not an event logger, it discards every call
+type plainLogger struct{}
 
-// callRecorder records every call made to it
-type callRecorder struct {
-	calls []loggedCall
-}
+func (plainLogger) Info(msg string, args ...any)  {}
+func (plainLogger) Debug(msg string, args ...any) {}
+func (plainLogger) Warn(msg string, args ...any)  {}
+func (plainLogger) Error(msg string, args ...any) {}
 
-func (r *callRecorder) Info(msg string, args ...interface{}) {
-	r.calls = append(r.calls, loggedCall{"info", msg, args})
-}
-
-func (r *callRecorder) Debug(msg string, args ...interface{}) {
-	r.calls = append(r.calls, loggedCall{"debug", msg, args})
-}
-
-func (r *callRecorder) Warn(msg string, args ...interface{}) {
-	r.calls = append(r.calls, loggedCall{"warn", msg, args})
-}
-
-func (r *callRecorder) Error(msg string, args ...interface{}) {
-	r.calls = append(r.calls, loggedCall{"error", msg, args})
-}
-
-func TestWithTagStartsEveryMessageWithTheDefaultEventThenTheTag(t *testing.T) {
-	r := &callRecorder{}
-	l := WithTag(r, "provider", "postgres")
-
-	l.Info("create", "id", "resource.postgres.main")
-	l.Debug("read")
-	l.Warn("update")
-	l.Error("destroy")
-
-	require.Equal(t, []loggedCall{
-		{"info", "event=log provider=postgres create", []interface{}{"id", "resource.postgres.main"}},
-		{"debug", "event=log provider=postgres read", nil},
-		{"warn", "event=log provider=postgres update", nil},
-		{"error", "event=log provider=postgres destroy", nil},
-	}, r.calls)
-}
-
-func TestWithTagWritesOnlyTheEventAndTagForAnEmptyMessage(t *testing.T) {
-	r := &callRecorder{}
-	l := WithTag(r, "plugin", "example")
-
-	l.Info("", "id", "x")
-
-	require.Equal(t, []loggedCall{
-		{"info", "event=log plugin=example", []interface{}{"id", "x"}},
-	}, r.calls)
-}
-
-func TestWithTagNestedWritesOutermostTagFirst(t *testing.T) {
-	r := &callRecorder{}
-	pluginLogger := WithTag(r, "plugin", "example")
+func TestWithTagNestedKeepsEveryTag(t *testing.T) {
+	collector := &eventCollector{}
+	pluginLogger := WithTag(New(collector.emit, events.Event{}), "plugin", "example")
 	providerLogger := WithTag(pluginLogger, "provider", "postgres")
 
-	providerLogger.Info("create")
+	providerLogger.Info("calling provider")
 
-	require.Equal(t, []loggedCall{
-		{"info", "event=log plugin=example provider=postgres create", nil},
-	}, r.calls)
+	require.Len(t, collector.events, 1)
+	require.Equal(t, map[string]any{
+		"level":    "info",
+		"message":  "calling provider",
+		"plugin":   "example",
+		"provider": "postgres",
+	}, collector.events[0].Meta)
 }
 
-func TestWithTagMovesTheEventArgumentToLeadTheMessage(t *testing.T) {
-	r := &callRecorder{}
-	l := WithTag(r, "provider", "postgres")
+func TestWithTagNestedDoesNotAddTheInnerTagToTheOuterLogger(t *testing.T) {
+	collector := &eventCollector{}
+	pluginLogger := WithTag(New(collector.emit, events.Event{}), "plugin", "example")
+	_ = WithTag(pluginLogger, "provider", "postgres")
 
-	l.Info("calling provider", "event", "create", "resource", "resource.postgres.main")
+	pluginLogger.Info("calling provider")
 
-	require.Equal(t, []loggedCall{
-		{"info", "event=create provider=postgres calling provider", []interface{}{"resource", "resource.postgres.main"}},
-	}, r.calls)
+	require.Len(t, collector.events, 1)
+	require.Equal(t, map[string]any{
+		"level":   "info",
+		"message": "calling provider",
+		"plugin":  "example",
+	}, collector.events[0].Meta)
 }
 
-func TestWithTagRemovesTheEventArgumentWhenItIsTheOnlyArgument(t *testing.T) {
-	r := &callRecorder{}
-	l := WithTag(r, "provider", "postgres")
+func TestWithTagLaterTagWithTheSameKeyWins(t *testing.T) {
+	collector := &eventCollector{}
+	first := WithTag(New(collector.emit, events.Event{}), "provider", "postgres")
+	second := WithTag(first, "provider", "mysql")
 
-	l.Debug("", "event", "init")
+	second.Info("calling provider")
 
-	require.Len(t, r.calls, 1)
-	require.Equal(t, "debug", r.calls[0].level)
-	require.Equal(t, "event=init provider=postgres", r.calls[0].msg)
-	require.Empty(t, r.calls[0].args)
+	require.Len(t, collector.events, 1)
+	require.Equal(t, "mysql", collector.events[0].Meta["provider"])
 }
 
-func TestWithTagLiftsAnEventArgumentThatIsNotTheFirstArgument(t *testing.T) {
-	r := &callRecorder{}
-	l := WithTag(r, "provider", "postgres")
+func TestWithTagDetailGivenWithTheMessageOverridesATagWithTheSameKey(t *testing.T) {
+	collector := &eventCollector{}
+	l := WithTag(New(collector.emit, events.Event{}), "provider", "postgres")
 
-	l.Warn("changed", "resource", "resource.postgres.main", "event", "update", "field", "port")
+	l.Info("calling provider", "provider", "mysql")
 
-	require.Equal(t, []loggedCall{
-		{"warn", "event=update provider=postgres changed", []interface{}{"resource", "resource.postgres.main", "field", "port"}},
-	}, r.calls)
+	require.Len(t, collector.events, 1)
+	require.Equal(t, "mysql", collector.events[0].Meta["provider"])
 }
 
-func TestWithTagWritesTheDefaultEventForAMessageWithoutOne(t *testing.T) {
-	r := &callRecorder{}
-	l := WithTag(r, "provider", "postgres")
+func TestWithTagResourceIsNotAddedAsADetail(t *testing.T) {
+	collector := &eventCollector{}
+	l := WithTag(New(collector.emit, events.Event{}), "resource", "resource.network.frontend")
 
-	l.Error("destroy failed", "resource", "resource.postgres.main")
+	l.Info("calling provider")
 
-	require.Equal(t, []loggedCall{
-		{"error", "event=log provider=postgres destroy failed", []interface{}{"resource", "resource.postgres.main"}},
-	}, r.calls)
+	require.Len(t, collector.events, 1)
+	require.NotContains(t, collector.events[0].Meta, "resource")
 }
 
-func TestWithTagNestedKeepsTheEventBeforeEveryTag(t *testing.T) {
-	r := &callRecorder{}
-	pluginLogger := WithTag(r, "plugin", "example")
-	providerLogger := WithTag(pluginLogger, "provider", "postgres")
+func TestWithTagResourceFormatsANonStringValue(t *testing.T) {
+	collector := &eventCollector{}
+	l := WithTag(New(collector.emit, events.Event{}), "resource", 42)
 
-	providerLogger.Info("calling provider", "event", "create", "resource", "resource.postgres.main")
+	l.Info("calling provider")
 
-	require.Equal(t, []loggedCall{
-		{"info", "event=create plugin=example provider=postgres calling provider", []interface{}{"resource", "resource.postgres.main"}},
-	}, r.calls)
+	require.Len(t, collector.events, 1)
+	require.Equal(t, "42", collector.events[0].ResourceID)
 }
 
-func TestWithTagNestedWritesOnlyOneEventForAMessageWithoutOne(t *testing.T) {
-	r := &callRecorder{}
-	pluginLogger := WithTag(r, "plugin", "example")
-	providerLogger := WithTag(pluginLogger, "provider", "postgres")
+func TestWithTagReturnsANonEventLoggerUnchanged(t *testing.T) {
+	plain := plainLogger{}
 
-	providerLogger.Info("create")
+	tagged := WithTag(plain, "provider", "postgres")
 
-	require.Len(t, r.calls, 1)
-	require.Equal(t, "event=log plugin=example provider=postgres create", r.calls[0].msg)
+	require.Equal(t, Logger(plain), tagged)
 }
 
-func TestWithTagReturnsNilForNilLogger(t *testing.T) {
+func TestWithTagReturnsNilForANilLogger(t *testing.T) {
 	require.Nil(t, WithTag(nil, "plugin", "example"))
+}
+
+func TestWithSourceSetsTheSource(t *testing.T) {
+	collector := &eventCollector{}
+	l := WithSource(New(collector.emit, events.Event{Source: "core"}), "example")
+
+	l.Info("calling provider")
+
+	require.Len(t, collector.events, 1)
+	require.Equal(t, "example", collector.events[0].Source)
+}
+
+func TestWithSourceKeepsTheRestOfTheBaseEvent(t *testing.T) {
+	collector := &eventCollector{}
+	base := events.Event{
+		Source:       "core",
+		Operation:    "create",
+		ResourceType: "network.frontend",
+		ResourceID:   "resource.network.frontend",
+		File:         "/tmp/main.xcl",
+	}
+	l := WithSource(New(collector.emit, base), "example")
+
+	l.Info("calling provider")
+
+	require.Len(t, collector.events, 1)
+	e := collector.events[0]
+	require.Equal(t, "create", e.Operation)
+	require.Equal(t, "network.frontend", e.ResourceType)
+	require.Equal(t, "resource.network.frontend", e.ResourceID)
+	require.Equal(t, "/tmp/main.xcl", e.File)
+}
+
+func TestWithSourceKeepsTags(t *testing.T) {
+	collector := &eventCollector{}
+	tagged := WithTag(New(collector.emit, events.Event{}), "provider", "postgres")
+	l := WithSource(tagged, "example")
+
+	l.Info("calling provider")
+
+	require.Len(t, collector.events, 1)
+	require.Equal(t, map[string]any{
+		"level":    "info",
+		"message":  "calling provider",
+		"provider": "postgres",
+	}, collector.events[0].Meta)
+}
+
+func TestWithSourceKeepsAResourceSetByATag(t *testing.T) {
+	collector := &eventCollector{}
+	tagged := WithTag(New(collector.emit, events.Event{}), "resource", "resource.network.frontend")
+	l := WithSource(tagged, "example")
+
+	l.Info("calling provider")
+
+	require.Len(t, collector.events, 1)
+	require.Equal(t, "resource.network.frontend", collector.events[0].ResourceID)
+	require.Equal(t, "example", collector.events[0].Source)
+}
+
+func TestWithSourceDoesNotChangeTheOriginal(t *testing.T) {
+	collector := &eventCollector{}
+	original := New(collector.emit, events.Event{Source: "core"})
+	_ = WithSource(original, "example")
+
+	original.Info("calling provider")
+
+	require.Len(t, collector.events, 1)
+	require.Equal(t, "core", collector.events[0].Source)
+}
+
+func TestWithSourceTagAddedAfterwardsDoesNotReachTheOriginal(t *testing.T) {
+	collector := &eventCollector{}
+	original := WithTag(New(collector.emit, events.Event{}), "provider", "postgres")
+	sourced := WithSource(original, "example")
+	_ = WithTag(sourced, "plugin", "example")
+
+	original.Info("calling provider")
+
+	require.Len(t, collector.events, 1)
+	require.NotContains(t, collector.events[0].Meta, "plugin")
+}
+
+func TestWithSourceReturnsANonEventLoggerUnchanged(t *testing.T) {
+	plain := plainLogger{}
+
+	sourced := WithSource(plain, "example")
+
+	require.Equal(t, Logger(plain), sourced)
+}
+
+func TestWithSourceReturnsNilForANilLogger(t *testing.T) {
+	require.Nil(t, WithSource(nil, "example"))
 }

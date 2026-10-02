@@ -59,8 +59,7 @@ func TestApplyRecordsModuleAsParentOfItsResources(t *testing.T) {
 	h := setupRegisteredTypes(t)
 
 	h.applyAndSave(t, registeredBasicConfig)
-	saved, err := h.store.Load()
-	require.NoError(t, err)
+	saved := loadTyped(t, h.store, h.registry)
 
 	require.Equal(
 		t,

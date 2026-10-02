@@ -1,0 +1,43 @@
+# Covers every shape the conversion to configuration text has to handle:
+# a kind led registered type with a nested block, a bare registered type that
+# leads its own declaration, a plugin type whose provider fills in a computed
+# value, a plugin type with a repeated block, and a builtin that conversion
+# refuses.
+
+variable "region" {
+  default = "us-east"
+}
+
+resource "database" "main" {
+  location = variable.region
+  port     = 5432
+
+  timeouts {
+    connect = 30
+    read    = 60
+  }
+}
+
+cache "main" {
+  location = "us-east"
+}
+
+# the provider sets provider_id on create, so this is the entity that shows a
+# computed value appearing only when it is asked for
+resource "network" "main" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "container" "web" {
+  command = ["nginx", "-g", "daemon off;"]
+
+  network {
+    name       = resource.network.main.meta.name
+    ip_address = "10.0.0.10"
+  }
+
+  network {
+    name       = resource.network.main.meta.name
+    ip_address = "10.0.0.11"
+  }
+}

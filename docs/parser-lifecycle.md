@@ -6,7 +6,7 @@ of provider calls. It lives in `internal/parser/`.
 ## `Parser.Apply` — the single entry point
 
 ```go
-func (p *Parser) Apply(paths ...string) (*State, error)
+func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error)
 ```
 
 ([`internal/parser/parser.go`](../internal/parser/parser.go)) does,
@@ -40,14 +40,18 @@ If a removal in step 3 fails, `Apply` stops there; if a provider call fails
 in the walk, `Apply` returns the state the walk reached. Either way the error
 comes back with a state to save, see
 [State saved after a failed apply](#state-saved-after-a-failed-apply). An
-apply that removes nothing skips step 3 entirely.
+apply that removes nothing skips step 3 entirely. `ctx` is the operation's
+context; once it is cancelled no new provider call starts, see
+[The operation context](#the-operation-context).
 
 ```go
-func (p *Parser) Validate(paths ...string) error
+func (p *Parser) Validate(ctx context.Context, paths ...string) error
 ```
 
 is the checking half on its own: it runs `parseAndValidate` and stops there,
-so it never reaches steps 2-7. This is what `Config.Validate` calls.
+so it never reaches steps 2-7. This is what `Config.Validate` calls. It
+reaches no provider, so it takes `ctx` only for symmetry with `Apply` and
+`Destroy`.
 
 ### The validation gate
 
@@ -111,20 +115,22 @@ because it holds the identity needed to try the destroy again on the next
 apply.
 
 After `Create`, `Read` and `Update`, the lifecycle compares the resource it
-sent with what the provider returned and logs a warning for every configured
-(non-computed) value the provider changed
-([`configured_check.go`](../internal/parser/configured_check.go)). The
-warning never fails the apply. The
+sent with what the provider returned and emits a warn log event for every
+configured (non-computed) value the provider changed
+([`configured_check.go`](../internal/parser/configured_check.go)): message
+`provider changed a configured value`, the resource and step on the event and
+the field path in `Meta["field"]`. The warning never fails the apply. The
 [Plugin Developer Guide](plugin-developer-guide.md) describes what providers
 may change in each call.
 
 Builtin types with no provider (`variable`, `output`, `module`, the DAG
-root) are skipped early — see "Instrumentation" below for a subtlety here.
+root) are skipped early — see [Builtin types](#builtin-types) under Events
+below for a subtlety here.
 
 ### Destroy
 
 ```go
-func (p *Parser) Destroy(saved []any) (*State, error)
+func (p *Parser) Destroy(ctx context.Context, saved []any) (*State, error)
 ```
 
 ([`internal/parser/parser.go`](../internal/parser/parser.go#L301)) destroys
@@ -205,39 +211,69 @@ instantiate resources from HCL) is a *different* method not covered by
 `ProviderResolver` — a real registry is still needed for that part even in
 tests that mock the lifecycle-call path.
 
-## Instrumentation: `ParserEvent`
+## Events: `ParserOptions.Emit`
 
-[`internal/parser/events.go`](../internal/parser/events.go) defines a
-lightweight, purely observational event stream. Set
-`ParserOptions.OnParserEvent` and the parser calls it once per event, in the
-order the DAG walk produces them. `fireParserEvent(options, ...)` is a
-nil-safe helper — a no-op when no callback is set.
+The parser reports everything it does as `events.Event` values
+([`events/events.go`](../events/events.go)), the one flat event shape xcl and
+its plugins share. Set `ParserOptions.Emit` (an `events.Emit`) and the parser
+calls it for every event; a nil `Emit` is silent. The helpers in
+[`internal/parser/events.go`](../internal/parser/events.go) (`emit`,
+`emitLifecycle`, `emitParse`, `emitOperationError`) are nil-safe and skip
+building an event nobody receives. `Emit` may be called from several
+goroutines at once, since unrelated resources are walked in parallel; the
+runner in `Config` orders them for the receiver (see
+[Operation events and the runner](#operation-events-and-the-runner)).
 
 ```go
-type ParserEvent struct {
-    Operation    string        // "create", "read", "changed", "update", "destroy"
-    ResourceType string        // "<type>.<name>", e.g. "container.base"
-    ResourceID   string        // full resource ID, e.g. "resource.container.base"
-    Phase        string        // "start", "success", "error"
-    Duration     time.Duration // time spent in the provider call; 0 for "start"
-    Error        error         // the provider's error; only set for "error"
-    Data         []byte        // the resource serialized to JSON; nil for builtin types
+type Event struct {
+    Time         time.Time      // stamped when emitted if zero
+    Source       string         // events.SourceCore ("core") for the parser
+    Operation    string         // "parse", "validate", "apply", "create", "read", "changed", "update", "destroy", ...
+    Phase        string         // "start", "success", "error", "log", "blocked"
+    ResourceType string         // "<type>.<name>", e.g. "container.base"
+    ResourceID   string         // full resource ID, e.g. "resource.container.base"
+    File         string         // the file the resource was declared in
+    Duration     time.Duration  // time spent in the provider call; 0 for "start"
+    Error        error          // set for "error"
+    Data         []byte         // the resource serialized to JSON; nil for builtin types
+    Meta         map[string]any // details, e.g. a log event's level and message
 }
 ```
 
+Operations and phases are constants in the `events` package
+(`events.OperationCreate`, `events.PhaseStart`, ...), not string literals.
+
 ### Operation and phase
 
-`Operation` names the provider method being called. `Phase` says where in
-that call the event was fired:
+For lifecycle events, `Operation` names the provider method being called.
+`Phase` says where in that call the event was fired:
 
 | Phase | Fired | `Duration` | `Error` |
 |---|---|---|---|
 | `start` | immediately before the provider method is called | 0 | nil |
+| `log` | for each message the provider logs during the call, see below | 0 | nil |
 | `success` | after the method returns without error | time the call took | nil |
 | `error` | after the method returns an error | time the call took | the provider's error |
 
-Every provider call is bracketed: one `start`, then exactly one of `success`
-or `error`.
+Every provider call is bracketed: one `start`, any number of `log` events,
+then exactly one of `success` or `error`.
+
+The parser also emits:
+
+- **`parse`** — a `success` or `error` for every block as it is read, with
+  the `File` it came from. A file that is not valid syntax gives an error
+  with only `File` set.
+- **`validate`** — an `error` for every problem the
+  [validation gate](#the-validation-gate) finds, naming the resource declared
+  at the problem's position when there is one, otherwise only the file.
+- **`apply`** / **`destroy`** errors with no resource — a failure of the
+  operation as a whole, such as a dependency graph that can't be built.
+- **`apply`** errors for a resource that failed in the walk before any
+  provider call, such as a body that does not decode. A resource whose type
+  has no provider gets an error on the step it would have started with
+  (`create`, `read` or `destroy`).
+
+Every failure the parser returns is also emitted as an error event.
 
 ### Event sequences per resource
 
@@ -281,13 +317,69 @@ way, whichever operation it came from:
 - The one exception is `plugins.ErrNotFound` from `read`: the `error` event
   fires, but the lifecycle creates the resource again instead of failing.
 
-### Who can subscribe
+## The operation context
 
-`Parser` lives under `internal/`, but `Config` forwards the stream to the
-handler set with `xcl.WithEventHandler` ([`events.go`](../events.go)) during
-`Apply`, `Destroy` and, for parse events, `Validate`. Tests inside this module
-also set `OnParserEvent` directly to assert on provider calls and DAG-walk
-order.
+`Validate`, `Apply` and `Destroy` take the operation's `context.Context`.
+`Config` cancels it only when the application's event receiver panics (see
+below), but the parser treats any cancellation the same way:
+
+- **A cancellation check before each provider call.** `callProvider`
+  ([`lifecycle.go`](../internal/parser/lifecycle.go)) and the destroy
+  callback ([`callbacks.go`](../internal/parser/callbacks.go)) check
+  `ctx.Err()` before starting a call. Once it is cancelled no new call
+  starts and no event is fired for it; the resource is treated as not
+  reached, so it keeps its previous entry in the state. `Apply` returns the
+  partial state with `apply stopped before every resource was reached`
+  wrapping `ctx`'s error, and `Destroy` returns what is left with
+  `destroy stopped before every resource was reached`.
+- **A provider context that is never cancelled.** Each call is made with
+  `providerContext(...)` ([`events.go`](../internal/parser/events.go)),
+  built on `context.WithoutCancel(ctx)`, so a call already running always
+  finishes and its result is recorded.
+- **A per-call bound logger.** `providerContext` also puts a logger in the
+  call's context with `plugins.WithLogger`. It is `logger.New(Emit, base)`,
+  where `base` carries the resource's `ResourceID`, `ResourceType` and `File`
+  and the step as `Operation`, so every message a provider writes through
+  `plugins.Logger(ctx)` becomes a `log` event between the call's `start` and
+  its `success` or `error`, with no resource details passed by the provider.
+  The plugin's host sets the event's `Source` to the plugin's name (see
+  [Plugin logging](plugins.md#plugin-logging)).
+
+## Operation events and the runner
+
+`Parser` lives under `internal/`; applications receive its events through
+`Config`, which wraps every `Validate`, `Apply` and `Destroy` in `run`
+([`config.go`](../config.go)) and delivers to the handler set with
+`xcl.WithEventHandler`:
+
+- The operation emits its own `validate`, `apply` or `destroy` `start` event
+  first, and a `success` or `error` event, carrying the error the call
+  returns, last. Everything else, plugin `discover`/`load` events, `parse`
+  events and the resource lifecycle, comes in between.
+- Before the work, `withPlugins` calls the registry's `Activate(emit)`, so
+  messages plugins write outside a provider call reach this operation, then
+  `Load(emit)`, which loads the plugins on the first operation only.
+- With no handler, the work runs directly with a nil `Emit` and nothing is
+  started. With one, the work runs on a worker goroutine and emits into an
+  [`internal/eventstream`](../internal/eventstream/stream.go) `Stream`, a
+  bounded queue of `WithEventBufferSize` events (default
+  `DefaultEventBufferSize`, 1024). The calling goroutine runs `Drain`, which
+  calls the handler one event at a time in emit order.
+- Emitting waits only when the queue is full and never drops an event. Each
+  stretch of waiting is announced once, afterwards, as an `events` /
+  `blocked` event whose `Duration` is how long emitters waited; it is held
+  aside and delivered ahead of the queue, so it never takes a queue slot.
+- `run` returns once the work has finished and every event it emitted has
+  been delivered.
+- A panic in the handler happens on the calling goroutine and is not
+  recovered. The deferred shutdown cancels the operation context, so no new
+  provider call starts, calls `Discard` so emitters blocked on the full queue
+  are released and later events dropped, and waits for the worker, which lets
+  calls in progress finish and saves state. The panic then continues with
+  the handler's own value and stack.
+
+Tests inside this module set `ParserOptions.Emit` directly to assert on
+provider calls and DAG-walk order.
 
 ## State saved after a failed apply
 

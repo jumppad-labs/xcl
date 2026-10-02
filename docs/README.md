@@ -31,18 +31,20 @@ not at end users writing `.xcl` config.
 
 | Path | Purpose |
 |---|---|
-| `config.go`, `options.go` | Public facade: `Config` and functional options |
+| `config.go`, `options.go`, `events.go` | Public facade: `Config`, functional options, the `Event`/`EventHandler` aliases, and the runner that delivers each operation's events |
 | `types/` | Shared resource metadata: `types.Meta`, `types.ResourceBase`, reflection helpers |
 | `plugins/` | Provider contract (`ProviderAdapter`) and hosting (in-process / gRPC) |
-| `plugins/registry/` | `PluginRegistry` — aggregates plugin hosts, resolves types to adapters |
-| `internal/parser/` | HCL parsing, DAG construction, DAG walk, lifecycle calls, event instrumentation |
+| `plugins/registry/` | `PluginRegistry` — records plugins, loads them on the first operation, aggregates plugin hosts, resolves types to adapters |
+| `events/` | The one event shape (`events.Event`), the `Handler`/`Emit` types, the operation, phase and level constants, and `SlogHandler`, the adapter to `log/slog` |
+| `internal/eventstream/` | Delivers one operation's events: a bounded queue that emitters wait on only when it is full, drained into the application's receiver on the calling goroutine |
+| `internal/parser/` | HCL parsing, DAG construction, DAG walk, lifecycle calls, emitting parse, validate and lifecycle events |
 | `internal/resources/` | Built-in resource types: `module`, `output`, `variable`, `root` |
 | `internal/schema/` | Reflection-based JSON schema generation/instantiation (Go struct ⇄ schema ⇄ dynamic struct) |
 | `internal/modules/` | HTTP client for a Terraform-registry-style remote module API (not yet wired in) |
 | `internal/functions/` | Custom HCL functions available to config authors |
 | `state/` | `StateStore` interface (exchanges plain entities), `FileStateStore`, state error types |
-| `errors/` | Structured error types (`ParserError`, `ConfigError`) |
-| `logger/` | Pluggable `Logger` interface + implementations |
-| `example/` | Three runnable, tested examples, each with its own `config/` and `resources/`: `appconfig` (a single application block decoded into a Go type), `configonly` (a Kubernetes-like configuration parsed into registered types, no plugin) and `plugin` (an in-process and an external plugin, each providing two block types), sharing the `eventlog/` event handler |
+| `errors/` | Structured error types (`ParserError`, `ConfigError`, `PluginLoadError`) |
+| `logger/` | The `Logger` interface providers log through; its one implementation, `logger.New`, turns every log call into a log event |
+| `example/` | Three runnable, tested examples, each with its own `config/` and `resources/`: `appconfig` (a single application block decoded into a Go type), `configonly` (a Kubernetes-like configuration parsed into registered types, no plugin) and `plugin` (an in-process and an external plugin, each providing two block types), sharing the `prettylog/` event receiver |
 
 See individual pages for details on how these pieces connect.

@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -19,9 +19,7 @@ func TestPluginDiscoverySingleValidPlugin(t *testing.T) {
 
 	setup.copyPlugin(examplePlugin, validDir, "xcl-plugin-test")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{validDir}, "xcl-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{validDir}, "xcl-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -52,9 +50,7 @@ func TestPluginDiscoveryMultipleValidPlugins(t *testing.T) {
 	setup.copyPlugin(examplePlugin, validDir, "xcl-plugin-one")
 	setup.copyPlugin(examplePlugin, validDir, "xcl-plugin-two")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{validDir}, "xcl-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{validDir}, "xcl-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -84,9 +80,7 @@ func TestPluginDiscoveryPluginNotMatchingPattern(t *testing.T) {
 
 	setup.copyPlugin(examplePlugin, invalidDir, "not-a-plugin")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{invalidDir}, "xcl-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{invalidDir}, "xcl-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -106,9 +100,7 @@ func TestPluginDiscoveryNonExecutableFile(t *testing.T) {
 
 	setup.createNonExecutable(invalidDir, "xcl-plugin-fake")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{invalidDir}, "xcl-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{invalidDir}, "xcl-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -132,9 +124,7 @@ func TestPluginDiscoveryMixedDirectory(t *testing.T) {
 	setup.createNonExecutable(mixedDir, "xcl-plugin-text.txt")
 	setup.copyPlugin(examplePlugin, mixedDir, "wrong-pattern")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{mixedDir}, "xcl-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{mixedDir}, "xcl-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -162,9 +152,7 @@ func TestPluginDiscoveryEmptyDirectory(t *testing.T) {
 	setup := newTestPluginSetup(t)
 	emptyDir := setup.createPluginDir("empty")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{emptyDir}, "xcl-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{emptyDir}, "xcl-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -182,9 +170,7 @@ func TestPluginDiscoveryNonExistentDirectory(t *testing.T) {
 	setup := newTestPluginSetup(t)
 	nonExistentDir := filepath.Join(setup.testDir, "non-existent")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{nonExistentDir}, "xcl-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{nonExistentDir}, "xcl-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -208,9 +194,7 @@ func TestPluginDiscoveryMultipleDirectories(t *testing.T) {
 	setup.copyPlugin(examplePlugin, validDir, "xcl-plugin-dir1")
 	setup.copyPlugin(examplePlugin, mixedDir, "xcl-plugin-dir2")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{validDir, mixedDir, emptyDir}, "xcl-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{validDir, mixedDir, emptyDir}, "xcl-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -241,9 +225,7 @@ func TestPluginDiscoveryCustomPattern(t *testing.T) {
 	setup.copyPlugin(examplePlugin, validDir, "my-custom-plugin-test")
 	setup.copyPlugin(examplePlugin, validDir, "xcl-plugin-ignored")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{validDir}, "my-custom-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{validDir}, "my-custom-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -273,9 +255,7 @@ func TestPluginDiscoveryDuplicateDirectories(t *testing.T) {
 
 	setup.copyPlugin(examplePlugin, validDir, "xcl-plugin-unique")
 
-	testLogger := logger.NewTestLogger(t)
-
-	pd := NewPluginDiscovery([]string{validDir, validDir, validDir}, "xcl-plugin-*", testLogger)
+	pd := NewPluginDiscovery([]string{validDir, validDir, validDir}, "xcl-plugin-*", nil)
 	plugins, err := pd.DiscoverPlugins()
 
 	if err != nil {
@@ -465,33 +445,80 @@ func TestExpandPluginDirectoriesMixedPaths(t *testing.T) {
 	}
 }
 
-func TestDiscoverAndLoadPluginsLoadsDiscoveredPlugins(t *testing.T) {
+func TestPluginDiscoveryReportsWhatItFindsAsDiscoverLogEvents(t *testing.T) {
+	setup := newTestPluginSetup(t)
+	validDir := setup.createPluginDir("valid")
+	examplePlugin := setup.buildExamplePlugin("test-plugin-base")
+	pluginPath := setup.copyPlugin(examplePlugin, validDir, "xcl-plugin-test")
+
+	recorder := &eventRecorder{}
+
+	pd := NewPluginDiscovery([]string{validDir}, "xcl-plugin-*", recorder.emit)
+	_, err := pd.DiscoverPlugins()
+	require.NoError(t, err)
+
+	found := logsWithMessage(recorder.recorded(), "Found plugin")
+	require.Len(t, found, 1)
+	require.Equal(t, events.SourceCore, found[0].Source)
+	require.Equal(t, events.OperationDiscover, found[0].Operation)
+	require.Equal(t, pluginPath, found[0].Meta["path"])
+}
+
+func TestPluginDiscoveryWithANilEmitDoesNotPanic(t *testing.T) {
+	setup := newTestPluginSetup(t)
+	emptyDir := setup.createPluginDir("empty")
+
+	require.NotPanics(t, func() {
+		_, err := NewPluginDiscovery([]string{emptyDir}, "xcl-plugin-*", nil).DiscoverPlugins()
+		require.NoError(t, err)
+	})
+}
+
+func TestDiscoverPluginsStartsNothingBeforeLoad(t *testing.T) {
 	setup := newTestPluginSetup(t)
 	pluginDir := setup.createPluginDir("plugins")
 
 	examplePlugin := setup.buildExamplePlugin("test-plugin")
 	setup.copyPlugin(examplePlugin, pluginDir, "xcl-plugin-example")
 
-	testLogger := logger.NewTestLogger(t)
-	r := NewPluginRegistry(testLogger)
+	r := NewPluginRegistry()
 
-	err := r.DiscoverAndLoadPlugins(testLogger, []string{pluginDir}, "xcl-plugin-*")
+	r.DiscoverPlugins([]string{pluginDir}, "xcl-plugin-*")
+
+	require.Empty(t, r.GetPluginHosts())
+	require.False(t, r.Loaded())
+}
+
+func TestLoadStartsDiscoveredPlugins(t *testing.T) {
+	setup := newTestPluginSetup(t)
+	pluginDir := setup.createPluginDir("plugins")
+
+	examplePlugin := setup.buildExamplePlugin("test-plugin")
+	setup.copyPlugin(examplePlugin, pluginDir, "xcl-plugin-example")
+
+	r := NewPluginRegistry()
+	t.Cleanup(func() { stopHosts(r) })
+
+	r.DiscoverPlugins([]string{pluginDir}, "xcl-plugin-*")
+
+	err := r.Load(nil)
 	require.NoError(t, err)
 
 	require.Len(t, r.GetPluginHosts(), 1)
 }
 
-func TestDiscoverAndLoadPluginsLoadsNothingWhenNoPluginMatches(t *testing.T) {
+func TestLoadStartsNothingWhenNoDiscoveredPluginMatches(t *testing.T) {
 	setup := newTestPluginSetup(t)
 	pluginDir := setup.createPluginDir("plugins")
 
 	examplePlugin := setup.buildExamplePlugin("test-plugin")
 	setup.copyPlugin(examplePlugin, pluginDir, "not-a-matching-name")
 
-	testLogger := logger.NewTestLogger(t)
-	r := NewPluginRegistry(testLogger)
+	r := NewPluginRegistry()
 
-	err := r.DiscoverAndLoadPlugins(testLogger, []string{pluginDir}, "xcl-plugin-*")
+	r.DiscoverPlugins([]string{pluginDir}, "xcl-plugin-*")
+
+	err := r.Load(nil)
 	require.NoError(t, err)
 
 	require.Empty(t, r.GetPluginHosts())
@@ -505,20 +532,22 @@ type Person struct {
 	FirstName string `xcl:"first_name" json:"first_name"`
 }
 
-func TestDiscoverAndLoadPluginsRejectsPluginClashingWithRegisteredType(t *testing.T) {
+func TestLoadRejectsDiscoveredPluginClashingWithRegisteredType(t *testing.T) {
 	setup := newTestPluginSetup(t)
 	pluginDir := setup.createPluginDir("plugins")
 
 	examplePlugin := setup.buildExamplePlugin("test-plugin")
 	setup.copyPlugin(examplePlugin, pluginDir, "xcl-plugin-test")
 
-	testLogger := logger.NewTestLogger(t)
-	r := NewPluginRegistry(testLogger)
+	r := NewPluginRegistry()
+	t.Cleanup(func() { stopHosts(r) })
 
 	err := r.RegisterType("person", &Person{})
 	require.NoError(t, err)
 
-	err = r.DiscoverAndLoadPlugins(testLogger, []string{pluginDir}, "xcl-plugin-*")
+	r.DiscoverPlugins([]string{pluginDir}, "xcl-plugin-*")
+
+	err = r.Load(nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, `"person"`)
 
@@ -531,7 +560,7 @@ func TestDiscoverAndLoadPluginsRejectsPluginClashingWithRegisteredType(t *testin
 	require.True(t, r.IsRegisteredType("person"))
 }
 
-func TestDiscoverAndLoadPluginsRejectsSecondPluginProvidingSameType(t *testing.T) {
+func TestLoadRejectsSecondDiscoveredPluginProvidingSameType(t *testing.T) {
 	setup := newTestPluginSetup(t)
 	pluginDir := setup.createPluginDir("plugins")
 
@@ -539,10 +568,12 @@ func TestDiscoverAndLoadPluginsRejectsSecondPluginProvidingSameType(t *testing.T
 	setup.copyPlugin(examplePlugin, pluginDir, "xcl-plugin-one")
 	setup.copyPlugin(examplePlugin, pluginDir, "xcl-plugin-two")
 
-	testLogger := logger.NewTestLogger(t)
-	r := NewPluginRegistry(testLogger)
+	r := NewPluginRegistry()
+	t.Cleanup(func() { stopHosts(r) })
 
-	err := r.DiscoverAndLoadPlugins(testLogger, []string{pluginDir}, "xcl-plugin-*")
+	r.DiscoverPlugins([]string{pluginDir}, "xcl-plugin-*")
+
+	err := r.Load(nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, `"person"`)
 
@@ -552,23 +583,39 @@ func TestDiscoverAndLoadPluginsRejectsSecondPluginProvidingSameType(t *testing.T
 	require.Equal(t, "plugin", clash.Existing)
 
 	require.Len(t, r.GetPluginHosts(), 1)
-
-	for _, host := range r.GetPluginHosts() {
-		host.Stop()
-	}
 }
 
-func TestRegisterPluginWithPathRejectsRegisteredTypeName(t *testing.T) {
+func TestLoadFailsWhenEveryDiscoveredPluginFailsToStart(t *testing.T) {
+	setup := newTestPluginSetup(t)
+	pluginDir := setup.createPluginDir("plugins")
+
+	setup.createNonPlugin(pluginDir, "xcl-plugin-bad")
+
+	r := NewPluginRegistry()
+
+	r.DiscoverPlugins([]string{pluginDir}, "xcl-plugin-*")
+
+	err := r.Load(nil)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "all plugin loads failed")
+
+	require.Empty(t, r.GetPluginHosts())
+}
+
+func TestLoadRejectsExplicitPluginPathClashingWithRegisteredType(t *testing.T) {
 	setup := newTestPluginSetup(t)
 	examplePlugin := setup.buildExamplePlugin("test-plugin")
 
-	testLogger := logger.NewTestLogger(t)
-	r := NewPluginRegistry(testLogger)
+	r := NewPluginRegistry()
+	t.Cleanup(func() { stopHosts(r) })
 
 	err := r.RegisterType("person", &Person{})
 	require.NoError(t, err)
 
 	err = r.RegisterPluginWithPath(examplePlugin)
+	require.NoError(t, err)
+
+	err = r.Load(nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, `"person"`)
 	require.ErrorContains(t, err, examplePlugin)
@@ -581,12 +628,12 @@ func TestRegisterPluginWithPathRejectsRegisteredTypeName(t *testing.T) {
 	require.Empty(t, r.GetPluginHosts())
 }
 
-func TestRegisterPluginWithPathLoadsPluginWithoutClash(t *testing.T) {
+func TestLoadStartsExplicitPluginPathWithoutClash(t *testing.T) {
 	setup := newTestPluginSetup(t)
 	examplePlugin := setup.buildExamplePlugin("test-plugin")
 
-	testLogger := logger.NewTestLogger(t)
-	r := NewPluginRegistry(testLogger)
+	r := NewPluginRegistry()
+	t.Cleanup(func() { stopHosts(r) })
 
 	err := r.RegisterType("thing", &Thing{})
 	require.NoError(t, err)
@@ -594,9 +641,50 @@ func TestRegisterPluginWithPathLoadsPluginWithoutClash(t *testing.T) {
 	err = r.RegisterPluginWithPath(examplePlugin)
 	require.NoError(t, err)
 
-	require.Len(t, r.GetPluginHosts(), 1)
+	err = r.Load(nil)
+	require.NoError(t, err)
 
-	for _, host := range r.GetPluginHosts() {
-		host.Stop()
-	}
+	require.Len(t, r.GetPluginHosts(), 1)
+}
+
+func TestDiscoveryReportsDiscoverLoadAndRejectEvents(t *testing.T) {
+	setup := newTestPluginSetup(t)
+	pluginDir := setup.createPluginDir("plugins")
+
+	examplePlugin := setup.buildExamplePlugin("test-plugin")
+	setup.copyPlugin(examplePlugin, pluginDir, "xcl-plugin-good")
+	badPath := setup.createNonPlugin(pluginDir, "xcl-plugin-bad")
+
+	recorder := &eventRecorder{}
+	r := NewPluginRegistry()
+	t.Cleanup(func() { stopHosts(r) })
+
+	r.DiscoverPlugins([]string{pluginDir}, "xcl-plugin-*")
+
+	err := r.Load(recorder.emit)
+	require.NoError(t, err)
+
+	discovered := lifecycleEvents(recorder.recorded(), events.OperationDiscover)
+	require.Len(t, discovered, 2)
+
+	require.Equal(t, events.SourceCore, discovered[0].Source)
+	require.Equal(t, events.PhaseStart, discovered[0].Phase)
+	require.Equal(t, map[string]any{"dirs": []string{pluginDir}}, discovered[0].Meta)
+
+	require.Equal(t, events.SourceCore, discovered[1].Source)
+	require.Equal(t, events.PhaseSuccess, discovered[1].Phase)
+	require.Equal(t, map[string]any{"dirs": []string{pluginDir}, "count": 2}, discovered[1].Meta)
+
+	loads := lifecycleEvents(recorder.recorded(), events.OperationLoad)
+
+	succeeded := eventsWithPhase(loads, events.PhaseSuccess)
+	require.Len(t, succeeded, 1)
+	require.Equal(t, events.SourceCore, succeeded[0].Source)
+	require.Equal(t, map[string]any{"plugin": "xcl-plugin-good", "block_types": "person"}, succeeded[0].Meta)
+
+	rejected := eventsWithPhase(loads, events.PhaseError)
+	require.Len(t, rejected, 1)
+	require.Equal(t, events.SourceCore, rejected[0].Source)
+	require.Error(t, rejected[0].Error)
+	require.Equal(t, map[string]any{"plugin": "xcl-plugin-bad", "path": badPath, "rejected": true}, rejected[0].Meta)
 }

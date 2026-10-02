@@ -1,5 +1,6 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
+// Modifications Copyright (c) Jumppad Labs
 
 package hclwrite
 
@@ -80,6 +81,19 @@ func (n *node) ReplaceWith(c nodeContent) *node {
 	if after != nil {
 		after.before = nn
 	}
+
+	// Upstream rewired the neighbours but left the list's own endpoints
+	// pointing at the node just detached. Replacing the first node then left
+	// first on a node whose after is nil, so walking the list yielded only
+	// that one and dropped everything after it, and replacing the last node
+	// left last stale for anything appending afterwards.
+	if list.first == n {
+		list.first = nn
+	}
+	if list.last == n {
+		list.last = nn
+	}
+
 	return nn
 }
 

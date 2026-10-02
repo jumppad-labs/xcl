@@ -1,16 +1,17 @@
 package parser
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
-	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -55,9 +56,9 @@ type lifecycleHarness struct {
 	store     *state.FileStateStore
 	statePath string
 
-	// log, when set, is the logger every parser built by newParser uses in
-	// place of a test logger
-	log logger.Logger
+	// emit, when set, receives the events of every parser built by newParser
+	// that is given no emit of its own
+	emit events.Emit
 }
 
 // setupLifecycle redirects HOME to a temp dir, registers a TestPlugin into a new
@@ -71,15 +72,16 @@ func setupLifecycle(t *testing.T) *lifecycleHarness {
 		os.Setenv("HOME", home)
 	})
 
-	reg := registry.NewPluginRegistry(logger.NewTestLogger(t))
+	reg := registry.NewPluginRegistry()
 
 	testPlugin := &TestPlugin{}
 	err := reg.RegisterPlugin(testPlugin)
 	require.NoError(t, err)
 
-	statePath := filepath.Join(t.TempDir(), "state.json")
-	store, err := state.NewFileStateStore(statePath, reg)
+	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
+
+	statePath := store.Path()
 
 	return &lifecycleHarness{
 		registry:  reg,
@@ -90,19 +92,36 @@ func setupLifecycle(t *testing.T) *lifecycleHarness {
 }
 
 // newParser builds a fresh Parser that shares the harness registry and state
-// store. onEvent may be nil.
-func (h *lifecycleHarness) newParser(t *testing.T, onEvent func(ParserEvent)) *Parser {
+// store. emit may be nil, in which case the harness emit, if any, is used.
+// newParserWithEventData is newParser for a test that asserts on Event.Data,
+// which carries nothing unless a level asks for it
+func (h *lifecycleHarness) newParserWithEventData(t *testing.T, emit events.Emit, level events.DataLevel) *Parser {
 	t.Helper()
 
 	options := testOptions(t)
-	options.Logger = logger.NewTestLogger(t)
-	if h.log != nil {
-		options.Logger = h.log
-	}
-
 	options.PluginRegistry = h.registry
 	options.StateStore = h.store
-	options.OnParserEvent = onEvent
+	options.EventData = level
+
+	options.Emit = emit
+	if options.Emit == nil {
+		options.Emit = h.emit
+	}
+
+	return NewParser(options)
+}
+
+func (h *lifecycleHarness) newParser(t *testing.T, emit events.Emit) *Parser {
+	t.Helper()
+
+	options := testOptions(t)
+	options.PluginRegistry = h.registry
+	options.StateStore = h.store
+
+	options.Emit = emit
+	if options.Emit == nil {
+		options.Emit = h.emit
+	}
 
 	return NewParser(options)
 }
@@ -114,7 +133,7 @@ func (h *lifecycleHarness) applyAndSave(t *testing.T, path string) *State {
 
 	p := h.newParser(t, nil)
 
-	st, err := p.Apply(path)
+	st, err := p.Apply(context.Background(), path)
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
@@ -132,7 +151,7 @@ func (h *lifecycleHarness) applyAndSaveExpectingFailure(t *testing.T, path strin
 
 	p := h.newParser(t, nil)
 
-	st, err := p.Apply(path)
+	st, err := p.Apply(context.Background(), path)
 	require.Error(t, err)
 
 	if st != nil {
@@ -147,11 +166,24 @@ func (h *lifecycleHarness) applyAndSaveExpectingFailure(t *testing.T, path strin
 func (h *lifecycleHarness) loadSaved(t *testing.T) []any {
 	t.Helper()
 
-	saved, err := h.store.Load()
-	require.NoError(t, err)
+	saved := loadTyped(t, h.store, h.registry)
 	require.NotNil(t, saved)
 
 	return saved
+}
+
+// loadTyped loads what store saved and types each record with reg, the way
+// the parser reads previous state
+func loadTyped(t *testing.T, store state.StateStore, reg *registry.PluginRegistry) []any {
+	t.Helper()
+
+	loaded, err := store.Load()
+	require.NoError(t, err)
+
+	entities, err := savedentity.DecodeAll(reg, loaded)
+	require.NoError(t, err)
+
+	return entities
 }
 
 // resourceStatus returns the status recorded for the resource in the given entities.
@@ -179,28 +211,41 @@ func callsFor(calls []string, resourceID string) []string {
 	return matching
 }
 
-// eventCollector gathers parser events; the walker fires them in parallel.
-// eventCollector records the lifecycle events of an apply. Parse events, fired
-// as each block is read, are not recorded, they have tests of their own.
+// eventCollector records the events of an apply other than parse events,
+// which are fired as each block is read and have tests of their own. The
+// walker emits events from several goroutines at once.
 type eventCollector struct {
-	mu     sync.Mutex
-	events []ParserEvent
+	mu       sync.Mutex
+	recorded []events.Event
 }
 
-func (c *eventCollector) collect(event ParserEvent) {
-	if event.Operation == "parse" {
+func (c *eventCollector) collect(event events.Event) {
+	if event.Operation == events.OperationParse {
 		return
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.events = append(c.events, event)
+	c.recorded = append(c.recorded, event)
 }
 
-func (c *eventCollector) all() []ParserEvent {
+func (c *eventCollector) all() []events.Event {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return append([]ParserEvent{}, c.events...)
+	return append([]events.Event{}, c.recorded...)
+}
+
+// warnings returns every recorded warn log event with the given message, in
+// the order they were emitted
+func (c *eventCollector) warnings(message string) []events.Event {
+	found := []events.Event{}
+	for _, event := range c.all() {
+		if event.Phase == events.PhaseLog && event.Meta[events.KeyLevel] == events.LevelWarn && event.Meta[events.KeyMessage] == message {
+			found = append(found, event)
+		}
+	}
+
+	return found
 }
 
 // networkStatus returns the status recorded for the network in the given entities.
@@ -218,9 +263,9 @@ func networkStatus(t *testing.T, entities []any) string {
 
 // eventsFor returns the "<operation> <phase>" of each event for the resource,
 // in the order they fired.
-func eventsFor(events []ParserEvent, resourceID string) []string {
+func eventsFor(recorded []events.Event, resourceID string) []string {
 	fired := []string{}
-	for _, event := range events {
+	for _, event := range recorded {
 		if event.ResourceID == resourceID {
 			fired = append(fired, fmt.Sprintf("%s %s", event.Operation, event.Phase))
 		}
@@ -244,8 +289,7 @@ func TestApplyUnchangedConfigTwiceCreatesOnceAndOnlyReadsOnSecondApply(t *testin
 	require.Empty(t, h.plugin.GetUpdatedResources())
 	require.Equal(t, types.StatusCreated, networkStatus(t, st.GetResources()))
 
-	saved, err := h.store.Load()
-	require.NoError(t, err)
+	saved := loadTyped(t, h.store, h.registry)
 	require.Equal(t, types.StatusCreated, networkStatus(t, saved))
 }
 
@@ -346,7 +390,7 @@ func TestReadFailureFailsApply(t *testing.T) {
 	h.plugin.SetReadError(lifecycleNetworkID, fmt.Errorf("network API unavailable"))
 
 	p := h.newParser(t, nil)
-	st, err := p.Apply(lifecycleOriginalConfig)
+	st, err := p.Apply(context.Background(), lifecycleOriginalConfig)
 
 	require.Error(t, err)
 	require.NotNil(t, st)
@@ -477,7 +521,7 @@ func TestReadEventsUseReadOperation(t *testing.T) {
 	collector := &eventCollector{}
 	p := h.newParser(t, collector.collect)
 
-	_, err := p.Apply(lifecycleOriginalConfig)
+	_, err := p.Apply(context.Background(), lifecycleOriginalConfig)
 	require.NoError(t, err)
 
 	events := collector.all()
@@ -506,7 +550,7 @@ func TestReadEventsReportReadError(t *testing.T) {
 	collector := &eventCollector{}
 	p := h.newParser(t, collector.collect)
 
-	_, err := p.Apply(lifecycleOriginalConfig)
+	_, err := p.Apply(context.Background(), lifecycleOriginalConfig)
 	require.Error(t, err)
 
 	events := collector.all()
@@ -790,9 +834,10 @@ func TestRebuildDestroyReceivesSavedCopy(t *testing.T) {
 	failNetworkCreate(t, h)
 
 	collector := &eventCollector{}
-	p := h.newParser(t, collector.collect)
+	// Data is off by default, this test is about what a destroy event carries
+	p := h.newParserWithEventData(t, collector.collect, events.DataRaw)
 
-	_, err := p.Apply(lifecycleOriginalConfig)
+	_, err := p.Apply(context.Background(), lifecycleOriginalConfig)
 	require.NoError(t, err)
 
 	destroyStart := requireEvent(t, collector.all(), "destroy", "start", lifecycleNetworkID)
@@ -815,7 +860,7 @@ func TestRebuildEventsUseDestroyThenCreate(t *testing.T) {
 	collector := &eventCollector{}
 	p := h.newParser(t, collector.collect)
 
-	_, err := p.Apply(lifecycleOriginalConfig)
+	_, err := p.Apply(context.Background(), lifecycleOriginalConfig)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
@@ -834,7 +879,7 @@ func TestRebuildEventsReportDestroyError(t *testing.T) {
 	collector := &eventCollector{}
 	p := h.newParser(t, collector.collect)
 
-	_, err := p.Apply(lifecycleOriginalConfig)
+	_, err := p.Apply(context.Background(), lifecycleOriginalConfig)
 	require.Error(t, err)
 
 	events := collector.all()
@@ -971,8 +1016,8 @@ func TestNestedComputedValueFollowsKeyWhenBlocksReordered(t *testing.T) {
 
 func TestProviderChangingConfiguredValueWarns(t *testing.T) {
 	h := setupLifecycle(t)
-	log := &recordingLogger{}
-	h.log = log
+	collector := &eventCollector{}
+	h.emit = collector.collect
 
 	h.plugin.SetMutateConfigured(lifecycleNetworkID, "10.9.0.0/16")
 
@@ -983,23 +1028,53 @@ func TestProviderChangingConfiguredValueWarns(t *testing.T) {
 	require.Equal(t, "10.9.0.0/16", network.Subnet)
 	require.Equal(t, types.StatusCreated, network.Meta.Status)
 
-	require.Equal(t, [][]any{
-		{"event", "configured_value_changed", "resource", lifecycleNetworkID, "field", "subnet"},
-	}, log.warningsWithMessage(changedConfiguredValueWarning))
+	warnings := collector.warnings(changedConfiguredValueWarning)
+	require.Len(t, warnings, 1)
+
+	warning := warnings[0]
+	require.Equal(t, events.SourceCore, warning.Source)
+	require.Equal(t, events.OperationCreate, warning.Operation)
+	require.Equal(t, events.PhaseLog, warning.Phase)
+	require.Equal(t, lifecycleNetworkID, warning.ResourceID)
+	require.Equal(t, "network.one", warning.ResourceType)
+	require.True(t, strings.HasSuffix(warning.File, "single.xcl"), "warning file is %s", warning.File)
+	require.Equal(t, map[string]any{
+		events.KeyLevel:   events.LevelWarn,
+		events.KeyMessage: changedConfiguredValueWarning,
+		"field":           "subnet",
+	}, warning.Meta)
+}
+
+func TestProviderChangingConfiguredValueOnReadWarnsWithReadOperation(t *testing.T) {
+	h := setupLifecycle(t)
+
+	h.applyAndSave(t, lifecycleOriginalConfig)
+
+	collector := &eventCollector{}
+	h.emit = collector.collect
+	h.plugin.SetMutateConfigured(lifecycleNetworkID, "10.9.0.0/16")
+
+	h.applyAndSave(t, lifecycleOriginalConfig)
+
+	warnings := collector.warnings(changedConfiguredValueWarning)
+	require.NotEmpty(t, warnings)
+	require.Equal(t, events.OperationRead, warnings[0].Operation)
+	require.Equal(t, lifecycleNetworkID, warnings[0].ResourceID)
+	require.Equal(t, "subnet", warnings[0].Meta["field"])
 }
 
 func TestProviderSettingComputedFieldDoesNotWarn(t *testing.T) {
 	h := setupLifecycle(t)
-	log := &recordingLogger{}
-	h.log = log
+	collector := &eventCollector{}
+	h.emit = collector.collect
 
 	// apply 1: Create sets the computed provider id
 	h.applyAndSave(t, lifecycleOriginalConfig)
-	require.Empty(t, log.warningsWithMessage(changedConfiguredValueWarning))
+	require.Empty(t, collector.warnings(changedConfiguredValueWarning))
 
 	// apply 2: the provider id is carried over and read back
 	h.applyAndSave(t, lifecycleOriginalConfig)
-	require.Empty(t, log.warningsWithMessage(changedConfiguredValueWarning))
+	require.Empty(t, collector.warnings(changedConfiguredValueWarning))
 
 	network := findResource[structs.Network](t, h.loadSaved(t), lifecycleNetworkID)
 	require.Equal(t, "id-one", network.ProviderID)
@@ -1007,8 +1082,8 @@ func TestProviderSettingComputedFieldDoesNotWarn(t *testing.T) {
 
 func TestReferenceSetFieldDoesNotWarn(t *testing.T) {
 	h := setupLifecycle(t)
-	log := &recordingLogger{}
-	h.log = log
+	collector := &eventCollector{}
+	h.emit = collector.collect
 
 	// b's subnet is set by reference, so the provider changing it is not a
 	// change to a value the user configured
@@ -1018,7 +1093,7 @@ func TestReferenceSetFieldDoesNotWarn(t *testing.T) {
 
 	b := findResource[structs.Network](t, st.GetResources(), referenceReferenceID)
 	require.Equal(t, "other", b.Subnet)
-	require.Empty(t, log.warningsWithMessage(changedConfiguredValueWarning))
+	require.Empty(t, collector.warnings(changedConfiguredValueWarning))
 }
 
 // The dependent fixture mixes blocks a provider handles (network, container)
@@ -1063,7 +1138,7 @@ func TestApplyHandlesBuiltinBlocksWithoutAProvider(t *testing.T) {
 	collector := &eventCollector{}
 	p := h.newParser(t, collector.collect)
 
-	st, err := p.Apply(lifecycleDependentConfig)
+	st, err := p.Apply(context.Background(), lifecycleDependentConfig)
 	require.NoError(t, err)
 
 	// the variable and the output reach no provider at all
@@ -1121,11 +1196,16 @@ func TestApplyNamesTheVarietyOfEachResourceInItsEvents(t *testing.T) {
 	collector := &eventCollector{}
 	p := h.newParser(t, collector.collect)
 
-	_, err := p.Apply(lifecycleDependentConfig)
+	_, err := p.Apply(context.Background(), lifecycleDependentConfig)
 	require.NoError(t, err)
 
 	named := map[string]string{}
 	for _, event := range collector.all() {
+		// plugin load events name a plugin, not a resource
+		if event.Operation == events.OperationLoad {
+			continue
+		}
+
 		named[event.ResourceID] = event.ResourceType
 	}
 

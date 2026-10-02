@@ -306,18 +306,19 @@ to write one *is* that agreement, and needs no further confirmation.
 
 Every file Spektacular manages is reached through its CLI, never with your own
 file tools. This covers specs, plans, their context and research documents,
-test plans, changelog records, knowledge entries and design documents.
+test plans, changelog records, knowledge entries, design documents and epics.
 
 Never use the `Write` or `Edit` tool on a file under a store directory, and
 never build a store path by hand. Use `spektacular spec file`,
-`spektacular plan file`, `spektacular changelog file`, `spektacular knowledge`
-and `spektacular design` instead. A write supplies its body with
+`spektacular plan file`, `spektacular changelog file`, `spektacular knowledge`,
+`spektacular design` and `spektacular epic` instead. A write supplies its body with
 `--from <path>`, never on stdin and never as prose on the command line.
 
 Removal is a CLI verb too. Deleting a managed file with `rm`, or with any
 equivalent of your own, is never correct — not for a knowledge entry, not for
 a design document, and not for anything else a store holds. Use
-`spektacular knowledge delete` and `spektacular design delete`, alongside the
+`spektacular knowledge delete`, `spektacular design delete` and
+`spektacular epic delete`, alongside the
 `delete` each of `spektacular spec file`, `spektacular plan file` and
 `spektacular changelog file` already offers. Going around the tool is how a
 spec is left pointing at a design that is not there, and it stops working
@@ -332,7 +333,7 @@ a stored artifact: a directory listing can show entries Spektacular does not
 consider valid, and omits the metadata the CLI reports alongside each one.
 
 This includes an edit that looks too small to be worth a command, such as
-ticking a phase checkbox in a plan or appending a line to a changelog record.
+ticking a task checkbox in a plan or appending a line to a changelog record.
 Read the document with the CLI, apply the change, and write it back with the
 CLI. A store write is not a file copy: it merges Spektacular's lifecycle
 metadata, preserving a created date and carrying forward fields such as a

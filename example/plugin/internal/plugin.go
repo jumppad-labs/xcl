@@ -23,11 +23,13 @@ var _ plugins.Plugin = (*ExamplePlugin)(nil)
 // plugin provides as many block types as it likes, each is registered with its
 // own provider by calling RegisterResourceProvider once per type.
 //
-// xcl tags everything the plugin logs with plugin=ExamplePlugin, and
-// everything a provider logs with provider=<block type> as well, so the two
-// providers below are told apart in the log.
+// logger is plugin scoped, for messages written outside a provider call like
+// this one. xcl names the plugin, ExamplePlugin, as the source of everything
+// it logs, and adds provider=<block type> to what each provider's Init logs.
+// During a call the providers log through plugins.Logger(ctx) instead, which
+// xcl binds to the resource and step being worked on.
 func (p *ExamplePlugin) Init(logger logger.Logger, state plugins.State) error {
-	logger.Debug("", "event", "init")
+	logger.Debug("registering block types", "block_types", "postgres, redis")
 
 	err := plugins.RegisterResourceProvider(
 		&p.PluginBase,
@@ -59,18 +61,15 @@ func (p *ExamplePlugin) Init(logger logger.Logger, state plugins.State) error {
 // Change detection comes from the embedded DefaultChanged.
 type postgresProvider struct {
 	plugins.DefaultChanged[*resources.PostgreSQL]
-
-	logger logger.Logger
 }
 
 var _ plugins.ResourceProvider[*resources.PostgreSQL] = (*postgresProvider)(nil)
 
 // Init is called once when the provider is registered. The logger it receives
-// writes to the host's logger, tagging every message with
-// plugin=ExamplePlugin provider=postgres.
+// is plugin scoped and adds provider=postgres to every message. The provider
+// does not keep it, during a call it logs through plugins.Logger(ctx).
 func (p *postgresProvider) Init(state plugins.State, functions plugins.ProviderFunctions, logger logger.Logger) error {
-	p.logger = logger
-	p.logger.Debug("", "event", "init")
+	logger.Debug("provider ready")
 
 	return nil
 }
@@ -79,7 +78,7 @@ func (p *postgresProvider) Init(state plugins.State, functions plugins.ProviderF
 // changed
 func (p *postgresProvider) Create(ctx context.Context, db *resources.PostgreSQL) (*resources.PostgreSQL, error) {
 	db.ConnectionString = connectionString(db)
-	p.logger.Debug("", "event", "create", "resource", db.Meta.ID, "connection_string", db.ConnectionString)
+	plugins.Logger(ctx).Info("created database", "connection_string", db.ConnectionString)
 
 	return db, nil
 }
@@ -87,7 +86,7 @@ func (p *postgresProvider) Create(ctx context.Context, db *resources.PostgreSQL)
 // Read reports the database as configured, xcl has already carried the
 // computed connection string over from the previous state
 func (p *postgresProvider) Read(ctx context.Context, old *resources.PostgreSQL, new *resources.PostgreSQL) (*resources.PostgreSQL, error) {
-	p.logger.Debug("", "event", "read", "resource", new.Meta.ID)
+	plugins.Logger(ctx).Info("read database")
 
 	return new, nil
 }
@@ -95,14 +94,14 @@ func (p *postgresProvider) Read(ctx context.Context, old *resources.PostgreSQL, 
 // Update sets the computed connection string for the changed configuration
 func (p *postgresProvider) Update(ctx context.Context, db *resources.PostgreSQL) (*resources.PostgreSQL, error) {
 	db.ConnectionString = connectionString(db)
-	p.logger.Debug("", "event", "update", "resource", db.Meta.ID, "connection_string", db.ConnectionString)
+	plugins.Logger(ctx).Info("updated database", "connection_string", db.ConnectionString)
 
 	return db, nil
 }
 
 // Destroy would remove the database, there is nothing to remove here
 func (p *postgresProvider) Destroy(ctx context.Context, db *resources.PostgreSQL, force bool) error {
-	p.logger.Debug("", "event", "destroy", "resource", db.Meta.ID, "force", force)
+	plugins.Logger(ctx).Info("destroyed database", "force", force)
 
 	return nil
 }
@@ -116,21 +115,18 @@ func connectionString(db *resources.PostgreSQL) string {
 }
 
 // redisProvider handles the lifecycle of redis blocks, the second block type
-// this plugin provides. It is a separate provider with its own logger, tagged
-// provider=redis, registered in Init alongside the postgres one.
+// this plugin provides. It is a separate provider, registered in Init
+// alongside the postgres one.
 type redisProvider struct {
 	plugins.DefaultChanged[*resources.Redis]
-
-	logger logger.Logger
 }
 
 var _ plugins.ResourceProvider[*resources.Redis] = (*redisProvider)(nil)
 
-// Init is called once when the provider is registered, with a logger that
-// tags every message with plugin=ExamplePlugin provider=redis
+// Init is called once when the provider is registered, with a plugin scoped
+// logger that adds provider=redis to every message
 func (p *redisProvider) Init(state plugins.State, functions plugins.ProviderFunctions, logger logger.Logger) error {
-	p.logger = logger
-	p.logger.Debug("", "event", "init")
+	logger.Debug("provider ready")
 
 	return nil
 }
@@ -139,7 +135,7 @@ func (p *redisProvider) Init(state plugins.State, functions plugins.ProviderFunc
 // the external plugin
 func (p *redisProvider) Create(ctx context.Context, cache *resources.Redis) (*resources.Redis, error) {
 	cache.ConnectionString = cacheConnectionString(cache)
-	p.logger.Debug("", "event", "create", "resource", cache.Meta.ID, "connection_string", cache.ConnectionString)
+	plugins.Logger(ctx).Info("created cache", "connection_string", cache.ConnectionString)
 
 	return cache, nil
 }
@@ -147,7 +143,7 @@ func (p *redisProvider) Create(ctx context.Context, cache *resources.Redis) (*re
 // Read reports the cache as configured, xcl has already carried the computed
 // connection string over from the previous state
 func (p *redisProvider) Read(ctx context.Context, old *resources.Redis, new *resources.Redis) (*resources.Redis, error) {
-	p.logger.Debug("", "event", "read", "resource", new.Meta.ID)
+	plugins.Logger(ctx).Info("read cache")
 
 	return new, nil
 }
@@ -155,14 +151,14 @@ func (p *redisProvider) Read(ctx context.Context, old *resources.Redis, new *res
 // Update sets the computed connection string for the changed configuration
 func (p *redisProvider) Update(ctx context.Context, cache *resources.Redis) (*resources.Redis, error) {
 	cache.ConnectionString = cacheConnectionString(cache)
-	p.logger.Debug("", "event", "update", "resource", cache.Meta.ID, "connection_string", cache.ConnectionString)
+	plugins.Logger(ctx).Info("updated cache", "connection_string", cache.ConnectionString)
 
 	return cache, nil
 }
 
 // Destroy would remove the cache, there is nothing to remove here
 func (p *redisProvider) Destroy(ctx context.Context, cache *resources.Redis, force bool) error {
-	p.logger.Debug("", "event", "destroy", "resource", cache.Meta.ID, "force", force)
+	plugins.Logger(ctx).Info("destroyed cache", "force", force)
 
 	return nil
 }

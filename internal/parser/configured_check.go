@@ -10,7 +10,8 @@ import (
 )
 
 // warnChangedConfiguredValues logs a warning for every configured value a
-// provider changed. before is the resource as sent to the provider, after is
+// provider changed, log is bound to the resource and the step so the warning
+// names only the field. before is the resource as sent to the provider, after is
 // the resource it returned. Computed fields belong to the provider and are never
 // reported, nor is a field whose configuration references another resource or a
 // module, since its value comes from elsewhere. The check never fails the apply.
@@ -20,7 +21,7 @@ func warnChangedConfiguredValues(log logger.Logger, id string, body *hclsyntax.B
 	}
 
 	for _, path := range changedConfiguredValues(body, resourceType, before, after) {
-		log.Warn("provider changed a configured value", "event", "configured_value_changed", "resource", id, "field", path)
+		log.Warn("provider changed a configured value", "field", path)
 	}
 }
 

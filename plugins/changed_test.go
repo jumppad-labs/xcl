@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -24,7 +25,7 @@ type providerWithDefaultChanged struct {
 	DefaultChanged[*testResource]
 }
 
-func (p *providerWithDefaultChanged) Init(state State, functions ProviderFunctions, logger Logger) error {
+func (p *providerWithDefaultChanged) Init(state State, functions ProviderFunctions, log logger.Logger) error {
 	return nil
 }
 

@@ -3,6 +3,7 @@ package plugins
 import (
 	"context"
 	"errors"
+	"github.com/jumppad-labs/xcl/logger"
 	"net/rpc"
 
 	"github.com/hashicorp/go-plugin"
@@ -16,7 +17,12 @@ type GRPCPlugin struct {
 	// Impl is the concrete implementation (e.g., PersonPlugin)
 	Impl           Plugin
 	callbackServer *GRPCHostCallbackServer
-	logger         Logger
+
+	// logger is the host side plugin scoped logger, for messages the plugin
+	// writes outside a provider call, and calls the loggers of the calls in
+	// progress
+	logger logger.Logger
+	calls  *callLoggers
 }
 
 // Ensure GRPCPlugin implements plugin.Plugin interface
@@ -25,14 +31,15 @@ var _ plugin.GRPCPlugin = (*GRPCPlugin)(nil)
 
 // GRPCServer is called by go-plugin to create the gRPC server
 func (p *GRPCPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	// Initialize the plugin implementation with broker-connected logger/state
-	if err := p.Impl.Init(nil, nil); err != nil {
+	server, err := NewGRPCServer(p.Impl, broker)
+	if err != nil {
 		return err
 	}
 
-	// Create the gRPC server with already-connected logger/state
-	server, err := NewGRPCServer(p.Impl, broker)
-	if err != nil {
+	// Initialize the plugin with its plugin scoped logger, which sends to the
+	// host once it has connected. During a provider call the plugin logs
+	// through the call's logger instead, see Logger.
+	if err := p.Impl.Init(server.pluginLogger(), nil); err != nil {
 		return err
 	}
 
@@ -49,6 +56,7 @@ func (p *GRPCPlugin) Client(*plugin.MuxBroker, *rpc.Client) (interface{}, error)
 // SetupHostCallbackService configures the host callback service for bidirectional communication
 func (p *GRPCPlugin) SetupHostCallbackService() {
 	p.callbackServer = NewGRPCHostCallbackServer(p.logger, nil)
+	p.callbackServer.calls = p.calls
 
 	var s *grpc.Server
 	serverFunc := func(opts []grpc.ServerOption) *grpc.Server {

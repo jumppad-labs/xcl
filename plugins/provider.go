@@ -3,6 +3,7 @@ package plugins
 
 import (
 	"context"
+	"github.com/jumppad-labs/xcl/logger"
 )
 
 // Jumppad uses a plugin model that allows you to register custom providers
@@ -21,7 +22,7 @@ type ResourceProvider[T any] interface {
 	// The state parameter provides access to the current state of resources.
 	// The functions parameter provides access to provider-defined functions.
 	// The logger parameter is the logger instance for all logging operations.
-	Init(state State, functions ProviderFunctions, logger Logger) error
+	Init(state State, functions ProviderFunctions, logger logger.Logger) error
 
 	// Create creates a new resource.
 	// This method is called when a resource is not in the previous state, when

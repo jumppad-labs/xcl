@@ -3,15 +3,25 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
+	"log/slog"
+	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/state"
+
+	"github.com/jumppad-labs/xcl"
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/example/appconfig/resources"
-	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +33,7 @@ const configDir = "./config"
 func application(t *testing.T) *resources.Application {
 	t.Helper()
 
-	app, err := run(&bytes.Buffer{}, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	app, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	return app
@@ -145,7 +155,7 @@ func TestAppConfigExampleDecodesFloats(t *testing.T) {
 func TestAppConfigExampleWritesTheApplicationAsJSON(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, logger.NewTestLogger(t), configDir, filepath.Join(t.TempDir(), "state.json"))
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
 	require.NoError(t, err)
 
 	_, document, found := bytes.Cut(out.Bytes(), []byte("## JSON\n"))
@@ -225,4 +235,270 @@ func TestAppConfigExampleUsesPortableLookupForm(t *testing.T) {
 	})
 
 	require.NotZero(t, lookups, "the guard found no lookups in main.go, so it proves nothing")
+}
+
+// eventRecorder records every event the run reports, it is the handler the
+// tests pass in place of the example's pretty printer. The handler is never
+// called concurrently, the mutex guards the reads the tests make
+type eventRecorder struct {
+	mu     sync.Mutex
+	events []xcl.Event
+}
+
+func (r *eventRecorder) handle(e xcl.Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.events = append(r.events, e)
+}
+
+// snapshot returns a copy of every event recorded so far
+func (r *eventRecorder) snapshot() []xcl.Event {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return append([]xcl.Event{}, r.events...)
+}
+
+// runRecordingEvents runs the example with a recorder as its event handler
+// and returns the recorder once the run has succeeded
+func runRecordingEvents(t *testing.T) *eventRecorder {
+	t.Helper()
+
+	recorder := &eventRecorder{}
+
+	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, t.TempDir())
+	require.NoError(t, err)
+
+	return recorder
+}
+
+// TestAppConfigExampleReportsParseEventWithFile asserts each block's parse is
+// reported as a success by core with the file it was parsed from
+func TestAppConfigExampleReportsParseEventWithFile(t *testing.T) {
+	recorder := runRecordingEvents(t)
+
+	files := map[string]string{}
+	for _, e := range recorder.snapshot() {
+		if e.Operation != events.OperationParse {
+			continue
+		}
+
+		require.Equal(t, events.SourceCore, e.Source)
+		require.Equal(t, events.PhaseSuccess, e.Phase)
+		files[e.ResourceID] = filepath.Base(e.File)
+	}
+
+	require.Equal(t, map[string]string{
+		"variable.environment":     "app.xcl",
+		"variable.db_host":         "app.xcl",
+		"resource.application.api": "app.xcl",
+		"output.listen_address":    "app.xcl",
+	}, files)
+}
+
+// TestAppConfigExampleReportsApplicationCreated asserts the application's
+// create is reported as a success by core, naming its type and file
+func TestAppConfigExampleReportsApplicationCreated(t *testing.T) {
+	recorder := runRecordingEvents(t)
+
+	created := []xcl.Event{}
+	for _, e := range recorder.snapshot() {
+		if e.Operation == events.OperationCreate && e.ResourceID == "resource.application.api" {
+			created = append(created, e)
+		}
+	}
+
+	require.Len(t, created, 1)
+	require.Equal(t, events.SourceCore, created[0].Source)
+	require.Equal(t, events.PhaseSuccess, created[0].Phase)
+	require.Equal(t, "application.api", created[0].ResourceType)
+	require.Equal(t, "app.xcl", filepath.Base(created[0].File))
+}
+
+// TestAppConfigExampleReportsNoErrors asserts a successful run reports no
+// error event
+func TestAppConfigExampleReportsNoErrors(t *testing.T) {
+	recorder := runRecordingEvents(t)
+
+	for _, e := range recorder.snapshot() {
+		require.NotEqual(t, events.PhaseError, e.Phase, "unexpected error event: %+v", e)
+		require.NoError(t, e.Error, "unexpected event with an error: %+v", e)
+	}
+}
+
+// capturedOutput is what was written to the process's standard output and
+// standard error while a function ran
+type capturedOutput struct {
+	stdout string
+	stderr string
+}
+
+// captureStandardStreams runs fn with os.Stdout and os.Stderr redirected to
+// pipes, and returns what was written to each. The streams are restored when
+// fn returns, and again in cleanup should fn fail the test
+func captureStandardStreams(t *testing.T, fn func()) capturedOutput {
+	t.Helper()
+
+	originalStdout := os.Stdout
+	originalStderr := os.Stderr
+
+	restore := func() {
+		os.Stdout = originalStdout
+		os.Stderr = originalStderr
+	}
+	t.Cleanup(restore)
+
+	stdoutReader, stdoutWriter, err := os.Pipe()
+	require.NoError(t, err)
+
+	stderrReader, stderrWriter, err := os.Pipe()
+	require.NoError(t, err)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+
+	var drained sync.WaitGroup
+	drained.Add(2)
+
+	go func() {
+		defer drained.Done()
+		_, _ = io.Copy(stdout, stdoutReader)
+	}()
+
+	go func() {
+		defer drained.Done()
+		_, _ = io.Copy(stderr, stderrReader)
+	}()
+
+	os.Stdout = stdoutWriter
+	os.Stderr = stderrWriter
+
+	fn()
+
+	restore()
+
+	require.NoError(t, stdoutWriter.Close())
+	require.NoError(t, stderrWriter.Close())
+	drained.Wait()
+
+	require.NoError(t, stdoutReader.Close())
+	require.NoError(t, stderrReader.Close())
+
+	return capturedOutput{stdout: stdout.String(), stderr: stderr.String()}
+}
+
+// TestRunWithoutReceiverWritesNothingToStdoutOrStderr asserts xcl writes
+// nothing of its own when no event handler is given, the report the example
+// prints goes to out alone
+func TestRunWithoutReceiverWritesNothingToStdoutOrStderr(t *testing.T) {
+	out := &bytes.Buffer{}
+
+	var runErr error
+	captured := captureStandardStreams(t, func() {
+		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	})
+
+	require.NoError(t, runErr)
+	require.Empty(t, captured.stdout)
+	require.Empty(t, captured.stderr)
+	require.Contains(t, out.String(), "## JSON\n")
+}
+
+// renderEvents runs the example with the pretty printer the program itself
+// uses, writing to a buffer rather than the terminal, and returns everything
+// it wrote. The registry is shared with the printer exactly as main shares
+// it, since it is what types the entity an event carries
+func renderEvents(t *testing.T) string {
+	t.Helper()
+
+	r := registry.NewPluginRegistry()
+	rendered := &bytes.Buffer{}
+
+	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, t.TempDir())
+	require.NoError(t, err)
+
+	return rendered.String()
+}
+
+// TestAppConfigExampleShowsCreatedEntities asserts the application's
+// configuration is written beneath the line announcing its create, the whole
+// tree of nested blocks with it
+func TestAppConfigExampleShowsCreatedEntities(t *testing.T) {
+	rendered := renderEvents(t)
+
+	// a block is written indented beneath the line that announced it, either
+	// as a resource or under its own keyword
+	require.Regexp(t, `(?m)^\s+(resource "|[a-z_]+ ")`, rendered)
+
+	require.Contains(t, rendered, `resource "application" "api" {`)
+
+	// the blocks nested inside it are written too, four deep, and the
+	// formatter aligns the equals signs, so the gap before one is matched
+	// rather than written out
+	require.Contains(t, rendered, "server {")
+	require.Contains(t, rendered, "tls {")
+	require.Contains(t, rendered, "client_auth {")
+	require.Regexp(t, `port\s+= 8443`, rendered)
+	require.Regexp(t, `mode\s+=\s+"require_and_verify"`, rendered)
+}
+
+// savedID returns the address a saved record carries, which is how a record
+// is matched to the entity it was written from
+func savedID(t *testing.T, record json.RawMessage) string {
+	t.Helper()
+
+	var envelope struct {
+		Meta struct {
+			ID string `json:"id"`
+		} `json:"meta"`
+	}
+
+	require.NoError(t, json.Unmarshal(record, &envelope))
+	require.NotEmpty(t, envelope.Meta.ID)
+
+	return envelope.Meta.ID
+}
+
+// TestAppConfigExampleEntityAndStateAgree asserts the configuration text of a
+// saved record is identical to the text of the entity it was written from.
+// This example keeps what it applied, so the state file still holds the
+// records when the run returns. A variable or output is never written as
+// configuration, so those records are skipped, which leaves the application
+func TestAppConfigExampleEntityAndStateAgree(t *testing.T) {
+	r := registry.NewPluginRegistry()
+	stateDir := t.TempDir()
+	statePath := filepath.Join(stateDir, state.StateFileName)
+
+	app, err := run(&bytes.Buffer{}, nil, r, configDir, stateDir)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(statePath)
+	require.NoError(t, err)
+
+	records := []json.RawMessage{}
+	require.NoError(t, json.Unmarshal(data, &records))
+	require.NotEmpty(t, records)
+
+	compared := 0
+
+	for _, record := range records {
+		fromState, err := xcl.EncodeSavedEntity(r, record)
+		if errors.Is(err, xcl.ErrNotEncodable) {
+			continue
+		}
+		require.NoError(t, err)
+
+		id := savedID(t, record)
+		require.Equal(t, app.Meta.ID, id, "the state holds a record the run did not return")
+
+		fromEntity, err := xcl.EncodeEntity(app)
+		require.NoError(t, err)
+
+		require.Equal(t, string(fromEntity), string(fromState), "the saved record and the entity disagree for %s", id)
+
+		compared++
+	}
+
+	require.Equal(t, 1, compared, "the application was not compared, so the check proves nothing")
 }

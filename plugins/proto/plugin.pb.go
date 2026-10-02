@@ -846,9 +846,13 @@ func (x *ChangedResponse) GetError() string {
 
 // Logger service messages
 type LogRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	Args          []string               `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Message string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Args    []string               `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty"`
+	// call_id names the provider call the message was written during, the
+	// host sent it as the xcl-call-id metadata of that call. It is empty for a
+	// message written outside a provider call.
+	CallId        string `protobuf:"bytes,3,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -895,6 +899,13 @@ func (x *LogRequest) GetArgs() []string {
 		return x.Args
 	}
 	return nil
+}
+
+func (x *LogRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
 }
 
 type LogResponse struct {
@@ -1191,11 +1202,12 @@ const file_plugins_plugin_proto_rawDesc = "" +
 	"\x0fnew_entity_data\x18\x04 \x01(\fR\rnewEntityData\"A\n" +
 	"\x0fChangedResponse\x12\x18\n" +
 	"\achanged\x18\x01 \x01(\bR\achanged\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\":\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"S\n" +
 	"\n" +
 	"LogRequest\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x12\n" +
-	"\x04args\x18\x02 \x03(\tR\x04args\"\r\n" +
+	"\x04args\x18\x02 \x03(\tR\x04args\x12\x17\n" +
+	"\acall_id\x18\x03 \x01(\tR\x06callId\"\r\n" +
 	"\vLogResponse\"#\n" +
 	"\x0fStateGetRequest\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\"M\n" +

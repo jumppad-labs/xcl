@@ -28,9 +28,10 @@ var _ plugins.Plugin = (*ExternalPlugin)(nil)
 // An external plugin registers several block types exactly as an in-process
 // one does, calling RegisterResourceProvider once per type.
 //
-// An external plugin is initialized when its process starts, before it is
-// connected to the host, so logger is nil here. The providers are given a
-// logger connected to the host before each call.
+// logger is plugin scoped, for messages written outside a provider call. It
+// sends to the host once the host has connected. During a call the providers
+// log through plugins.Logger(ctx), which the host binds to the resource and
+// step being worked on.
 func (p *ExternalPlugin) Init(logger logger.Logger, state plugins.State) error {
 	err := plugins.RegisterResourceProvider(
 		&p.PluginBase,
@@ -62,19 +63,14 @@ func (p *ExternalPlugin) Init(logger logger.Logger, state plugins.State) error {
 // Change detection comes from the embedded DefaultChanged.
 type appProvider struct {
 	plugins.DefaultChanged[*resources.App]
-
-	logger logger.Logger
 }
 
 var _ plugins.ResourceProvider[*resources.App] = (*appProvider)(nil)
 
-// Init stores the logger. In an external plugin Init is called again before
-// every call from the host, with a logger connected to the host that tags
-// every message with plugin=external provider=app, so it does not log
-// itself. The first call, when the process starts, has no logger.
+// Init is called once, when the plugin process starts. The provider logs
+// during a call through plugins.Logger(ctx), which the host binds to the
+// resource and step, exactly as an in-process provider does.
 func (p *appProvider) Init(state plugins.State, functions plugins.ProviderFunctions, logger logger.Logger) error {
-	p.logger = logger
-
 	return nil
 }
 
@@ -83,27 +79,27 @@ func (p *appProvider) Init(state plugins.State, functions plugins.ProviderFuncti
 // and sets the computed url that the ingress block reads
 func (p *appProvider) Create(ctx context.Context, app *resources.App) (*resources.App, error) {
 	app.URL = appURL(app)
-	p.logger.Debug("", "event", "create", "resource", app.Meta.ID,
+	plugins.Logger(ctx).Info("created app",
 		"connection_string", app.ConnectionString, "cache_connection_string", app.CacheConnectionString, "url", app.URL)
 
 	return app, nil
 }
 
 func (p *appProvider) Read(ctx context.Context, old *resources.App, new *resources.App) (*resources.App, error) {
-	p.logger.Debug("", "event", "read", "resource", new.Meta.ID)
+	plugins.Logger(ctx).Info("read app")
 
 	return new, nil
 }
 
 func (p *appProvider) Update(ctx context.Context, app *resources.App) (*resources.App, error) {
 	app.URL = appURL(app)
-	p.logger.Debug("", "event", "update", "resource", app.Meta.ID, "url", app.URL)
+	plugins.Logger(ctx).Info("updated app", "url", app.URL)
 
 	return app, nil
 }
 
 func (p *appProvider) Destroy(ctx context.Context, app *resources.App, force bool) error {
-	p.logger.Debug("", "event", "destroy", "resource", app.Meta.ID, "force", force)
+	plugins.Logger(ctx).Info("destroyed app", "force", force)
 
 	return nil
 }
@@ -117,49 +113,43 @@ func appURL(app *resources.App) string {
 }
 
 // ingressProvider handles the lifecycle of ingress blocks, the second block
-// type this plugin provides. It is a separate provider with its own logger,
-// tagged provider=ingress, registered in Init alongside the app one.
+// type this plugin provides. It is a separate provider, registered in Init
+// alongside the app one.
 //
 // Change detection comes from the embedded DefaultChanged.
 type ingressProvider struct {
 	plugins.DefaultChanged[*resources.Ingress]
-
-	logger logger.Logger
 }
 
 var _ plugins.ResourceProvider[*resources.Ingress] = (*ingressProvider)(nil)
 
-// Init stores the logger, which tags every message with plugin=external
-// provider=ingress. As with the app provider, the first call, when the
-// process starts, has no logger.
+// Init is called once, when the plugin process starts, see appProvider.Init
 func (p *ingressProvider) Init(state plugins.State, functions plugins.ProviderFunctions, logger logger.Logger) error {
-	p.logger = logger
-
 	return nil
 }
 
 // Create receives the ingress with the computed url of the app it routes to,
 // filled in by the app provider in this same plugin
 func (p *ingressProvider) Create(ctx context.Context, ingress *resources.Ingress) (*resources.Ingress, error) {
-	p.logger.Debug("", "event", "create", "resource", ingress.Meta.ID, "hostname", ingress.Hostname, "app_url", ingress.AppURL)
+	plugins.Logger(ctx).Info("created ingress", "hostname", ingress.Hostname, "app_url", ingress.AppURL)
 
 	return ingress, nil
 }
 
 func (p *ingressProvider) Read(ctx context.Context, old *resources.Ingress, new *resources.Ingress) (*resources.Ingress, error) {
-	p.logger.Debug("", "event", "read", "resource", new.Meta.ID)
+	plugins.Logger(ctx).Info("read ingress")
 
 	return new, nil
 }
 
 func (p *ingressProvider) Update(ctx context.Context, ingress *resources.Ingress) (*resources.Ingress, error) {
-	p.logger.Debug("", "event", "update", "resource", ingress.Meta.ID)
+	plugins.Logger(ctx).Info("updated ingress")
 
 	return ingress, nil
 }
 
 func (p *ingressProvider) Destroy(ctx context.Context, ingress *resources.Ingress, force bool) error {
-	p.logger.Debug("", "event", "destroy", "resource", ingress.Meta.ID, "force", force)
+	plugins.Logger(ctx).Info("destroyed ingress", "force", force)
 
 	return nil
 }

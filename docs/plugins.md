@@ -29,7 +29,7 @@ own concrete Go struct (e.g. `*ContainerResource`):
 
 ```go
 type ResourceProvider[T any] interface {
-    Init(state State, functions ProviderFunctions, logger Logger) error
+    Init(state State, functions ProviderFunctions, logger logger.Logger) error
     Create(ctx context.Context, resource T) (T, error)
     Destroy(ctx context.Context, resource T, force bool) error
     Read(ctx context.Context, old T, new T) (T, error)
@@ -43,6 +43,9 @@ This is the ergonomic, type-safe surface — no manual JSON marshaling, no
 `any`. What each method receives, may change and returns, and when xcl calls
 it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
 
+- `Init` gets a plugin scoped logger, for messages written outside a
+  provider call. During a call, log through `plugins.Logger(ctx)`, which xcl
+  binds to the resource and step (see [Plugin logging](#plugin-logging)).
 - `Read(ctx, old, new)` reports the real resource. `old` is the copy saved by
   the last apply, `new` is the configured copy; `Read` fills `new` in and
   returns it. It is only called for resources in the previous state.
@@ -65,7 +68,7 @@ can call regardless of which plugin or resource type it's dealing with:
 ```go
 // plugins/adapter.go
 type ProviderAdapter interface {
-    Init(state State, functions ProviderFunctions, logger Logger) error
+    Init(state State, functions ProviderFunctions, logger logger.Logger) error
     Validate(ctx context.Context, entityData []byte) error
     Create(ctx context.Context, entityData []byte) ([]byte, error)
     Destroy(ctx context.Context, entityData []byte, force bool) error
@@ -100,24 +103,32 @@ are indistinguishable — same interface, same call sites.
 // plugins/plugin_host.go
 type PluginHost interface {
     GetTypes() []RegisteredType
-    Validate(entityType, entitySubType string, entityData []byte) error
-    Create(entityType, entitySubType string, entityData []byte) ([]byte, error)
-    Destroy(entityType, entitySubType string, entityData []byte) error
+    Validate(ctx context.Context, entityType, entitySubType string, entityData []byte) error
+    Create(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
+    Destroy(ctx context.Context, entityType, entitySubType string, entityData []byte) error
     Read(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) ([]byte, error)
-    Update(entityType, entitySubType string, entityData []byte) ([]byte, error)
-    Changed(entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error)
+    Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
+    Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error)
     Stop()
 }
 ```
 
+Every lifecycle method takes the provider call's context, which carries the
+call's logger; `PluginEntityProvider`
+([`plugins/plugin.go`](../plugins/plugin.go)), the lifecycle half of a
+`Plugin`, has the same signatures.
+
 Two implementations:
 
 - **`DirectPluginHost`** ([`plugins/direct_plugin_host.go`](../plugins/direct_plugin_host.go)) —
-  wraps a `Plugin` living in the same process. Every method is a direct
-  passthrough call. Used for embedded/in-process plugins and in tests
-  (see `internal/parser/test_plugin.go`).
+  wraps a `Plugin` living in the same process. `NewDirectPluginHost(emit,
+  state, plugin)` calls the plugin's `Init` with a plugin scoped logger that
+  emits to `emit`. Every method is a direct passthrough call, after naming
+  the plugin as the source of the call's logger. Used for embedded/in-process
+  plugins and in tests (see `internal/parser/test_plugin.go`).
 - **`GRPCPluginHost`** ([`plugins/grpc_plugin_host.go`](../plugins/grpc_plugin_host.go)) —
-  starts a plugin binary as a subprocess and talks to it over gRPC
+  created with `NewGRPCPluginHost(emit, state)`, `Start(path)` starts a
+  plugin binary as a subprocess and talks to it over gRPC
   (`plugins/grpc_server.go` is what runs *inside* the plugin process).
   `GetTypes()` calls the remote `GetTypes` RPC once, then builds and caches
   one `GRPCResourceProviderAdapter` per returned type (`h.cachedTypes`,
@@ -140,7 +151,7 @@ and, per resource type, calls:
 
 ```go
 func RegisterResourceProvider[T any](
-    p *PluginBase, logger Logger, state State,
+    p *PluginBase, logger logger.Logger, state State,
     typeName, subTypeName string,
     resourceInstance T, provider ResourceProvider[T],
 ) error
@@ -148,7 +159,9 @@ func RegisterResourceProvider[T any](
 
 This does three things:
 
-1. Wraps `provider` in a `TypedProviderAdapter[T]` and calls `Init` on it.
+1. Wraps `provider` in a `TypedProviderAdapter[T]` and calls `Init` on it,
+   passing on `logger`, the plugin scoped logger the plugin's own `Init` was
+   given.
 2. Generates a JSON schema from `resourceInstance` via
    `schema.GenerateSchemaFromInstance` (reflects over the struct — see
    `internal/schema/serialize.go`).
@@ -157,8 +170,13 @@ This does three things:
 
 A plugin provides as many block types as it likes: call
 `RegisterResourceProvider` once per type in `Init`, each with its own
-provider. The adapter tags each provider's logger with its block type, so the
-providers of one plugin are told apart in the log. Both plugins in
+provider. The adapter adds the detail `provider=<block type>` to the plugin
+scoped logger it passes to each provider's `Init`, so the providers of one
+plugin are told apart in what they log outside a call. (It is added with
+`logger.WithTag`, which only tags xcl's own event logger, so it applies to
+in-process plugins; inside an external plugin process the plugin scoped logger
+sends to the host over gRPC and is passed on unchanged.) During a call the
+event names the resource and its type instead. Both plugins in
 [`example/plugin`](../example/plugin) provide two types this way, the
 in-process one `postgres` and `redis`, the external one `app` and `ingress`.
 
@@ -176,10 +194,39 @@ from the schema via `schema.CreateInstanceFromSchema` — see
 ## `PluginRegistry` — tying it together
 
 [`plugins/registry/plugin_registry.go`](../plugins/registry/plugin_registry.go)
-holds a `[]plugins.PluginHost` (populated via `RegisterPlugin` for
-in-process plugins, `RegisterPluginWithPath`/`DiscoverAndLoadPlugins` for
-gRPC ones) plus the compiled-in builtin types. Its two jobs, used from two
-different places in the parser:
+holds a `[]plugins.PluginHost` plus the compiled-in builtin types.
+`NewPluginRegistry()` takes no logger, and registering only records:
+`RegisterPlugin` for in-process plugins, `RegisterPluginWithPath` for a gRPC
+plugin binary, and `DiscoverPlugins(dirs, pattern)` for directories to search
+for binaries named like `pattern` (`xcl-plugin-*` when empty).
+
+Nothing is started until `Load(emit)`, which `Config` calls at the start of
+the first `Validate`, `Apply` or `Destroy` (and the parser calls again, which
+is free). `Load` runs once per registry however many `Config`s share it, and
+later calls return the first call's result, failure included. It reports what
+it does to `emit`:
+
+- a `discover` start, `discover` log events for the binaries found, then a
+  success with `Meta` `dirs` and `count` (or an error), when there are
+  directories to search;
+- for each plugin, a `load` start, then a `load` success whose `Meta` names
+  the `plugin` and its `block_types`, or a `load` error.
+
+A registered plugin that fails to start fails the load, and so the
+operation, with a `*xcl.PluginLoadError` (from
+[`errors/plugin_load_error.go`](../errors/plugin_load_error.go), re-exported
+from the root package) that names the plugin and matches `xcl.ErrPluginLoad`
+with `errors.Is`. A discovered binary that fails to start is rejected, with a
+`load` error event whose `Meta` has `rejected=true`, and skipped; discovery
+fails only when every discovered plugin fails. `Loaded()` reports whether
+`Load` has run.
+
+`Activate(emit)` routes the messages plugins write outside a provider call,
+such as `Init` messages and go-plugin's, to the operation in progress; `Config`
+activates each operation before loading. While plugins load, those messages
+go to the loading operation.
+
+Its two jobs, used from two different places in the parser:
 
 - **`CreateResource(resourceType, resourceName) (any, error)`** — instantiate
   a new (empty) resource instance for an HCL block. Tries builtins first,
@@ -203,61 +250,109 @@ Lifecycle](parser-lifecycle.md)).
 
 ## Plugin logging
 
-A plugin logs to the logger its host was given, with every message tagged so
-it can be told apart from the host's own logs. Every line, from a plugin or
-from the host, leads with the event it belongs to, `event=<name>`, taken from
-an `event` argument; a message logged without one is written with
-`event=log`. Log with an event, and the resource with `resource`:
+Plugins never write output. Everything a plugin logs becomes an
+`events.Event` with the phase `log` on the same stream as xcl's own events,
+delivered to the application's receiver (see
+[Parser & Resource Lifecycle](parser-lifecycle.md#events-parseroptionsemit)).
+The level and text are in `Meta` under `events.KeyLevel` (`level`) and
+`events.KeyMessage` (`message`), and the key/value arguments of the call are
+the other `Meta` details, under their own names. The `logger` package holds
+the `Logger` interface (`Debug`/`Info`/`Warn`/`Error(msg, args ...any)`) and
+its one implementation, `logger.New(emit, base)`, which turns each call into
+a copy of `base` with the message in `Meta`. `logger.Nop()` emits nothing.
+
+### Logging during a provider call
+
+A provider logs through the logger in the call's context:
 
 ```go
-p.logger.Debug("", "event", "create", "resource", db.Meta.ID)
-```
- The plugin host tags the
-plugin's logger with `plugin=<name>`: the Go type name for an in-process
-plugin (`ExamplePlugin`), the binary's file name for an external one. The
-adapter that `RegisterResourceProvider` creates also tags the provider's
-logger with `provider=<block type>`, inside the plugin process, so a provider
-message reads
-
-```
-DEBU event=create plugin=ExamplePlugin provider=postgres resource=resource.postgres.main
+func (p *postgresProvider) Create(ctx context.Context, db *resources.PostgreSQL) (*resources.PostgreSQL, error) {
+    db.ConnectionString = connectionString(db)
+    plugins.Logger(ctx).Info("created database", "connection_string", db.ConnectionString)
+    return db, nil
+}
 ```
 
-The tags are written at the start of the message, after the event, by
-`logger.WithTag`; `StdOutLogger` also moves the event to the front, so the
-host's own lines read the same way.
+The parser puts a logger in the context before each call with
+`plugins.WithLogger` (see
+[The operation context](parser-lifecycle.md#the-operation-context)), bound to
+the resource (`ResourceID`, `ResourceType`, `File`) and the step (`Operation`
+is `create`, `read`, `changed`, `update` or `destroy`). The provider passes no
+resource details, and the message arrives between the call's `start` and its
+`success` or `error`. Outside a provider call, `plugins.Logger(ctx)` returns a
+logger that emits nothing.
 
-An external plugin reaches the host through go-plugin, which logs how it
-starts and talks to the plugin process, and passes on anything the process
-writes to stderr. `GRPCPluginHost` gives go-plugin an adapter
-([`plugins/hclog_adapter.go`](../plugins/hclog_adapter.go)) that writes all
-of that through the same `plugin=<name>` tagged logger, as `event=go-plugin`. go-plugin's info and
-debug messages are passed on at debug and its trace messages are dropped;
-warnings and errors keep their level. go-plugin's `received EOF, stopping recv
-loop` debug message is dropped as well: it reports the plugin's stdio stream
-ending, which happens every time the plugin process stops, but carries an
-`err=` field that reads like a failure. Everything an external plugin
-produces therefore reaches the host app's logger in one format, rather than
-partly through go-plugin's default logger straight to stderr:
+The event's `Source` is the plugin's name: `core` is xcl itself. The host
+sets it with `logger.WithSource` before the call reaches the plugin:
 
-```
-DEBU event=go-plugin plugin=external starting plugin path=build/external args=[build/external]
-DEBU event=create plugin=external provider=app resource=resource.app.web
-```
+- in-process, `DirectPluginHost` re-sources the call's logger with the Go
+  type name of the plugin, `plugins.PluginName` (`ExamplePlugin`);
+- external, `GRPCPluginHost` uses the binary's file name,
+  `plugins.PluginBinaryName` (`xcl-plugin-person`, without `.exe`).
 
-Both kinds of plugin log the same framework messages, at debug: a
-`plugin loaded` line (`event=load`) listing the block types when the host
-loads the plugin, and a `calling provider` line before each provider call,
-whose event is the provider call. The call line is
-written by the adapter around the provider, which runs in the host for an
-in-process plugin and inside the plugin process for an external one:
+Loggers are not kept on the provider: providers are called concurrently for
+different resources, so each call carries its own.
 
-```
-DEBU event=load plugin=ExamplePlugin plugin loaded block_types=postgres, redis
-DEBU event=create plugin=ExamplePlugin provider=postgres calling provider resource=resource.postgres.main
-DEBU event=load plugin=external plugin loaded block_types=app, ingress
-DEBU event=create plugin=external provider=app calling provider resource=resource.app.web
-```
+### The plugin scoped logger
+
+`Plugin.Init(logger, state)` and each provider's `Init` get a plugin scoped
+logger, for messages written outside a provider call. Its events have the
+plugin's name as `Source` and `load` as `Operation`, and no resource. The
+registry forwards them to the operation loading the plugins, or later to the
+active operation (see `Activate` above); with neither, they are dropped.
+
+### Across the process boundary
+
+An external plugin's messages cross gRPC through the host callback service
+([`plugins/grpc_host_callback.go`](../plugins/grpc_host_callback.go)):
+
+- **Call IDs.** Before each call, the host registers the call's logger,
+  sourced to the plugin, under a new ID and sends the ID as the `xcl-call-id`
+  gRPC metadata ([`plugins/grpc_calls.go`](../plugins/grpc_calls.go)). Inside
+  the plugin, `GRPCServer` puts a `GRPCLogger` carrying that ID into the
+  call's context, so `plugins.Logger(ctx)` works the same as in-process. Each
+  message is sent as a `LogRequest` with the ID in its `call_id` field, and
+  the host writes it to that call's logger, so it gets the call's resource,
+  step and receiver. A message with no ID, or one for a call that has
+  already returned, goes to the plugin scoped logger.
+- **Values as text.** `LogRequest.args` is a list of strings, so detail values
+  cross the boundary as text. The host converts them back to integers,
+  floats and booleans where they parse as one, so they may not keep their
+  original types.
+- **The plugin scoped logger inside the plugin** is an asynchronous logger:
+  `Init` runs before the host has connected, so each message is sent from its
+  own goroutine once the connection is available. Such messages may arrive
+  out of order, and are dropped when the host can't be reached. A message
+  that fails to send is always dropped; logging never changes the outcome of
+  a call.
+
+### go-plugin's messages
+
+go-plugin starts external plugins and logs how it starts and talks to the
+plugin process, and passes on anything the process writes to stderr.
+`GRPCPluginHost` gives it an adapter
+([`plugins/hclog_adapter.go`](../plugins/hclog_adapter.go)) that turns all of
+that into log events from the plugin scoped logger, with the detail
+`component=go-plugin` so a receiver can tell them apart from the plugin's own.
+They are routed like any other message outside a call, to the operation
+loading plugins or the active one. go-plugin's info and debug messages are
+passed on at debug and its trace messages are dropped; warnings and errors
+keep their level. The `received EOF, stopping recv loop` debug message is
+dropped as well: it reports the plugin's stdio stream ending, which happens
+every time the plugin process stops, but carries an `err=` field that reads
+like a failure.
+
+One message escapes this. When an external plugin is stopped within
+milliseconds of starting, go-plugin v1.6.3 writes
+`[ERR] plugin: plugin acceptAndServe error: broker closed` to standard error
+through the standard library's global logger, which xcl does not change. It
+is outside xcl's control and is accepted as a known exception.
+
+### What is no longer logged
+
+There is no framework log message around provider calls: the lifecycle
+`start`, `success` and `error` events describe each call, and a plugin
+loading is a `load` event rather than a log message.
 
 ## Configuration-only types
 
@@ -267,7 +362,7 @@ Not every block type needs a plugin. `PluginRegistry.RegisterType(name,
 provider:
 
 ```go
-r := registry.NewPluginRegistry(log)
+r := registry.NewPluginRegistry()
 err := r.RegisterType("postgres", &PostgreSQL{})
 ```
 
@@ -279,12 +374,19 @@ satisfies. The lifecycle and the destroy walk treat a registered type like a
 builtin: it gets a success event and no provider is ever called for it. On
 apply its status is left unchanged; on destroy it is removed from the state.
 
-Type names are unique across the registry. `RegisterType`, `RegisterPlugin`,
-`RegisterPluginWithPath` and `DiscoverAndLoadPlugins` all check each incoming
-name against builtins, registered types and every loaded plugin's resource
-types, and fail with a `*registry.TypeNameClashError` naming the type. A
-clashing plugin is stopped and not added, and discovery always returns clash
-errors, even when other plugins load.
+Type names are unique across the registry, and a clash is a
+`*registry.TypeNameClashError` naming the type. When it is found depends on
+when the name arrives:
+
+- `RegisterType` checks immediately, against builtins, registered types and
+  the types of plugins that have already loaded, and leaves the registry
+  unchanged on a clash.
+- Plugin types are checked when plugins load, against all of those and the
+  other types the same plugin provides. A clashing plugin is stopped and not
+  added, and the load fails, and with it the operation, even when other
+  discovered plugins loaded. A registered type that shares a name with a
+  plugin that has not loaded yet is accepted by `RegisterType` and reported
+  here.
 
 [`example/configonly`](../example/configonly) parses a Kubernetes-like
 configuration into registered types this way, with no plugin at all.

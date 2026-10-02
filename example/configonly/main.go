@@ -21,12 +21,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
-	"github.com/jumppad-labs/xcl/example/eventlog"
-	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -45,7 +43,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, err = run(os.Stdout, logger.NewStdOutLogger(), dir, filepath.Join(stateDir, "state.json"))
+	// the registry is built here so that the event receiver can share it: it
+	// is what types the entity an event carries, which is how the receiver
+	// shows each resource's configuration as it is created
+	r := registry.NewPluginRegistry()
+
+	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), r), r, dir, stateDir)
 	os.RemoveAll(stateDir)
 
 	if err != nil {
@@ -55,11 +58,11 @@ func main() {
 }
 
 // run applies the configuration in dir with the example types registered,
-// keeping the state in a file at statePath, writes the resources and query
+// keeping the state in a file in stateDir, writes the resources and query
 // results to out, then destroys everything and returns the resources that were
-// applied. Every event xcl fires is logged to log.
-func run(out io.Writer, log logger.Logger, dir string, statePath string) ([]any, error) {
-	r := registry.NewPluginRegistry(log)
+// applied. Every event xcl produces goes to handler, a nil handler leaves xcl
+// silent.
+func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, dir string, stateDir string) ([]any, error) {
 
 	// Register each Go type under the block type name used in configuration.
 	// A registered type needs nothing else: no plugin, no provider, no schema
@@ -81,7 +84,7 @@ func run(out io.Writer, log logger.Logger, dir string, statePath string) ([]any,
 	}
 
 	// Keep the state in a file, Destroy works from it alone
-	store, err := state.NewFileStateStore(statePath, r)
+	store, err := state.NewFileStateStore(stateDir)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +92,11 @@ func run(out io.Writer, log logger.Logger, dir string, statePath string) ([]any,
 	c := xcl.NewConfig(
 		xcl.WithPluginRegistry(r),
 		xcl.WithStateStore(store),
-		xcl.WithEventHandler(eventlog.Handler(log)),
+		xcl.WithEventHandler(handler),
+		// events carry nothing by default, this asks for each resource as
+		// state records it, which is what the receiver turns back into
+		// configuration text
+		xcl.WithEventData(xcl.EventDataProcessed),
 	)
 
 	if err := c.Apply(dir); err != nil {
