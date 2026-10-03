@@ -520,12 +520,10 @@ func TestParseContainerWithNoTypeReturnsError(t *testing.T) {
 	require.Error(t, err)
 }
 
-// A declaration may lead with the variety it is declaring, container "mine",
-// instead of the resource kind. The keyword names a type the registry knows,
-// so the single label is the name of the thing declared. The fixture this
-// reads used to live under invalid/ as no_resource.xcl, back when a top level
-// declaration had to lead with a stanza keyword
-func TestApplyRejectsTheBareFormOfAKindLedType(t *testing.T) {
+// A declaration leads with its type. container is a subtype of the resource
+// type, provided by a plugin, so container "mine" names a type nothing
+// registers rather than being another way to write resource "container" "mine"
+func TestApplyRejectsASubtypeOfResourceUsedAsAType(t *testing.T) {
 	absoluteFolderPath, err := filepath.Abs("../test_fixtures/config/bare/container.xcl")
 	if err != nil {
 		t.Fatal(err)
@@ -536,10 +534,7 @@ func TestApplyRejectsTheBareFormOfAKindLedType(t *testing.T) {
 	_, err = p.Apply(context.Background(), absoluteFolderPath)
 	require.Error(t, err)
 
-	// container is provided by a plugin, so it is declared with the resource
-	// keyword. Leading with it is a different type, not an alias
-	require.Contains(t, err.Error(), "container")
-	require.Contains(t, err.Error(), "declared with the resource keyword")
+	require.Contains(t, err.Error(), "'container' is not a known type")
 }
 
 // The leading keyword names nothing the system knows, so the declaration is
@@ -1498,7 +1493,7 @@ func TestParseResourceReturnsConfigErrorWhenTypeIsNotRegistered(t *testing.T) {
 	// checked, not the literal block keyword 'resource'
 	require.Equal(
 		t,
-		"unable to create resource 'example' of type 'nosuchtype': resource type nosuchtype not found in any registered plugin",
+		"unable to create resource 'example' of type 'nosuchtype': type resource.nosuchtype not found in any registered plugin",
 		pe.Message,
 	)
 }

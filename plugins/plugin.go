@@ -137,8 +137,9 @@ func (p *PluginBase) GetTypes() []RegisteredType {
 
 // Validate validates the given entity data.
 func (p *PluginBase) Validate(ctx context.Context, entityType, entitySubType string, entityData []byte) error {
-	if entityType == "" || entitySubType == "" {
-		return errors.New("entityType and entitySubType cannot be empty")
+	// the subtype is optional, an entity type declared without one has none
+	if entityType == "" {
+		return errors.New("entityType cannot be empty")
 	}
 
 	rt := p.getRegisteredType(entityType, entitySubType)

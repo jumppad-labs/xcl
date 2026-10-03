@@ -96,7 +96,7 @@ func (s *State) addResource(r any) error {
 		return fmt.Errorf("resource does not have ResourceBase embedded: %w", err)
 	}
 
-	// An entity is already held when one of the same kind, variety, name and
+	// An entity is already held when one of the same type, subtype, name and
 	// module is. This compares metadata rather than resolving an address,
 	// because storing entities does not require knowing how they are addressed
 	for _, e := range s.resources {

@@ -31,7 +31,7 @@ func testSaveState(t *testing.T) (StateStore, string, *registry.PluginRegistry) 
 	ss, p, reg := testCreateState(t)
 
 	// Create a variable resource using the registry
-	varResource, err := reg.CreateResource(resources.TypeVariable, "example")
+	varResource, err := reg.CreateEntity(resources.TypeVariable, "", "example")
 	require.NoError(t, err)
 
 	// the parser assigns an entity its id while parsing, storage records what
@@ -131,10 +131,10 @@ func TestLoadFailsWhenStateFileIsNotAnArray(t *testing.T) {
 func TestSaveRecordsBothAxesOfEachEntity(t *testing.T) {
 	ss, _, reg := testCreateState(t)
 
-	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
-	database, err := reg.CreateResource(registered.TypeDatabase, "main")
+	database, err := reg.CreateEntity("resource", registered.TypeDatabase, "main")
 	require.NoError(t, err)
 
 	databaseMeta, err := types.GetMeta(database)

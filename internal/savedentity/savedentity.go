@@ -17,6 +17,7 @@ import (
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
+	"github.com/jumppad-labs/xcl/types"
 )
 
 // Decode returns the typed entity for one saved record. registry resolves the
@@ -42,29 +43,25 @@ func Decode(registry *registry.PluginRegistry, data []byte) (any, error) {
 	// record that fails later can still be named
 	id, _ := meta["id"].(string)
 
-	resourceType, ok := meta["type"].(string)
-	if !ok || resourceType == "" {
+	entityType, ok := meta["type"].(string)
+	if !ok || entityType == "" {
 		return nil, &xclerrors.InvalidSavedDataError{ID: id, Err: fmt.Errorf("record has no type")}
 	}
 
-	// A resource is created from its variety, every other kind from the kind
-	// itself. Both axes are written to state, so read the variety back where
-	// the record carries one
-	if subtype, ok := meta["subtype"].(string); ok && subtype != "" {
-		resourceType = subtype
-	}
+	// an entity is created from its type and its subtype, where it has one,
+	// both of which are written to state
+	subtype, _ := meta["subtype"].(string)
 
-	resourceName, ok := meta["name"].(string)
-	if !ok || resourceName == "" {
+	name, ok := meta["name"].(string)
+	if !ok || name == "" {
 		return nil, &xclerrors.InvalidSavedDataError{ID: id, Err: fmt.Errorf("record has no name")}
 	}
 
-	// Create a typed resource reference using the registry
-	resource, err := registry.CreateResource(resourceType, resourceName)
+	// Create a typed entity using the registry
+	resource, err := registry.CreateEntity(entityType, subtype, name)
 	if err != nil {
-		// the type is not registered, or the record predates the split and
-		// names a kind that no longer resolves
-		return nil, &xclerrors.UnregisteredTypeError{Type: resourceType}
+		// the type is not registered, or not loaded
+		return nil, &xclerrors.UnregisteredTypeError{Type: types.TypeKey(entityType, subtype)}
 	}
 
 	// Re-marshal and unmarshal into the typed reference. This overwrites what

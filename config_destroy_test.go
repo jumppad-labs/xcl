@@ -441,8 +441,8 @@ func TestConfigDestroyFailsWhenSavedStateHasUnknownType(t *testing.T) {
 
 	var unknown state.UnknownTypesError
 	require.True(t, errors.As(err, &unknown), "expected UnknownTypesError, got: %v", err)
-	require.Contains(t, unknown.Types, "network")
-	require.Contains(t, unknown.Types, "container")
+	require.Contains(t, unknown.Types, "resource.network")
+	require.Contains(t, unknown.Types, "resource.container")
 
 	require.Empty(t, f.plugin.GetCalls())
 

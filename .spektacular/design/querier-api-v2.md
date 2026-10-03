@@ -38,21 +38,48 @@ leaves `resource` meaning both one stanza and all of them — and the address
 grammar already treats `resource` as a sibling of `output`, `variable` and
 `local` (`internal/resources/fqrn.go:58`), not their parent.
 
-## No syntactic sugar between stanza forms
+## Entities have a type and an optional subtype
 
-`resource "container" "nics"` and `container "nics"` are **different types**,
-not two spellings of one. The first is type `resource`, subtype `container`,
-addressed `resource.container.nics`; the second is type `container` with no
-subtype, addressed `container.nics`. Neither normalises to the other, and a Go
-type is registered under one form or the other, never both.
+Every entity has a type, the keyword its block leads with, and an optional
+subtype, its first label when the type takes one. One registration call says
+both, for registered Go types and plugin types alike:
 
-This keeps the positional rule honest: segment one is always the type, so
-`FindByType("container")` matches bare-form container entities where they
-exist, and reports an unknown type where they do not. Nothing has to know
-which form a stanza was written in.
+```go
+r.RegisterType(&Postgres{}, "resource", "postgres") // resource "postgres" "main" {}  → resource.postgres.main
+r.RegisterType(&Server{}, "server", "big")          // server "big" "web" {}          → server.big.web
+r.RegisterType(&Cache{}, "cache")                   // cache "main" {}                → cache.main
+```
 
-Entities with a single label — `variable`, `output`, `module`, and any
-bare-form type — carry an **empty** subtype.
+```go
+func (r *PluginRegistry) RegisterType(entity any, entityType string, subtype ...string) error
+```
+
+The only special thing about `resource` is that it always takes a subtype.
+Any other type may take one too. There is one registration call; the separate
+bare-form call is gone. A plugin already registers the same way, with
+`PluginBase.RegisterType(entityType, subtype, ...)`, and the host accepts
+plugin types of any type, not only `resource`.
+
+**A type keyword takes a subtype for every registration or for none.**
+`resource` always does. Registering `server` without a subtype once it has
+one, or the reverse, fails with `*registry.TypeFormError`. This keeps
+addresses positional: the keyword alone says whether `server.big.web` means
+subtype `big` named `web`, or entity `big` with attribute `web`, and how many
+labels a block carries.
+
+**No syntactic sugar between types.** `resource "container" "nics"` and
+`container "nics"` are different types, `resource.container` and `container`,
+not two spellings of one. Neither normalises to the other, and registering
+both is not a clash. Uniqueness covers the type and subtype together, and a
+clash names both, i.e. `resource.postgres`.
+
+This keeps the positional rule honest. Segment one is always the type, and
+segment two is the subtype where the type takes one. So
+`FindByType("container")` matches container entities where they exist, and
+reports an unknown type where they do not.
+
+Entities without a subtype carry an **empty** subtype: `variable`, `output`,
+`module`, and any type registered without one.
 
 ## Two spellings, one implementation
 
@@ -226,13 +253,13 @@ c.All[resources.Deployment]()   // subtype derived from T, no string
 ```
 
 Derived by reflecting `T` against the registry's prototypes, which are stored
-as concrete pointers (`registeredTypes types.RegisteredTypes`,
-`plugins/registry/plugin_registry.go:20`, e.g. `&resources.Deployment{}`):
+as concrete pointers in the registry's `typeInfo`, keyed by type and subtype
+(e.g. `&resources.Deployment{}`):
 
 ```go
-// TypePath returns the address segments a registered type is reached by:
-// {"resource", "container"} for resource "container" "nics", or {"container"}
-// for the bare form. A type is registered under one form, never both.
+// TypePath returns the address segments a registered type is reached by: its
+// type and subtype, i.e. {"resource", "container"} or {"server", "big"}, or its
+// type alone, i.e. {"container"}, when it was registered without a subtype.
 func (r *PluginRegistry) TypePath(t reflect.Type) ([]string, bool)
 ```
 
@@ -388,9 +415,6 @@ condition, and the doc comments must say so.
 ## Not in scope
 
 Exposing the DAG or a dependency-ordered public walk, an index (every lookup
-stays a linear scan), `Meta.Properties` (allocated but never written), implementing the bare
-`container "nics"` stanza form — the parser accepts only `variable`,
-`resource`, `module` and `output` today (`internal/parser/parser.go:543`), and
-this design only has to leave room for it — and
+stays a linear scan), `Meta.Properties` (allocated but never written), and
 the stale `Process`/`ToJSON` sections in `README.md` that document methods
 which do not exist.

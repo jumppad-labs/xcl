@@ -242,7 +242,7 @@ func setContextVariablesFromList(s ResourceProvider, addresses *resources.Addres
 			return pe
 		}
 
-		fqrn, err := resources.ParseFQRN(v)
+		fqrn, err := addresses.Parse(v)
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				r,
@@ -517,7 +517,7 @@ func getResourceDependencies(rp ResourceProvider, addresses *resources.AddressPa
 
 	for _, d := range deps {
 		var err error
-		fqdn, err := resources.ParseFQRN(d)
+		fqdn, err := addresses.Parse(d)
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				resource,

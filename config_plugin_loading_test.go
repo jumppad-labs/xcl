@@ -10,7 +10,10 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/resources"
+	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/stretchr/testify/require"
 )
@@ -238,7 +241,7 @@ func TestRegisterTypeAcceptsNameOfUnloadedPluginType(t *testing.T) {
 	err := pr.RegisterPlugin(&parser.TestPlugin{})
 	require.NoError(t, err)
 
-	err = pr.RegisterType("network", &registered.Database{})
+	err = pr.RegisterType(&registered.Database{}, "resource", "network")
 	require.NoError(t, err)
 }
 
@@ -250,7 +253,7 @@ func TestFirstValidateFailsWithClashForPluginType(t *testing.T) {
 	err := pr.RegisterPlugin(&parser.TestPlugin{})
 	require.NoError(t, err)
 
-	err = pr.RegisterType("network", &registered.Database{})
+	err = pr.RegisterType(&registered.Database{}, "resource", "network")
 	require.NoError(t, err)
 
 	c := NewConfig(WithPluginRegistry(pr))
@@ -260,7 +263,7 @@ func TestFirstValidateFailsWithClashForPluginType(t *testing.T) {
 
 	var clash *registry.TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "network", clash.Name)
+	require.Equal(t, "resource.network", clash.Name)
 	require.Equal(t, "registered type", clash.Existing)
 }
 
@@ -344,10 +347,21 @@ func TestInProcessPluginInitLogsReachTheLoadingOperation(t *testing.T) {
 	require.Greater(t, loadSucceeded, initLogged)
 }
 
-// moduleNetworkAddress is a module relative address whose split depends on
-// whether "network", a type the TestPlugin provides, is known: the start of the
+// moduleServerAddress is a module relative address whose split depends on
+// whether "server", a type serverPlugin provides, is known: the start of the
 // body when it is, part of the module name when it is not
-const moduleNetworkAddress = "module.web.network.one"
+const moduleServerAddress = "module.web.server.big.one"
+
+// serverPlugin is an in-process plugin that provides the type "server" with
+// the subtype "big", a type other than resource that takes a subtype. Nothing
+// declares one, so it needs no provider
+type serverPlugin struct {
+	plugins.PluginBase
+}
+
+func (p *serverPlugin) Init(logger.Logger, plugins.State) error {
+	return p.RegisterType("server", "big", &structs.Network{}, nil)
+}
 
 // setupUnloadedPluginConfig returns a Config whose registry holds the
 // in-process TestPlugin, not yet loaded
@@ -359,6 +373,9 @@ func setupUnloadedPluginConfig(t *testing.T) *Config {
 	pr := registry.NewPluginRegistry()
 
 	err := pr.RegisterPlugin(&parser.TestPlugin{})
+	require.NoError(t, err)
+
+	err = pr.RegisterPlugin(&serverPlugin{})
 	require.NoError(t, err)
 
 	return NewConfig(WithPluginRegistry(pr))
@@ -377,11 +394,11 @@ func TestAddressParserIsNotCachedBeforePluginsLoad(t *testing.T) {
 func TestAddressParserResolvesWithoutPluginTypesBeforePluginsLoad(t *testing.T) {
 	c := setupUnloadedPluginConfig(t)
 
-	fqrn, err := c.addressParser().Parse(moduleNetworkAddress)
+	fqrn, err := c.addressParser().Parse(moduleServerAddress)
 	require.NoError(t, err)
 
 	require.Equal(t, resources.TypeModule, fqrn.Type)
-	require.Equal(t, "web.network", fqrn.Module)
+	require.Equal(t, "web.server.big", fqrn.Module)
 	require.Equal(t, "one", fqrn.Resource)
 }
 
@@ -395,10 +412,11 @@ func TestAddressParserKnowsPluginTypesAfterFirstOperation(t *testing.T) {
 	err = c.Validate(writeConfigFile(t, singleNetworkConfig))
 	require.NoError(t, err)
 
-	fqrn, err := c.addressParser().Parse(moduleNetworkAddress)
+	fqrn, err := c.addressParser().Parse(moduleServerAddress)
 	require.NoError(t, err)
 
-	require.Equal(t, "network", fqrn.Type)
+	require.Equal(t, "server", fqrn.Type)
+	require.Equal(t, "big", fqrn.Subtype)
 	require.Equal(t, "web", fqrn.Module)
 	require.Equal(t, "one", fqrn.Resource)
 

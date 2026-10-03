@@ -1,0 +1,4 @@
+# cache takes no subtype, so a declaration with two labels is invalid
+cache "big" "main" {
+  location = "eu-west"
+}

@@ -447,9 +447,8 @@ func (l *resourceLifecycle) firstStep(meta *types.Meta) string {
 // provider: the builtin types xcl handles itself, and the plain Go types
 // registered without a plugin. typeRegistry may be nil, in which case only
 // builtin types are handled without a provider.
-// It takes the whole meta rather than a single name because the two questions
-// it asks sit on different axes: the builtins are stanza kinds, while a
-// registered Go type is registered under its variety.
+// It takes the whole meta rather than a single name because a registered Go
+// type is registered under its type and subtype together.
 func handledWithoutProvider(typeRegistry TypeRegistry, meta *types.Meta) bool {
 	if meta.Type == resources.TypeVariable ||
 		meta.Type == resources.TypeOutput ||
@@ -458,9 +457,8 @@ func handledWithoutProvider(typeRegistry TypeRegistry, meta *types.Meta) bool {
 		return true
 	}
 
-	// a kind led type is registered under its variety and a bare one under its
-	// own keyword, which is exactly what AddressType returns
-	return typeRegistry != nil && typeRegistry.IsRegisteredType(meta.AddressType())
+	// a registered Go type is registered under its type and subtype
+	return typeRegistry != nil && typeRegistry.IsRegisteredType(meta.Type, meta.Subtype)
 }
 
 // resourceType returns the "<type>.<name>" form used in parser events

@@ -6,24 +6,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// AddressPath returns the segments a type is reached by, and a type is reached
-// by one form only: a kind led type sits under resource, a bare one and a
-// builtin lead with their own name.
+// AddressPath returns the segments a type is reached by: its type, followed
+// by its subtype where it has one.
 
-func TestAddressPathPutsAKindLedTypeUnderResource(t *testing.T) {
-	info := TypeInfo{Name: "container"}
+func TestAddressPathPutsTheSubtypeAfterTheType(t *testing.T) {
+	info := TypeInfo{Type: TypeResource, Subtype: "container"}
 
 	require.Equal(t, []string{TypeResource, "container"}, info.AddressPath())
 }
 
-func TestAddressPathLeadsWithTheNameOfABareType(t *testing.T) {
-	info := TypeInfo{Name: "container", Bare: true}
+func TestAddressPathPutsTheSubtypeAfterAnyType(t *testing.T) {
+	info := TypeInfo{Type: "server", Subtype: "big"}
+
+	require.Equal(t, []string{"server", "big"}, info.AddressPath())
+}
+
+func TestAddressPathIsTheTypeAloneWithoutASubtype(t *testing.T) {
+	info := TypeInfo{Type: "container"}
 
 	require.Equal(t, []string{"container"}, info.AddressPath())
 }
 
 func TestAddressPathLeadsWithTheNameOfABuiltin(t *testing.T) {
-	info := TypeInfo{Name: "variable", Builtin: true}
+	info := TypeInfo{Type: "variable", Builtin: true}
 
 	require.Equal(t, []string{"variable"}, info.AddressPath())
+}
+
+func TestTypeKeyJoinsTypeAndSubtype(t *testing.T) {
+	require.Equal(t, "server.big", TypeKey("server", "big"))
+}
+
+func TestTypeKeyIsTheTypeAloneWithoutASubtype(t *testing.T) {
+	require.Equal(t, "cache", TypeKey("cache", ""))
 }

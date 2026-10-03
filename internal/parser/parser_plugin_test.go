@@ -34,7 +34,7 @@ func TestPluginRegistration(t *testing.T) {
 	require.Len(t, parser.pluginRegistry.GetPluginHosts(), 1, "Should have one plugin host")
 
 	// Try to create a resource using the plugin registry
-	resource, err := parser.pluginRegistry.CreateResource("person", "test_person")
+	resource, err := parser.pluginRegistry.CreateEntity("resource", "person", "test_person")
 	require.NoError(t, err, "Should create resource from plugin")
 	require.NotNil(t, resource, "Resource should not be nil")
 	meta, err := types.GetMeta(resource)
@@ -51,7 +51,7 @@ func TestPluginResourceCreationWithFallback(t *testing.T) {
 
 	// Try to create a resource that doesn't exist in plugins (should fall back to registered types)
 	// This should fail since we don't have any registered types for "nonexistent"
-	_, err := parser.pluginRegistry.CreateResource("nonexistent", "test")
+	_, err := parser.pluginRegistry.CreateEntity("resource", "nonexistent", "test")
 	require.Error(t, err, "Should fail to create nonexistent resource type")
 	require.Contains(t, err.Error(), "not found in any registered plugin")
 }

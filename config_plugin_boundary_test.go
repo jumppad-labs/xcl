@@ -660,7 +660,7 @@ func TestExternalPluginRejectedForTypeClashWritesNothing(t *testing.T) {
 
 	pr := registry.NewPluginRegistry()
 
-	err := pr.RegisterType("person", &registered.Database{})
+	err := pr.RegisterType(&registered.Database{}, "resource", "person")
 	require.NoError(t, err)
 
 	err = pr.RegisterPluginWithPath(binary)

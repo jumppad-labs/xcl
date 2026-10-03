@@ -457,7 +457,7 @@ func TestParseFQRNKeepsLocalAddressForm(t *testing.T) {
 // only reason it exists, because a body is otherwise read positionally.
 
 func TestAddressParserSplitsTheModulePrefixOfAKnownType(t *testing.T) {
-	parser := NewAddressParser([]types.TypeInfo{{Name: typeTestContainer, Bare: true}})
+	parser := NewAddressParser([]types.TypeInfo{{Type: typeTestContainer}})
 
 	fqrn, err := parser.Parse("module.m1.container.nics")
 	require.NoError(t, err)
@@ -477,4 +477,57 @@ func TestParseFQRNReadsAnUnknownTypeSegmentAsPartOfTheModulePath(t *testing.T) {
 	require.Equal(t, "m1.container", fqrn.Module)
 	require.Equal(t, TypeModule, fqrn.Type)
 	require.Equal(t, "nics", fqrn.Resource)
+}
+
+// A type other than resource that takes a subtype is addressed by its type,
+// its subtype and its name, once the parser knows the type takes one.
+
+func TestAddressParserReadsTheSubtypeOfAnyTypeThatTakesOne(t *testing.T) {
+	parser := NewAddressParser([]types.TypeInfo{{Type: "server", Subtype: "big"}})
+
+	fqrn, err := parser.Parse("server.big.web.address")
+	require.NoError(t, err)
+
+	require.Equal(t, "server", fqrn.Type)
+	require.Equal(t, "big", fqrn.Subtype)
+	require.Equal(t, "web", fqrn.Resource)
+	require.Equal(t, "address", fqrn.Attribute)
+}
+
+func TestAddressParserReadsTheSubtypeInsideAModule(t *testing.T) {
+	parser := NewAddressParser([]types.TypeInfo{{Type: "server", Subtype: "big"}})
+
+	fqrn, err := parser.Parse("module.m1.server.big.web")
+	require.NoError(t, err)
+
+	require.Equal(t, "m1", fqrn.Module)
+	require.Equal(t, "server", fqrn.Type)
+	require.Equal(t, "big", fqrn.Subtype)
+	require.Equal(t, "web", fqrn.Resource)
+}
+
+func TestAddressParserReadsATypeWithoutASubtypeAsTypeAndName(t *testing.T) {
+	parser := NewAddressParser([]types.TypeInfo{{Type: "cache"}})
+
+	fqrn, err := parser.Parse("cache.main.size")
+	require.NoError(t, err)
+
+	require.Equal(t, "cache", fqrn.Type)
+	require.Empty(t, fqrn.Subtype)
+	require.Equal(t, "main", fqrn.Resource)
+	require.Equal(t, "size", fqrn.Attribute)
+}
+
+func TestAddressParserRejectsATypeWithASubtypeButNoName(t *testing.T) {
+	parser := NewAddressParser([]types.TypeInfo{{Type: "server", Subtype: "big"}})
+
+	_, err := parser.Parse("server.big")
+	require.Error(t, err)
+}
+
+func TestFQRNStringWritesTheSubtypeOfAnyType(t *testing.T) {
+	fqrn := FQRN{Module: "m1", Type: "server", Subtype: "big", Resource: "web", Attribute: "address"}
+
+	require.Equal(t, "module.m1.server.big.web.address", fqrn.String())
+	require.Equal(t, "module.m1.server.big.web", fqrn.StringWithoutAttribute())
 }

@@ -29,7 +29,7 @@ func setupQueryConfig(t *testing.T) *Config {
 
 	pr := registry.NewPluginRegistry()
 
-	err := pr.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := pr.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
 	err = pr.RegisterPlugin(&parser.TestPlugin{})

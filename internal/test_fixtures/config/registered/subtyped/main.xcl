@@ -1,0 +1,19 @@
+# server is registered with the subtype big, so it is declared with the
+# subtype as its first label and addressed server.big.web. cache is registered
+# without a subtype and resource "app" under the resource type, and both read
+# the server's fields, so references to an entity of any type are resolved.
+server "big" "web" {
+  location = "eu-west"
+  size     = 3
+}
+
+cache "main" {
+  location = server.big.web.location
+}
+
+resource "app" "api" {
+  environment       = "production"
+  database_location = server.big.web.location
+  database_port     = server.big.web.size
+  shared_location   = cache.main.location
+}

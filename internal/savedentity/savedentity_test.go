@@ -46,13 +46,13 @@ func testRegisteredRegistry(t *testing.T) *registry.PluginRegistry {
 
 	reg := registry.NewPluginRegistry()
 
-	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
-	err = reg.RegisterType(registered.TypeApp, &registered.App{})
+	err = reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
 	require.NoError(t, err)
 
-	err = reg.RegisterType(registered.TypeConsumer, &registered.Consumer{})
+	err = reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
 	require.NoError(t, err)
 
 	return reg
@@ -68,7 +68,7 @@ func testPluginRegistry(t *testing.T) *registry.PluginRegistry {
 
 	reg := registry.NewPluginRegistry()
 
-	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
 	err = reg.RegisterPlugin(&parser.TestPlugin{})
@@ -267,7 +267,7 @@ func TestDecodeFailsForUnregisteredType(t *testing.T) {
 
 	var detail *xclerrors.UnregisteredTypeError
 	require.True(t, errors.As(err, &detail))
-	require.Equal(t, "widget", detail.Type)
+	require.Equal(t, "resource.widget", detail.Type)
 }
 
 // Bytes that are not JSON at all are not a record, and the failure has to be

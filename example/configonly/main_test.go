@@ -475,10 +475,10 @@ func TestConfigOnlyExampleDestroysEverythingItApplied(t *testing.T) {
 	require.NoError(t, err)
 
 	reg := registry.NewPluginRegistry()
-	require.NoError(t, reg.RegisterType("config_map", &resources.ConfigMap{}))
-	require.NoError(t, reg.RegisterType("deployment", &resources.Deployment{}))
-	require.NoError(t, reg.RegisterType("service", &resources.Service{}))
-	require.NoError(t, reg.RegisterType("ingress", &resources.Ingress{}))
+	require.NoError(t, reg.RegisterType(&resources.ConfigMap{}, "resource", "config_map"))
+	require.NoError(t, reg.RegisterType(&resources.Deployment{}, "resource", "deployment"))
+	require.NoError(t, reg.RegisterType(&resources.Service{}, "resource", "service"))
+	require.NoError(t, reg.RegisterType(&resources.Ingress{}, "resource", "ingress"))
 
 	store, err := state.NewFileStateStore(stateDir)
 	require.NoError(t, err)

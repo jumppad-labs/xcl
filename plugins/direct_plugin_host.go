@@ -45,13 +45,20 @@ func NewDirectPluginHost(emit events.Emit, state State, plugin Plugin) (*DirectP
 	return host, nil
 }
 
-// ResourceTypeNames returns the comma separated block types of the resource
-// types in registered, i.e. "postgres, app"
+// ResourceTypeNames returns the comma separated names of the types in
+// registered, i.e. "postgres, app, server.big, cache". A type declared with
+// the resource keyword is named by its subtype alone, any other type with a
+// subtype by both, and one without by its type
 func ResourceTypeNames(registered []RegisteredType) string {
 	names := []string{}
 	for _, t := range registered {
-		if t.Type == "resource" {
+		switch {
+		case t.SubType == "":
+			names = append(names, t.Type)
+		case t.Type == "resource":
 			names = append(names, t.SubType)
+		default:
+			names = append(names, t.Type+"."+t.SubType)
 		}
 	}
 

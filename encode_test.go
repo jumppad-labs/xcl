@@ -63,17 +63,18 @@ func applyEncodeFixture(t *testing.T) (*Config, *registry.PluginRegistry, string
 }
 
 // encodeRegistry returns a registry holding every type the encode fixture
-// declares: a kind led registered type, a bare registered type and the plugin
+// declares: a type registered under resource, one registered without a
+// subtype and the plugin
 // that provides the network and container types
 func encodeRegistry(t *testing.T) *registry.PluginRegistry {
 	t.Helper()
 
 	pr := registry.NewPluginRegistry()
 
-	err := pr.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := pr.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
-	err = pr.RegisterBareType(registered.TypeCache, &registered.Cache{})
+	err = pr.RegisterType(&registered.Cache{}, registered.TypeCache)
 	require.NoError(t, err)
 
 	err = pr.RegisterPlugin(&parser.TestPlugin{})
@@ -364,7 +365,7 @@ func TestEncodeSavedEntityFailsForUnregisteredType(t *testing.T) {
 
 	unregistered := &UnregisteredTypeError{}
 	require.ErrorAs(t, err, &unregistered)
-	require.Equal(t, "unknown", unregistered.Type)
+	require.Equal(t, "resource.unknown", unregistered.Type)
 }
 
 func TestEncodeSavedEntityFailsForInvalidData(t *testing.T) {

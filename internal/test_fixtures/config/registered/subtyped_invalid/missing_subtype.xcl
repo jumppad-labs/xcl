@@ -1,0 +1,4 @@
+# server takes a subtype, so a declaration with only a name is invalid
+server "web" {
+  location = "eu-west"
+}

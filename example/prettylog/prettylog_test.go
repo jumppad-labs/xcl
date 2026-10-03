@@ -212,17 +212,17 @@ func TestHandlerWritesOneLinePerEvent(t *testing.T) {
 }
 
 // encodeFixtureRegistry returns a registry holding every type the encode
-// fixture declares, a kind led registered type, a bare registered type and the
-// plugin that provides the network and container types
+// fixture declares, a type registered under resource, one registered without
+// a subtype and the plugin that provides the network and container types
 func encodeFixtureRegistry(t *testing.T) *registry.PluginRegistry {
 	t.Helper()
 
 	pr := registry.NewPluginRegistry()
 
-	err := pr.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := pr.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
-	err = pr.RegisterBareType(registered.TypeCache, &registered.Cache{})
+	err = pr.RegisterType(&registered.Cache{}, registered.TypeCache)
 	require.NoError(t, err)
 
 	err = pr.RegisterPlugin(&parser.TestPlugin{})

@@ -42,11 +42,11 @@ func IncludeComputed() EncodeOption {
 // EncodeEntity returns entity as configuration text in xcl's own syntax,
 // formatted and ready to print or write to a .xcl file.
 //
-// entity is one resource-kind or bare registered entity, such as one returned
-// by Find, FindByType, All or Entities after Apply. The text holds exactly one
-// block: resource "<subtype>" "<name>" for a resource-kind entity, and
-// <type> "<name>" for one declared by its own keyword. Convert several
-// entities by calling this once for each.
+// entity is one entity, such as one returned by Find, FindByType, All or
+// Entities after Apply. The text holds exactly one block:
+// <type> "<subtype>" "<name>" for an entity with a subtype, i.e.
+// resource "container" "nics", and <type> "<name>" for one without. Convert
+// several entities by calling this once for each.
 //
 // Fields a provider filled in are left out unless IncludeComputed is given, so
 // the text reads back to the same configured values. Values are written as the
@@ -130,11 +130,11 @@ func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 		}
 	}
 
-	// a resource-kind entity is led by the kind and labelled with its variety
-	// and name, one declared by its own keyword carries only its name
+	// an entity is led by its type and labelled with its subtype, where it
+	// has one, and its name
 	block := hclwrite.NewBlock(meta.Type, []string{meta.Name})
 	if meta.Subtype != "" {
-		block = hclwrite.NewBlock(types.TypeResource, []string{meta.Subtype, meta.Name})
+		block = hclwrite.NewBlock(meta.Type, []string{meta.Subtype, meta.Name})
 	}
 
 	err = gohcl.EncodeBody(entity, block.Body(), gohcl.EncodeOptions{

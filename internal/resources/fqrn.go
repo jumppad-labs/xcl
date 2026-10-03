@@ -13,11 +13,11 @@ import (
 type FQRN struct {
 	// Name of the module
 	Module string
-	// Type is the kind of stanza the resource was declared by, i.e. the
-	// "resource" in resource.container.mine
+	// Type is the keyword the entity was declared by, i.e. the "resource" in
+	// resource.container.mine or the "server" in server.big.web
 	Type string
-	// Subtype is the variety of a resource kind address, i.e. the "container"
-	// in resource.container.mine. It is empty for the single label kinds
+	// Subtype is the entity's subtype, i.e. the "container" in
+	// resource.container.mine. It is empty for a type declared without one
 	Subtype string
 	// Resource name
 	Resource string
@@ -25,10 +25,9 @@ type FQRN struct {
 	Attribute string
 }
 
-// AddressType returns the segment an address carries between its kind and its
-// name: the variety where there is one, and the kind itself otherwise. A bare
-// "local" has no Go type and no variety, so it formats through the kind, which
-// is what keeps local.x rendering as it always has
+// AddressType returns the subtype where there is one, and the type itself
+// otherwise. A "local" has no Go type and no subtype, so it formats through
+// the type, which is what keeps local.x rendering as it always has
 func (f FQRN) AddressType() string {
 	if f.Subtype != "" {
 		return f.Subtype
@@ -71,23 +70,25 @@ func ParseFQRN(fqrn string) (*FQRN, error) {
 }
 
 // structuralKeywords are the leading keywords that always begin an address
-// body, whatever types are registered. They are what ParseFQRN resolves with
-// when no registry is at hand.
+// body, whatever types are registered, each mapped to whether it takes a
+// subtype. They are what ParseFQRN resolves with when no registry is at hand.
 var structuralKeywords = map[string]bool{
 	types.TypeResource: true,
-	TypeOutput:         true,
-	TypeVariable:       true,
-	TypeModule:         true,
-	"local":            true,
+	TypeOutput:         false,
+	TypeVariable:       false,
+	TypeModule:         false,
+	"local":            false,
 }
 
 // AddressParser parses addresses against a known set of types. It exists
-// because a module relative address cannot be split by position alone: in
-// module.a.b.c, "b" is a module name when nothing is registered under it and
-// the start of the body when something is. Only the set of known types
-// settles it, so the parser is constructed with them rather than reaching for
-// a registry it must not depend on.
+// because an address cannot be split by position alone. In module.a.b.c, "b"
+// is a module name when nothing is registered under it and the start of the
+// body when something is, and in server.big.web, "big" is the subtype when the
+// server type takes one and the name when it does not. Only the set of known
+// types settles it, so the parser is constructed with them rather than
+// reaching for a registry it must not depend on.
 type AddressParser struct {
+	// keywords maps every known type keyword to whether it takes a subtype
 	keywords map[string]bool
 }
 
@@ -95,12 +96,12 @@ type AddressParser struct {
 // addition to the structural keywords.
 func NewAddressParser(known []types.TypeInfo) *AddressParser {
 	keywords := map[string]bool{}
-	for k := range structuralKeywords {
-		keywords[k] = true
+	for k, takesSubtype := range structuralKeywords {
+		keywords[k] = takesSubtype
 	}
 
 	for _, info := range known {
-		keywords[info.Name] = true
+		keywords[info.Type] = info.Subtype != ""
 	}
 
 	return &AddressParser{keywords: keywords}
@@ -133,7 +134,7 @@ func parseAddress(fqrn string, keywords map[string]bool) (*FQRN, error) {
 		// begins at the first segment after it that names a type
 		bodyStart := -1
 		for i := 1; i < len(rest); i++ {
-			if keywords[rest[i]] {
+			if _, ok := keywords[rest[i]]; ok {
 				bodyStart = i
 				break
 			}
@@ -156,22 +157,23 @@ func parseAddress(fqrn string, keywords map[string]bool) (*FQRN, error) {
 		return nil, errors.New(formatErrorString(fqrn))
 	}
 
-	switch body[0] {
-	case types.TypeResource:
-		// resource.<variety>.<name>[.attribute]
+	switch {
+	case keywords[body[0]]:
+		// a type that takes a subtype, i.e.
+		// resource.<subtype>.<name>[.attribute]
 		if len(body) < 3 {
 			return nil, errors.New(formatErrorString(fqrn))
 		}
 
 		return &FQRN{
 			Module:    moduleName,
-			Type:      types.TypeResource,
+			Type:      body[0],
 			Subtype:   body[1],
 			Resource:  body[2],
 			Attribute: strings.Join(body[3:], "."),
 		}, nil
 
-	case TypeVariable:
+	case body[0] == TypeVariable:
 		// a variable may not carry a trailing attribute
 		if len(body) != 2 {
 			return nil, errors.New(formatErrorString(fqrn))
@@ -179,13 +181,13 @@ func parseAddress(fqrn string, keywords map[string]bool) (*FQRN, error) {
 
 		return &FQRN{Module: moduleName, Type: TypeVariable, Resource: body[1]}, nil
 
-	case TypeModule:
+	case body[0] == TypeModule:
 		// module.<name> reached through a parent module prefix
 		return &FQRN{Module: moduleName, Type: TypeModule, Resource: body[1]}, nil
 
 	default:
-		// every single label form: output, local, and any type declared by its
-		// own keyword. Segment one is the kind, segment two the name
+		// every single label form: output, local, and any type declared
+		// without a subtype. Segment one is the type, segment two the name
 		resourceName := body[1]
 		attribute := strings.Join(body[2:], ".")
 
@@ -222,7 +224,7 @@ func formatErrorString(address string) string {
 	}
 
 	if strings.HasPrefix(address, types.TypeResource+".") {
-		return fmt.Sprintf("%q is not a complete address: a resource is addressed by its kind, its variety and its name, like resource.container.mine", address)
+		return fmt.Sprintf("%q is not a complete address: a resource is addressed by its type, its subtype and its name, like resource.container.mine", address)
 	}
 
 	return fmt.Sprintf("%q is not a valid address, like resource.container.mine, variable.region, output.url, module.db or module.db.output.url", address)
@@ -284,8 +286,8 @@ func (f FQRN) String() string {
 		return fmt.Sprintf("%s%s", modulePart, f.Resource)
 	}
 
-	if f.Type == types.TypeResource {
-		return fmt.Sprintf("%sresource.%s.%s%s", modulePart, f.Subtype, f.Resource, attrPart)
+	if f.Subtype != "" {
+		return fmt.Sprintf("%s%s.%s.%s%s", modulePart, f.Type, f.Subtype, f.Resource, attrPart)
 	}
 
 	return fmt.Sprintf("%s%s.%s%s", modulePart, f.Type, f.Resource, attrPart)
@@ -309,8 +311,8 @@ func (f FQRN) StringWithoutAttribute() string {
 		return fmt.Sprintf("%s%s", modulePart, f.Resource)
 	}
 
-	if f.Type == types.TypeResource {
-		return fmt.Sprintf("%sresource.%s.%s", modulePart, f.Subtype, f.Resource)
+	if f.Subtype != "" {
+		return fmt.Sprintf("%s%s.%s.%s", modulePart, f.Type, f.Subtype, f.Resource)
 	}
 
 	return fmt.Sprintf("%s%s.%s", modulePart, f.Type, f.Resource)

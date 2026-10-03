@@ -1,0 +1,4 @@
+# server is only registered with the subtype big
+server "small" "web" {
+  location = "eu-west"
+}

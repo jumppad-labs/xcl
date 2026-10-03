@@ -75,7 +75,7 @@ func TestUnregisteredTypeRaisedByTheLibraryMatchesTheRootPackageSentinel(t *test
 
 	var detail *UnregisteredTypeError
 	require.True(t, errors.As(err, &detail))
-	require.Equal(t, "widget", detail.Type)
+	require.Equal(t, "resource.widget", detail.Type)
 }
 
 func TestInvalidSavedDataRaisedByTheLibraryMatchesTheRootPackageSentinel(t *testing.T) {

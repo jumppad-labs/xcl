@@ -593,26 +593,18 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 		case resources.TypeVariable:
 			fallthrough
 		case resources.TypeOutput:
-			fallthrough
-		case types.TypeResource:
 			err := p.parseResource(file, b, module)
 			if err != nil {
 				blockErrors = append(blockErrors, err)
 			}
 
-			resourceType, resourceID := blockResource(b, module)
+			resourceType, resourceID := p.blockResource(b, module)
 			emitParse(&p.options, resourceType, resourceID, file, err)
 		default:
-			// not one of the four stanza keywords, so it is only valid when it
-			// names a type registered in the bare form. A type is registered
-			// under one form or the other, never both, so leading with the
-			// keyword of a kind led type is an error rather than an alias for it
-			info, known := types.TypeInfo{}, false
-			if p.pluginRegistry != nil {
-				info, known = p.pluginRegistry.Type(b.Type)
-			}
-
-			if !known {
+			// not a builtin keyword, so it must be the type of an entity.
+			// "resource" always is, any other keyword only once something
+			// is registered under it
+			if _, known := p.takesSubtype(b.Type); !known {
 				de := errors.NewParserError(
 					file,
 					b.TypeRange.Start.Line,
@@ -626,26 +618,12 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 				continue
 			}
 
-			if !info.Bare {
-				de := errors.NewParserError(
-					file,
-					b.TypeRange.Start.Line,
-					b.TypeRange.Start.Column,
-					fmt.Sprintf("'%s' is declared with the resource keyword, i.e. 'resource \"%s\" \"name\" {}', not as '%s \"name\" {}'", b.Type, b.Type, b.Type),
-				)
-
-				emitParse(&p.options, "", "", file, de)
-				blockErrors = append(blockErrors, de)
-
-				continue
-			}
-
 			err := p.parseResource(file, b, module)
 			if err != nil {
 				blockErrors = append(blockErrors, err)
 			}
 
-			resourceType, resourceID := blockResource(b, module)
+			resourceType, resourceID := p.blockResource(b, module)
 			emitParse(&p.options, resourceType, resourceID, file, err)
 		}
 	}
@@ -657,21 +635,47 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 	return nil
 }
 
-// blockResource returns the "<type>.<name>" and the ID of the resource a block
+// takesSubtype reports whether declarations of the type keyword entityType
+// carry a subtype as their first label, and whether the keyword is known.
+// "resource" always takes one, even with no registry
+func (p *Parser) takesSubtype(entityType string) (bool, bool) {
+	if p.pluginRegistry == nil {
+		return entityType == types.TypeResource, entityType == types.TypeResource
+	}
+
+	return p.pluginRegistry.TakesSubtype(entityType)
+}
+
+// isReferenceRoot reports whether name, the first segment of a traversal in an
+// expression, names something a reference can point at: one of the builtin
+// keywords, "resource", or the type of any known entity
+func (p *Parser) isReferenceRoot(name string) bool {
+	switch name {
+	case types.TypeResource, resources.TypeModule, resources.TypeVariable, resources.TypeOutput:
+		return true
+	}
+
+	_, known := p.takesSubtype(name)
+	return known
+}
+
+// blockResource returns the "<type>.<name>" and the ID of the entity a block
 // declares in module, i.e. "postgres.main" and "resource.postgres.main". They
-// are the same the parsed resource gets, and are worked out from the block's
+// are the same the parsed entity gets, and are worked out from the block's
 // labels so a block that fails to parse can still be reported against its
-// resource. They are empty when the labels do not name a resource.
-func blockResource(b *hclsyntax.Block, module string) (string, string) {
+// entity. They are empty when the labels do not name an entity.
+func (p *Parser) blockResource(b *hclsyntax.Block, module string) (string, string) {
 	fqrn := resources.FQRN{Module: module, Type: b.Type}
 
+	takes, _ := p.takesSubtype(b.Type)
+
 	switch {
-	case b.Type == types.TypeResource && len(b.Labels) == 2:
+	case takes && len(b.Labels) == 2:
 		fqrn.Subtype = b.Labels[0]
 		fqrn.Resource = b.Labels[1]
-	case b.Type != types.TypeResource && len(b.Labels) == 1:
-		// covers the single label builtins and the bare declaration form
-		// alike: the keyword is the kind and there is no variety
+	case !takes && len(b.Labels) == 1:
+		// covers the single label builtins and every type declared without
+		// a subtype alike: the keyword is the type and there is no subtype
 		fqrn.Resource = b.Labels[0]
 	default:
 		return "", ""
@@ -685,54 +689,6 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 	var err error
 
 	switch b.Type {
-	case types.TypeResource:
-		// If the type is resource there should be two labels, one for the type and one for the name
-		if len(b.Labels) != 2 {
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = `"invalid format for 'resource', resources should have a name and a type, i.e. 'resource "type" "name" {}'`
-
-			return de
-		}
-
-		// Check the resource name is valid
-		name := b.Labels[1]
-		if err := validateResourceName(name); err != nil {
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = de.Error()
-
-			return de
-		}
-
-		// a type registered in the bare form is declared by its own keyword,
-		// so it is not reachable through the resource keyword
-		if info, known := p.pluginRegistry.Type(b.Labels[0]); known && info.Bare {
-			return errors.NewParserError(
-				file,
-				b.TypeRange.Start.Line,
-				b.TypeRange.Start.Column,
-				fmt.Sprintf("'%s' is declared by its own keyword, i.e. '%s \"%s\" {}', not with the resource keyword", b.Labels[0], b.Labels[0], name),
-			)
-		}
-
-		// Create resource type using plugin registry
-		rt, err = p.pluginRegistry.CreateResource(b.Labels[0], name)
-		if err != nil {
-			de := errors.NewParserErrorWrapping(
-				file,
-				b.TypeRange.Start.Line,
-				b.TypeRange.Start.Column,
-				err,
-				fmt.Sprintf("unable to create resource '%s' of type '%s': %s", name, b.Labels[0], err),
-			)
-			return de
-		}
-
 	case resources.TypeOutput:
 		// If the type is output check there is one label
 		if len(b.Labels) != 1 {
@@ -803,20 +759,39 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 		}
 
 	default:
-		// a declaration led by its own type keyword, i.e. container "nics".
-		// It carries one label, the name, and is a different type from the
-		// kind led resource "container" "nics" rather than a spelling of it
-		if len(b.Labels) != 1 {
+		// an entity declared by its type keyword. A type that takes a
+		// subtype carries it as the first label and the name as the second,
+		// i.e. resource "container" "nics" or server "big" "web", and one
+		// that does not carries only the name, i.e. cache "main"
+		takes, _ := p.takesSubtype(b.Type)
+
+		subtype := ""
+		name := ""
+
+		switch {
+		case takes && len(b.Labels) == 2:
+			subtype = b.Labels[0]
+			name = b.Labels[1]
+		case takes:
 			de := &errors.ParserError{}
 			de.Line = b.TypeRange.Start.Line
 			de.Column = b.TypeRange.Start.Column
 			de.Filename = file
-			de.Message = fmt.Sprintf(`invalid format for '%s', a resource declared by its type has only a name, i.e. '%s "name" {}'`, b.Type, b.Type)
+			de.Message = fmt.Sprintf(`invalid format for '%s', it is declared with a subtype and a name, i.e. '%s "subtype" "name" {}'`, b.Type, b.Type)
+
+			return de
+		case len(b.Labels) == 1:
+			name = b.Labels[0]
+		default:
+			de := &errors.ParserError{}
+			de.Line = b.TypeRange.Start.Line
+			de.Column = b.TypeRange.Start.Column
+			de.Filename = file
+			de.Message = fmt.Sprintf(`invalid format for '%s', it is declared with only a name, i.e. '%s "name" {}'`, b.Type, b.Type)
 
 			return de
 		}
 
-		name := b.Labels[0]
 		if err := validateResourceName(name); err != nil {
 			de := &errors.ParserError{}
 			de.Line = b.TypeRange.Start.Line
@@ -827,14 +802,19 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 			return de
 		}
 
-		rt, err = p.pluginRegistry.CreateResource(b.Type, name)
+		rt, err = p.pluginRegistry.CreateEntity(b.Type, subtype, name)
 		if err != nil {
+			typeName := b.Type
+			if subtype != "" {
+				typeName = subtype
+			}
+
 			de := errors.NewParserErrorWrapping(
 				file,
 				b.TypeRange.Start.Line,
 				b.TypeRange.Start.Column,
 				err,
-				fmt.Sprintf("unable to create resource '%s' of type '%s': %s", name, b.Type, err),
+				fmt.Sprintf("unable to create resource '%s' of type '%s': %s", name, typeName, err),
 			)
 
 			return de
@@ -918,7 +898,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule string) []error {
 	// fail fires the module's parse error and returns it, every problem with
 	// the module block itself goes through it
-	resourceType, resourceID := blockResource(b, parentModule)
+	resourceType, resourceID := p.blockResource(b, parentModule)
 	fail := func(err error) []error {
 		emitParse(&p.options, resourceType, resourceID, file, err)
 		return []error{err}
@@ -1138,7 +1118,7 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block) ([]stri
 
 	// Process all attributes in the block
 	for _, a := range b.Body.Attributes {
-		refs, err := processExpr(a.Expr)
+		refs, err := processExpr(a.Expr, p.isReferenceRoot)
 		if err != nil {
 			return nil, errors.NewParserError(
 				b.Body.SrcRange.Filename,
@@ -1219,7 +1199,7 @@ func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block) ([]string, e
 
 	// Process attributes in the block
 	for _, a := range b.Body.Attributes {
-		refs, err := processExpr(a.Expr)
+		refs, err := processExpr(a.Expr, p.isReferenceRoot)
 		if err != nil {
 			return nil, fmt.Errorf("unable to process attribute %s: %w", a.Name, err)
 		}

@@ -542,22 +542,22 @@ func TestLoadRejectsDiscoveredPluginClashingWithRegisteredType(t *testing.T) {
 	r := NewPluginRegistry()
 	t.Cleanup(func() { stopHosts(r) })
 
-	err := r.RegisterType("person", &Person{})
+	err := r.RegisterType(&Person{}, "resource", "person")
 	require.NoError(t, err)
 
 	r.DiscoverPlugins([]string{pluginDir}, "xcl-plugin-*")
 
 	err = r.Load(nil)
 	require.Error(t, err)
-	require.ErrorContains(t, err, `"person"`)
+	require.ErrorContains(t, err, `"resource.person"`)
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "person", clash.Name)
+	require.Equal(t, "resource.person", clash.Name)
 	require.Equal(t, "registered type", clash.Existing)
 
 	require.Empty(t, r.GetPluginHosts())
-	require.True(t, r.IsRegisteredType("person"))
+	require.True(t, r.IsRegisteredType("resource", "person"))
 }
 
 func TestLoadRejectsSecondDiscoveredPluginProvidingSameType(t *testing.T) {
@@ -575,11 +575,11 @@ func TestLoadRejectsSecondDiscoveredPluginProvidingSameType(t *testing.T) {
 
 	err := r.Load(nil)
 	require.Error(t, err)
-	require.ErrorContains(t, err, `"person"`)
+	require.ErrorContains(t, err, `"resource.person"`)
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "person", clash.Name)
+	require.Equal(t, "resource.person", clash.Name)
 	require.Equal(t, "plugin", clash.Existing)
 
 	require.Len(t, r.GetPluginHosts(), 1)
@@ -609,7 +609,7 @@ func TestLoadRejectsExplicitPluginPathClashingWithRegisteredType(t *testing.T) {
 	r := NewPluginRegistry()
 	t.Cleanup(func() { stopHosts(r) })
 
-	err := r.RegisterType("person", &Person{})
+	err := r.RegisterType(&Person{}, "resource", "person")
 	require.NoError(t, err)
 
 	err = r.RegisterPluginWithPath(examplePlugin)
@@ -617,12 +617,12 @@ func TestLoadRejectsExplicitPluginPathClashingWithRegisteredType(t *testing.T) {
 
 	err = r.Load(nil)
 	require.Error(t, err)
-	require.ErrorContains(t, err, `"person"`)
+	require.ErrorContains(t, err, `"resource.person"`)
 	require.ErrorContains(t, err, examplePlugin)
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "person", clash.Name)
+	require.Equal(t, "resource.person", clash.Name)
 	require.Equal(t, "registered type", clash.Existing)
 
 	require.Empty(t, r.GetPluginHosts())
@@ -635,7 +635,7 @@ func TestLoadStartsExplicitPluginPathWithoutClash(t *testing.T) {
 	r := NewPluginRegistry()
 	t.Cleanup(func() { stopHosts(r) })
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
 	err = r.RegisterPluginWithPath(examplePlugin)

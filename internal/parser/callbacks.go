@@ -29,7 +29,7 @@ type ProviderResolver interface {
 // without a plugin. Resources of these types are handled like builtins, no
 // provider is ever called for them. Satisfied by *registry.PluginRegistry.
 type TypeRegistry interface {
-	IsRegisteredType(name string) bool
+	IsRegisteredType(entityType, subtype string) bool
 }
 
 // walkCallback creates the internal callback that is called when a node in the
@@ -77,7 +77,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		}
 
 		// Build a fresh context for this resource dynamically
-		ctx, err := buildContextForResource(parsedData, r, options, functions)
+		ctx, err := buildContextForResource(parsedData, r, addresses, options, functions)
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				r,

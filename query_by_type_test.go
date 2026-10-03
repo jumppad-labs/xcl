@@ -19,9 +19,9 @@ import (
 // one at the root and one inside a module, which is what makes a query that
 // matches more than one entity natural.
 //
-// setupBareTypeConfig is the one exception. A type registered in the bare form
-// leads its own declaration rather than sitting under the resource keyword, so
-// it needs the bare fixture and a registry that registers it that way.
+// setupBareTypeConfig is the one exception. A type registered without a
+// subtype leads its own declaration rather than sitting under the resource
+// type, so it needs the bare fixture and a registry that registers it that way.
 func setupBareTypeConfig(t *testing.T) *Config {
 	t.Helper()
 
@@ -29,10 +29,10 @@ func setupBareTypeConfig(t *testing.T) *Config {
 
 	reg := registry.NewPluginRegistry()
 
-	err := reg.RegisterBareType(registered.TypeCache, &registered.Cache{})
+	err := reg.RegisterType(&registered.Cache{}, registered.TypeCache)
 	require.NoError(t, err)
 
-	err = reg.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err = reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
 	store, err := state.NewFileStateStore(t.TempDir())
@@ -166,7 +166,7 @@ func TestFindByTypeRejectsTheResourceKindOnItsOwn(t *testing.T) {
 	var notTypeable *NotTypeableError
 	require.True(t, errors.As(err, &notTypeable))
 	require.Equal(t, []string{"resource"}, notTypeable.Segments)
-	require.Contains(t, notTypeable.Use, "variety")
+	require.Contains(t, notTypeable.Use, "subtype")
 }
 
 func TestFindByTypeRejectsPublishedValuesAndNamesTheCallThatReturnsThem(t *testing.T) {

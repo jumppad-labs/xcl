@@ -189,7 +189,7 @@ doesn't have `T` compiled in, so it can't decode `entityData` itself. When a
 resource of a given type needs to be *instantiated* from HCL (not just
 passed through as `[]byte`), the host reconstructs a Go type dynamically
 from the schema via `schema.CreateInstanceFromSchema` — see
-[`plugins/registry/plugin_registry.go:createResourceFromPlugins`](../plugins/registry/plugin_registry.go).
+[`plugins/registry/plugin_registry.go:createEntityFromPlugins`](../plugins/registry/plugin_registry.go).
 
 ## `PluginRegistry` — tying it together
 
@@ -228,8 +228,8 @@ go to the loading operation.
 
 Its two jobs, used from two different places in the parser:
 
-- **`CreateResource(resourceType, resourceName) (any, error)`** — instantiate
-  a new (empty) resource instance for an HCL block. Tries builtins first,
+- **`CreateEntity(entityType, subtype, name) (any, error)`** — instantiate
+  a new (empty) entity for an HCL block, from its type and subtype. Tries builtins first,
   then [configuration-only types](#configuration-only-types) (a real
   instance of the registered Go type), then walks plugin hosts' `GetTypes()`
   looking for a schema match, and builds a dynamic instance via
@@ -237,8 +237,8 @@ Its two jobs, used from two different places in the parser:
   before any dependency graph exists.
 - **`GetProviderForResource(resource any) plugins.ProviderAdapter`** —
   given an already-decoded resource, find the `ProviderAdapter` that
-  handles its type (matches `types.GetMeta(resource).Type` against each
-  host's `GetTypes()`). Used during the DAG walk to actually invoke
+  handles its type (matches `types.GetMeta(resource).Type` and `.Subtype`
+  against each host's `GetTypes()`). Used during the DAG walk to actually invoke
   lifecycle methods (see [Parser & Resource Lifecycle](parser-lifecycle.md)).
 
 These are two different methods on the same struct because they solve two
@@ -356,27 +356,38 @@ loading is a `load` event rather than a log message.
 
 ## Configuration-only types
 
-Not every block type needs a plugin. `PluginRegistry.RegisterType(name,
-&MyType{})` registers a plain Go type (a pointer to a struct embedding
-`types.ResourceBase`) under a block type name, with no plugin and no
-provider:
+Not every block type needs a plugin. `PluginRegistry.RegisterType(resource any,
+name ...string)` registers a plain Go type (a pointer to a struct embedding
+`types.ResourceBase`) under a name made of a type and an optional subtype,
+with no plugin and no provider. A plugin registers its types the same way, through
+`PluginBase.RegisterType(entityType, subtype, ...)`, and neither has to use
+the `resource` type:
 
 ```go
 r := registry.NewPluginRegistry()
-err := r.RegisterType("postgres", &PostgreSQL{})
+err := r.RegisterType(&PostgreSQL{}, "resource", "postgres") // resource "postgres" "main" {}
+err = r.RegisterType(&Server{}, "server", "big")             // server "big" "web" {}
+err = r.RegisterType(&Cache{}, "cache")                      // cache "main" {}
 ```
 
-`CreateResource` builds registered types with `reflect.New`, like builtins, so
+The type is the keyword a block leads with and the subtype its first label.
+A type keyword takes a subtype for every registration or for none, so the
+parser knows from the keyword alone how many labels a block has, and an
+address such as `server.big.web` is read by position. `resource` always takes
+a subtype. Registering a keyword in the other form from the one it already
+has fails with a `*registry.TypeFormError`.
+
+`CreateEntity` builds registered types with `reflect.New`, like builtins, so
 blocks decode into the developer's own type and state reload returns that
 type. The parser learns about them through the one-method
-`parser.TypeRegistry` interface (`IsRegisteredType`), which `*PluginRegistry`
-satisfies. The lifecycle and the destroy walk treat a registered type like a
+`parser.TypeRegistry` interface (`IsRegisteredType(entityType, subtype)`),
+which `*PluginRegistry` satisfies. The lifecycle and the destroy walk treat a registered type like a
 builtin: it gets a success event and no provider is ever called for it. On
 apply its status is left unchanged; on destroy it is removed from the state.
 
-Type names are unique across the registry, and a clash is a
-`*registry.TypeNameClashError` naming the type. When it is found depends on
-when the name arrives:
+A type and subtype are unique across the registry, and a clash is a
+`*registry.TypeNameClashError` naming them, i.e. `resource.postgres`. When it
+is found depends on when the type arrives:
 
 - `RegisterType` checks immediately, against builtins, registered types and
   the types of plugins that have already loaded, and leaves the registry

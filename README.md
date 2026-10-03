@@ -246,26 +246,44 @@ When a block only holds configuration and nothing needs to be created, read or
 destroyed, register its Go type on the plugin registry with `RegisterType`.
 No plugin or provider is needed.
 
+Everything a configuration declares is an entity, and an entity has a type
+and an optional subtype. The type is the keyword a block leads with, and the
+subtype, when there is one, is its first label:
+
 ```go
 r := registry.NewPluginRegistry()
 
-// the name is the block type used in configuration: resource "postgres" "main" {}
-err := r.RegisterType("postgres", &PostgreSQL{})
+// a type with a subtype, declared: server "big" "web" {}, addressed server.big.web
+err := r.RegisterType(&Server{}, "server", "big")
+
+// a type without one, declared: cache "main" {}, addressed cache.main
+err = r.RegisterType(&Cache{}, "cache")
+
+// resource is a type like any other: resource "postgres" "main" {}
+err = r.RegisterType(&PostgreSQL{}, "resource", "postgres")
 
 c := xcl.NewConfig(xcl.WithPluginRegistry(r))
 err = c.Apply("./config")
 ```
 
 Registered blocks are decoded into your own Go type, take part in references
-and dependency ordering, work in modules and when disabled, and are saved to
-state. They are never passed to a provider. `RegisterType` takes a pointer to
-a struct that embeds `types.ResourceBase`.
+(`server.big.web.location`, `cache.main.location`) and dependency ordering,
+work in modules and when disabled, and are saved to state. They are never
+passed to a provider. `RegisterType` takes a pointer to a struct that embeds
+`types.ResourceBase`.
 
-Every type name must be unique across builtin blocks (`variable`, `output`,
-`module`, `root`), registered types and plugin types. Registering a type whose
-name a builtin or another registered type already has fails straight away with
-a `*registry.TypeNameClashError` that names the type. A clash with a type a
-plugin provides is reported when the plugins load, see below.
+A type keyword takes a subtype for every registration or for none, so an
+address can always be read by position. `resource` always takes one.
+Registering `server` without a subtype after registering it with one, or the
+other way round, fails with a `*registry.TypeFormError`.
+
+Every type and subtype must be unique across builtin blocks (`variable`,
+`output`, `module`, `root`), registered types and plugin types.
+`server` and `resource "server"` are different types and do not clash.
+Registering a type and subtype a builtin or another registered type already
+has fails straight away with a `*registry.TypeNameClashError` that names it,
+i.e. `resource.postgres`. A clash with a type a plugin provides is reported
+when the plugins load, see below.
 
 ### Registering plugins
 
@@ -307,9 +325,11 @@ all, err := xcl.All[PostgreSQL](c)
 ```
 
 The segments given to `FindByType` and `FindOne` are the leading segments of an
-address, matched in order from the left: segment one is the kind, segment two
-the variety. A block declared by its own keyword, `container "nics"`, is a
-different type from `resource "container" "nics"` and is reached as
+address, matched in order from the left: segment one is the type, segment two
+the subtype where the type takes one. `xcl.FindByType[Server](c, "server",
+"big")` returns every `server "big"` entity. A block declared without a
+subtype, `container "nics"`, is a different type from
+`resource "container" "nics"` and is reached as
 `xcl.FindByType[Container](c, "container")`.
 
 Everything a configuration declares can be enumerated without naming a type,
@@ -1279,7 +1299,7 @@ You set up the parser as normal
 
 ```go
 p := NewParser(DefaultOptions())
-p.RegisterType("postgres", &structs.Postgres{})
+p.RegisterType(&structs.Postgres{}, "resource", "postgres")
 ```
 
 However, in order to use the custom function before parsing you register it with the 

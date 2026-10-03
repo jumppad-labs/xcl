@@ -13,9 +13,16 @@ const TypeApp = "app"
 // TypeConsumer is the string resource type for Consumer resources
 const TypeConsumer = "consumer"
 
-// TypeCache is the string resource type for Cache resources, registered in the
-// bare form so that it leads its own declaration, cache "main" {}
+// TypeCache is the type of Cache entities, registered without a subtype so
+// that it leads its own declaration with only a name, cache "main" {}
 const TypeCache = "cache"
+
+// TypeServer is the type of Server entities, registered with the subtype
+// SubtypeBig so that they are declared server "big" "web" {}
+const TypeServer = "server"
+
+// SubtypeBig is the subtype Server entities are registered under
+const SubtypeBig = "big"
 
 // Database is a registered type with a nested block and a computed field
 type Database struct {
@@ -53,10 +60,20 @@ type Consumer struct {
 	AppEnvironment string `xcl:"app_environment" json:"app_environment"`
 }
 
-// Cache is registered with RegisterBareType, it is declared by its own keyword
+// Cache is registered as the type "cache" without a subtype, it is declared
 // with a single label and is addressed cache.<name>
 type Cache struct {
 	types.ResourceBase `xcl:",remain"`
 
 	Location string `xcl:"location" json:"location"`
+}
+
+// Server is registered as the type "server" with the subtype "big", a type
+// other than resource that takes a subtype. It is declared
+// server "big" "<name>" {} and addressed server.big.<name>
+type Server struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Location string `xcl:"location" json:"location"`
+	Size     int    `xcl:"size,optional" json:"size,omitempty"`
 }

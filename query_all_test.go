@@ -62,7 +62,7 @@ func TestAllDerivesTheBareFormAddressingForABareRegisteredType(t *testing.T) {
 	require.NoError(t, err)
 
 	// a bare type leads its own declaration, so the derived path is the single
-	// segment rather than the resource keyword and a variety
+	// segment rather than the resource type and a subtype
 	byKind, err := FindByType[registered.Cache](c, "cache")
 	require.NoError(t, err)
 
@@ -88,8 +88,8 @@ func TestAllReportsAPluginProvidedTypeIsNotRegistered(t *testing.T) {
 	var notRegistered *NotRegisteredError
 	require.True(t, errors.As(err, &notRegistered))
 	require.Contains(t, notRegistered.Use, "FindByType")
-	require.Contains(t, notRegistered.Use, "kind")
-	require.Contains(t, notRegistered.Use, "variety")
+	require.Contains(t, notRegistered.Use, "type")
+	require.Contains(t, notRegistered.Use, "subtype")
 }
 
 func TestFindByTypeStillReachesThePluginProvidedTypeAllRefuses(t *testing.T) {

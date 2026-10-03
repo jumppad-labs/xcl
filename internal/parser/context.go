@@ -12,7 +12,7 @@ import (
 
 // buildContextForResource creates a fresh context for a specific resource
 // by building variables dynamically from config and module sources
-func buildContextForResource(res *parsed, r any, options *ParserOptions, functions functionsForFile) (*hcl.EvalContext, error) {
+func buildContextForResource(res *parsed, r any, addresses *resources.AddressParser, options *ParserOptions, functions functionsForFile) (*hcl.EvalContext, error) {
 	rMeta, err := types.GetMeta(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resource metadata: %w", err)
@@ -34,10 +34,17 @@ func buildContextForResource(res *parsed, r any, options *ParserOptions, functio
 	// expression like module.consul_1.output.foo resolves against
 	// ctx.Variables["module"]["consul_1"]["output"]["foo"].
 	moduleVars := map[string]map[string]cty.Value{}
+	// typedVars holds entities of a type other than "resource" and the
+	// builtins, nested as typedVars[type][subtype][name] or
+	// typedVars[type][name], so that server.big.web resolves against
+	// ctx.Variables["server"]["big"]["web"] and cache.main against
+	// ctx.Variables["cache"]["main"]
+	typedVars := map[string]cty.Value{}
 
 	for _, link := range rMeta.Links {
-		// Parse the link into an FQDN
-		fqdn, err := resources.ParseFQRN(link)
+		// Parse the link into an FQDN, against the known types so a subtype
+		// is told apart from a name
+		fqdn, err := addresses.Parse(link)
 		if err != nil {
 			continue // Skip invalid links
 		}
@@ -95,9 +102,38 @@ func buildContextForResource(res *parsed, r any, options *ParserOptions, functio
 				continue
 			}
 
+			// an entity of a type other than "resource" and the builtins is
+			// reached under its own type keyword, by its subtype where it has
+			// one and its name, i.e. server.big.web or cache.main
+			typedPath := []string{}
+			if resourceMeta.Type != types.TypeResource && resourceMeta.Type != resources.TypeOutput {
+				typedPath = append([]string{resourceMeta.Type}, resourceMeta.Subtype, resourceMeta.Name)
+				if resourceMeta.Subtype == "" {
+					typedPath = []string{resourceMeta.Type, resourceMeta.Name}
+				}
+			}
+
 			// A reference written with a "module." prefix (fqdn.Module != "")
 			// is nested under the module namespace instead of the flat
 			// resource namespace, keyed by that reference's own module name.
+			if fqdn.Module != "" && len(typedPath) > 0 {
+				typeMap, ok := moduleVars[fqdn.Module]
+				if !ok {
+					typeMap = map[string]cty.Value{}
+				}
+
+				typeMap[typedPath[0]] = withNested(typeMap[typedPath[0]], typedPath[1:], ctyRes)
+				moduleVars[fqdn.Module] = typeMap
+
+				continue
+			}
+
+			if len(typedPath) > 0 {
+				typedVars[typedPath[0]] = withNested(typedVars[typedPath[0]], typedPath[1:], ctyRes)
+
+				continue
+			}
+
 			if fqdn.Module != "" {
 				typeMap, ok := moduleVars[fqdn.Module]
 				if !ok {
@@ -174,6 +210,10 @@ func buildContextForResource(res *parsed, r any, options *ParserOptions, functio
 	// Set the resource variables in the context
 	ctx.Variables["resource"] = cty.ObjectVal(resourceVars)
 
+	for entityType, value := range typedVars {
+		ctx.Variables[entityType] = value
+	}
+
 	// Set the module namespace, so references like
 	// module.consul_1.output.foo resolve for resources outside that module
 	moduleNamespace := map[string]cty.Value{}
@@ -183,4 +223,24 @@ func buildContextForResource(res *parsed, r any, options *ParserOptions, functio
 	ctx.Variables["module"] = cty.ObjectVal(moduleNamespace)
 
 	return ctx, nil
+}
+
+// withNested returns existing with value set at path, creating an object at
+// every step that does not have one yet and keeping what is already there
+func withNested(existing cty.Value, path []string, value cty.Value) cty.Value {
+	if len(path) == 0 {
+		return value
+	}
+
+	fields := map[string]cty.Value{}
+	// a missing entry is the zero value, which reads as null
+	if !existing.IsNull() && existing.Type().IsObjectType() {
+		for k, v := range existing.AsValueMap() {
+			fields[k] = v
+		}
+	}
+
+	fields[path[0]] = withNested(fields[path[0]], path[1:], value)
+
+	return cty.ObjectVal(fields)
 }

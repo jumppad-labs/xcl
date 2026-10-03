@@ -196,9 +196,10 @@ previous state for `Apply`/`Validate` and at the start of `Destroy`, passes
 what the store loaded through
 [`savedentity.DecodeAll`](../internal/savedentity/savedentity.go) with its
 plugin registry. A `json.RawMessage`, `[]byte` or `map[string]any` is a saved
-record and is decoded: peek at `meta.type`/`meta.subtype`/`meta.name`, call
-`registry.CreateResource(type, name)` to get a correctly-typed *empty*
-instance, then unmarshal the record into it. Anything else is taken to be an
+record and is decoded: read `meta.type`, `meta.subtype` (empty for an entity
+without one) and `meta.name`, call `registry.CreateEntity(type, subtype,
+name)` to get a correctly-typed *empty* instance, then unmarshal the record
+into it. Anything else is taken to be an
 entity already and passes through unchanged, which is why a store that keeps
 entities in memory needs no decoding.
 

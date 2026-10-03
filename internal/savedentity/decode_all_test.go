@@ -89,8 +89,8 @@ func TestDecodeAllFailsWhenStateHoldsUnknownType(t *testing.T) {
 
 	unknown := state.UnknownTypesError{}
 	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"postgres"}, unknown.Types)
-	require.Contains(t, err.Error(), "postgres")
+	require.Equal(t, []string{"resource.postgres"}, unknown.Types)
+	require.Contains(t, err.Error(), "resource.postgres")
 }
 
 // Every unknown type is named once, in sorted order, however many resources
@@ -102,7 +102,7 @@ func TestDecodeAllNamesEachUnknownTypeOnceInSortedOrder(t *testing.T) {
 
 	unknown := state.UnknownTypesError{}
 	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"postgres", "redis"}, unknown.Types)
+	require.Equal(t, []string{"resource.postgres", "resource.redis"}, unknown.Types)
 }
 
 // stateWithRecordMissingMeta is a saved state whose second record carries no
@@ -268,7 +268,7 @@ func TestDecodeAllNamesEveryUnreadableRecordOnceInSortedOrder(t *testing.T) {
 
 	unknown := state.UnknownTypesError{}
 	require.True(t, errors.As(err, &unknown))
-	require.Equal(t, []string{"entry 0", "entry 4", "postgres", "variable.broken"}, unknown.Types)
+	require.Equal(t, []string{"entry 0", "entry 4", "resource.postgres", "variable.broken"}, unknown.Types)
 }
 
 // Entities saved to a file store and decoded from what it loads come back
@@ -276,20 +276,20 @@ func TestDecodeAllNamesEveryUnreadableRecordOnceInSortedOrder(t *testing.T) {
 // it and the variety it names where it has one.
 func TestDecodeAllTypesWhatAFileStoreLoaded(t *testing.T) {
 	reg := registry.NewPluginRegistry()
-	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
-	database, err := reg.CreateResource(registered.TypeDatabase, "main")
+	database, err := reg.CreateEntity("resource", registered.TypeDatabase, "main")
 	require.NoError(t, err)
 
 	databaseMeta, err := types.GetMeta(database)
 	require.NoError(t, err)
 	databaseMeta.ID = "resource.database.main"
 
-	variable, err := reg.CreateResource(resources.TypeVariable, "environment")
+	variable, err := reg.CreateEntity(resources.TypeVariable, "", "environment")
 	require.NoError(t, err)
 
 	variableMeta, err := types.GetMeta(variable)
@@ -324,7 +324,7 @@ func TestDecodeAllTypesWhatAFileStoreLoaded(t *testing.T) {
 func TestDecodeAllReturnsTypedEntitiesUnchanged(t *testing.T) {
 	reg := registry.NewPluginRegistry()
 
-	variable, err := reg.CreateResource(resources.TypeVariable, "environment")
+	variable, err := reg.CreateEntity(resources.TypeVariable, "", "environment")
 	require.NoError(t, err)
 
 	decoded, err := savedentity.DecodeAll(reg, []any{variable})
@@ -361,4 +361,39 @@ func TestDecodeAllReturnsNoEntitiesForNothingLoaded(t *testing.T) {
 func TestDecodeAllFailsForRecordsWithoutARegistry(t *testing.T) {
 	_, err := savedentity.DecodeAll(nil, testRecords(t, stateWithUnknownType))
 	require.ErrorContains(t, err, "no plugin registry")
+}
+
+// A type registered without a subtype is declared by its own keyword, so it is
+// saved with that keyword as its type and no subtype, and it decodes back to
+// the registered Go type with the same type and subtype.
+func TestDecodeAllTypesABareTypeWhatAFileStoreLoaded(t *testing.T) {
+	reg := registry.NewPluginRegistry()
+	err := reg.RegisterType(&registered.Database{}, registered.TypeDatabase)
+	require.NoError(t, err)
+
+	store, err := state.NewFileStateStore(t.TempDir())
+	require.NoError(t, err)
+
+	database, err := reg.CreateEntity(registered.TypeDatabase, "", "main")
+	require.NoError(t, err)
+
+	databaseMeta, err := types.GetMeta(database)
+	require.NoError(t, err)
+	databaseMeta.ID = "database.main"
+
+	err = store.Save([]any{database})
+	require.NoError(t, err)
+
+	loaded, err := store.Load()
+	require.NoError(t, err)
+
+	decoded, err := savedentity.DecodeAll(reg, loaded)
+	require.NoError(t, err)
+	require.Len(t, decoded, 1)
+
+	loadedDatabase, ok := decoded[0].(*registered.Database)
+	require.True(t, ok)
+	require.Equal(t, registered.TypeDatabase, loadedDatabase.Meta.Type)
+	require.Empty(t, loadedDatabase.Meta.Subtype)
+	require.Equal(t, "main", loadedDatabase.Meta.Name)
 }

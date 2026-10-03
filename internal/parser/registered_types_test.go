@@ -23,6 +23,8 @@ const (
 	registeredRemovedBeforeConfig = "../test_fixtures/config/registered/removed/before/main.xcl"
 	registeredRemovedAfterConfig  = "../test_fixtures/config/registered/removed/after/main.xcl"
 	registeredBareConfig          = "../test_fixtures/config/registered/bare/main.xcl"
+	registeredSubtypedConfig      = "../test_fixtures/config/registered/subtyped/main.xcl"
+	registeredSubtypedInvalid     = "../test_fixtures/config/registered/subtyped_invalid/"
 
 	registeredVariableID       = "variable.environment"
 	registeredDatabaseID       = "resource.database.main"
@@ -33,6 +35,8 @@ const (
 	registeredKeptID           = "resource.database.kept"
 	registeredRemovedID        = "resource.database.removed"
 	registeredCacheID          = "cache.main"
+	registeredServerID         = "server.big.web"
+	registeredAPIID            = "resource.app.api"
 )
 
 // registeredHarness holds what every apply in a registered type scenario
@@ -58,18 +62,23 @@ func setupRegisteredTypes(t *testing.T) *registeredHarness {
 
 	reg := registry.NewPluginRegistry()
 
-	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
-	err = reg.RegisterType(registered.TypeApp, &registered.App{})
+	err = reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
 	require.NoError(t, err)
 
-	err = reg.RegisterType(registered.TypeConsumer, &registered.Consumer{})
+	err = reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
 	require.NoError(t, err)
 
-	// cache is the one type registered in the bare form, it is declared by its
-	// own keyword with a single label rather than under the resource kind
-	err = reg.RegisterBareType(registered.TypeCache, &registered.Cache{})
+	// cache is registered without a subtype, it is declared with a single
+	// label rather than under the resource type
+	err = reg.RegisterType(&registered.Cache{}, registered.TypeCache)
+	require.NoError(t, err)
+
+	// server is a type other than resource that takes a subtype, it is
+	// declared server "big" "<name>"
+	err = reg.RegisterType(&registered.Server{}, registered.TypeServer, registered.SubtypeBig)
 	require.NoError(t, err)
 
 	store, err := state.NewFileStateStore(t.TempDir())
@@ -619,10 +628,10 @@ func TestApplyNeverLooksUpAProviderForRegisteredOrBuiltinBlocks(t *testing.T) {
 	require.Equal(t, 7, st.ResourceCount())
 }
 
-// A type registered in the bare form leads its own declaration, cache "main",
-// and carries no variety. It is a different type from the kind led
-// resource "database" "main", not another spelling of it, and is addressed
-// cache.main rather than resource.cache.main.
+// A type registered without a subtype leads its own declaration, cache "main",
+// and carries no subtype. It is a different type from resource "database"
+// "main", not another spelling of it, and is addressed cache.main rather than
+// resource.cache.main.
 
 func TestParseBareDeclarationParsesWithoutError(t *testing.T) {
 	h := setupRegisteredTypes(t)
@@ -673,4 +682,120 @@ func TestParseGivesEachDeclarationFormItsOwnAddress(t *testing.T) {
 
 	require.Equal(t, registeredCacheID, requireMeta(t, st.GetResources(), registeredCacheID).ID)
 	require.Equal(t, registeredDatabaseID, requireMeta(t, st.GetResources(), registeredDatabaseID).ID)
+}
+
+// An entity has a type and an optional subtype. server is registered with the
+// subtype big, so it is declared server "big" "web", addressed server.big.web,
+// and can be referenced by entities of any type.
+
+func TestApplyDeclaresAnEntityOfATypeWithASubtype(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	st, err := p.Apply(context.Background(), registeredSubtypedConfig)
+	require.NoError(t, err)
+
+	meta := requireMeta(t, st.GetResources(), registeredServerID)
+	require.Equal(t, registered.TypeServer, meta.Type)
+	require.Equal(t, registered.SubtypeBig, meta.Subtype)
+	require.Equal(t, "web", meta.Name)
+
+	server, err := findByID(st.GetResources(), registeredServerID)
+	require.NoError(t, err)
+
+	typed, ok := server.(*registered.Server)
+	require.True(t, ok, "expected *registered.Server, got %T", server)
+	require.Equal(t, "eu-west", typed.Location)
+	require.Equal(t, 3, typed.Size)
+}
+
+func TestApplyResolvesAReferenceToAnEntityWithASubtypeFromATypeWithout(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	st, err := p.Apply(context.Background(), registeredSubtypedConfig)
+	require.NoError(t, err)
+
+	cache, err := findByID(st.GetResources(), registeredCacheID)
+	require.NoError(t, err)
+
+	typed, ok := cache.(*registered.Cache)
+	require.True(t, ok, "expected *registered.Cache, got %T", cache)
+	require.Equal(t, "eu-west", typed.Location)
+}
+
+func TestApplyResolvesReferencesToEntitiesOfOtherTypesFromAResource(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	st, err := p.Apply(context.Background(), registeredSubtypedConfig)
+	require.NoError(t, err)
+
+	app, err := findByID(st.GetResources(), registeredAPIID)
+	require.NoError(t, err)
+
+	typed, ok := app.(*registered.App)
+	require.True(t, ok, "expected *registered.App, got %T", app)
+	require.Equal(t, "eu-west", typed.DatabaseLocation)
+	require.Equal(t, 3, typed.DatabasePort)
+	require.Equal(t, "eu-west", typed.SharedLocation)
+}
+
+func TestApplyRecordsAnEntityWithASubtypeAsAParentOfWhatReferencesIt(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	st, err := p.Apply(context.Background(), registeredSubtypedConfig)
+	require.NoError(t, err)
+
+	require.Contains(t, requireMeta(t, st.GetResources(), registeredCacheID).Parents, registeredServerID)
+	require.Contains(t, requireMeta(t, st.GetResources(), registeredAPIID).Parents, registeredServerID)
+	require.Contains(t, requireMeta(t, st.GetResources(), registeredAPIID).Parents, registeredCacheID)
+}
+
+func TestApplyReadsAnEntityWithASubtypeBackFromSavedState(t *testing.T) {
+	h := setupRegisteredTypes(t)
+
+	h.applyAndSave(t, registeredSubtypedConfig)
+
+	saved := loadTyped(t, h.store, h.registry)
+
+	server, err := findByID(saved, registeredServerID)
+	require.NoError(t, err)
+
+	typed, ok := server.(*registered.Server)
+	require.True(t, ok, "expected *registered.Server, got %T", server)
+	require.Equal(t, registered.TypeServer, typed.Meta.Type)
+	require.Equal(t, registered.SubtypeBig, typed.Meta.Subtype)
+	require.Equal(t, "eu-west", typed.Location)
+
+	// a second apply reads that state back and succeeds
+	h.applyAndSave(t, registeredSubtypedConfig)
+}
+
+func TestApplyRejectsATypeWithASubtypeDeclaredWithOnlyAName(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	_, err := p.Apply(context.Background(), registeredSubtypedInvalid+"missing_subtype.xcl")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `invalid format for 'server', it is declared with a subtype and a name`)
+}
+
+func TestApplyRejectsATypeWithoutASubtypeDeclaredWithOne(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	_, err := p.Apply(context.Background(), registeredSubtypedInvalid+"extra_subtype.xcl")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `invalid format for 'cache', it is declared with only a name`)
+}
+
+func TestApplyRejectsASubtypeThatWasNotRegistered(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	_, err := p.Apply(context.Background(), registeredSubtypedInvalid+"unknown_subtype.xcl")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "server.small")
 }

@@ -67,19 +67,19 @@ func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, di
 	// Register each Go type under the block type name used in configuration.
 	// A registered type needs nothing else: no plugin, no provider, no schema
 	// to write by hand.
-	if err := r.RegisterType("config_map", &resources.ConfigMap{}); err != nil {
+	if err := r.RegisterType(&resources.ConfigMap{}, "resource", "config_map"); err != nil {
 		return nil, err
 	}
 
-	if err := r.RegisterType("deployment", &resources.Deployment{}); err != nil {
+	if err := r.RegisterType(&resources.Deployment{}, "resource", "deployment"); err != nil {
 		return nil, err
 	}
 
-	if err := r.RegisterType("service", &resources.Service{}); err != nil {
+	if err := r.RegisterType(&resources.Service{}, "resource", "service"); err != nil {
 		return nil, err
 	}
 
-	if err := r.RegisterType("ingress", &resources.Ingress{}); err != nil {
+	if err := r.RegisterType(&resources.Ingress{}, "resource", "ingress"); err != nil {
 		return nil, err
 	}
 

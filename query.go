@@ -152,16 +152,16 @@ func describeType(entity any) string {
 // in an address: FindByType[Container](c, "resource", "container") for an
 // entity declared resource "container" "nics", and
 // FindByType[Container](c, "container") for one declared container "nics".
-// Segment one is always the kind, so a variety on its own matches nothing and
+// Segment one is always the type, so a subtype on its own matches nothing and
 // says so rather than matching in the wrong position.
 //
 // At least one segment is required; the no-segment form is All.
 //
 // A well formed query that matches nothing returns an empty result and a nil
 // error. A query that cannot be answered returns an error: one wrapping
-// ErrUnknownType where the leading segment is not a kind, and one wrapping
-// ErrNotTypeable where the segments span more than one Go type, as the
-// resource kind alone does.
+// ErrUnknownType where the leading segment is not a type, and one wrapping
+// ErrNotTypeable where the segments span more than one Go type, as a type
+// that takes a subtype does when it is given alone.
 func FindByType[T any](c *Config, path ...string) ([]*T, error) {
 	return findByType[T](c, path...)
 }
@@ -235,31 +235,15 @@ func findOne[T any](c *Config, path ...string) (*T, error) {
 // typeable reports whether the segments given pin exactly one Go type, which
 // is what makes a result typeable at all.
 //
-// Segment one names a kind: one of the stanza keywords, or a type declared by
-// its own keyword. The resource kind spans every variety declared under it, so
-// it needs a second segment to pin a type, and published values span whatever
-// the configuration publishes, so they are never typeable and point at the
-// call that does return them.
+// Segment one names a type: one of the builtin keywords, "resource", or a type
+// registered under its own keyword. A type that takes a subtype spans every
+// subtype declared under it, so it needs a second segment to pin a Go type,
+// and published values span whatever the configuration publishes, so they are
+// never typeable and point at the call that does return them.
 func (c *Config) typeable(path []string) error {
-	kind := path[0]
+	entityType := path[0]
 
-	switch kind {
-	case types.TypeResource:
-		if len(path) < 2 {
-			return &xclerrors.NotTypeableError{Segments: path, Use: "FindByType with the variety, i.e. (\"resource\", \"container\")"}
-		}
-
-		// the variety must be a type that can actually be declared under the
-		// resource keyword. A type declared by its own keyword, or a builtin
-		// kind, never can be, so naming one here asks a question no
-		// configuration could answer
-		info, ok := c.typeInfo(path[1])
-		if !ok || info.Bare || info.Builtin {
-			return &xclerrors.UnknownTypeError{Segments: path, Name: path[1]}
-		}
-
-		return nil
-
+	switch entityType {
 	case resources.TypeOutput:
 		return &xclerrors.NotTypeableError{Segments: path, Use: "Outputs"}
 
@@ -268,20 +252,30 @@ func (c *Config) typeable(path []string) error {
 		return nil
 	}
 
-	// anything else is only a kind when it is declared by its own keyword
-	if info, ok := c.typeInfo(kind); ok && info.Bare {
+	if c.pluginRegistry == nil {
+		return &xclerrors.UnknownTypeError{Segments: path, Name: entityType}
+	}
+
+	takes, known := c.pluginRegistry.TakesSubtype(entityType)
+	if !known {
+		return &xclerrors.UnknownTypeError{Segments: path, Name: entityType}
+	}
+
+	if !takes {
 		return nil
 	}
 
-	return &xclerrors.UnknownTypeError{Segments: path, Name: kind}
-}
-
-func (c *Config) typeInfo(name string) (types.TypeInfo, bool) {
-	if c.pluginRegistry == nil {
-		return types.TypeInfo{}, false
+	if len(path) < 2 {
+		return &xclerrors.NotTypeableError{Segments: path, Use: fmt.Sprintf("FindByType with the subtype, i.e. (%q, \"<subtype>\")", entityType)}
 	}
 
-	return c.pluginRegistry.Type(name)
+	// the subtype must be one that can actually be declared under the type,
+	// naming any other asks a question no configuration could answer
+	if !c.pluginRegistry.KnownType(entityType, path[1]) {
+		return &xclerrors.UnknownTypeError{Segments: path, Name: path[1]}
+	}
+
+	return nil
 }
 
 // addressable refuses a query for a type that has no address of its own,
@@ -304,8 +298,9 @@ func addressable[T any]() error {
 //
 // The addressing is worked out from how T was registered, so All[Container]
 // returns what FindByType[Container]("resource", "container") returns for a
-// type declared with the resource keyword, and what
-// FindByType[Container]("container") returns for one declared by its own.
+// type registered as ("resource", "container"), and what
+// FindByType[Container]("container") returns for one registered as
+// ("container") alone.
 //
 // A plugin provides a schema and no Go type, so a plugin backed entity cannot
 // be matched this way. Asking for one returns an error wrapping
@@ -320,12 +315,12 @@ func all[T any](c *Config) ([]*T, error) {
 	}
 
 	if c.pluginRegistry == nil {
-		return nil, &xclerrors.NotRegisteredError{Type: reflect.TypeFor[T](), Use: "FindByType with the kind and variety"}
+		return nil, &xclerrors.NotRegisteredError{Type: reflect.TypeFor[T](), Use: "FindByType with the type and subtype"}
 	}
 
 	path, ok := c.pluginRegistry.TypePath(reflect.TypeFor[T]())
 	if !ok {
-		return nil, &xclerrors.NotRegisteredError{Type: reflect.TypeFor[T](), Use: "FindByType with the kind and variety"}
+		return nil, &xclerrors.NotRegisteredError{Type: reflect.TypeFor[T](), Use: "FindByType with the type and subtype"}
 	}
 
 	// deliberately goes through the kind lookup rather than scanning again, so

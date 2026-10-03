@@ -47,13 +47,13 @@ func testRegistry(t *testing.T) *registry.PluginRegistry {
 
 	reg := registry.NewPluginRegistry()
 
-	err := reg.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
-	err = reg.RegisterType(registered.TypeApp, &registered.App{})
+	err = reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
 	require.NoError(t, err)
 
-	err = reg.RegisterType(registered.TypeConsumer, &registered.Consumer{})
+	err = reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
 	require.NoError(t, err)
 
 	return reg

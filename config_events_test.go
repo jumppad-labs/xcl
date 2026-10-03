@@ -63,7 +63,7 @@ func applyQueryFixtureWithEventData(t *testing.T, level EventDataLevel) *eventRe
 
 	pr := registry.NewPluginRegistry()
 
-	err := pr.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := pr.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
 	err = pr.RegisterPlugin(&parser.TestPlugin{})
@@ -146,7 +146,7 @@ func TestValidateCallsEventHandlerWhenResourceIsParsed(t *testing.T) {
 
 	pr := registry.NewPluginRegistry()
 
-	err := pr.RegisterType(registered.TypeDatabase, &registered.Database{})
+	err := pr.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 	require.NoError(t, err)
 
 	err = pr.RegisterPlugin(&parser.TestPlugin{})

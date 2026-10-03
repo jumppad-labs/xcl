@@ -66,7 +66,7 @@ func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, di
 
 	// One block type, one Go type. Everything nested inside it is reached
 	// through the fields of that type.
-	if err := r.RegisterType("application", &resources.Application{}); err != nil {
+	if err := r.RegisterType(&resources.Application{}, "resource", "application"); err != nil {
 		return nil, err
 	}
 

@@ -10,13 +10,12 @@ import (
 
 // TypePath is what lets a lookup name a Go type and nothing else: the address
 // segments are read back from how the type was registered rather than spelled
-// out by the caller. A kind led registration is reached through the resource
-// keyword, a bare one and a builtin lead their own declaration.
+// out by the caller: its type, followed by its subtype where it has one.
 
-func TestTypePathReturnsTheResourcePathForAKindLedRegistration(t *testing.T) {
+func TestTypePathReturnsTheResourcePathForAResourceRegistration(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
 	path, ok := r.TypePath(reflect.TypeFor[Thing]())
@@ -24,15 +23,26 @@ func TestTypePathReturnsTheResourcePathForAKindLedRegistration(t *testing.T) {
 	require.Equal(t, []string{"resource", "thing"}, path)
 }
 
-func TestTypePathReturnsTheBarePathForABareRegistration(t *testing.T) {
+func TestTypePathReturnsTheTypePathForARegistrationWithoutASubtype(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterBareType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "thing")
 	require.NoError(t, err)
 
 	path, ok := r.TypePath(reflect.TypeFor[Thing]())
 	require.True(t, ok)
 	require.Equal(t, []string{"thing"}, path)
+}
+
+func TestTypePathReturnsTheTypeAndSubtypeOfAnyType(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, err)
+
+	path, ok := r.TypePath(reflect.TypeFor[Thing]())
+	require.True(t, ok)
+	require.Equal(t, []string{"server", "big"}, path)
 }
 
 func TestTypePathReturnsTheBuiltinPathForABuiltinType(t *testing.T) {
@@ -46,7 +56,7 @@ func TestTypePathReturnsTheBuiltinPathForABuiltinType(t *testing.T) {
 func TestTypePathResolvesAPointerAndANonPointerAlike(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
 	value, valueOK := r.TypePath(reflect.TypeFor[Thing]())
@@ -81,7 +91,7 @@ func TestTypePathRejectsAPluginProvidedType(t *testing.T) {
 	require.NoError(t, err)
 
 	// the registry knows the name, because the loaded plugin declares it
-	require.True(t, r.KnownType("thing"))
+	require.True(t, r.KnownType("resource", "thing"))
 
 	// but the type exists host side only as a schema, so there is nothing to
 	// reflect against and no path to derive

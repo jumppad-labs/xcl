@@ -13,7 +13,7 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error)
 in order:
 
 1. `parseAndValidate` — load previous state, parse all HCL files under
-   `paths` into Go resource instances (via `PluginRegistry.CreateResource`
+   `paths` into Go resource instances (via `PluginRegistry.CreateEntity`
    for typing), then **validate the configuration as a whole**. Nothing is
    acted upon unless validation passes, and validation itself decodes no
    bodies and reaches no provider.
@@ -206,7 +206,7 @@ ProviderResolver ProviderResolver // overrides provider lookup; defaults to Plug
 This is what `TestParserProcessesResourcesInCorrectOrder` uses to verify
 DAG-walk ordering with a single mock adapter/resolver pair instead of the
 hand-written `TestPlugin` fake ([`internal/parser/test_plugin.go`](../internal/parser/test_plugin.go)).
-Note `PluginRegistry.CreateResource` (used in step 1 of `Apply`, to
+Note `PluginRegistry.CreateEntity` (used in step 1 of `Apply`, to
 instantiate resources from HCL) is a *different* method not covered by
 `ProviderResolver` — a real registry is still needed for that part even in
 tests that mock the lifecycle-call path.

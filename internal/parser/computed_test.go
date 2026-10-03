@@ -55,7 +55,7 @@ type unkeyedHolder struct {
 func TestComputedFieldsFindsTaggedFieldsOnSchemaRebuiltType(t *testing.T) {
 	r := newTestRegistry(t)
 
-	network, err := r.CreateResource("network", "x")
+	network, err := r.CreateEntity("resource", "network", "x")
 	require.NoError(t, err)
 
 	// the registry rebuilds the type from the plugin's schema, it is not the
@@ -90,7 +90,7 @@ func TestComputedFieldsIncludesPromotedEmbeddedFields(t *testing.T) {
 func TestComputedFieldsIncludesPromotedEmbeddedFieldsOnSchemaRebuiltType(t *testing.T) {
 	r := newTestRegistry(t)
 
-	container, err := r.CreateResource("container", "x")
+	container, err := r.CreateEntity("resource", "container", "x")
 	require.NoError(t, err)
 
 	paths := computedPaths(reflect.TypeOf(container))
@@ -141,13 +141,13 @@ func TestCopyComputedCopiesOnlyComputedValues(t *testing.T) {
 func TestCopyComputedCopiesOnlyComputedValuesOnSchemaRebuiltType(t *testing.T) {
 	r := newTestRegistry(t)
 
-	src, err := r.CreateResource("network", "x")
+	src, err := r.CreateEntity("resource", "network", "x")
 	require.NoError(t, err)
 
 	err = json.Unmarshal([]byte(`{"subnet":"10.0.0.0/16","provider_id":"p-1","observed":"seen"}`), src)
 	require.NoError(t, err)
 
-	dst, err := r.CreateResource("network", "x")
+	dst, err := r.CreateEntity("resource", "network", "x")
 	require.NoError(t, err)
 
 	err = json.Unmarshal([]byte(`{"subnet":"10.1.0.0/16"}`), dst)

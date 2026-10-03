@@ -105,10 +105,22 @@ func (p *doubleThingPlugin) Init(logger logger.Logger, state plugins.State) erro
 	return plugins.RegisterResourceProvider(&p.PluginBase, logger, state, "resource", "thing", &Thing{}, &thingProvider{})
 }
 
+// bigServerPlugin is an in-process plugin that provides the type "server"
+// with the subtype "big", a type other than resource that takes a subtype
+type bigServerPlugin struct {
+	plugins.PluginBase
+}
+
+var _ plugins.Plugin = (*bigServerPlugin)(nil)
+
+func (p *bigServerPlugin) Init(logger logger.Logger, state plugins.State) error {
+	return plugins.RegisterResourceProvider(&p.PluginBase, logger, state, "server", "big", &Thing{}, &thingProvider{})
+}
+
 func TestRegisterTypeSucceedsWithoutPlugins(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
 	require.Empty(t, r.GetPluginHosts())
@@ -117,10 +129,10 @@ func TestRegisterTypeSucceedsWithoutPlugins(t *testing.T) {
 func TestCreateResourceReturnsRegisteredGoType(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
-	resource, err := r.CreateResource("thing", "my_thing")
+	resource, err := r.CreateEntity("resource", "thing", "my_thing")
 	require.NoError(t, err)
 
 	thing, ok := resource.(*Thing)
@@ -133,19 +145,19 @@ func TestCreateResourceReturnsRegisteredGoType(t *testing.T) {
 func TestRegisterTypeRejectsDuplicateName(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
-	err = r.RegisterType("thing", &Gadget{})
+	err = r.RegisterType(&Gadget{}, "resource", "thing")
 	require.Error(t, err)
-	require.ErrorContains(t, err, `"thing"`)
+	require.ErrorContains(t, err, `"resource.thing"`)
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "thing", clash.Name)
+	require.Equal(t, "resource.thing", clash.Name)
 	require.Equal(t, "registered type", clash.Existing)
 
-	resource, err := r.CreateResource("thing", "my_thing")
+	resource, err := r.CreateEntity("resource", "thing", "my_thing")
 	require.NoError(t, err)
 
 	thing, ok := resource.(*Thing)
@@ -158,7 +170,7 @@ func TestRegisterTypeRejectsDuplicateName(t *testing.T) {
 func TestRegisterTypeRejectsBuiltinNameVariable(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("variable", &Thing{})
+	err := r.RegisterType(&Thing{}, "variable")
 	require.Error(t, err)
 	require.ErrorContains(t, err, `"variable"`)
 
@@ -166,13 +178,13 @@ func TestRegisterTypeRejectsBuiltinNameVariable(t *testing.T) {
 	require.True(t, errors.As(err, &clash))
 	require.Equal(t, "variable", clash.Name)
 	require.Equal(t, "builtin", clash.Existing)
-	require.False(t, r.IsRegisteredType("variable"))
+	require.False(t, r.IsRegisteredType("variable", ""))
 }
 
 func TestRegisterTypeRejectsBuiltinNameOutput(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("output", &Thing{})
+	err := r.RegisterType(&Thing{}, "output")
 	require.Error(t, err)
 	require.ErrorContains(t, err, `"output"`)
 
@@ -180,13 +192,13 @@ func TestRegisterTypeRejectsBuiltinNameOutput(t *testing.T) {
 	require.True(t, errors.As(err, &clash))
 	require.Equal(t, "output", clash.Name)
 	require.Equal(t, "builtin", clash.Existing)
-	require.False(t, r.IsRegisteredType("output"))
+	require.False(t, r.IsRegisteredType("output", ""))
 }
 
 func TestRegisterTypeRejectsBuiltinNameModule(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("module", &Thing{})
+	err := r.RegisterType(&Thing{}, "module")
 	require.Error(t, err)
 	require.ErrorContains(t, err, `"module"`)
 
@@ -194,13 +206,13 @@ func TestRegisterTypeRejectsBuiltinNameModule(t *testing.T) {
 	require.True(t, errors.As(err, &clash))
 	require.Equal(t, "module", clash.Name)
 	require.Equal(t, "builtin", clash.Existing)
-	require.False(t, r.IsRegisteredType("module"))
+	require.False(t, r.IsRegisteredType("module", ""))
 }
 
 func TestRegisterTypeRejectsBuiltinNameRoot(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("root", &Thing{})
+	err := r.RegisterType(&Thing{}, "root")
 	require.Error(t, err)
 	require.ErrorContains(t, err, `"root"`)
 
@@ -208,7 +220,7 @@ func TestRegisterTypeRejectsBuiltinNameRoot(t *testing.T) {
 	require.True(t, errors.As(err, &clash))
 	require.Equal(t, "root", clash.Name)
 	require.Equal(t, "builtin", clash.Existing)
-	require.False(t, r.IsRegisteredType("root"))
+	require.False(t, r.IsRegisteredType("root", ""))
 }
 
 func TestRegisterTypeRejectsLoadedPluginProvidedName(t *testing.T) {
@@ -220,21 +232,21 @@ func TestRegisterTypeRejectsLoadedPluginProvidedName(t *testing.T) {
 	err = r.Load(nil)
 	require.NoError(t, err)
 
-	err = r.RegisterType("thing", &Thing{})
+	err = r.RegisterType(&Thing{}, "resource", "thing")
 	require.Error(t, err)
-	require.ErrorContains(t, err, `"thing"`)
+	require.ErrorContains(t, err, `"resource.thing"`)
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "thing", clash.Name)
+	require.Equal(t, "resource.thing", clash.Name)
 	require.Equal(t, "plugin", clash.Existing)
-	require.False(t, r.IsRegisteredType("thing"))
+	require.False(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestLoadRejectsPluginClashingWithEarlierRegisteredType(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
 	err = r.RegisterPlugin(&thingPlugin{})
@@ -242,11 +254,11 @@ func TestLoadRejectsPluginClashingWithEarlierRegisteredType(t *testing.T) {
 
 	err = r.Load(nil)
 	require.Error(t, err)
-	require.ErrorContains(t, err, `"thing"`)
+	require.ErrorContains(t, err, `"resource.thing"`)
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "thing", clash.Name)
+	require.Equal(t, "resource.thing", clash.Name)
 	require.Equal(t, "registered type", clash.Existing)
 
 	require.Empty(t, r.GetPluginHosts())
@@ -263,11 +275,11 @@ func TestLoadRejectsNameFromAnotherPlugin(t *testing.T) {
 
 	err = r.Load(nil)
 	require.Error(t, err)
-	require.ErrorContains(t, err, `"thing"`)
+	require.ErrorContains(t, err, `"resource.thing"`)
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "thing", clash.Name)
+	require.Equal(t, "resource.thing", clash.Name)
 	require.Equal(t, "plugin", clash.Existing)
 
 	require.Len(t, r.GetPluginHosts(), 1)
@@ -281,11 +293,11 @@ func TestLoadRejectsPluginReportingSameTypeTwice(t *testing.T) {
 
 	err = r.Load(nil)
 	require.Error(t, err)
-	require.ErrorContains(t, err, `"thing"`)
+	require.ErrorContains(t, err, `"resource.thing"`)
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "thing", clash.Name)
+	require.Equal(t, "resource.thing", clash.Name)
 	require.Equal(t, "the same plugin", clash.Existing)
 
 	require.Empty(t, r.GetPluginHosts())
@@ -294,7 +306,7 @@ func TestLoadRejectsPluginReportingSameTypeTwice(t *testing.T) {
 func TestLoadAcceptsPluginWithUniqueTypes(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("gadget", &Gadget{})
+	err := r.RegisterType(&Gadget{}, "resource", "gadget")
 	require.NoError(t, err)
 
 	err = r.RegisterPlugin(&thingPlugin{})
@@ -309,10 +321,10 @@ func TestLoadAcceptsPluginWithUniqueTypes(t *testing.T) {
 func TestRegisterTypeAcceptsComputedField(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("computed_thing", &ComputedThing{})
+	err := r.RegisterType(&ComputedThing{}, "resource", "computed_thing")
 	require.NoError(t, err)
 
-	resource, err := r.CreateResource("computed_thing", "my_thing")
+	resource, err := r.CreateEntity("resource", "computed_thing", "my_thing")
 	require.NoError(t, err)
 
 	thing, ok := resource.(*ComputedThing)
@@ -325,74 +337,74 @@ func TestRegisterTypeAcceptsComputedField(t *testing.T) {
 func TestRegisterTypeRejectsNonPointer(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", Thing{})
+	err := r.RegisterType(Thing{}, "resource", "thing")
 	require.Error(t, err)
-	require.ErrorContains(t, err, `type "thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	require.ErrorContains(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
 
-	require.False(t, r.IsRegisteredType("thing"))
+	require.False(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestRegisterTypeRejectsNil(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", nil)
+	err := r.RegisterType(nil, "resource", "thing")
 	require.Error(t, err)
-	require.ErrorContains(t, err, `type "thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	require.ErrorContains(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
 
-	require.False(t, r.IsRegisteredType("thing"))
+	require.False(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestRegisterTypeRejectsNilPointer(t *testing.T) {
 	r := NewPluginRegistry()
 
 	var thing *Thing
-	err := r.RegisterType("thing", thing)
+	err := r.RegisterType(thing, "resource", "thing")
 	require.Error(t, err)
-	require.ErrorContains(t, err, `type "thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	require.ErrorContains(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
 
-	require.False(t, r.IsRegisteredType("thing"))
+	require.False(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestRegisterTypeRejectsPointerToNonStruct(t *testing.T) {
 	r := NewPluginRegistry()
 
 	size := 1
-	err := r.RegisterType("thing", &size)
+	err := r.RegisterType(&size, "resource", "thing")
 	require.Error(t, err)
-	require.ErrorContains(t, err, `type "thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	require.ErrorContains(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
 
-	require.False(t, r.IsRegisteredType("thing"))
+	require.False(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestRegisterTypeRejectsTypeWithoutResourceBase(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &NotAResource{})
+	err := r.RegisterType(&NotAResource{}, "resource", "thing")
 	require.Error(t, err)
-	require.ErrorContains(t, err, `type "thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	require.ErrorContains(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
 
-	require.False(t, r.IsRegisteredType("thing"))
+	require.False(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestIsRegisteredTypeReportsRegisteredTypes(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
-	require.True(t, r.IsRegisteredType("thing"))
+	require.True(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestIsRegisteredTypeIgnoresUnknownTypes(t *testing.T) {
 	r := NewPluginRegistry()
 
-	require.False(t, r.IsRegisteredType("thing"))
+	require.False(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestIsRegisteredTypeIgnoresBuiltinTypes(t *testing.T) {
 	r := NewPluginRegistry()
 
-	require.False(t, r.IsRegisteredType("variable"))
+	require.False(t, r.IsRegisteredType("variable", ""))
 }
 
 func TestIsRegisteredTypeIgnoresPluginTypes(t *testing.T) {
@@ -404,66 +416,246 @@ func TestIsRegisteredTypeIgnoresPluginTypes(t *testing.T) {
 	err = r.Load(nil)
 	require.NoError(t, err)
 
-	require.False(t, r.IsRegisteredType("thing"))
+	require.False(t, r.IsRegisteredType("resource", "thing"))
 }
 
-// A type is registered under one declaration form or the other, never both.
-// RegisterBareType records the bare form, so the type leads its own
-// declaration and is addressed <name>.<resource>, while RegisterType leaves it
-// kind led and addressed resource.<name>.<resource>.
+// An entity has a type and an optional subtype. Registering with a subtype
+// declares the type with it as the first label, i.e. server "big" "web", and
+// without one declares it with only the name, i.e. thing "my_thing".
 
-func TestRegisterBareTypeRecordsTheBareForm(t *testing.T) {
+func TestRegisterTypeWithoutASubtypeRecordsTheTypeAlone(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterBareType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "thing")
 	require.NoError(t, err)
 
-	info, ok := r.Type("thing")
+	info, ok := r.Type("thing", "")
 	require.True(t, ok)
-	require.True(t, info.Bare)
-	require.Equal(t, "thing", info.Name)
+	require.Equal(t, "thing", info.Type)
+	require.Empty(t, info.Subtype)
 }
 
-func TestRegisterTypeDoesNotRecordTheBareForm(t *testing.T) {
+func TestRegisterTypeWithASubtypeRecordsBoth(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "server", "big")
 	require.NoError(t, err)
 
-	info, ok := r.Type("thing")
+	info, ok := r.Type("server", "big")
 	require.True(t, ok)
-	require.False(t, info.Bare)
+	require.Equal(t, "server", info.Type)
+	require.Equal(t, "big", info.Subtype)
 }
 
-func TestCreateResourceMakesABareTypeItsOwnKind(t *testing.T) {
+func TestCreateEntityWithoutASubtypeMakesTheTypeItsOwn(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterBareType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "thing")
 	require.NoError(t, err)
 
-	resource, err := r.CreateResource("thing", "my_thing")
+	entity, err := r.CreateEntity("thing", "", "my_thing")
 	require.NoError(t, err)
 
-	thing, ok := resource.(*Thing)
-	require.True(t, ok, "expected *Thing, got %T", resource)
+	thing, ok := entity.(*Thing)
+	require.True(t, ok, "expected *Thing, got %T", entity)
 	require.Equal(t, "my_thing", thing.Meta.Name)
 	require.Equal(t, "thing", thing.Meta.Type)
 	require.Equal(t, "", thing.Meta.Subtype)
 }
 
-func TestCreateResourceMakesAKindLedTypeAResourceOfThatVariety(t *testing.T) {
+func TestCreateEntityWithASubtypeOfAnyTypeSetsBoth(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "server", "big")
 	require.NoError(t, err)
 
-	resource, err := r.CreateResource("thing", "my_thing")
+	entity, err := r.CreateEntity("server", "big", "web")
 	require.NoError(t, err)
 
-	thing, ok := resource.(*Thing)
-	require.True(t, ok, "expected *Thing, got %T", resource)
+	thing, ok := entity.(*Thing)
+	require.True(t, ok, "expected *Thing, got %T", entity)
+	require.Equal(t, "web", thing.Meta.Name)
+	require.Equal(t, "server", thing.Meta.Type)
+	require.Equal(t, "big", thing.Meta.Subtype)
+}
+
+func TestCreateEntityUnderTheResourceTypeSetsBoth(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, err)
+
+	entity, err := r.CreateEntity("resource", "thing", "my_thing")
+	require.NoError(t, err)
+
+	thing, ok := entity.(*Thing)
+	require.True(t, ok, "expected *Thing, got %T", entity)
 	require.Equal(t, types.TypeResource, thing.Meta.Type)
 	require.Equal(t, "thing", thing.Meta.Subtype)
+}
+
+func TestCreateEntityFailsForATypeRegisteredWithADifferentSubtype(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, err)
+
+	_, err = r.CreateEntity("server", "small", "web")
+	require.ErrorContains(t, err, "server.small")
+}
+
+func TestRegisterTypeAcceptsSeveralSubtypesOfOneType(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, err)
+
+	err = r.RegisterType(&Gadget{}, "server", "small")
+	require.NoError(t, err)
+
+	require.True(t, r.IsRegisteredType("server", "big"))
+	require.True(t, r.IsRegisteredType("server", "small"))
+}
+
+func TestRegisterTypeRejectsTheSameSubtypeTwice(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, err)
+
+	err = r.RegisterType(&Gadget{}, "server", "big")
+
+	var clash *TypeNameClashError
+	require.True(t, errors.As(err, &clash))
+	require.Equal(t, "server.big", clash.Name)
+	require.Equal(t, "registered type", clash.Existing)
+}
+
+// A type keyword takes a subtype for every registration or for none, so an
+// address such as server.big.web can always be read by position.
+
+func TestRegisterTypeRejectsASubtypeForATypeRegisteredWithoutOne(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "server")
+	require.NoError(t, err)
+
+	err = r.RegisterType(&Gadget{}, "server", "big")
+
+	var form *TypeFormError
+	require.True(t, errors.As(err, &form))
+	require.Equal(t, "server", form.Type)
+	require.False(t, form.TakesSubtype)
+	require.False(t, r.IsRegisteredType("server", "big"))
+}
+
+func TestRegisterTypeRejectsNoSubtypeForATypeRegisteredWithOne(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, err)
+
+	err = r.RegisterType(&Gadget{}, "server")
+
+	var form *TypeFormError
+	require.True(t, errors.As(err, &form))
+	require.Equal(t, "server", form.Type)
+	require.True(t, form.TakesSubtype)
+	require.False(t, r.IsRegisteredType("server", ""))
+}
+
+func TestRegisterTypeRejectsTheResourceTypeWithoutASubtype(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "resource")
+
+	var form *TypeFormError
+	require.True(t, errors.As(err, &form))
+	require.Equal(t, "resource", form.Type)
+	require.True(t, form.TakesSubtype)
+}
+
+func TestRegisterTypeRejectsABuiltinTypeWithASubtype(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "variable", "big")
+
+	var clash *TypeNameClashError
+	require.True(t, errors.As(err, &clash))
+	require.Equal(t, "variable.big", clash.Name)
+	require.Equal(t, "builtin", clash.Existing)
+}
+
+func TestRegisterTypeRejectsMoreThanOneSubtype(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "server", "big", "small")
+	require.ErrorContains(t, err, "at most one subtype")
+	require.False(t, r.KnownType("server", "big"))
+}
+
+func TestRegisterTypeRejectsAnEmptySubtype(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "server", "")
+	require.ErrorContains(t, err, "empty subtype")
+	require.False(t, r.KnownType("server", ""))
+}
+
+func TestRegisterTypeRejectsNoName(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{})
+	require.ErrorContains(t, err, "must be named")
+}
+
+func TestRegisterTypeRejectsAnEmptyType(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "")
+	require.ErrorContains(t, err, "must be named")
+}
+
+func TestTakesSubtypeReportsTheFormOfARegisteredType(t *testing.T) {
+	r := NewPluginRegistry()
+
+	require.NoError(t, r.RegisterType(&Thing{}, "server", "big"))
+	require.NoError(t, r.RegisterType(&Gadget{}, "cache"))
+
+	takes, known := r.TakesSubtype("server")
+	require.True(t, known)
+	require.True(t, takes)
+
+	takes, known = r.TakesSubtype("cache")
+	require.True(t, known)
+	require.False(t, takes)
+}
+
+func TestTakesSubtypeAlwaysKnowsTheResourceType(t *testing.T) {
+	r := NewPluginRegistry()
+
+	takes, known := r.TakesSubtype("resource")
+	require.True(t, known)
+	require.True(t, takes)
+}
+
+func TestTakesSubtypeIgnoresAnUnknownType(t *testing.T) {
+	r := NewPluginRegistry()
+
+	_, known := r.TakesSubtype("server")
+	require.False(t, known)
+}
+
+func TestTypeFormErrorMessageForATypeThatTakesASubtype(t *testing.T) {
+	err := &TypeFormError{Type: "server", TakesSubtype: true}
+
+	require.Equal(t, `type "server" takes a subtype, i.e. 'server "<subtype>" "<name>" {}', so it must be registered with one`, err.Error())
+}
+
+func TestTypeFormErrorMessageForATypeWithoutASubtype(t *testing.T) {
+	err := &TypeFormError{Type: "server"}
+
+	require.Equal(t, `type "server" is declared without a subtype, i.e. 'server "<name>" {}', so it can not be registered with one`, err.Error())
 }
 
 // KnownType answers for every source the registry draws on, which is what the
@@ -474,25 +666,25 @@ func TestCreateResourceMakesAKindLedTypeAResourceOfThatVariety(t *testing.T) {
 func TestKnownTypeReportsABuiltin(t *testing.T) {
 	r := NewPluginRegistry()
 
-	require.True(t, r.KnownType("variable"))
+	require.True(t, r.KnownType("variable", ""))
 }
 
 func TestKnownTypeReportsARegisteredType(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
-	require.True(t, r.KnownType("thing"))
+	require.True(t, r.KnownType("resource", "thing"))
 }
 
-func TestKnownTypeReportsABareRegisteredType(t *testing.T) {
+func TestKnownTypeReportsARegisteredTypeWithoutASubtype(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterBareType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "thing")
 	require.NoError(t, err)
 
-	require.True(t, r.KnownType("thing"))
+	require.True(t, r.KnownType("thing", ""))
 }
 
 func TestKnownTypeReportsAPluginProvidedType(t *testing.T) {
@@ -504,7 +696,7 @@ func TestKnownTypeReportsAPluginProvidedType(t *testing.T) {
 	err = r.Load(nil)
 	require.NoError(t, err)
 
-	require.True(t, r.KnownType("thing"))
+	require.True(t, r.KnownType("resource", "thing"))
 }
 
 func TestKnownTypeIgnoresAPluginTypeBeforeLoad(t *testing.T) {
@@ -513,13 +705,13 @@ func TestKnownTypeIgnoresAPluginTypeBeforeLoad(t *testing.T) {
 	err := r.RegisterPlugin(&thingPlugin{})
 	require.NoError(t, err)
 
-	require.False(t, r.KnownType("thing"))
+	require.False(t, r.KnownType("resource", "thing"))
 }
 
 func TestKnownTypeIgnoresAnUnknownName(t *testing.T) {
 	r := NewPluginRegistry()
 
-	require.False(t, r.KnownType("nosuchtype"))
+	require.False(t, r.KnownType("nosuchtype", ""))
 }
 
 func TestTypeNameClashErrorMessage(t *testing.T) {
@@ -777,7 +969,7 @@ func TestLoadCachesFailure(t *testing.T) {
 func TestRegisterTypeClashingWithBuiltinFailsImmediately(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterBareType("output", &Thing{})
+	err := r.RegisterType(&Thing{}, "output")
 	require.Error(t, err)
 
 	var clash *TypeNameClashError
@@ -791,18 +983,33 @@ func TestRegisterTypeClashingWithBuiltinFailsImmediately(t *testing.T) {
 func TestRegisterTypeClashingWithRegisteredTypeFailsImmediately(t *testing.T) {
 	r := NewPluginRegistry()
 
-	err := r.RegisterBareType("thing", &Thing{})
+	err := r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
-	err = r.RegisterType("thing", &Gadget{})
+	err = r.RegisterType(&Gadget{}, "resource", "thing")
 	require.Error(t, err)
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "thing", clash.Name)
+	require.Equal(t, "resource.thing", clash.Name)
 	require.Equal(t, "registered type", clash.Existing)
 
 	require.False(t, r.Loaded())
+}
+
+// thing and resource.thing are different types, one declared thing "x" {} and
+// the other resource "thing" "x" {}, so registering both is not a clash
+func TestRegisterTypeAcceptsATypeNamedLikeAResourceSubtype(t *testing.T) {
+	r := NewPluginRegistry()
+
+	err := r.RegisterType(&Thing{}, "thing")
+	require.NoError(t, err)
+
+	err = r.RegisterType(&Gadget{}, "resource", "thing")
+	require.NoError(t, err)
+
+	require.True(t, r.IsRegisteredType("thing", ""))
+	require.True(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestRegisterTypeMatchingPluginTypeSucceedsBeforeLoad(t *testing.T) {
@@ -811,10 +1018,10 @@ func TestRegisterTypeMatchingPluginTypeSucceedsBeforeLoad(t *testing.T) {
 	err := r.RegisterPlugin(&thingPlugin{})
 	require.NoError(t, err)
 
-	err = r.RegisterType("thing", &Thing{})
+	err = r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
-	require.True(t, r.IsRegisteredType("thing"))
+	require.True(t, r.IsRegisteredType("resource", "thing"))
 }
 
 func TestLoadFailsWithClashForRegisteredTypeMatchingPluginType(t *testing.T) {
@@ -823,7 +1030,7 @@ func TestLoadFailsWithClashForRegisteredTypeMatchingPluginType(t *testing.T) {
 	err := r.RegisterPlugin(&thingPlugin{})
 	require.NoError(t, err)
 
-	err = r.RegisterType("thing", &Thing{})
+	err = r.RegisterType(&Thing{}, "resource", "thing")
 	require.NoError(t, err)
 
 	err = r.Load(nil)
@@ -831,7 +1038,7 @@ func TestLoadFailsWithClashForRegisteredTypeMatchingPluginType(t *testing.T) {
 
 	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
-	require.Equal(t, "thing", clash.Name)
+	require.Equal(t, "resource.thing", clash.Name)
 	require.Equal(t, "registered type", clash.Existing)
 
 	require.Empty(t, r.GetPluginHosts())
@@ -933,7 +1140,7 @@ func TestConcurrentLoadIsSafe(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			_ = r.Types()
-			_ = r.KnownType("thing")
+			_ = r.KnownType("resource", "thing")
 			_ = r.GetPluginHosts()
 		}()
 	}
@@ -945,7 +1152,7 @@ func TestConcurrentLoadIsSafe(t *testing.T) {
 	}
 
 	require.Len(t, r.GetPluginHosts(), 1)
-	require.True(t, r.KnownType("thing"))
+	require.True(t, r.KnownType("resource", "thing"))
 }
 
 func TestActivateRoutesPluginLogsToTheActiveEmitter(t *testing.T) {
@@ -1008,4 +1215,62 @@ func TestDeactivateOfAnOlderActivationKeepsTheNewer(t *testing.T) {
 
 	require.Empty(t, older.recorded())
 	require.Len(t, logsWithMessage(newer.recorded(), "creating a thing"), 1)
+}
+
+// A plugin provides types the same way RegisterType does, by a type and an
+// optional subtype, and its types need not be declared under resource.
+
+func TestLoadedPluginTypeWithASubtypeIsKnown(t *testing.T) {
+	r := NewPluginRegistry()
+
+	require.NoError(t, r.RegisterPlugin(&bigServerPlugin{}))
+	require.NoError(t, r.Load(nil))
+
+	require.True(t, r.KnownType("server", "big"))
+
+	takes, known := r.TakesSubtype("server")
+	require.True(t, known)
+	require.True(t, takes)
+}
+
+func TestCreateEntityCreatesALoadedPluginTypeWithASubtype(t *testing.T) {
+	r := NewPluginRegistry()
+
+	require.NoError(t, r.RegisterPlugin(&bigServerPlugin{}))
+	require.NoError(t, r.Load(nil))
+
+	entity, err := r.CreateEntity("server", "big", "web")
+	require.NoError(t, err)
+
+	meta, err := types.GetMeta(entity)
+	require.NoError(t, err)
+	require.Equal(t, "server", meta.Type)
+	require.Equal(t, "big", meta.Subtype)
+	require.Equal(t, "web", meta.Name)
+}
+
+func TestGetProviderFindsTheProviderOfALoadedPluginTypeWithASubtype(t *testing.T) {
+	r := NewPluginRegistry()
+
+	require.NoError(t, r.RegisterPlugin(&bigServerPlugin{}))
+	require.NoError(t, r.Load(nil))
+
+	entity, err := r.CreateEntity("server", "big", "web")
+	require.NoError(t, err)
+
+	require.NotNil(t, r.GetProvider(entity))
+	require.NotNil(t, r.GetProviderForResource(entity))
+}
+
+func TestRegisterTypeRejectsTheOtherFormOfALoadedPluginType(t *testing.T) {
+	r := NewPluginRegistry()
+
+	require.NoError(t, r.RegisterPlugin(&bigServerPlugin{}))
+	require.NoError(t, r.Load(nil))
+
+	err := r.RegisterType(&Gadget{}, "server")
+
+	var form *TypeFormError
+	require.True(t, errors.As(err, &form))
+	require.True(t, form.TakesSubtype)
 }
