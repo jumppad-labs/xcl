@@ -148,8 +148,11 @@ func newPersonConfig(t *testing.T, pr *registry.PluginRegistry, configFile, stat
 		WithStateStore(store),
 	}, opts...)
 
+	c, err := NewConfig(options...)
+	require.NoError(t, err)
+
 	return &personFixture{
-		config:     NewConfig(options...),
+		config:     c,
 		configFile: configFile,
 		statePath:  store.Path(),
 	}
@@ -631,7 +634,8 @@ func TestStoppingUnusedExternalPluginWritesNothing(t *testing.T) {
 	err := pr.RegisterPluginWithPath(binary)
 	require.NoError(t, err)
 
-	c := NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(WithPluginRegistry(pr))
+	require.NoError(t, err)
 
 	finish := captureAllOutput(t)
 
@@ -666,7 +670,8 @@ func TestExternalPluginRejectedForTypeClashWritesNothing(t *testing.T) {
 	err = pr.RegisterPluginWithPath(binary)
 	require.NoError(t, err)
 
-	c := NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(WithPluginRegistry(pr))
+	require.NoError(t, err)
 
 	finish := captureAllOutput(t)
 

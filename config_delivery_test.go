@@ -96,8 +96,11 @@ func setupDeliveryConfig(t *testing.T, contents string, opts ...ConfigOption) *d
 		WithStateStore(store),
 	}, opts...)
 
+	c, err := NewConfig(options...)
+	require.NoError(t, err)
+
 	return &deliveryFixture{
-		config:     NewConfig(options...),
+		config:     c,
 		plugin:     testPlugin,
 		store:      store,
 		configFile: configFile,
@@ -531,13 +534,15 @@ func TestIgnoringReceiverDoesNotChangeApplyResult(t *testing.T) {
 }
 
 func TestWithEventBufferSizeSetsLimit(t *testing.T) {
-	c := NewConfig(WithEventBufferSize(7))
+	c, err := NewConfig(WithEventBufferSize(7))
+	require.NoError(t, err)
 
 	require.Equal(t, 7, c.eventBufferSize)
 }
 
 func TestDefaultEventBufferSizeIsUsedWhenUnset(t *testing.T) {
-	c := NewConfig()
+	c, err := NewConfig()
+	require.NoError(t, err)
 
 	// run treats an unset size as DefaultEventBufferSize
 	require.Equal(t, 0, c.eventBufferSize)

@@ -88,10 +88,11 @@ func testApplyToStateFile(t *testing.T, reg *registry.PluginRegistry, config str
 
 	statePath := store.Path()
 
-	c := xcl.NewConfig(
+	c, err := xcl.NewConfig(
 		xcl.WithPluginRegistry(reg),
 		xcl.WithStateStore(store),
 	)
+	require.NoError(t, err)
 
 	err = c.Apply(config)
 	require.NoError(t, err)

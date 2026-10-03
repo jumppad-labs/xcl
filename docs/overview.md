@@ -11,7 +11,7 @@ persisted in between runs.
 ```
 Config            (repo root, package xcl)
   owns: PluginRegistry, StateStore, the entities currently declared
-  entry point: NewConfig(opts...), then Apply()/Validate()/Destroy()
+  entry point: NewConfig(opts...) (*Config, error), then Apply()/Validate()/Destroy()
 
 Parser            (internal/parser)
   does one Apply() call: load previous state -> parse HCL -> destroy
@@ -34,9 +34,9 @@ user. `Parser` is constructed fresh, internally, on every
 ## Entry point
 
 ```go
-cfg := xcl.NewConfig(
+cfg, err := xcl.NewConfig(
     xcl.WithPluginRegistry(pluginRegistry),
-    xcl.WithStateStore(stateStore),
+    xcl.WithStateStore(stateStore),       // or xcl.WithStatePath("./.xcl")
     xcl.WithVariables(vars),
 )
 
@@ -46,7 +46,9 @@ err := cfg.Destroy()                   // destroys everything in the saved state
 ```
 
 [`config.go:27`](../config.go#L27) `NewConfig` applies functional options
-([`options.go`](../options.go)) onto a `Config` holding no entities yet.
+([`options.go`](../options.go)) onto a `Config` holding no entities yet. An
+option can fail, `WithStatePath` does when it cannot create the state
+directory, and the first failure is returned from `NewConfig`.
 With no options, you get a config that parses and validates HCL but never
 touches a real provider or disk — useful for testing.
 

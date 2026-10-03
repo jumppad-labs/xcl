@@ -48,10 +48,11 @@ func applyEncodeFixture(t *testing.T) (*Config, *registry.PluginRegistry, string
 
 	statePath := store.Path()
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithStateStore(store),
 	)
+	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/encode/main.xcl")
 	require.NoError(t, err)

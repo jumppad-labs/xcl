@@ -43,10 +43,11 @@ func setupConfig(t *testing.T) (*Config, *parser.TestPlugin, *statemocks.MockSta
 	ss.On("Load").Return(nil, nil)
 	ss.On("Save", mock.Anything).Return(nil)
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithStateStore(ss),
 	)
+	require.NoError(t, err)
 
 	return c, testPlugin, ss
 }

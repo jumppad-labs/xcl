@@ -13,7 +13,8 @@ import (
 
 // TestNewConfig tests that NewConfig creates a valid config with initialized state
 func TestNewConfig(t *testing.T) {
-	c := NewConfig()
+	c, err := NewConfig()
+	require.NoError(t, err)
 	require.NotNil(t, c)
 	require.Equal(t, 0, c.ResourceCount())
 	require.NotNil(t, c.GetResources())
@@ -21,7 +22,8 @@ func TestNewConfig(t *testing.T) {
 
 // TestFindResourceReturnsNotFoundError tests that FindResource returns an error for non-existent resources
 func TestFindResourceReturnsNotFoundError(t *testing.T) {
-	c := NewConfig()
+	c, err := NewConfig()
+	require.NoError(t, err)
 
 	r, err := c.FindResource("resource.container.notexist")
 	require.ErrorIs(t, err, ErrNotFound)
@@ -90,7 +92,8 @@ func testSetupConfig(t *testing.T) (*Config, []any) {
 	types.AppendUniqueDependency(out2, "resource.network.cloud.id")
 	types.AppendUniqueDependency(out2, "resource.container.test_dev")
 
-	c := NewConfig()
+	c, err := NewConfig()
+	require.NoError(t, err)
 	err := c.addResource(net1, nil)
 	require.NoError(t, err)
 
@@ -310,7 +313,8 @@ func TestAppendResourcesMerges(t *testing.T) {
 
 	c, _ := testSetupConfig(t)
 
-	c2 := NewConfig()
+	c2, err := NewConfig()
+	require.NoError(t, err)
 	net1, err := typs.CreateResource(structs.TypeNetwork, "cloud2")
 	require.NoError(t, err)
 	c2.addResource(net1, nil)
@@ -329,7 +333,8 @@ func TestAppendResourcesWhenExistsReturnsError(t *testing.T) {
 
 	c, _ := testSetupConfig(t)
 
-	c2 := NewConfig()
+	c2, err := NewConfig()
+	require.NoError(t, err)
 	net1, err := typs.CreateResource(structs.TypeNetwork, "cloud")
 	require.NoError(t, err)
 	c2.addResource(net1, nil)

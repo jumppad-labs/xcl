@@ -262,7 +262,7 @@ err = r.RegisterType(&Cache{}, "cache")
 // resource is a type like any other: resource "postgres" "main" {}
 err = r.RegisterType(&PostgreSQL{}, "resource", "postgres")
 
-c := xcl.NewConfig(xcl.WithPluginRegistry(r))
+c, err := xcl.NewConfig(xcl.WithPluginRegistry(r))
 err = c.Apply("./config")
 ```
 
@@ -423,12 +423,10 @@ configuration: it destroys everything in the saved state, dependents before
 what they depend on.
 
 ```go
-// keeps state in ./.xcl/state.json, creating the directory and file if needed
-store, err := state.NewFileStateStore("./.xcl")
-
-c := xcl.NewConfig(
+c, err := xcl.NewConfig(
 	xcl.WithPluginRegistry(r),
-	xcl.WithStateStore(store),
+	// keeps state in ./.xcl/state.json, creating the directory and file if needed
+	xcl.WithStatePath("./.xcl"),
 )
 
 err = c.Apply("./config")
@@ -467,7 +465,7 @@ level, lifecycle and loading events at info, failures at error, and filters
 by the slog handler's level:
 
 ```go
-c := xcl.NewConfig(
+c, err := xcl.NewConfig(
 	xcl.WithPluginRegistry(r),
 	xcl.WithEventHandler(events.SlogHandler(slog.Default())),
 )
@@ -495,7 +493,7 @@ are not something to push through every receiver by accident, so you ask for
 them:
 
 ```go
-c := xcl.NewConfig(
+c, err := xcl.NewConfig(
 	xcl.WithEventHandler(handler),
 	xcl.WithEventData(xcl.EventDataProcessed),
 )

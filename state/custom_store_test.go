@@ -65,12 +65,13 @@ func TestCustomStateStoreRoundTripsAnApply(t *testing.T) {
 	reg := testRegistry(t)
 	store := &memoryStore{}
 
-	c := xcl.NewConfig(
+	c, err := xcl.NewConfig(
 		xcl.WithPluginRegistry(reg),
 		xcl.WithStateStore(store),
 	)
+	require.NoError(t, err)
 
-	err := c.Apply(appliedConfig)
+	err = c.Apply(appliedConfig)
 	require.NoError(t, err)
 
 	require.True(t, store.Exists())
@@ -88,12 +89,13 @@ func TestCustomStateStoreIsHandedEntitiesWithBothAxes(t *testing.T) {
 	reg := testRegistry(t)
 	store := &memoryStore{}
 
-	c := xcl.NewConfig(
+	c, err := xcl.NewConfig(
 		xcl.WithPluginRegistry(reg),
 		xcl.WithStateStore(store),
 	)
+	require.NoError(t, err)
 
-	err := c.Apply(appliedConfig)
+	err = c.Apply(appliedConfig)
 	require.NoError(t, err)
 
 	loaded, err := store.Load()
@@ -124,18 +126,20 @@ func TestCustomStateStoreIsReadBackByALaterRun(t *testing.T) {
 	reg := testRegistry(t)
 	store := &memoryStore{}
 
-	first := xcl.NewConfig(
+	first, err := xcl.NewConfig(
 		xcl.WithPluginRegistry(reg),
 		xcl.WithStateStore(store),
 	)
-
-	err := first.Apply(appliedConfig)
 	require.NoError(t, err)
 
-	second := xcl.NewConfig(
+	err = first.Apply(appliedConfig)
+	require.NoError(t, err)
+
+	second, err := xcl.NewConfig(
 		xcl.WithPluginRegistry(reg),
 		xcl.WithStateStore(store),
 	)
+	require.NoError(t, err)
 
 	err = second.Apply(appliedConfig)
 	require.NoError(t, err)

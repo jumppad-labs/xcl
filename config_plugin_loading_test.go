@@ -68,10 +68,11 @@ func setupMissingPluginConfig(t *testing.T) (*Config, *eventRecorder) {
 
 	recorder := &eventRecorder{}
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithEventHandler(recorder.handle),
 	)
+	require.NoError(t, err)
 
 	return c, recorder
 }
@@ -209,10 +210,12 @@ func TestSharedRegistryStartsExternalPluginOnce(t *testing.T) {
 	require.NoError(t, err)
 
 	firstRecorder := &eventRecorder{}
-	first := NewConfig(WithPluginRegistry(pr), WithEventHandler(firstRecorder.handle))
+	first, err := NewConfig(WithPluginRegistry(pr), WithEventHandler(firstRecorder.handle))
+	require.NoError(t, err)
 
 	secondRecorder := &eventRecorder{}
-	second := NewConfig(WithPluginRegistry(pr), WithEventHandler(secondRecorder.handle))
+	second, err := NewConfig(WithPluginRegistry(pr), WithEventHandler(secondRecorder.handle))
+	require.NoError(t, err)
 
 	path := writeConfigFile(t, variableOnlyConfig)
 
@@ -256,7 +259,8 @@ func TestFirstValidateFailsWithClashForPluginType(t *testing.T) {
 	err = pr.RegisterType(&registered.Database{}, "resource", "network")
 	require.NoError(t, err)
 
-	c := NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(WithPluginRegistry(pr))
+	require.NoError(t, err)
 
 	err = c.Validate(writeConfigFile(t, variableOnlyConfig))
 	require.Error(t, err)
@@ -378,7 +382,10 @@ func setupUnloadedPluginConfig(t *testing.T) *Config {
 	err = pr.RegisterPlugin(&serverPlugin{})
 	require.NoError(t, err)
 
-	return NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(WithPluginRegistry(pr))
+	require.NoError(t, err)
+
+	return c
 }
 
 func TestAddressParserIsNotCachedBeforePluginsLoad(t *testing.T) {

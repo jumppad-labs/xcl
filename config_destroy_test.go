@@ -69,7 +69,7 @@ func setupDestroyConfig(t *testing.T, log logger.Logger) *destroyFixture {
 
 	recorder := &eventRecorder{}
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithStateStore(store),
 		WithEventHandler(recorder.handle),
@@ -77,6 +77,7 @@ func setupDestroyConfig(t *testing.T, log logger.Logger) *destroyFixture {
 		// unless a level asks for it
 		WithEventData(EventDataRaw),
 	)
+	require.NoError(t, err)
 
 	return &destroyFixture{
 		config:     c,
@@ -253,7 +254,8 @@ func TestConfigDestroyWithNoStateStoreAndNothingAppliedSucceeds(t *testing.T) {
 	err := pr.RegisterPlugin(testPlugin)
 	require.NoError(t, err)
 
-	c := NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(WithPluginRegistry(pr))
+	require.NoError(t, err)
 
 	err = c.Destroy()
 	require.NoError(t, err)
@@ -431,10 +433,11 @@ func TestConfigDestroyFailsWhenSavedStateHasUnknownType(t *testing.T) {
 	store, err := state.NewFileStateStore(filepath.Dir(f.statePath))
 	require.NoError(t, err)
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(emptyRegistry),
 		WithStateStore(store),
 	)
+	require.NoError(t, err)
 
 	err = c.Destroy()
 	require.Error(t, err)

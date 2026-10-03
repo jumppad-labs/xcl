@@ -144,8 +144,9 @@ func (c *Config) addressParser() *resources.AddressParser {
 
 // NewConfig creates a new Config with functional options
 // If no options are provided, creates a minimal config with only the builtin
-// resource types and no state
-func NewConfig(opts ...ConfigOption) *Config {
+// resource types and no state. The options are applied in order, and the
+// first one to fail stops NewConfig and its error is returned.
+func NewConfig(opts ...ConfigOption) (*Config, error) {
 	c := &Config{
 		entities:  []any{},
 		variables: map[string]any{},
@@ -153,14 +154,16 @@ func NewConfig(opts ...ConfigOption) *Config {
 
 	// Apply all options
 	for _, opt := range opts {
-		opt(c)
+		if err := opt(c); err != nil {
+			return nil, err
+		}
 	}
 
 	if c.pluginRegistry == nil {
 		c.pluginRegistry = registry.NewPluginRegistry()
 	}
 
-	return c
+	return c, nil
 }
 
 // GetResources returns all resources in current state

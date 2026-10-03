@@ -246,11 +246,12 @@ func applyEncodeFixture(t *testing.T, out *bytes.Buffer, level slog.Level) {
 
 	pr := encodeFixtureRegistry(t)
 
-	c := xcl.NewConfig(
+	c, err := xcl.NewConfig(
 		xcl.WithPluginRegistry(pr),
 		xcl.WithEventHandler(prettylog.Handler(out, level, pr)),
 		xcl.WithEventData(xcl.EventDataProcessed),
 	)
+	require.NoError(t, err)
 
 	path, err := filepath.Abs("../../internal/test_fixtures/config/encode/main.xcl")
 	require.NoError(t, err)

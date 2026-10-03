@@ -40,10 +40,11 @@ func setupQueryConfig(t *testing.T) *Config {
 	ss.On("Load").Return(nil, nil)
 	ss.On("Save", mock.Anything).Return(nil)
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithStateStore(ss),
 	)
+	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/query/main.xcl")
 	require.NoError(t, err)

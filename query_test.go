@@ -47,10 +47,11 @@ func setupFindConfig(t *testing.T) *Config {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(reg),
 		WithStateStore(store),
 	)
+	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/registered/basic/main.xcl")
 	require.NoError(t, err)

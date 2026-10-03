@@ -28,7 +28,6 @@ import (
 	"github.com/jumppad-labs/xcl/example/appconfig/resources"
 	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/plugins/registry"
-	"github.com/jumppad-labs/xcl/state"
 )
 
 func main() {
@@ -70,20 +69,19 @@ func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, di
 		return nil, err
 	}
 
-	store, err := state.NewFileStateStore(stateDir)
-	if err != nil {
-		return nil, err
-	}
-
-	c := xcl.NewConfig(
+	c, err := xcl.NewConfig(
 		xcl.WithPluginRegistry(r),
-		xcl.WithStateStore(store),
+		// Keep the state in a file, Destroy works from it alone
+		xcl.WithStatePath(stateDir),
 		xcl.WithEventHandler(handler),
 		// events carry nothing by default, this asks for each resource as
 		// state records it, which is what the receiver turns back into
 		// configuration text
 		xcl.WithEventData(xcl.EventDataProcessed),
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := c.Apply(dir); err != nil {
 		return nil, err

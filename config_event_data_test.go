@@ -36,12 +36,13 @@ func applyEncodeFixtureWithEventData(t *testing.T, level EventDataLevel) (*event
 
 	recorder := &eventRecorder{}
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithStateStore(store),
 		WithEventHandler(recorder.handle),
 		WithEventData(level),
 	)
+	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/encode/main.xcl")
 	require.NoError(t, err)
@@ -72,11 +73,12 @@ func applyEncodeFixtureWithDefaultEventData(t *testing.T) *eventRecorder {
 
 	recorder := &eventRecorder{}
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithStateStore(store),
 		WithEventHandler(recorder.handle),
 	)
+	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/encode/main.xcl")
 	require.NoError(t, err)

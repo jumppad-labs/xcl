@@ -71,11 +71,12 @@ func applyQueryFixtureWithEventData(t *testing.T, level EventDataLevel) *eventRe
 
 	recorder := &eventRecorder{}
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithEventHandler(recorder.handle),
 		WithEventData(level),
 	)
+	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/query/main.xcl")
 	require.NoError(t, err)
@@ -154,10 +155,11 @@ func TestValidateCallsEventHandlerWhenResourceIsParsed(t *testing.T) {
 
 	recorder := &eventRecorder{}
 
-	c := NewConfig(
+	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithEventHandler(recorder.handle),
 	)
+	require.NoError(t, err)
 
 	file, err := filepath.Abs("./internal/test_fixtures/config/query/main.xcl")
 	require.NoError(t, err)
