@@ -1,5 +1,15 @@
 # Changelog
 
+## 20261003081552-e1e07cbe-config-decode
+
+A configuration can fill a struct of your own in one call, `c.Decode(&cfg)` or `xcl.Decode(c, &cfg)`, so an application gathers what a configuration declares without a lookup per block type, and reading a new block type needs only a new field. Fields are matched by their type alone, with no struct tags: a `[]*T` field, `T` a registered type, receives every entity of `T` exactly as `xcl.All[T]` returns them, in the order they were written, disabled entities included and as the configuration's own instances; a `*T` field receives the one entity of `T`, is `nil` when none is declared, and makes the call fail with the error `xcl.FindOne` returns, matching `xcl.ErrNotUnique`, when more than one is. Every other field keeps its value, and nested structs are not entered. `Decode` is not generic, so its method form works on every supported Go version.
+
+A target that is not a non-nil pointer to a struct returns the new `xcl.ErrInvalidDecodeTarget`, whose `*xcl.InvalidDecodeTargetError` detail names what was passed. On any error nothing is assigned. Before `Apply` the call succeeds with empty slices and `nil` pointers.
+
+Entities now come back from every lookup, from `c.Entities()` and in saved state in the order they were written. Before, the order was unspecified and could change from one run to the next.
+
+The configuration-only example gathers its blocks into one application struct with `Decode`. There are no breaking changes.
+
 ## 20260922132517-hcl-encoding-helpers
 
 An entity can be turned back into configuration text in xcl's own syntax. `xcl.EncodeEntity(entity, options...)` converts one entity you hold, such as one returned by `Find` after an `Apply`, and `xcl.EncodeSavedEntity(registry, data, options...)` converts one entity's saved data, in the form state stores it and events carry it at `EventDataProcessed`. Both return the text of exactly one block, formatted and ready to print or write to a `.xcl` file, and both produce identical text for the same entity. The block is written the way a person writes it: `resource "<variety>" "<name>"` for a resource-kind entity and `<type> "<name>"` for one declared by its own keyword, with configuration names rather than Go field names, and nested and repeated blocks as blocks.

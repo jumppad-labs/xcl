@@ -544,14 +544,15 @@ var methodFormLookups = []string{"Find", "FindByType", "FindOne", "All"}
 // entities up through the package level functions rather than the generic
 // methods of the same name. Generic methods arrived in Go 1.27, so the method
 // form would stop the code a reader copies from compiling on the project's
-// minimum supported version. Entities, EntityCount and Outputs are ordinary
-// methods and are not affected
+// minimum supported version. Entities, EntityCount, Outputs and Decode are
+// ordinary methods and are not affected
 func TestConfigOnlyExampleUsesPortableLookupForm(t *testing.T) {
 	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
 	require.NoError(t, err)
 
-	lookups := 0
-
+	// the example legitimately makes no generic lookups now that it assembles
+	// its configuration with Decode, so finding none here is expected. The
+	// guard still fails should a method form lookup be added later
 	ast.Inspect(file, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
@@ -584,12 +585,80 @@ func TestConfigOnlyExampleUsesPortableLookupForm(t *testing.T) {
 		require.Equal(t, "xcl", qualifier.Name,
 			"main.go calls the %s method form, which needs Go 1.27, call xcl.%s instead", selector.Sel.Name, selector.Sel.Name)
 
-		lookups++
+		return true
+	})
+}
+
+// TestConfigOnlyExampleAssemblesItsConfigurationWithDecode asserts the example
+// fills its application struct with exactly one Decode call, rather than
+// gathering the configuration a piece at a time
+func TestConfigOnlyExampleAssemblesItsConfigurationWithDecode(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
+	require.NoError(t, err)
+
+	decodes := 0
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		if selector.Sel.Name == "Decode" {
+			decodes++
+		}
 
 		return true
 	})
 
-	require.NotZero(t, lookups, "the guard found no lookups in main.go, so it proves nothing")
+	require.Equal(t, 1, decodes, "main.go should assemble its configuration with exactly one Decode call")
+}
+
+// TestConfigOnlyExampleMakesNoPerTypeLookups asserts the example assembles its
+// configuration without looking any block type up on its own, in either the
+// package level or the method form. Decode gathers every type the example
+// reads, so a per-type lookup means the example has gone back to assembling
+// its configuration a type at a time
+func TestConfigOnlyExampleMakesNoPerTypeLookups(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
+	require.NoError(t, err)
+
+	lookups := []string{}
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+
+		// a lookup names its type at the call, xcl.Find[T](c, address), so the
+		// function called is the selector wrapped in an index expression
+		fun := call.Fun
+		switch indexed := fun.(type) {
+		case *ast.IndexExpr:
+			fun = indexed.X
+		case *ast.IndexListExpr:
+			fun = indexed.X
+		}
+
+		selector, ok := fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		if slices.Contains(methodFormLookups, selector.Sel.Name) {
+			lookups = append(lookups, selector.Sel.Name)
+		}
+
+		return true
+	})
+
+	require.Empty(t, lookups, "main.go looks block types up one at a time, assemble the configuration with Decode instead")
 }
 
 // capturedOutput is what was written to the process's standard output and

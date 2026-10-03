@@ -47,6 +47,22 @@ type parsed struct {
 	// until the stack is exhausted, which is a crash rather than a reportable
 	// problem.
 	moduleSources map[string]bool
+
+	// order holds each FQRN in the order it was first parsed. The maps above
+	// iterate in no fixed order, so this is what keeps the entities a parse
+	// produces in declaration order.
+	order []string
+}
+
+// store records a parsed resource and its body, keeping the order in which
+// resources were first declared.
+func (p *parsed) store(id string, body *hclsyntax.Body, resource any) {
+	if _, seen := p.resources[id]; !seen {
+		p.order = append(p.order, id)
+	}
+
+	p.bodies[id] = body
+	p.resources[id] = resource
 }
 
 type ParserOptions struct {
@@ -526,9 +542,9 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 		return nil, nil, ce
 	}
 
-	// Move parsed resources into currentState
-	for _, resource := range p.parsedResources.resources {
-		if err := currentState.AppendResource(resource); err != nil {
+	// Move parsed resources into currentState, in declaration order
+	for _, id := range p.parsedResources.order {
+		if err := currentState.AppendResource(p.parsedResources.resources[id]); err != nil {
 			return nil, nil, fmt.Errorf("failed to add resource to state: %w", err)
 		}
 	}
@@ -882,8 +898,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 	//}
 
 	// add the resource to the cache
-	p.parsedResources.bodies[rtMeta.ID] = b.Body
-	p.parsedResources.resources[rtMeta.ID] = rt
+	p.parsedResources.store(rtMeta.ID, b.Body, rt)
 
 	return nil
 }
@@ -975,8 +990,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 	}
 
 	// add the module to the cache
-	p.parsedResources.bodies[rtMeta.ID] = b.Body
-	p.parsedResources.resources[rtMeta.ID] = rt
+	p.parsedResources.store(rtMeta.ID, b.Body, rt)
 
 	// Resolve the module's source as a local directory relative to the file
 	// that declared it, and recurse into that directory's .xcl files, scoping

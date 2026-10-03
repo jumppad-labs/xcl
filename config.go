@@ -29,7 +29,8 @@ var ErrEmptyConfiguration = parser.ErrEmptyConfiguration
 // needs no import named errors beside the standard library's.
 //
 // ErrNotFound and ErrNotUnique are ordinary outcomes to handle. The other five
-// mean the question itself had no answer.
+// mean the question itself had no answer, and ErrInvalidDecodeTarget means
+// Decode was given nothing it could fill.
 var (
 	// ErrNotFound means no entity is declared at the address given. It is
 	// distinct from plugins.ErrNotFound, which means the real infrastructure
@@ -57,6 +58,10 @@ var (
 	// ErrNotUnique means a query expecting exactly one entity matched more
 	// than one. The detail reports how many.
 	ErrNotUnique = xclerrors.ErrNotUnique
+
+	// ErrInvalidDecodeTarget means Decode was not given a non-nil pointer to a
+	// struct, so there was nothing it could fill.
+	ErrInvalidDecodeTarget = xclerrors.ErrInvalidDecodeTarget
 )
 
 // ErrPluginLoad is returned by the first Validate, Apply or Destroy when a
@@ -97,6 +102,8 @@ type (
 	NotAnEntityError   = xclerrors.NotAnEntityError
 	NotUniqueError     = xclerrors.NotUniqueError
 	PluginLoadError    = xclerrors.PluginLoadError
+
+	InvalidDecodeTargetError = xclerrors.InvalidDecodeTargetError
 
 	UnregisteredTypeError = xclerrors.UnregisteredTypeError
 	InvalidSavedDataError = xclerrors.InvalidSavedDataError

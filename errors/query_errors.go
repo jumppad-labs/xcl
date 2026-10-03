@@ -19,7 +19,8 @@ import (
 // package unaliased in their own code.
 //
 // ErrNotFound and ErrNotUnique are ordinary outcomes a caller handles. The
-// other five mean the question itself had no answer, which is a caller bug.
+// other five mean the question itself had no answer, and ErrInvalidDecodeTarget
+// means Decode was given nothing it could fill, each of which is a caller bug.
 var (
 	// ErrNotFound is returned when no entity is declared at the address given.
 	// It is distinct from plugins.ErrNotFound, which means the real
@@ -53,6 +54,10 @@ var (
 	// ErrNotUnique is returned when a query expecting exactly one entity
 	// matched more than one. The detail reports how many.
 	ErrNotUnique = errors.New("more than one entity matched")
+
+	// ErrInvalidDecodeTarget is returned by Decode when the target is not a
+	// non-nil pointer to a struct. Match it with errors.Is.
+	ErrInvalidDecodeTarget = errors.New("decode target must be a non-nil pointer to a struct")
 )
 
 // NotFoundError reports the address that matched nothing.
@@ -157,6 +162,28 @@ func (e *NotUniqueError) Error() string {
 }
 
 func (e *NotUniqueError) Unwrap() error { return ErrNotUnique }
+
+// InvalidDecodeTargetError reports what was passed to Decode in place of a
+// non-nil pointer to a struct. Type is nil when nothing was passed at all, and
+// Nil is set when the target was a pointer holding nil.
+type InvalidDecodeTargetError struct {
+	Type reflect.Type
+	Nil  bool
+}
+
+func (e *InvalidDecodeTargetError) Error() string {
+	if e.Type == nil {
+		return fmt.Sprintf("%s, got nil", ErrInvalidDecodeTarget)
+	}
+
+	if e.Nil {
+		return fmt.Sprintf("%s, got nil %s", ErrInvalidDecodeTarget, e.Type)
+	}
+
+	return fmt.Sprintf("%s, got %s", ErrInvalidDecodeTarget, e.Type)
+}
+
+func (e *InvalidDecodeTargetError) Unwrap() error { return ErrInvalidDecodeTarget }
 
 // typeName renders a Go type for an error message, tolerating a nil type and
 // the anonymous structs that reflection built plugin resources are.

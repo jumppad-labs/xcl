@@ -66,19 +66,31 @@ func find[T any](c *Config, address string) (*T, error) {
 // and zeroes absent ones, so without that refusal converting one entity into
 // an unrelated type would quietly yield a value with most of its fields unset.
 func As[T any](entity any) (*T, error) {
-	if entity == nil {
-		return nil, &xclerrors.TypeMismatchError{Want: reflect.TypeFor[T](), Got: "nothing"}
-	}
-
-	if typed, ok := entity.(*T); ok {
-		return typed, nil
-	}
-
-	if err := convertible[T](entity); err != nil {
+	typed, err := asType(entity, reflect.TypeFor[T]())
+	if err != nil {
 		return nil, err
 	}
 
-	typed := new(T)
+	return typed.(*T), nil
+}
+
+// asType is the conversion behind As, written over a runtime type so a caller
+// that only learns the type it wants by reflection converts an entity by
+// exactly the same rule. On success the result is always a pointer to want.
+func asType(entity any, want reflect.Type) (any, error) {
+	if entity == nil {
+		return nil, &xclerrors.TypeMismatchError{Want: want, Got: "nothing"}
+	}
+
+	if reflect.TypeOf(entity) == reflect.PointerTo(want) {
+		return entity, nil
+	}
+
+	if err := convertibleTo(entity, want); err != nil {
+		return nil, err
+	}
+
+	typed := reflect.New(want).Interface()
 	if err := schema.UnmarshalUntyped(entity, typed); err != nil {
 		// the copy is the last word on whether the entity can be a T, so a
 		// failure here is a type mismatch like any other and is reported as
@@ -86,7 +98,7 @@ func As[T any](entity any) (*T, error) {
 		// detail, but it is not what they have to match on
 		return nil, fmt.Errorf("%w: %w", &xclerrors.TypeMismatchError{
 			Address: entityAddress(entity),
-			Want:    reflect.TypeFor[T](),
+			Want:    want,
 			Got:     describeType(entity),
 		}, err)
 	}
@@ -94,15 +106,13 @@ func As[T any](entity any) (*T, error) {
 	return typed, nil
 }
 
-// convertible refuses a conversion the entity's own Go type rules out.
+// convertibleTo refuses a conversion the entity's own Go type rules out.
 //
 // A named struct is its own type and nothing else: a Database is not a
 // Container, whatever their fields look like. An entity built by reflection
 // from a plugin schema is an anonymous struct with no name to compare, so it
 // is left to the copy, which is the only way to reach those types at all.
-func convertible[T any](entity any) error {
-	want := reflect.TypeFor[T]()
-
+func convertibleTo(entity any, want reflect.Type) error {
 	et := reflect.TypeOf(entity)
 	for et != nil && et.Kind() == reflect.Ptr {
 		et = et.Elem()
@@ -177,7 +187,25 @@ func FindOne[T any](c *Config, path ...string) (*T, error) {
 }
 
 func findByType[T any](c *Config, path ...string) ([]*T, error) {
-	if err := addressable[T](); err != nil {
+	found, err := c.entitiesOf(reflect.TypeFor[T](), path...)
+	if err != nil {
+		return nil, err
+	}
+
+	typed := make([]*T, 0, len(found))
+	for _, e := range found {
+		typed = append(typed, e.(*T))
+	}
+
+	return typed, nil
+}
+
+// entitiesOf is the kind scan behind FindByType, written over a runtime type
+// so every caller, typed or reflective, matches entities by the same rule.
+// Each result is a pointer to want, and nothing matching gives an empty,
+// non-nil result.
+func (c *Config) entitiesOf(want reflect.Type, path ...string) ([]any, error) {
+	if err := addressableType(want); err != nil {
 		return nil, err
 	}
 
@@ -189,7 +217,7 @@ func findByType[T any](c *Config, path ...string) ([]*T, error) {
 		return nil, err
 	}
 
-	found := []*T{}
+	found := []any{}
 
 	for _, e := range c.Entities() {
 		meta, err := types.GetMeta(e)
@@ -205,7 +233,7 @@ func findByType[T any](c *Config, path ...string) ([]*T, error) {
 			continue
 		}
 
-		typed, err := As[T](e)
+		typed, err := asType(e, want)
 		if err != nil {
 			return nil, err
 		}
@@ -217,18 +245,34 @@ func findByType[T any](c *Config, path ...string) ([]*T, error) {
 }
 
 func findOne[T any](c *Config, path ...string) (*T, error) {
-	found, err := findByType[T](c, path...)
+	found, err := c.entitiesOf(reflect.TypeFor[T](), path...)
 	if err != nil {
 		return nil, err
 	}
 
-	switch len(found) {
-	case 1:
-		return found[0], nil
-	case 0:
+	one, ok, err := oneOf(found, path)
+	if err != nil {
+		return nil, err
+	}
+
+	if !ok {
 		return nil, &xclerrors.NotFoundError{Address: strings.Join(path, ".")}
+	}
+
+	return one.(*T), nil
+}
+
+// oneOf picks the single entity out of a scan's results, reporting whether
+// there was one at all. More than one is an error naming the query and how
+// many matched, the same error whoever asked.
+func oneOf(found []any, path []string) (any, bool, error) {
+	switch len(found) {
+	case 0:
+		return nil, false, nil
+	case 1:
+		return found[0], true, nil
 	default:
-		return nil, &xclerrors.NotUniqueError{Segments: path, Count: len(found)}
+		return nil, false, &xclerrors.NotUniqueError{Segments: path, Count: len(found)}
 	}
 }
 
@@ -278,15 +322,14 @@ func (c *Config) typeable(path []string) error {
 	return nil
 }
 
-// addressable refuses a query for a type that has no address of its own,
+// addressableType refuses a query for a type that has no address of its own,
 // because it is a block nested inside another declaration rather than a
 // declaration in its own right. Answering such a query with an empty result
 // would read as "you declared none of those", which is not what is true.
-func addressable[T any]() error {
-	var zero T
-	if _, err := types.GetMeta(&zero); err != nil {
+func addressableType(want reflect.Type) error {
+	if _, err := types.GetMeta(reflect.New(want).Interface()); err != nil {
 		return &xclerrors.NotAnEntityError{
-			Type:           reflect.TypeFor[T](),
+			Type:           want,
 			ReachedThrough: "declaration",
 		}
 	}
@@ -310,20 +353,32 @@ func All[T any](c *Config) ([]*T, error) {
 }
 
 func all[T any](c *Config) ([]*T, error) {
-	if err := addressable[T](); err != nil {
+	path, err := c.typePath(reflect.TypeFor[T]())
+	if err != nil {
 		return nil, err
-	}
-
-	if c.pluginRegistry == nil {
-		return nil, &xclerrors.NotRegisteredError{Type: reflect.TypeFor[T](), Use: "FindByType with the type and subtype"}
-	}
-
-	path, ok := c.pluginRegistry.TypePath(reflect.TypeFor[T]())
-	if !ok {
-		return nil, &xclerrors.NotRegisteredError{Type: reflect.TypeFor[T](), Use: "FindByType with the type and subtype"}
 	}
 
 	// deliberately goes through the kind lookup rather than scanning again, so
 	// the two cannot disagree about what a type matches
 	return findByType[T](c, path...)
+}
+
+// typePath works out the address segments a Go type is declared under from
+// how it was registered, refusing a type with no address of its own and one
+// the registry cannot reach, such as a plugin provided type.
+func (c *Config) typePath(want reflect.Type) ([]string, error) {
+	if err := addressableType(want); err != nil {
+		return nil, err
+	}
+
+	if c.pluginRegistry == nil {
+		return nil, &xclerrors.NotRegisteredError{Type: want, Use: "FindByType with the type and subtype"}
+	}
+
+	path, ok := c.pluginRegistry.TypePath(want)
+	if !ok {
+		return nil, &xclerrors.NotRegisteredError{Type: want, Use: "FindByType with the type and subtype"}
+	}
+
+	return path, nil
 }

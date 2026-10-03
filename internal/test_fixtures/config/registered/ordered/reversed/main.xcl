@@ -1,0 +1,9 @@
+# The same two caches as the forward fixture, declared the other way round, so
+# a lookup that keeps declaration order yields second then first.
+cache "second" {
+  location = "eu-west"
+}
+
+cache "first" {
+  location = "us-east"
+}

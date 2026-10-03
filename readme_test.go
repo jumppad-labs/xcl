@@ -78,3 +78,29 @@ func TestChangelogRecordsTheEventDataBreakingChange(t *testing.T) {
 
 	require.Contains(t, breaking, "Event.Data")
 }
+
+func TestReadmeDocumentsDecode(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "#### Filling a struct of your own")
+	require.Contains(t, text, ".Decode(&")
+	require.Contains(t, text, "ErrInvalidDecodeTarget")
+}
+
+// Decode is not generic, so unlike the query functions its method form works
+// on every supported Go version
+func TestReadmeSaysDecodeWorksAsAMethodOnEveryVersion(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "`Decode` is the exception to the rule")
+}
+
+func TestChangelogRecordsDecode(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	entry := string(data)
+	require.Contains(t, entry, "## 20261003081552-e1e07cbe-config-decode")
+	require.Contains(t, entry, "xcl.Decode(")
+	require.Contains(t, entry, "ErrInvalidDecodeTarget")
+}

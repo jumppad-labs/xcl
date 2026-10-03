@@ -66,6 +66,7 @@ func TestReExportedSentinelsAreTheSameValuesAsTheErrorsPackage(t *testing.T) {
 	require.Same(t, xclerrors.ErrTypeMismatch, ErrTypeMismatch)
 	require.Same(t, xclerrors.ErrNotAnEntity, ErrNotAnEntity)
 	require.Same(t, xclerrors.ErrNotUnique, ErrNotUnique)
+	require.Same(t, xclerrors.ErrInvalidDecodeTarget, ErrInvalidDecodeTarget)
 }
 
 func TestReExportedDetailTypesMatchTheReExportedSentinels(t *testing.T) {
@@ -76,6 +77,7 @@ func TestReExportedDetailTypesMatchTheReExportedSentinels(t *testing.T) {
 	require.ErrorIs(t, &TypeMismatchError{Address: "a"}, ErrTypeMismatch)
 	require.ErrorIs(t, &NotAnEntityError{}, ErrNotAnEntity)
 	require.ErrorIs(t, &NotUniqueError{Count: 2}, ErrNotUnique)
+	require.ErrorIs(t, &InvalidDecodeTargetError{}, ErrInvalidDecodeTarget)
 }
 
 func TestReExportedDetailTypesAreRecoverableThroughAWrap(t *testing.T) {

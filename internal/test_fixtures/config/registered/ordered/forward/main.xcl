@@ -1,0 +1,9 @@
+# cache is registered in the bare form. first is declared before second, so a
+# lookup that keeps declaration order yields first then second.
+cache "first" {
+  location = "us-east"
+}
+
+cache "second" {
+  location = "eu-west"
+}

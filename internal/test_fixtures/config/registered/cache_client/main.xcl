@@ -1,0 +1,20 @@
+# cache is registered in the bare form and cache_client alongside it. Each
+# nested block of the client references a whole cache rather than one of its
+# fields, primary into a pointer field and mirror into a value field.
+cache "east" {
+  location = "us-east"
+}
+
+cache "west" {
+  location = "eu-west"
+}
+
+cache_client "app" {
+  primary {
+    cache = cache.east
+  }
+
+  mirror {
+    cache = cache.west
+  }
+}

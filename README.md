@@ -118,6 +118,22 @@ resource "deployment" "api" {
 }
 ```
 
+After `Apply`, the program gathers every block it reads into one struct of its
+own with a single call, rather than looking each type up separately (see
+[Filling a struct of your own](#filling-a-struct-of-your-own)):
+
+```go
+type appConfig struct {
+	ConfigMaps  []*resources.ConfigMap
+	Deployments []*resources.Deployment
+	Service     *resources.Service
+	Ingress     *resources.Ingress
+}
+
+var cfg appConfig
+err := c.Decode(&cfg)
+```
+
 ### Plugins
 
 [`example/plugin`](./example/plugin) applies its configuration
@@ -346,6 +362,76 @@ container, err := xcl.As[Container](entity)
 A registered type is returned as the value held in state, so changing it
 changes state. A plugin type is returned as a copy.
 
+#### Filling a struct of your own
+
+An application usually wants its configuration gathered into one structure it
+can pass around. `Decode` fills a struct of your own from the entities a
+configuration declares, in one call, so reading a new block type needs only a
+new field. Given this configuration, with `Server` and `Mount` registered as
+`server` and `mount`:
+
+```hcl
+server "vault_current" {
+  location = "http://localhost:8200"
+  type     = "current"
+}
+
+server "vault_arc" {
+  location = "http://localhost:9100"
+  type     = "arc"
+}
+
+mount "secrets_classic_v1" {
+  path = "secrets/kv1"
+  type = "kv1"
+
+  classic {
+    server     = server.vault_current
+    mount_path = "v1/secrets"
+  }
+}
+```
+
+one call fills the application's struct:
+
+```go
+type Config struct {
+	Servers     []*Server // every server block
+	MountPoints []*Mount  // every mount block
+	Name        string    // the application's own, left as it is
+}
+
+var cfg Config
+if err := c.Decode(&cfg); err != nil {
+	return err
+}
+
+// cfg.Servers holds vault_current then vault_arc, cfg.MountPoints holds
+// secrets_classic_v1, its classic block holding the referenced server
+```
+
+Each exported field is matched by its type alone. No struct tags are read, and
+field names play no part:
+
+- A `[]*T` field, where `T` is a registered type, receives every entity of
+  `T`, exactly as `xcl.All[T]` returns them: in the order they were written,
+  disabled entities included, and as the configuration's own instances rather
+  than copies. None declared gives an empty slice.
+- A `*T` field, where `T` is a registered type, receives the one entity of
+  `T`, and is set to `nil` when none is declared. When more than one is
+  declared the call fails with the error `xcl.FindOne` returns for the same
+  type, matching `xcl.ErrNotUnique`. A `Primary *Server` field would do that
+  against the configuration above, which declares two servers.
+- Every other field keeps its value: plain values, structs, and a `[]*T` or
+  `*T` whose `T` is not registered or is provided by a plugin, which has no Go
+  type to match. Nested structs are not entered.
+
+A target that is not a non-nil pointer to a struct returns an error matching
+`xcl.ErrInvalidDecodeTarget`, whose `*xcl.InvalidDecodeTargetError` detail
+names what was passed. On any error no field is assigned, so the struct is
+never left partly filled. Before `Apply` the call succeeds, leaving every
+slice empty and every pointer `nil`.
+
 #### Reading values a configuration publishes
 
 An `output` is read by its address like anything else, and comes back as the
@@ -392,7 +478,9 @@ if errors.As(err, &many) {
 The full vocabulary is `ErrNotFound`, `ErrUnknownType`, `ErrNotTypeable`,
 `ErrNotRegistered`, `ErrTypeMismatch`, `ErrNotAnEntity` and `ErrNotUnique`.
 `ErrNotFound` and `ErrNotUnique` are ordinary outcomes to handle; the other
-five mean the question itself had no answer. Errors returned from `Apply` and
+five mean the question itself had no answer. `Decode` adds one more,
+`ErrInvalidDecodeTarget` (`*xcl.InvalidDecodeTargetError`), for a target it
+cannot fill. Errors returned from `Apply` and
 `Destroy` are matchable the same way, so `errors.Is` reaches a failure nested
 inside them without unwrapping anything by hand.
 
@@ -411,6 +499,11 @@ and cannot differ; tests assert they return equal values and equal errors.
 
 `As` is a function in both worlds, because it takes no configuration for a
 method to hang off.
+
+`Decode` is the exception to the rule. It is not generic, so `c.Decode(&cfg)`
+and `xcl.Decode(c, &cfg)` are both available on Go 1.25, and the examples use
+the method form for it. The two spellings delegate to one implementation, as
+the lookups do.
 
 Lookups are linear scans over the configuration's entities. There is no index,
 which is adequate at one configuration's scale; see `docs/state.md`.

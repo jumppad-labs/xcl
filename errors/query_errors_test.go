@@ -207,6 +207,66 @@ func TestNotUniqueErrorDetailReportsHowManyMatchedThroughAWrap(t *testing.T) {
 	require.Equal(t, 3, detail.Count)
 }
 
+// Decode target. Decode reports a target it cannot fill with its own sentinel,
+// kept apart from the seven lookup failures above: a caller handing Decode the
+// wrong thing has made a different mistake from one asking a question with no
+// answer, and must be able to tell which by identity alone.
+
+func TestInvalidDecodeTargetErrorUnwrapsToItsSentinel(t *testing.T) {
+	err := &InvalidDecodeTargetError{Type: reflect.TypeFor[queryErrorFixture]()}
+
+	require.ErrorIs(t, err, ErrInvalidDecodeTarget)
+
+	require.NotErrorIs(t, err, ErrNotFound)
+	require.NotErrorIs(t, err, ErrUnknownType)
+	require.NotErrorIs(t, err, ErrNotTypeable)
+	require.NotErrorIs(t, err, ErrNotRegistered)
+	require.NotErrorIs(t, err, ErrTypeMismatch)
+	require.NotErrorIs(t, err, ErrNotAnEntity)
+	require.NotErrorIs(t, err, ErrNotUnique)
+}
+
+func TestInvalidDecodeTargetErrorDetailIsRecoverableThroughAWrap(t *testing.T) {
+	wrapped := fmt.Errorf("decoding configuration: %w", &InvalidDecodeTargetError{
+		Type: reflect.TypeFor[queryErrorFixture](),
+	})
+
+	var detail *InvalidDecodeTargetError
+	require.True(t, errors.As(wrapped, &detail))
+	require.Equal(t, reflect.TypeFor[queryErrorFixture](), detail.Type)
+	require.False(t, detail.Nil)
+}
+
+// The three tests below pin the message, one per shape of mistake. Each says
+// what Decode expected and then what it was actually given, so a caller reading
+// the output can fix the call without looking anything up.
+
+func TestInvalidDecodeTargetErrorNamesTheTypePassed(t *testing.T) {
+	err := &InvalidDecodeTargetError{Type: reflect.TypeFor[queryErrorFixture]()}
+
+	require.Equal(
+		t,
+		"decode target must be a non-nil pointer to a struct, got errors.queryErrorFixture",
+		err.Error(),
+	)
+}
+
+func TestInvalidDecodeTargetErrorSaysNothingWasPassed(t *testing.T) {
+	err := &InvalidDecodeTargetError{}
+
+	require.Equal(t, "decode target must be a non-nil pointer to a struct, got nil", err.Error())
+}
+
+func TestInvalidDecodeTargetErrorNamesATypedNilPointer(t *testing.T) {
+	err := &InvalidDecodeTargetError{Type: reflect.TypeFor[*queryErrorFixture](), Nil: true}
+
+	require.Equal(
+		t,
+		"decode target must be a non-nil pointer to a struct, got nil *errors.queryErrorFixture",
+		err.Error(),
+	)
+}
+
 // Traversal. ConfigError is what Apply and Destroy return, and a consumer meets
 // a query failure through it, usually with a ParserError in between.
 

@@ -1,120 +1,149 @@
-# Working context: spec for 20260923095659-references-and-secrets
+# Working context: 20261003081552-e1e07cbe-config-decode
 
-## Status
-- Spec workflow started 2026-09-23. Name chosen by the user: `references-and-secrets`.
-- Step: interview done → overview. Synthesis is in
-  `.spektacular/work/20260923095659-references-and-secrets/interview.md`; draft every section from it.
+## Problem
 
-## User decisions from the interview (2026-09-23) — all binding
-1. **Link resolution stays ON by default**, references are the opt-in. Reason in the user's words:
-   the resolved value "visibly shows me the result of the config".
-2. **Field→reference provenance is recorded in saved state**, so both entry points can write
-   references and keep producing identical text. This **deliberately lifts** the previous spec's
-   "the stored format must not change" constraint.
-3. **No backwards compatibility required** — user's words: "We don't need to worry about backwards
-   compatibility." Old state files do not have to load. Removes any migration requirement.
-4. **Secrets are marked with an `xcl:"...,sensitive"` tag option**, a third alongside `computed` and
-   `key`. Verified: nothing like it exists in the codebase today.
-5. **Sensitive values are masked by default**, revealing is the opt-in, so a newly tagged field is
-   protected immediately.
-6. **Secret scope is display output only** — user's words: "this is just for log output right now."
-7. **Docs**: update the existing `/configuration-text/` guide and the `/events/` page. No new pages.
+The user wants to "clean up the config a little": parse HCL like this
 
-## Follow-up the user wants as its OWN spec (do not fold in)
-**Encrypted state.** Raised unprompted: "I am wondering if we should add encrypted state, I am
-thinking we should but add it as a separate spec." Offer to start it once this spec is finished.
-Related known gap to mention there: `Event.Data` at raw/processed carries the whole resource as
-JSON, secrets included, and that path is deliberately unchanged by this spec.
+```hcl
+server "vault_current" { location = "http://localhost:8200"  type = "current" }
+server "vault_arc"     { location = "http://localhost:9100"  type = "arc" }
 
-## Where this came from
-All three items were found while implementing `20260922132517-hcl-encoding-helpers`, which added
-`xcl.EncodeEntity` / `xcl.EncodeSavedEntity`. Two were deferred out of that plan **by the user's
-explicit decision**, and recorded in its Out of Scope; the third was already Out of Scope there.
-That plan's `## Changelog` section holds the full findings if more detail is needed.
-
-## The three items
-
-### 1. Resolve links — write the reference, not the value it resolved to
-The encoder writes every reference as the literal value it resolved to. A field written as
-`networkobj = resource.network.onprem` comes back as a dumped object.
-
-**The user's framing, in their words:** they want the value visible because it "visibly shows me the
-result of the config", but "augmented with a link if it came from interpolation". They proposed a
-**resolve-links flag**: with it on, `networkobj = { ... }`; with it off,
-`networkobj = resource.blah`. They also noted the scenario "might not be a computed block — the
-scenario I was describing was something that the user could author".
-
-**Blocker, verified in code:** `getDependentResources` (`internal/parser/parser.go:1119-1132`)
-collects references per attribute but flattens them into one `[]string` and discards `a.Name`:
-
-```go
-for _, a := range b.Body.Attributes {
-    refs, err := processExpr(a.Expr)
-    references = append(references, refs...)   // a.Name is thrown away
+mount "secrets_classic_v1" {
+  path = "secrets/kv1"
+  type = "kv1"
+  classic { server = server.vault_current  mount_path = "v1/secrets" }
+  arc     { server = server.vault_arc      store_id   = env("ARC_SECRET_STORE_ID") }
 }
 ```
 
-So `Meta.Links` records *what* was referenced, never *which field* referenced it. The parser must
-record field→reference provenance before any of this is possible.
+directly into an application struct
 
-**Constraint carried over:** the previous spec required the stored state format not change, and
-`EncodeSavedEntity` works from a state record. If references must survive into saved data, that
-touches the stored format. Restricting references to `EncodeEntity` only avoids that but breaks the
-"both entry points give identical text" guarantee the last feature established and tested. **This
-tension is unresolved and needs a decision in this spec.**
+```go
+type Config struct {
+    Servers     []*Server
+    MountPoints []*Mount
+}
+```
 
-### 2. DependsOn / Links — stop overwriting a user-set property with computed data
-**The user considers this a design mistake, in their words:** "I did not realize we used the public
-property to store the privately computed links. I honestly feel this is a mistake and that we should
-never overwrite a user set property in the backend. We should probably use a different private
-property which merges in the depends_on values. Originally I think we did have one."
+instead of calling `All[Server]` / `All[Mount]` and assembling it by hand.
+User's words: "I was kind of thinking could I do something like
+c.ParseInto(&Config{}) or something, I don't really like the ParseInto".
 
-That private property already exists: **`Meta.Links`**. `types.AppendUniqueDependency`
-(`types/resource_helpers.go:89-108`) mirrors it into the public `DependsOn` under a comment reading
-`// Also update DependsOn for backwards compatibility`.
+## Decisions (user-confirmed via question dialog)
 
-**It is NOT vestigial.** `dag.go:62-74` copies every `Links` entry into `DependsOn` via
-`AppendUniqueDependency`, then reads `DependsOn` back through `getResourceDependencies` to build the
-graph. So the mirror is the DAG's transport and cannot simply be deleted.
+- Name: `c.Decode(&cfg)` (recommended option chosen); package-level
+  `xcl.Decode(c, &cfg)` proposed for symmetry with `Find` (method form only on
+  Go 1.27+ for generic methods — but Decode is not generic, so a plain method
+  works on every version).
+- Exported fields whose type is not a registered type: left untouched.
+- Single `*T` field: FindOne semantics — exactly one → set, none → nil, more
+  than one → error wrapping ErrNotUnique.
+- `[]*T` field (T registered): receives what `All[T]` returns.
+- User chose to capture as a spec before implementing.
+- Earlier in session: NewConfig now returns (*Config, error); WithStatePath added.
 
-**The contained fix:** point `getResourceDependencies` (`internal/parser/util.go:506`) at
-`Meta.Links`, then drop both the `dag.go` copy loop and the mirror write. `Links` already holds
-user-authored entries (`parser.go:1105`), so nothing is lost. Everything else load-bearing already
-reads `Links` (`validate.go:71,116`, `context.go:38`, `parser.go:1170`). `DependsOn`'s only other
-readers are `logger/pretty_printer.go` and `encode.go`.
+## Facts from code exploration
 
-**Risk:** it changes DAG construction, which orders create and destroy. Needs its own tests.
+- No existing aggregate decode API. Closest: `All[T]` (query.go:308) uses
+  `pluginRegistry.TypePath(reflect.Type)` then `findByType`.
+- Query results are the config's own instances (As returns stored *T as-is),
+  in declaration order in practice (files sorted by name, blocks in order) —
+  not documented as a guarantee.
+- Whole-block references (`server = server.vault_current`) decode into `Server`
+  or `*Server` fields as a copy; no test covers the pointer form or a
+  registered non-`resource` type referenced from a nested block.
+- Nested optional single blocks decode into pointer fields, nil when absent.
+- User `type` attribute does not clash with internal `meta.type`.
+- `env()` works in registered-type blocks; unset var → "".
+- Results are not filtered for disabled entities.
+- User's original HCL referenced undeclared `server.vault_arc`; added above.
 
-**Consequence for the encoder:** `depends_on` is currently **not written at all**, because after
-parsing it mixes hand-written and derived entries indistinguishably. Once fixed it can be written
-faithfully — a one-line change in `trimBookkeeping` in `encode.go`.
+## Interview answers (user-confirmed)
 
-### 3. Secrets
-Encoded output shows every value exactly as held, including passwords. Example terminal output now
-prints `password = "password"` by default, which is more prominent than before: it used to be
-reachable only through the API. Tracked at https://github.com/jumppad-labs/xcl/issues/1 and listed
-as Out of Scope in the previous plan. The user asked for it here: "we can add the secrets stuff to
-that too".
+- Decode before Apply: no error, empty slices / nil pointers (as All does).
+- Disabled blocks: included, same as All.
+- Docs: README + xcl-website configuration-only example page.
+- Started this spec with `spec new --force`, dropping the in-progress
+  `20260923095659-references-and-secrets` workflow state (its interview.md
+  remains in .spektacular/work/ for later).
+- User feedback: Decode is generic — spec text must not be written around
+  servers/mounts. Criteria use registered types A, B and unregistered U; the
+  server/mount HCL is only the docs' worked example, not a requirement.
+- User (mid technical-approach step): "just keep going I will review the final doc"
+  — draft remaining sections without per-section confirmation; user reviews
+  the assembled spec at verification.
+- Spec written to store as 20261003081552-e1e07cbe-config-decode (user: "looks good").
+- Split check: not offered — one weak signal only (>7 requirements), requirements
+  tightly coupled around one call; moderate threshold needs two weak signals.
+- Pending outside the workflow: knowledge update for architecture/ux-flow.md
+  staged at .spektacular/tmp/ux-flow.md, awaiting user yes/no.
 
-## Framing to confirm during the interview
-Items 1 and 2 share a root cause — xcl does not track what the user wrote versus what it derived.
-Item 3 is a different mechanism (marking fields sensitive, probably a struct tag option like the
-existing `computed`). Worth confirming the user wants one spec rather than two, and if one, that the
-unifying frame is "the text shows what the user wrote, and does not show what they would not want
-shown".
+# Plan workflow (started 2026-10-03)
 
-## Repos
-- `xclconfig` → `/home/nicj/code/github.com/jumppad-labs/xcl` — all three items live here.
-- `xcl-website` → `/home/nicj/code/github.com/jumppad-labs/xcl-website` — the
-  `/configuration-text/` guide and `/events/` already document the current behaviour and would need
-  updating. The example pages quote the library's example code directly.
+- Plan workflow started for 20261003081552-e1e07cbe-config-decode (user picked it).
+- Spec read. Success metrics to carry into Testing Approach: one call fills a
+  struct regardless of #types; new type = new field only; every shipped example
+  program that assembles config from several block types uses Decode.
+- Discovery done (research.md in work dir). Key learnings: Decode can't call
+  generic all[T] at runtime -> refactor findByType core + As into non-generic
+  reflect.Type helpers shared by both. Spike showed whole-block refs into T and
+  *T nested fields already work (coverage only). Only example/configonly
+  qualifies for the "examples use Decode" metric (plugin example = plugin types).
+  Website configuration-only.mdx Go snippets are stale vs repo.
+- Architecture chosen: shared non-generic cores (reflect.Type) behind
+  findByType/all/As + Decode two-phase; new ErrInvalidDecodeTarget; NotUniqueError
+  unwrapped; new decode.go; website only configuration-only.mdx.
+- Components drafted (decoder, shared type-path/kind-scan/conversion cores,
+  new error, fixtures, configonly example, docs).
+- Data structures drafted: Decode(target any) error both forms; ErrInvalidDecodeTarget; cores typePath/entitiesOf/asType; fixtures Endpoint/Mount.
+- Impl detail drafted. Examples/docs use method form c.Decode (non-generic, Go 1.25 ok).
+- Dependencies drafted (no design docs; stdlib only).
+- Testing approach drafted: each success metric = behavioural test (incl. AST guard on configonly).
+- Milestones: M1 shared core + ref coverage; M2 Decode; M3 docs/example/site.
+- Tasks drafted (7 ids, xcl-website task last). configonly example: Service/Ingress become *T fields, no Find left; guard NotZero dropped.
+- Open questions: two impl-time STOP-and-ask items (refactor regressions, non-pointer registered entities).
+- Out of scope drafted.
+- Assembled; staged plan/context/research templates in .spektacular/tmp/.
+- Verification passed (removed shell commands from plan).
+- plan.md written to store.
+- context.md written to store.
+- research.md written; work dir removed. Now in walkthrough.
+- Walkthrough: user said existing resources can be reused for Decode tests. Applied:
+  reuse Database/App/Consumer/Cache + registered/{basic,bare,disabled}; only new =
+  2 ordering fixtures (cache first/second) + test-local cacheClient type & cache_client
+  fixture for whole-block refs. All 3 docs rewritten. Walkthrough resumes at beat 2.
+- Walkthrough signed off by user (nested-struct non-goal confirmed). Advancing to finished.
 
-## Standing preferences
-- Don't commit unless asked.
-- Go conventions: testify `require`, NEVER table-driven, never mix positive and negative tests in
-  one function, favour verbose readable tests, `any` over `interface{}`.
-- Store files (specs, plans, changelog, knowledge, design) go through the `spektacular` CLI only.
-- The HCL fork in `internal/xcl` is ours but MPL-2.0: keep the HashiCorp header, add
-  "Modifications Copyright (c) Jumppad Labs", record changes in `internal/xcl/UPSTREAM.md`.
-- **The IDE/LSP diagnostics in this environment are stale and routinely wrong.** Trust
-  `go build`/`go vet`/`go test`, not the diagnostics panel.
+# Implement workflow (started 2026-10-03)
+
+- read_plan passed: structure complete; drift = line offsets only (printDeployments
+  :140 not :141, portable guard NotZero :592 not :594) — targets exist, adapt on the fly.
+- Spec coverage complete, nothing descoped. No ## Changelog in plan → first-task run.
+- Repo roots: xclconfig = /home/nicj/code/github.com/jumppad-labs/xcl,
+  xcl-website = /home/nicj/code/github.com/jumppad-labs/xcl-website.
+- Task 1 (shared core) analysed in main context: only query.go changes; find[T] keeps calling As[T].
+- Task 1 implemented: asType/convertibleTo/entitiesOf/oneOf/addressableType/typePath in query.go.
+  gofmt -l lists many pre-existing internal/* files — not ours, ignore.
+- Task 1 test step: no new tests by design (plan); proof = existing suite unedited.
+- Task 1 verified green (go test ./..., go1.25 build+vet). Examples are in the root module (no own go.mod).
+- Task 1 ticked in plan.
+- Task 1 changelog entry written. USER: "run the rest without asking" — loop tasks autonomously,
+  stop only on failures/mismatches.
+- Task 2: fixture registered/cache_client/main.xcl added (implement); tests next via sub-agent.
+- Task 2 done (tests pass, no code fix needed).
+- Task 3 implemented: ErrInvalidDecodeTarget + InvalidDecodeTargetError{Type,Nil} in errors/query_errors.go; re-exported in config.go.
+- Task 3 done.
+- Task 4 (Decode) analysed: reuse setupFindConfig/setupBareTypeConfig/setupCacheClientConfig; decode.go written in main ctx, tests by sub-agent.
+- Task 4 implemented: decode.go (Decode fn+method, decode two-phase, isCollectionField/isSingleField).
+- Task 4: order tests flaked — parser parsedResources is a map, ranged at parseAndValidate.
+  USER chose fix in parser ("ordering is probably useful ... when we do diff"): parsed.order +
+  parsed.store in internal/parser/parser.go. Now green 40x. Deviation logged in changelog.
+- Task 5 implemented: appConfig + c.Decode in example/configonly/main.go; output byte-identical.
+- Task 5 done.
+- Task 6 implemented: README Decode section (+configonly snippet, vocab, two-spellings), CHANGELOG entry incl. ordering change.
+- Task 6 done.
+- Task 7 implemented: website configuration-only.mdx program section, Decode snippet, notice bullet, output order.
+- Task 7 done; all tasks complete. Website needs npm ci before make check.
+- test-plan written (none required).
+- Feature changelog: project + xclconfig + xcl-website records written.
+- Spec reconciled: all 26 checkboxes satisfied.

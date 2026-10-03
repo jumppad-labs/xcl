@@ -9,6 +9,10 @@
 // them they show blocks nested inside blocks, blocks that repeat into a
 // slice, and resources linked to each other by reference.
 //
+// After the configuration is applied, one Decode call gathers every block the
+// program reads into a struct of its own, appConfig, rather than looking each
+// type up separately.
+//
 // The state is kept in a file, and after the resources are printed everything
 // is destroyed again, which for these types only clears them from the state.
 //
@@ -54,6 +58,17 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+// appConfig is the application's view of the configuration. Decode fills it
+// in one call: a slice field receives every block of its registered type, in
+// the order the blocks were written, and a pointer field receives the one
+// block of its type. Reading a new block type needs only a new field.
+type appConfig struct {
+	ConfigMaps  []*resources.ConfigMap
+	Deployments []*resources.Deployment
+	Service     *resources.Service
+	Ingress     *resources.Ingress
 }
 
 // run applies the configuration in dir with the example types registered,
@@ -110,11 +125,16 @@ func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, di
 		fmt.Fprintf(out, "  %s\n", meta.ID)
 	}
 
-	if err := printDeployments(out, c); err != nil {
+	// gather the configuration into the application's own struct, Decode is
+	// an ordinary method so this works on every supported Go version
+	var cfg appConfig
+	if err := c.Decode(&cfg); err != nil {
 		return nil, err
 	}
 
-	if err := printRouting(out, c); err != nil {
+	printDeployments(out, cfg.Deployments)
+
+	if err := printRouting(out, cfg.Service, cfg.Ingress); err != nil {
 		return nil, err
 	}
 
@@ -137,18 +157,7 @@ func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, di
 // it, the containers and, for each of those, its ports, environment and
 // resource limits. Registered types come back as the Go type that was
 // registered, so the nested blocks are ordinary Go structs and slices.
-func printDeployments(out io.Writer, c *xcl.Config) error {
-	deployments, err := xcl.FindByType[resources.Deployment](c, "resource", "deployment")
-	if err != nil {
-		return err
-	}
-
-	// Go 1.27 version with method generics
-	// deployments, err = c.FindByType[resources.Deployment]("resource", "deployment")
-	// if err != nil {
-	// 	return err
-	// }
-
+func printDeployments(out io.Writer, deployments []*resources.Deployment) {
 	fmt.Fprintln(out, "## Deployments")
 	for _, d := range deployments {
 		fmt.Fprintf(out, "  %s replicas=%d\n", d.Meta.ID, d.Replicas)
@@ -182,26 +191,23 @@ func printDeployments(out io.Writer, c *xcl.Config) error {
 			fmt.Fprintf(out, "    volume %s config_map=%s\n", volume.Name, volume.ConfigMap)
 		}
 	}
-
-	return nil
 }
 
 // printRouting writes the two resources that are linked to the deployment,
 // their values were read from the blocks they reference rather than repeated
-// in the configuration
-func printRouting(out io.Writer, c *xcl.Config) error {
-	service, err := xcl.Find[resources.Service](c, "resource.service.api")
-	if err != nil {
-		return err
+// in the configuration. The configuration declares one of each, a missing one
+// is reported rather than printed
+func printRouting(out io.Writer, service *resources.Service, ingress *resources.Ingress) error {
+	if service == nil {
+		return fmt.Errorf("the configuration declares no service")
+	}
+
+	if ingress == nil {
+		return fmt.Errorf("the configuration declares no ingress")
 	}
 
 	fmt.Fprintln(out, "## Service")
 	fmt.Fprintf(out, "  %s deployment=%s port=%d target_port=%d\n", service.Meta.ID, service.Deployment, service.Port, service.TargetPort)
-
-	ingress, err := xcl.Find[resources.Ingress](c, "resource.ingress.api")
-	if err != nil {
-		return err
-	}
 
 	fmt.Fprintln(out, "## Ingress")
 	fmt.Fprintf(out, "  %s host=%s\n", ingress.Meta.ID, ingress.Host)
