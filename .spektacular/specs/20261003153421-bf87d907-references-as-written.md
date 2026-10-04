@@ -1,9 +1,11 @@
 ---
-created_date: "2026-09-23"
-document_status: draft
+created_date: "2026-10-03"
+document_status: final
+closed_date: "2026-10-03"
+epic: 20261003134528-327e0657-references-and-secrets
 ---
 
-# Feature: 20260923095659-references-and-secrets
+# Feature: 20261003153421-bf87d907-references-as-written
 
 <!--
   OVERVIEW
@@ -15,7 +17,7 @@ document_status: draft
 -->
 ## Overview
 
-
+Configuration text produced by xcl shows every reference as the literal value it resolved to, so a reader cannot see which other entity a field pointed at. This lets developers who embed xcl ask for references to be shown exactly as the user wrote them, from a live entity or from its saved data with identical results, while resolved values remain the default.
 
 <!--
   REQUIREMENTS
@@ -29,7 +31,14 @@ document_status: draft
 -->
 ## Requirements
 
-
+- [ ] **References can be shown as written**
+  Developers can ask for an entity's configuration text to show each reference as the address the user wrote, instead of the value it resolved to.
+- [ ] **Resolved values remain the default**
+  Without that request, configuration text continues to show references as the values they resolved to.
+- [ ] **References survive saving**
+  Text produced from an entity's saved data shows the same references, and is identical to the text produced from the live entity, whichever form is requested.
+- [ ] **References output is documented**
+  The library's documentation and the documentation site's configuration-text guide describe how to request references and what the text then shows.
 
 <!--
   CONSTRAINTS
@@ -43,7 +52,6 @@ document_status: draft
 -->
 ## Constraints
 
-
 <!--
   ACCEPTANCE CRITERIA
   The specific, binary conditions that define "done".
@@ -55,7 +63,14 @@ document_status: draft
 -->
 ## Acceptance Criteria
 
-
+- [ ] **References written as addresses on request**
+  Given an entity with a field written as a reference to another entity (e.g. `x = resource.b.one.y`), when its configuration text is requested with references shown, the text contains that field as the reference exactly as written, not the resolved value.
+- [ ] **Resolved values by default**
+  Given the same entity, when its configuration text is requested without asking for references, the field shows the resolved value, as before this change.
+- [ ] **Live and saved text match**
+  For an entity containing references, after applying, the text produced from the live entity and the text produced from its saved data are byte-identical, both with references shown and without.
+- [ ] **References docs updated**
+  The library's documentation and the site's configuration-text guide each describe requesting references, with an example showing a reference written as the user wrote it.
 
 <!--
   TECHNICAL APPROACH
@@ -69,6 +84,7 @@ document_status: draft
 -->
 ## Technical Approach
 
+- Record which field each reference came from at parse time and keep it in saved state, so both the live and the saved encoding paths can write references; the stored format may change to carry it.
 
 <!--
   SUCCESS METRICS
@@ -79,7 +95,6 @@ document_status: draft
   Leave blank if not applicable.
 -->
 ## Success Metrics
-
 
 <!--
   NON-GOALS
@@ -92,3 +107,6 @@ document_status: draft
   Leave blank if there are no explicit exclusions to call out.
 -->
 ## Non-Goals
+
+- Backwards compatibility with existing state files: state written by earlier versions does not have to load.
+- Making configuration text reprocessable: it remains for display and reading, as settled in spec `20260922132517-hcl-encoding-helpers`.
