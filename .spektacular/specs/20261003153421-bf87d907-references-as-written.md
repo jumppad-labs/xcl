@@ -31,13 +31,13 @@ Configuration text produced by xcl shows every reference as the literal value it
 -->
 ## Requirements
 
-- [ ] **References can be shown as written**
+- [x] **References can be shown as written**
   Developers can ask for an entity's configuration text to show each reference as the address the user wrote, instead of the value it resolved to.
-- [ ] **Resolved values remain the default**
+- [x] **Resolved values remain the default**
   Without that request, configuration text continues to show references as the values they resolved to.
-- [ ] **References survive saving**
+- [x] **References survive saving**
   Text produced from an entity's saved data shows the same references, and is identical to the text produced from the live entity, whichever form is requested.
-- [ ] **References output is documented**
+- [x] **References output is documented**
   The library's documentation and the documentation site's configuration-text guide describe how to request references and what the text then shows.
 
 <!--
@@ -63,13 +63,13 @@ Configuration text produced by xcl shows every reference as the literal value it
 -->
 ## Acceptance Criteria
 
-- [ ] **References written as addresses on request**
+- [x] **References written as addresses on request**
   Given an entity with a field written as a reference to another entity (e.g. `x = resource.b.one.y`), when its configuration text is requested with references shown, the text contains that field as the reference exactly as written, not the resolved value.
-- [ ] **Resolved values by default**
+- [x] **Resolved values by default**
   Given the same entity, when its configuration text is requested without asking for references, the field shows the resolved value, as before this change.
-- [ ] **Live and saved text match**
+- [x] **Live and saved text match**
   For an entity containing references, after applying, the text produced from the live entity and the text produced from its saved data are byte-identical, both with references shown and without.
-- [ ] **References docs updated**
+- [x] **References docs updated**
   The library's documentation and the site's configuration-text guide each describe requesting references, with an example showing a reference written as the user wrote it.
 
 <!--

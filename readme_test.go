@@ -228,3 +228,50 @@ func TestChangelogNoLongerSaysSecretsAreShown(t *testing.T) {
 
 	require.NotContains(t, string(data), "so a password or other secret is shown too")
 }
+
+func TestReadmeDocumentsTheReferencesOption(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "**Showing references as written.**")
+	require.Contains(t, text, "xcl.EncodeEntity(app, xcl.ShowReferences())")
+	require.Contains(t, text, "  db_location = resource.postgres.main.location\n")
+}
+
+func TestReadmeQualifiesThatReferencesAreResolvedByDefault(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "By default references come\nout as the literal values they resolved to, unless you ask for\n`ShowReferences`.")
+	require.NotContains(t, text, "**This text is for reading, not for reprocessing.** References come out as the")
+}
+
+func TestStateGuideDocumentsSavedReferences(t *testing.T) {
+	data, err := os.ReadFile("docs/state.md")
+	require.NoError(t, err)
+
+	require.Contains(t, string(data), "Each saved record also carries `meta.references`")
+}
+
+func TestChangelogRecordsTheReferencesOption(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	changelog := string(data)
+	require.Contains(t, changelog, "## 20261003153421-bf87d907-references-as-written")
+	require.Contains(t, changelog, "`xcl.ShowReferences()`")
+}
+
+func TestChangelogSaysTheReferencesOptionBreaksNothing(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	changelog := string(data)
+	start := strings.Index(changelog, "## 20261003153421-bf87d907-references-as-written")
+	require.GreaterOrEqual(t, start, 0)
+
+	end := strings.Index(changelog[start+3:], "\n## ")
+	require.Greater(t, end, 0)
+
+	entry := changelog[start : start+3+end]
+	require.Contains(t, entry, "There are no breaking changes.")
+	require.NotContains(t, entry, "**Breaking:**")
+}

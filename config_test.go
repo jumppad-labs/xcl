@@ -1,8 +1,15 @@
 package xcl
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/savedentity"
+	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/state"
+	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -457,3 +464,137 @@ func TestProcessCallbackErrorHaltsExecution(t *testing.T) {
 	require.Equal(t, 1, len(calls))
 }
 */
+
+// savedReferences returns the meta.references the saved record holds, nil
+// when it holds none
+func savedReferences(t *testing.T, record json.RawMessage) map[string]string {
+	t.Helper()
+
+	saved := struct {
+		Meta struct {
+			References map[string]string `json:"references"`
+		} `json:"meta"`
+	}{}
+
+	err := json.Unmarshal(record, &saved)
+	require.NoError(t, err)
+
+	return saved.Meta.References
+}
+
+func TestApplySavesReferencesInState(t *testing.T) {
+	c, _, statePath := applyEncodeFixture(t)
+
+	database := encodeEntityByID(t, c, encodeDatabaseID)
+	databaseMeta, err := types.GetMeta(database)
+	require.NoError(t, err)
+
+	require.Equal(t, map[string]string{"location": "variable.region"}, databaseMeta.References)
+
+	savedDatabase := savedReferences(t, encodeSavedRecordByID(t, statePath, encodeDatabaseID))
+	require.Equal(t, databaseMeta.References, savedDatabase)
+
+	container := encodeEntityByID(t, c, encodeContainerID)
+	containerMeta, err := types.GetMeta(container)
+	require.NoError(t, err)
+
+	expectedContainer := map[string]string{
+		"network[0].name": "resource.network.main.meta.name",
+		"network[1].name": "resource.network.main.meta.name",
+	}
+	require.Equal(t, expectedContainer, containerMeta.References)
+
+	savedContainer := savedReferences(t, encodeSavedRecordByID(t, statePath, encodeContainerID))
+	require.Equal(t, containerMeta.References, savedContainer)
+}
+
+// stripSavedReferences rewrites the state file at statePath without the
+// meta.references of any record, as state written before references were
+// recorded would be
+func stripSavedReferences(t *testing.T, statePath string) {
+	t.Helper()
+
+	data, err := os.ReadFile(statePath)
+	require.NoError(t, err)
+
+	records := []map[string]json.RawMessage{}
+	err = json.Unmarshal(data, &records)
+	require.NoError(t, err)
+
+	for _, record := range records {
+		meta := map[string]json.RawMessage{}
+		err = json.Unmarshal(record["meta"], &meta)
+		require.NoError(t, err)
+
+		delete(meta, "references")
+
+		record["meta"], err = json.Marshal(meta)
+		require.NoError(t, err)
+	}
+
+	data, err = json.MarshalIndent(records, "", "  ")
+	require.NoError(t, err)
+
+	err = os.WriteFile(statePath, data, 0644)
+	require.NoError(t, err)
+}
+
+// State is written by a real apply and only the meta.references key is then
+// removed from it, the one change that turns it into state saved before
+// references were recorded
+func TestStateWithoutReferencesStillLoads(t *testing.T) {
+	_, reg, statePath := applyEncodeFixture(t)
+
+	stripSavedReferences(t, statePath)
+
+	record := encodeSavedRecordByID(t, statePath, encodeDatabaseID)
+	require.Nil(t, savedReferences(t, record))
+
+	// the saved record still decodes, with its resolved value
+	store, err := state.NewFileStateStore(filepath.Dir(statePath))
+	require.NoError(t, err)
+
+	records, err := store.Load()
+	require.NoError(t, err)
+
+	loaded, err := savedentity.DecodeAll(reg, records)
+	require.NoError(t, err)
+
+	var database *registered.Database
+	for _, entity := range loaded {
+		candidate, ok := entity.(*registered.Database)
+		if ok && candidate.Meta.ID == encodeDatabaseID {
+			database = candidate
+		}
+	}
+
+	require.NotNil(t, database)
+	require.Equal(t, "us-east", database.Location)
+	require.Nil(t, database.Meta.References)
+
+	// the saved record still converts to configuration text showing the
+	// resolved value
+	text, err := EncodeSavedEntity(reg, record)
+	require.NoError(t, err)
+	require.Regexp(t, `location\s+= "us-east"`, string(text))
+
+	// asking for references still works, the record has none to show so the
+	// resolved value is written
+	withReferences, err := EncodeSavedEntity(reg, record, ShowReferences())
+	require.NoError(t, err)
+	require.Regexp(t, `location\s+= "us-east"`, string(withReferences))
+	require.NotContains(t, string(withReferences), "variable.region")
+
+	// a later run reads the stripped state back and applies over it
+	second, err := NewConfig(WithPluginRegistry(reg), WithStateStore(store))
+	require.NoError(t, err)
+
+	path, err := filepath.Abs("./internal/test_fixtures/config/encode/main.xcl")
+	require.NoError(t, err)
+
+	err = second.Apply(path)
+	require.NoError(t, err)
+
+	applied := encodeEntityByID(t, second, encodeDatabaseID)
+	require.Equal(t, "us-east", applied.(*registered.Database).Location)
+}

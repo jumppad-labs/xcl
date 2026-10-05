@@ -135,6 +135,12 @@ each as `(sensitive)`. Text made from event data therefore shows the marker
 for them, even with `xcl.RevealSensitive()`, since event data has no real
 value to show.
 
+Each saved record also carries `meta.references`, the text the user wrote for
+each field that referred to another entity, so
+`xcl.EncodeSavedEntity(registry, record, xcl.ShowReferences())` shows those
+references exactly as `EncodeEntity` does for the live entity. A record saved
+by an earlier version has none, and shows resolved values.
+
 The stored format has one reader. Both the file state store's `Load` and
 `EncodeSavedEntity` go through it, so there is a single place that knows how a
 record names its type. A record naming a type the registry does not know fails

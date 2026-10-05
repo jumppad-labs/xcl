@@ -1,5 +1,15 @@
 # Changelog
 
+## 20261003153421-bf87d907-references-as-written
+
+Configuration text can show references as the user wrote them. `xcl.ShowReferences()`, passed to `EncodeEntity` or `EncodeSavedEntity`, writes each field that referred to another entity exactly as written, such as `x = resource.b.one.y`, a template like `"${variable.region}-a"`, or a reference inside a nested block, instead of the value it resolved to. Without the option the text is unchanged and shows resolved values. Text from a live entity and from its saved data is byte-identical, with and without the option, and the option combines with `xcl.IncludeComputed()`.
+
+A sensitive field shows its reference only when it was written as a single bare reference, such as `password = variable.db_password`, since an address holds no secret. Written any other way it keeps `"(sensitive)"`, unless `xcl.RevealSensitive()` is also given.
+
+To make this possible, parsing records the text written for each reference-holding field in the entity's bookkeeping, the new `types.Meta.References`, and saved records gain an optional `meta.references` key. State saved by an earlier version still loads, and shows resolved values until the configuration is applied again.
+
+There are no breaking changes.
+
 ## 20261003134528-327e0657-references-and-secrets
 
 A field can be declared sensitive, for application types and plugin types alike, by giving it the type `types.Sensitive[T]`, as in `Password types.Sensitive[string]`. Configuration sets it exactly as before. xcl shows a sensitive value only as the fixed marker `(sensitive)` in its logs, events, errors, configuration text and printed resources, and so do the application's own `fmt`, `log/slog`, `encoding/json` and template output, because the type formats and marshals itself as the marker. `.Reveal()` is the only way to the real value; application code calls it where the value is used, and `types.NewSensitive(value)` builds one, for example in tests. State keeps real values, so a reloaded configuration reads them back unchanged, and plugins receive and return the real value.

@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"strings"
+
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
@@ -179,4 +181,27 @@ func processScopeTraversal(expr *hclsyntax.ScopeTraversalExpr, isRoot func(strin
 	// add to the references collection and replace with a nil value
 	// we will resolve these references before processing
 	return strExpression, nil
+}
+
+// recordWrittenText records in written, under path, the text the author wrote
+// after the = of attr, exactly as written: everything from the equals sign to
+// the end of the attribute, without the surrounding whitespace. The bytes are
+// sliced from src rather than taken from the expression's own range, because
+// some expressions' ranges do not cover all that was written, such as
+// wrapping parentheses. Nothing is recorded when src does not hold the
+// attribute.
+func recordWrittenText(written map[string]string, path string, attr *hclsyntax.Attribute, src []byte) {
+	start := attr.EqualsRange.End.Byte
+	end := attr.SrcRange.End.Byte
+
+	if src == nil || start < 0 || end > len(src) || start >= end {
+		return
+	}
+
+	text := strings.TrimSpace(string(src[start:end]))
+	if text == "" {
+		return
+	}
+
+	written[path] = text
 }

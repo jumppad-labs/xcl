@@ -1,0 +1,68 @@
+# Every way a field can be written as a reference, alongside fields and an
+# entity that hold no reference at all, so that parsing can be checked to
+# record the text exactly as the author wrote it.
+
+variable "region" {
+  default = "us-east"
+}
+
+variable "cpu" {
+  default = 512
+}
+
+# holds no reference anywhere
+resource "network" "main" {
+  subnet = "10.0.0.0/16"
+}
+
+# a bare reference
+resource "container" "bare" {
+  default = variable.region
+}
+
+# a reference inside a template
+resource "container" "template" {
+  default = "${variable.region}-a"
+}
+
+# a reference passed to a function
+resource "container" "function" {
+  default = format("%s-b", variable.region)
+}
+
+# a map written over several lines holding a reference
+resource "container" "multi_line" {
+  env = {
+    REGION = variable.region
+    MODE   = "web"
+  }
+}
+
+# references inside nested blocks, the first network block holds none so the
+# second is only recorded under its own position
+resource "container" "nested" {
+  command = ["nginx", "-g", "daemon off;"]
+
+  network {
+    name       = "literal"
+    ip_address = "10.0.0.10"
+  }
+
+  network {
+    name       = resource.network.main.meta.name
+    ip_address = "10.0.0.11"
+  }
+
+  resources {
+    cpu    = variable.cpu
+    memory = 1024
+  }
+}
+
+module "inner" {
+  source = "./module"
+
+  variables = {
+    region = variable.region
+  }
+}

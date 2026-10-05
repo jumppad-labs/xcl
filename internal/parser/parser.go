@@ -604,12 +604,12 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 		case resources.TypeModule:
 			// parseModule fires the module's own parse event, the resources in
 			// its source fire theirs as they are parsed
-			errs := p.parseModule(file, b, module)
+			errs := p.parseModule(file, b, module, f.Bytes)
 			blockErrors = append(blockErrors, errs...)
 		case resources.TypeVariable:
 			fallthrough
 		case resources.TypeOutput:
-			err := p.parseResource(file, b, module)
+			err := p.parseResource(file, b, module, f.Bytes)
 			if err != nil {
 				blockErrors = append(blockErrors, err)
 			}
@@ -634,7 +634,7 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 				continue
 			}
 
-			err := p.parseResource(file, b, module)
+			err := p.parseResource(file, b, module, f.Bytes)
 			if err != nil {
 				blockErrors = append(blockErrors, err)
 			}
@@ -700,7 +700,9 @@ func (p *Parser) blockResource(b *hclsyntax.Block, module string) (string, strin
 	return fqrn.AddressType() + "." + fqrn.Resource, fqrn.String()
 }
 
-func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName string) error {
+// src is the text of the file b was parsed from, it is where the text the
+// author wrote for each reference is read from
+func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName string, src []byte) error {
 	var rt any
 	var err error
 
@@ -860,7 +862,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 
 	// We now need to get all the dependent resources for this resource
 	// so that we can build the dependency graph
-	err = p.getUniqueResourceLinks(rt, b)
+	err = p.getUniqueResourceLinks(rt, b, src)
 	if err != nil {
 		de := &errors.ParserError{}
 		de.Line = b.TypeRange.Start.Line
@@ -910,7 +912,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 // module's source directory is resolved and recursed into here (Phase 1.2)
 // so that the module's child resources are discovered and scoped under the
 // module's own instance name.
-func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule string) []error {
+func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule string, src []byte) []error {
 	// fail fires the module's parse error and returns it, every problem with
 	// the module block itself goes through it
 	resourceType, resourceID := p.blockResource(b, parentModule)
@@ -978,7 +980,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 	// we can build the dependency graph; this walks the module's source,
 	// variables, and disabled attributes the same way it does for any other
 	// resource type
-	err = p.getUniqueResourceLinks(rt, b)
+	err = p.getUniqueResourceLinks(rt, b, src)
 	if err != nil {
 		de := &errors.ParserError{}
 		de.Line = b.TypeRange.Start.Line
@@ -1080,9 +1082,10 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 
 // getUniqueResourceLinks gets all the dependent resources for a resource
 // these are either manaully set using the depends_on attribute or automatically
-// inferred from the interpolations in the resource
-func (p *Parser) getUniqueResourceLinks(resource any, b *hclsyntax.Block) error {
-	dr, err := p.getDependentResources(resource, b)
+// inferred from the interpolations in the resource. src is the text of the
+// file b was parsed from
+func (p *Parser) getUniqueResourceLinks(resource any, b *hclsyntax.Block, src []byte) error {
+	dr, err := p.getDependentResources(resource, b, src)
 	if err != nil {
 		return err
 	}
@@ -1127,8 +1130,15 @@ func (p *Parser) getUniqueResourceLinks(resource any, b *hclsyntax.Block) error 
 // getDependentResources recursively checks the fields and blocks on the resource to identify links to other resources
 // i.e. resource.container.foo.network[0].name
 // This enables automatic building of the dependency graph
-func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block) ([]string, error) {
+//
+// The same walk records, in the resource's Meta.References, the text the
+// author wrote after the = for every attribute holding a reference, keyed by
+// the attribute's path, i.e. "location" or "network[1].name". A reference is
+// decided by the same rule as the links, so the two always agree on which
+// attributes hold one
+func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []byte) ([]string, error) {
 	references := []string{}
+	written := map[string]string{}
 
 	// Process all attributes in the block
 	for _, a := range b.Body.Attributes {
@@ -1143,6 +1153,12 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block) ([]stri
 		}
 
 		references = append(references, refs...)
+
+		// depends_on holds addresses as strings, never references, it is
+		// skipped so it is never recorded as one
+		if len(refs) > 0 && a.Name != "depends_on" {
+			recordWrittenText(written, a.Name, a, src)
+		}
 	}
 
 	// Process nested blocks recursively
@@ -1155,7 +1171,8 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block) ([]stri
 		}
 
 		// Recursively get dependencies from nested blocks
-		cr, err := p.getDependentResourcesFromBlock(block)
+		prefix := fmt.Sprintf("%s[%d].", block.Type, blockIndex[block.Type])
+		cr, err := p.getDependentResourcesFromBlock(block, prefix, src, written)
 		if err != nil {
 			return nil, err
 		}
@@ -1167,6 +1184,10 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block) ([]stri
 	rMeta, err := types.GetMeta(resource)
 	if err != nil {
 		return references, nil // Skip cycle check if resource doesn't have metadata
+	}
+
+	if len(written) > 0 {
+		rMeta.References = written
 	}
 
 	for _, dep := range references {
@@ -1207,8 +1228,11 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block) ([]stri
 	return references, nil
 }
 
-// getDependentResourcesFromBlock extracts dependencies from a nested block
-func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block) ([]string, error) {
+// getDependentResourcesFromBlock extracts dependencies from a nested block.
+// prefix is the block's path, i.e. "network[1].", and the text written for
+// each attribute holding a reference is recorded in written under prefix and
+// the attribute's name
+func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block, prefix string, src []byte, written map[string]string) ([]string, error) {
 	references := []string{}
 
 	// Process attributes in the block
@@ -1218,11 +1242,21 @@ func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block) ([]string, e
 			return nil, fmt.Errorf("unable to process attribute %s: %w", a.Name, err)
 		}
 		references = append(references, refs...)
+
+		if len(refs) > 0 {
+			recordWrittenText(written, prefix+a.Name, a, src)
+		}
 	}
 
-	// Process nested blocks recursively
+	// Process nested blocks recursively, numbering each by its position
+	// among the blocks of the same type
+	blockIndex := map[string]int{}
 	for _, block := range b.Body.Blocks {
-		cr, err := p.getDependentResourcesFromBlock(block)
+		index := blockIndex[block.Type]
+		blockIndex[block.Type] = index + 1
+
+		blockPrefix := fmt.Sprintf("%s%s[%d].", prefix, block.Type, index)
+		cr, err := p.getDependentResourcesFromBlock(block, blockPrefix, src, written)
 		if err != nil {
 			return nil, err
 		}
