@@ -5,6 +5,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/wire"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -38,63 +39,63 @@ func secretPre(t *testing.T) ([]byte, *eventDataSecret) {
 func TestEventDataRawStartShowsOnlyTheMarker(t *testing.T) {
 	pre, secret := secretPre(t)
 
-	data := eventData(&ParserOptions{EventData: events.DataRaw}, events.PhaseStart, pre, secret)
+	data := eventData(&ParserOptions{EventData: events.DataRaw, EventMask: mask.Redact()}, events.PhaseStart, pre, secret)
 
-	require.JSONEq(t, `{"username":"admin","password":"(sensitive)"}`, string(data))
+	require.JSONEq(t, `{"username":"admin","password":{"xcl_masked":"redact","value":"(sensitive)"}}`, string(data))
 	require.NotContains(t, string(data), "hunter2")
 }
 
 func TestEventDataRawSuccessShowsOnlyTheMarker(t *testing.T) {
 	pre, secret := secretPre(t)
 
-	data := eventData(&ParserOptions{EventData: events.DataRaw}, events.PhaseSuccess, pre, secret)
+	data := eventData(&ParserOptions{EventData: events.DataRaw, EventMask: mask.Redact()}, events.PhaseSuccess, pre, secret)
 
-	require.JSONEq(t, `{"username":"admin","password":"(sensitive)"}`, string(data))
+	require.JSONEq(t, `{"username":"admin","password":{"xcl_masked":"redact","value":"(sensitive)"}}`, string(data))
 	require.NotContains(t, string(data), "hunter2")
 }
 
 func TestEventDataRawErrorShowsOnlyTheMarker(t *testing.T) {
 	pre, secret := secretPre(t)
 
-	data := eventData(&ParserOptions{EventData: events.DataRaw}, events.PhaseError, pre, secret)
+	data := eventData(&ParserOptions{EventData: events.DataRaw, EventMask: mask.Redact()}, events.PhaseError, pre, secret)
 
-	require.JSONEq(t, `{"username":"admin","password":"(sensitive)"}`, string(data))
+	require.JSONEq(t, `{"username":"admin","password":{"xcl_masked":"redact","value":"(sensitive)"}}`, string(data))
 	require.NotContains(t, string(data), "hunter2")
 }
 
 func TestEventDataProcessedStartShowsOnlyTheMarker(t *testing.T) {
 	pre, secret := secretPre(t)
 
-	data := eventData(&ParserOptions{EventData: events.DataProcessed}, events.PhaseStart, pre, secret)
+	data := eventData(&ParserOptions{EventData: events.DataProcessed, EventMask: mask.Redact()}, events.PhaseStart, pre, secret)
 
-	require.JSONEq(t, `{"username":"admin","password":"(sensitive)"}`, string(data))
+	require.JSONEq(t, `{"username":"admin","password":{"xcl_masked":"redact","value":"(sensitive)"}}`, string(data))
 	require.NotContains(t, string(data), "hunter2")
 }
 
 func TestEventDataProcessedSuccessShowsOnlyTheMarker(t *testing.T) {
 	pre, secret := secretPre(t)
 
-	data := eventData(&ParserOptions{EventData: events.DataProcessed}, events.PhaseSuccess, pre, secret)
+	data := eventData(&ParserOptions{EventData: events.DataProcessed, EventMask: mask.Redact()}, events.PhaseSuccess, pre, secret)
 
-	require.JSONEq(t, `{"username":"admin","password":"(sensitive)"}`, string(data))
+	require.JSONEq(t, `{"username":"admin","password":{"xcl_masked":"redact","value":"(sensitive)"}}`, string(data))
 	require.NotContains(t, string(data), "hunter2")
 }
 
 func TestEventDataProcessedErrorShowsOnlyTheMarker(t *testing.T) {
 	pre, secret := secretPre(t)
 
-	data := eventData(&ParserOptions{EventData: events.DataProcessed}, events.PhaseError, pre, secret)
+	data := eventData(&ParserOptions{EventData: events.DataProcessed, EventMask: mask.Redact()}, events.PhaseError, pre, secret)
 
-	require.JSONEq(t, `{"username":"admin","password":"(sensitive)"}`, string(data))
+	require.JSONEq(t, `{"username":"admin","password":{"xcl_masked":"redact","value":"(sensitive)"}}`, string(data))
 	require.NotContains(t, string(data), "hunter2")
 }
 
 func TestEventDataRawWithoutPreShowsOnlyTheMarker(t *testing.T) {
 	secret := &eventDataSecret{Username: "admin", Password: types.NewSensitive("hunter2")}
 
-	data := eventData(&ParserOptions{EventData: events.DataRaw}, events.PhaseSuccess, nil, secret)
+	data := eventData(&ParserOptions{EventData: events.DataRaw, EventMask: mask.Redact()}, events.PhaseSuccess, nil, secret)
 
-	require.JSONEq(t, `{"username":"admin","password":"(sensitive)"}`, string(data))
+	require.JSONEq(t, `{"username":"admin","password":{"xcl_masked":"redact","value":"(sensitive)"}}`, string(data))
 	require.NotContains(t, string(data), "hunter2")
 }
 

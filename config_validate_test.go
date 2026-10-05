@@ -282,7 +282,7 @@ func TestApplySavesStateWhenProviderFails(t *testing.T) {
 	require.NotNil(t, savedRecords)
 
 	// a store is handed each entity's raw JSON record
-	saved, err := savedentity.DecodeAll(c.pluginRegistry, savedRecords)
+	saved, err := savedentity.DecodeAll(c.pluginRegistry, savedRecords, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	consul, err := entityByID(saved, "resource.container.consul")

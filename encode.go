@@ -110,9 +110,10 @@ func EncodeEntity(entity any, options ...EncodeOption) ([]byte, error) {
 // EncodeSavedEntity returns the configuration text for one entity's saved
 // data, exactly as state stores it and as events carry it at
 // EventDataProcessed. The text is identical to what EncodeEntity returns for
-// the same entity. Event data carries each sensitive value as
-// types.SensitiveMarker rather than its real value, so text from event data
-// shows the marker for it.
+// the same entity. A sensitive value masked in state or in event data, see
+// WithStateMask and WithEventMask, is shown as types.SensitiveMarker, never as
+// ciphertext or a hash; a receiver that needs the real value opens it with
+// mask.Unmask.
 //
 // registry resolves the record's type. A plugin's types resolve only once the
 // registry has loaded, so this loads it if it has not been loaded already.
@@ -143,7 +144,8 @@ func EncodeSavedEntity(registry *registry.PluginRegistry, data []byte, options .
 		return nil, err
 	}
 
-	entity, err := savedentity.Decode(registry, data)
+	// masked values are shown as the marker, never as ciphertext or a hash
+	entity, err := savedentity.Decode(registry, data, savedentity.ReadOptions{ForDisplay: true})
 	if err != nil {
 		return nil, err
 	}

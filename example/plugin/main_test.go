@@ -33,6 +33,10 @@ import (
 // configDir is the configuration this example applies
 const configDir = "./config"
 
+// testStateKey is the 32 byte key the tests encrypt the sensitive values in
+// state with, the key main reads from XCL_STATE_KEY
+var testStateKey = []byte("0123456789abcdef0123456789abcdef")
+
 // externalPlugin is the external plugin binary, built once for the package's
 // tests by TestMain
 var externalPlugin string
@@ -150,7 +154,7 @@ func runRecordingEvents(t *testing.T) *eventRecorder {
 
 	recorder := &eventRecorder{}
 
-	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	return recorder
@@ -174,7 +178,7 @@ func resourceIDs(t *testing.T, found []any) []string {
 func TestPluginExampleFindsDeclaredResources(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Equal(t, declaredResourceIDs, resourceIDs(t, found))
@@ -183,7 +187,7 @@ func TestPluginExampleFindsDeclaredResources(t *testing.T) {
 func TestPluginExamplePrintsEveryResource(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	for _, id := range declaredResourceIDs {
@@ -194,7 +198,7 @@ func TestPluginExamplePrintsEveryResource(t *testing.T) {
 func TestPluginExampleFillsConnectionString(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), `resource.postgres.main location=localhost port=5432 connection_string="postgres://admin@localhost:5432/main"`)
@@ -206,7 +210,7 @@ func TestPluginExampleFillsConnectionString(t *testing.T) {
 func TestPluginExamplePassesConnectionStringToReferencingBlock(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), `resource.app.web database_location=localhost database_user=admin analytics_location=analytics.localhost connection_string="postgres://admin@localhost:5432/main" cache_connection_string="redis://localhost:6379" url="http://web"`)
@@ -218,7 +222,7 @@ func TestPluginExamplePassesConnectionStringToReferencingBlock(t *testing.T) {
 func TestPluginExamplePassesComputedURLToIngress(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), `resource.ingress.web hostname=example.com app_url="http://web"`)
@@ -230,7 +234,7 @@ func TestPluginExamplePassesComputedURLToIngress(t *testing.T) {
 func TestPluginExampleHoldsGeneratedTypes(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	for _, r := range found {
@@ -251,7 +255,7 @@ func TestPluginExampleHoldsGeneratedTypes(t *testing.T) {
 func TestPluginExampleFailsForMissingConfig(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), "./does-not-exist", externalPlugin, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), "./does-not-exist", externalPlugin, t.TempDir(), testStateKey)
 	require.Error(t, err)
 }
 
@@ -437,7 +441,7 @@ func TestPluginExampleReportsExternalProviderCreateLogsFromThePluginBinary(t *te
 func TestPluginExampleFailsWithoutExternalPlugin(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, "./does-not-exist", t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, "./does-not-exist", t.TempDir(), testStateKey)
 	require.Error(t, err)
 	require.ErrorIs(t, err, xcl.ErrPluginLoad)
 	require.Contains(t, err.Error(), "./does-not-exist")
@@ -680,7 +684,7 @@ func TestPluginExampleDestroysEverythingItApplied(t *testing.T) {
 	stateDir := t.TempDir()
 	statePath := filepath.Join(stateDir, state.StateFileName)
 
-	_, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, externalPlugin, stateDir)
+	_, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, externalPlugin, stateDir, testStateKey)
 	require.NoError(t, err)
 
 	saved, err := os.ReadFile(statePath)
@@ -691,7 +695,7 @@ func TestPluginExampleDestroysEverythingItApplied(t *testing.T) {
 func TestPluginExamplePrintsNoResourcesRemaining(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Destroyed\n  0 resources remaining\n")
@@ -833,7 +837,7 @@ func TestPluginExampleReportsInProcessProviderDestroyLogsBetweenStartAndSuccess(
 func TestPluginExampleRetrievesPublishedValues(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Published\n")
@@ -847,7 +851,7 @@ func TestPluginExampleRetrievesPublishedValues(t *testing.T) {
 func TestPluginExamplePrintsPublishedTotal(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "  2 published in total\n")
@@ -978,7 +982,7 @@ func TestRunWithoutReceiverWritesNothingToStdoutOrStderr(t *testing.T) {
 
 	var runErr error
 	captured := captureStandardStreams(t, func() {
-		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	})
 
 	require.NoError(t, runErr)
@@ -997,7 +1001,7 @@ func renderEvents(t *testing.T) string {
 	r := registry.NewPluginRegistry()
 	rendered := &bytes.Buffer{}
 
-	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, externalPlugin, t.TempDir())
+	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	return rendered.String()
@@ -1119,7 +1123,7 @@ func TestPluginExampleEntityAndStateAgree(t *testing.T) {
 	statePath := filepath.Join(stateDir, state.StateFileName)
 	saved := &stateAtApply{path: statePath}
 
-	applied, err := run(&bytes.Buffer{}, saved.handle, r, configDir, externalPlugin, stateDir)
+	applied, err := run(&bytes.Buffer{}, saved.handle, r, configDir, externalPlugin, stateDir, testStateKey)
 	require.NoError(t, err)
 
 	require.NoError(t, saved.err)
@@ -1151,7 +1155,7 @@ func TestPluginExampleEntityAndStateAgree(t *testing.T) {
 // either converts to configuration text or is refused as not encodable, which
 // is what a variable, output or module is. No other failure is allowed
 func TestPluginExampleEveryEntityConverts(t *testing.T) {
-	applied, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir())
+	applied, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 	require.NotEmpty(t, applied)
 
@@ -1181,9 +1185,6 @@ func TestPluginExampleEveryEntityConverts(t *testing.T) {
 // anywhere the example writes, the report, the process's standard streams or
 // the events rendered by the pretty printer
 func TestPluginExamplePrintsNoSecret(t *testing.T) {
-	const variablePassword = "pg-s3cret-example"
-	const modulePassword = "pg-an4lytics-example"
-
 	r := registry.NewPluginRegistry()
 	out := &bytes.Buffer{}
 	rendered := &bytes.Buffer{}
@@ -1191,7 +1192,7 @@ func TestPluginExamplePrintsNoSecret(t *testing.T) {
 	var runErr error
 	captured := captureStandardStreams(t, func() {
 		runErr = func() error {
-			_, err := run(out, prettylog.Handler(rendered, slog.LevelDebug, r), r, configDir, externalPlugin, t.TempDir())
+			_, err := run(out, prettylog.Handler(rendered, slog.LevelDebug, r), r, configDir, externalPlugin, t.TempDir(), testStateKey)
 			return err
 		}()
 	})
@@ -1202,4 +1203,137 @@ func TestPluginExamplePrintsNoSecret(t *testing.T) {
 		require.NotContains(t, written, variablePassword)
 		require.NotContains(t, written, modulePassword)
 	}
+}
+
+// The passwords the example configuration holds: the default of the
+// db_password variable and the literal one in the analytics module
+const (
+	variablePassword = "pg-s3cret-example"
+	modulePassword   = "pg-an4lytics-example"
+)
+
+// stateFilesAtApply captures every file in the state directory as it stood
+// when the apply succeeded. The run destroys everything it applied before it
+// returns, which leaves the state file holding an empty array, so the files
+// have to be read while the records are still there
+type stateFilesAtApply struct {
+	dir   string
+	files map[string]string
+	err   error
+}
+
+// handle reads the state directory once the apply has succeeded, which is
+// after the state was saved and before the destroy empties it again
+func (s *stateFilesAtApply) handle(e xcl.Event) {
+	if e.Operation != events.OperationApply || e.Phase != events.PhaseSuccess {
+		return
+	}
+
+	entries, err := os.ReadDir(s.dir)
+	if err != nil {
+		s.err = err
+		return
+	}
+
+	s.files = map[string]string{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(s.dir, entry.Name()))
+		if err != nil {
+			s.err = err
+			return
+		}
+
+		s.files[entry.Name()] = string(data)
+	}
+}
+
+// TestPluginExampleStateHoldsNoSecret asserts that with a state key neither
+// password is in any file of the state directory once the apply has saved
+// it, the sensitive values written as masked envelopes
+func TestPluginExampleStateHoldsNoSecret(t *testing.T) {
+	stateDir := t.TempDir()
+	saved := &stateFilesAtApply{dir: stateDir}
+
+	_, err := run(&bytes.Buffer{}, saved.handle, registry.NewPluginRegistry(), configDir, externalPlugin, stateDir, testStateKey)
+	require.NoError(t, err)
+
+	require.NoError(t, saved.err)
+	require.NotEmpty(t, saved.files, "the apply left no state, so the check proves nothing")
+
+	all := ""
+	for name, data := range saved.files {
+		require.NotContains(t, data, variablePassword, "%s holds the variable's password", name)
+		require.NotContains(t, data, modulePassword, "%s holds the module's password", name)
+
+		all += data
+	}
+
+	require.Contains(t, all, "xcl_masked")
+}
+
+// TestPluginExampleEventDataHoldsNoSecret asserts no event the run reports
+// carries either password, neither in its data nor anywhere else in the event
+func TestPluginExampleEventDataHoldsNoSecret(t *testing.T) {
+	recorder := runRecordingEvents(t)
+
+	recorded := recorder.snapshot()
+	require.NotEmpty(t, recorded)
+
+	withData := 0
+	for _, e := range recorded {
+		require.NotContains(t, string(e.Data), variablePassword, "event data holds the variable's password: %s %s %s", e.Operation, e.Phase, e.ResourceID)
+		require.NotContains(t, string(e.Data), modulePassword, "event data holds the module's password: %s %s %s", e.Operation, e.Phase, e.ResourceID)
+
+		formatted := fmt.Sprintf("%+v", e)
+		require.NotContains(t, formatted, variablePassword, "event holds the variable's password: %s %s %s", e.Operation, e.Phase, e.ResourceID)
+		require.NotContains(t, formatted, modulePassword, "event holds the module's password: %s %s %s", e.Operation, e.Phase, e.ResourceID)
+
+		if len(e.Data) > 0 {
+			withData++
+		}
+	}
+
+	require.NotZero(t, withData, "no event carried data, so the check proves nothing")
+}
+
+// plaintextStateWarning is the warning xcl emits when it writes sensitive
+// values to state in plain text
+const plaintextStateWarning = "sensitive values are stored unencrypted in state; use xcl.WithStateMask to encrypt them"
+
+// TestPluginExampleWithoutKeyWarnsAboutPlainState asserts a run without a
+// state key reports the plain text warning from core once for the apply and
+// once for the destroy
+func TestPluginExampleWithoutKeyWarnsAboutPlainState(t *testing.T) {
+	recorder := &eventRecorder{}
+
+	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), nil)
+	require.NoError(t, err)
+
+	applyWarnings := []xcl.Event{}
+	destroyWarnings := []xcl.Event{}
+	for _, e := range recorder.snapshot() {
+		if e.Meta[events.KeyMessage] != plaintextStateWarning {
+			continue
+		}
+
+		require.Equal(t, events.SourceCore, e.Source)
+		require.Equal(t, events.PhaseLog, e.Phase)
+		require.Equal(t, events.LevelWarn, e.Meta[events.KeyLevel])
+
+		switch e.Operation {
+		case events.OperationApply:
+			applyWarnings = append(applyWarnings, e)
+		case events.OperationDestroy:
+			destroyWarnings = append(destroyWarnings, e)
+		default:
+			require.Failf(t, "unexpected warning", "the plain text warning was reported for %s", e.Operation)
+		}
+	}
+
+	require.Len(t, applyWarnings, 1)
+	require.Len(t, destroyWarnings, 1)
 }

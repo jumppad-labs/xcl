@@ -68,7 +68,7 @@ func TestUnregisteredTypeRaisedByTheLibraryMatchesTheRootPackageSentinel(t *test
 
 	record := []byte(`{"meta":{"id":"resource.widget.main","name":"main","type":"resource","subtype":"widget"}}`)
 
-	_, err := savedentity.Decode(reg, record)
+	_, err := savedentity.Decode(reg, record, savedentity.ReadOptions{})
 	require.Error(t, err)
 
 	require.ErrorIs(t, err, ErrUnregisteredType)
@@ -83,7 +83,7 @@ func TestInvalidSavedDataRaisedByTheLibraryMatchesTheRootPackageSentinel(t *test
 
 	record := []byte("this is not json")
 
-	_, err := savedentity.Decode(reg, record)
+	_, err := savedentity.Decode(reg, record, savedentity.ReadOptions{})
 	require.Error(t, err)
 
 	require.ErrorIs(t, err, ErrInvalidSavedData)

@@ -366,7 +366,7 @@ func TestConfigDestroyReturnsErrorNamingFailedResource(t *testing.T) {
 	require.NoError(t, err)
 
 	// the store hands back raw records, typing them needs the registry
-	saved, err := savedentity.DecodeAll(f.registry, loaded)
+	saved, err := savedentity.DecodeAll(f.registry, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	second, err := entityByID(saved, "resource.container.second")

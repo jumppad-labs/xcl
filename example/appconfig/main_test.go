@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -28,12 +29,16 @@ import (
 // configDir is the configuration this example parses
 const configDir = "./config"
 
+// testStateKey is the 32 byte key the tests encrypt the sensitive values in
+// state with, the key main reads from XCL_STATE_KEY
+var testStateKey = []byte("0123456789abcdef0123456789abcdef")
+
 // application runs the example and returns the application it parsed, every
 // test here is about that one resource
 func application(t *testing.T) *resources.Application {
 	t.Helper()
 
-	app, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	app, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	return app
@@ -155,7 +160,7 @@ func TestAppConfigExampleDecodesFloats(t *testing.T) {
 func TestAppConfigExampleWritesTheApplicationAsJSON(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	_, document, found := bytes.Cut(out.Bytes(), []byte("## JSON\n"))
@@ -267,7 +272,7 @@ func runRecordingEvents(t *testing.T) *eventRecorder {
 
 	recorder := &eventRecorder{}
 
-	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, t.TempDir())
+	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	return recorder
@@ -396,7 +401,7 @@ func TestRunWithoutReceiverWritesNothingToStdoutOrStderr(t *testing.T) {
 
 	var runErr error
 	captured := captureStandardStreams(t, func() {
-		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	})
 
 	require.NoError(t, runErr)
@@ -415,7 +420,7 @@ func renderEvents(t *testing.T) string {
 	r := registry.NewPluginRegistry()
 	rendered := &bytes.Buffer{}
 
-	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, t.TempDir())
+	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	return rendered.String()
@@ -470,7 +475,7 @@ func TestAppConfigExampleEntityAndStateAgree(t *testing.T) {
 	stateDir := t.TempDir()
 	statePath := filepath.Join(stateDir, state.StateFileName)
 
-	app, err := run(&bytes.Buffer{}, nil, r, configDir, stateDir)
+	app, err := run(&bytes.Buffer{}, nil, r, configDir, stateDir, testStateKey)
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(statePath)
@@ -517,7 +522,7 @@ func TestAppConfigExamplePrintsNoSecret(t *testing.T) {
 
 	var runErr error
 	captured := captureStandardStreams(t, func() {
-		_, runErr = run(out, prettylog.Handler(rendered, slog.LevelDebug, r), r, configDir, t.TempDir())
+		_, runErr = run(out, prettylog.Handler(rendered, slog.LevelDebug, r), r, configDir, t.TempDir(), testStateKey)
 	})
 
 	require.NoError(t, runErr)
@@ -534,10 +539,100 @@ func TestAppConfigExampleWritesTheMarkerForThePassword(t *testing.T) {
 
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	_, document, found := bytes.Cut(out.Bytes(), []byte("## JSON\n"))
 	require.True(t, found)
 	require.Contains(t, string(document), `"password": "(sensitive)"`)
+}
+
+// testPassword is the database password the tests set through DB_PASSWORD
+const testPassword = "app-s3cret-9f8e7d6c"
+
+// TestAppConfigExampleStateHoldsNoSecret asserts that with a state key the
+// password is encrypted in every file the run leaves in the state directory,
+// the sensitive values written as masked envelopes
+func TestAppConfigExampleStateHoldsNoSecret(t *testing.T) {
+	t.Setenv("DB_PASSWORD", testPassword)
+
+	stateDir := t.TempDir()
+
+	_, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, stateDir, testStateKey)
+	require.NoError(t, err)
+
+	entries, err := os.ReadDir(stateDir)
+	require.NoError(t, err)
+	require.NotEmpty(t, entries, "the run left no state, so the check proves nothing")
+
+	saved := ""
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(stateDir, entry.Name()))
+		require.NoError(t, err)
+
+		require.NotContains(t, string(data), testPassword, "%s holds the password", entry.Name())
+
+		saved += string(data)
+	}
+
+	require.Contains(t, saved, "xcl_masked")
+}
+
+// TestAppConfigExampleEventDataHoldsNoSecret asserts no event the run reports
+// carries the password, neither in its data nor anywhere else in the event
+func TestAppConfigExampleEventDataHoldsNoSecret(t *testing.T) {
+	t.Setenv("DB_PASSWORD", testPassword)
+
+	recorder := &eventRecorder{}
+
+	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
+	require.NoError(t, err)
+
+	recorded := recorder.snapshot()
+	require.NotEmpty(t, recorded)
+
+	withData := 0
+	for _, e := range recorded {
+		require.NotContains(t, string(e.Data), testPassword, "event data holds the password: %s %s %s", e.Operation, e.Phase, e.ResourceID)
+		require.NotContains(t, fmt.Sprintf("%+v", e), testPassword, "event holds the password: %s %s %s", e.Operation, e.Phase, e.ResourceID)
+
+		if len(e.Data) > 0 {
+			withData++
+		}
+	}
+
+	require.NotZero(t, withData, "no event carried data, so the check proves nothing")
+}
+
+// plaintextStateWarning is the warning xcl emits when it writes sensitive
+// values to state in plain text
+const plaintextStateWarning = "sensitive values are stored unencrypted in state; use xcl.WithStateMask to encrypt them"
+
+// TestAppConfigExampleWithoutKeyWarnsAboutPlainState asserts a run without a
+// state key reports, once, a warning from core that the apply wrote the
+// password to state in plain text
+func TestAppConfigExampleWithoutKeyWarnsAboutPlainState(t *testing.T) {
+	t.Setenv("DB_PASSWORD", testPassword)
+
+	recorder := &eventRecorder{}
+
+	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, t.TempDir(), nil)
+	require.NoError(t, err)
+
+	warnings := []xcl.Event{}
+	for _, e := range recorder.snapshot() {
+		if e.Meta[events.KeyMessage] == plaintextStateWarning {
+			warnings = append(warnings, e)
+		}
+	}
+
+	require.Len(t, warnings, 1)
+	require.Equal(t, events.SourceCore, warnings[0].Source)
+	require.Equal(t, events.OperationApply, warnings[0].Operation)
+	require.Equal(t, events.PhaseLog, warnings[0].Phase)
+	require.Equal(t, events.LevelWarn, warnings[0].Meta[events.KeyLevel])
 }

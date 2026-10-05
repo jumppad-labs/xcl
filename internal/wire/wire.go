@@ -14,6 +14,15 @@
 //   - query conversion (internal/schema),
 //   - the resource printer when revealing is asked for (logger).
 //
+// A caller may also pass a masker through Encode, which then writes each
+// sensitive value as that masker's envelope instead of its real value. The
+// masker is chosen per call, never through shared state:
+//
+//   - provider calls, change detection and conversions pass no masker, so
+//     they keep real values,
+//   - the state save passes the configured state masker,
+//   - event data passes the configured event masker.
+//
 // Apart from writing sensitive values revealed, the output follows
 // encoding/json exactly: tag names, omitempty, omitzero, "-", the string
 // option, embedded struct flattening with Go's dominance rules, and existing
@@ -32,6 +41,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -41,15 +51,52 @@ var (
 	textMarshalerType  = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
 )
 
-// Marshal returns the JSON encoding of value, with every sensitive value
-// written as its real value.
-func Marshal(value any) ([]byte, error) {
+// Options choose how Encode writes sensitive values.
+type Options struct {
+	// Mask, when set, writes each sensitive value as this masker's envelope.
+	// Nil writes real values.
+	Mask mask.Masker
+}
+
+// Result is what Encode wrote.
+type Result struct {
+	// Data is the JSON encoding.
+	Data []byte
+
+	// Sensitive reports whether at least one sensitive value was written,
+	// masked or not.
+	Sensitive bool
+}
+
+// Encode returns the JSON encoding of value, with every sensitive value
+// written as its real value, or as the options' masker's envelope when one is
+// given. It also reports whether any sensitive value was written.
+func Encode(value any, options Options) (Result, error) {
 	buffer := &bytes.Buffer{}
-	if err := encode(buffer, reflect.ValueOf(value)); err != nil {
+	state := &encoder{options: options}
+	if err := state.encode(buffer, reflect.ValueOf(value)); err != nil {
+		return Result{}, err
+	}
+
+	return Result{Data: buffer.Bytes(), Sensitive: state.sensitive}, nil
+}
+
+// Marshal returns the JSON encoding of value, with every sensitive value
+// written as its real value. It is Encode with no masker.
+func Marshal(value any) ([]byte, error) {
+	result, err := Encode(value, Options{})
+	if err != nil {
 		return nil, err
 	}
 
-	return buffer.Bytes(), nil
+	return result.Data, nil
+}
+
+// encoder carries one Encode call's options, and what it has seen, through
+// the recursive walk.
+type encoder struct {
+	options   Options
+	sensitive bool
 }
 
 // MarshalIndent is like Marshal but applies json.Indent to the output, as
@@ -68,7 +115,7 @@ func MarshalIndent(value any, prefix, indent string) ([]byte, error) {
 	return indented.Bytes(), nil
 }
 
-func encode(buffer *bytes.Buffer, value reflect.Value) error {
+func (e *encoder) encode(buffer *bytes.Buffer, value reflect.Value) error {
 	if !value.IsValid() {
 		buffer.WriteString("null")
 		return nil
@@ -77,7 +124,7 @@ func encode(buffer *bytes.Buffer, value reflect.Value) error {
 	valueType := value.Type()
 
 	if valueType.Kind() != reflect.Interface && valueType.Implements(sensitiveValueType) {
-		return encodeSensitive(buffer, value)
+		return e.encodeSensitive(buffer, value)
 	}
 
 	if !mayHoldSensitive(valueType) || isMarshaler(value) {
@@ -91,13 +138,13 @@ func encode(buffer *bytes.Buffer, value reflect.Value) error {
 			return nil
 		}
 
-		return encode(buffer, value.Elem())
+		return e.encode(buffer, value.Elem())
 
 	case reflect.Struct:
-		return encodeStruct(buffer, value)
+		return e.encodeStruct(buffer, value)
 
 	case reflect.Map:
-		return encodeMap(buffer, value)
+		return e.encodeMap(buffer, value)
 
 	case reflect.Slice:
 		if value.IsNil() {
@@ -105,23 +152,53 @@ func encode(buffer *bytes.Buffer, value reflect.Value) error {
 			return nil
 		}
 
-		return encodeArray(buffer, value)
+		return e.encodeArray(buffer, value)
 
 	case reflect.Array:
-		return encodeArray(buffer, value)
+		return e.encodeArray(buffer, value)
 	}
 
 	return delegate(buffer, value)
 }
 
-// encodeSensitive writes the real value of a sensitive value.
-func encodeSensitive(buffer *bytes.Buffer, value reflect.Value) error {
+// encodeSensitive writes the real value of a sensitive value, or its
+// envelope when a masker is given. A value already redacted is written as the
+// marker, or the marker masked.
+func (e *encoder) encodeSensitive(buffer *bytes.Buffer, value reflect.Value) error {
+	e.sensitive = true
+
 	sensitive := value.Interface().(types.SensitiveValue)
-	if types.IsRedacted(sensitive) {
-		return delegate(buffer, value)
+
+	if e.options.Mask == nil {
+		if types.IsRedacted(sensitive) {
+			return delegate(buffer, value)
+		}
+
+		return e.encode(buffer, reflect.ValueOf(sensitive.RevealAny()))
 	}
 
-	return encode(buffer, reflect.ValueOf(sensitive.RevealAny()))
+	plain := &bytes.Buffer{}
+	if types.IsRedacted(sensitive) {
+		if err := delegate(plain, value); err != nil {
+			return err
+		}
+	} else {
+		// the real value is what the masker receives, so it is written with
+		// no masker of its own
+		inner := &encoder{}
+		if err := inner.encode(plain, reflect.ValueOf(sensitive.RevealAny())); err != nil {
+			return err
+		}
+	}
+
+	envelope, err := mask.Envelope(plain.Bytes(), e.options.Mask)
+	if err != nil {
+		return err
+	}
+
+	buffer.Write(envelope)
+
+	return nil
 }
 
 // delegate writes value with encoding/json. An addressable value is passed
@@ -164,7 +241,7 @@ func isMarshaler(value reflect.Value) bool {
 	return false
 }
 
-func encodeStruct(buffer *bytes.Buffer, value reflect.Value) error {
+func (e *encoder) encodeStruct(buffer *bytes.Buffer, value reflect.Value) error {
 	buffer.WriteByte('{')
 
 	first := true
@@ -191,14 +268,14 @@ func encodeStruct(buffer *bytes.Buffer, value reflect.Value) error {
 		buffer.WriteByte(':')
 
 		if field.quoted {
-			if err := encodeQuoted(buffer, fieldValue); err != nil {
+			if err := e.encodeQuoted(buffer, fieldValue); err != nil {
 				return err
 			}
 
 			continue
 		}
 
-		if err := encode(buffer, fieldValue); err != nil {
+		if err := e.encode(buffer, fieldValue); err != nil {
 			return err
 		}
 	}
@@ -210,9 +287,9 @@ func encodeStruct(buffer *bytes.Buffer, value reflect.Value) error {
 
 // encodeQuoted writes a field carrying the string option, which encoding/json
 // writes as a JSON string holding the JSON encoding of the value.
-func encodeQuoted(buffer *bytes.Buffer, value reflect.Value) error {
+func (e *encoder) encodeQuoted(buffer *bytes.Buffer, value reflect.Value) error {
 	inner := &bytes.Buffer{}
-	if err := encode(inner, value); err != nil {
+	if err := e.encode(inner, value); err != nil {
 		return err
 	}
 
@@ -249,7 +326,7 @@ func fieldByIndex(value reflect.Value, index []int) (reflect.Value, bool) {
 	return value, true
 }
 
-func encodeMap(buffer *bytes.Buffer, value reflect.Value) error {
+func (e *encoder) encodeMap(buffer *bytes.Buffer, value reflect.Value) error {
 	if value.IsNil() {
 		buffer.WriteString("null")
 		return nil
@@ -289,7 +366,7 @@ func encodeMap(buffer *bytes.Buffer, value reflect.Value) error {
 		buffer.Write(encodedKey)
 		buffer.WriteByte(':')
 
-		if err := encode(buffer, mapEntry.value); err != nil {
+		if err := e.encode(buffer, mapEntry.value); err != nil {
 			return err
 		}
 	}
@@ -323,14 +400,14 @@ func mapKey(key reflect.Value) (string, error) {
 	return "", fmt.Errorf("json: unsupported map key type %s", key.Type())
 }
 
-func encodeArray(buffer *bytes.Buffer, value reflect.Value) error {
+func (e *encoder) encodeArray(buffer *bytes.Buffer, value reflect.Value) error {
 	buffer.WriteByte('[')
 	for i := 0; i < value.Len(); i++ {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
 
-		if err := encode(buffer, value.Index(i)); err != nil {
+		if err := e.encode(buffer, value.Index(i)); err != nil {
 			return err
 		}
 	}

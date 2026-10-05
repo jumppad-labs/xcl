@@ -137,7 +137,7 @@ func (h *lifecycleHarness) applyAndSave(t *testing.T, path string) *State {
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	encoded, err := EncodeForState(st.GetResources())
+	encoded, _, err := EncodeForState(st.GetResources(), nil)
 	require.NoError(t, err)
 
 	err = h.store.Save(encoded)
@@ -158,7 +158,7 @@ func (h *lifecycleHarness) applyAndSaveExpectingFailure(t *testing.T, path strin
 	require.Error(t, err)
 
 	if st != nil {
-		encoded, encodeErr := EncodeForState(st.GetResources())
+		encoded, _, encodeErr := EncodeForState(st.GetResources(), nil)
 		require.NoError(t, encodeErr)
 
 		saveErr := h.store.Save(encoded)
@@ -186,7 +186,7 @@ func loadTyped(t *testing.T, store state.StateStore, reg *registry.PluginRegistr
 	loaded, err := store.Load()
 	require.NoError(t, err)
 
-	entities, err := savedentity.DecodeAll(reg, loaded)
+	entities, err := savedentity.DecodeAll(reg, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	return entities

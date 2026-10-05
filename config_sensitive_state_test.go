@@ -120,7 +120,7 @@ func TestLoadedStateHoldsRealSensitiveValue(t *testing.T) {
 	records, err := secondStore.Load()
 	require.NoError(t, err)
 
-	loaded, err := savedentity.DecodeAll(reg, records)
+	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	var literal *registered.Secret
@@ -199,7 +199,7 @@ func TestStateSavedDuringDestroyHoldsRealSensitiveValues(t *testing.T) {
 func TestEncodeForStateWritesRealSensitiveValue(t *testing.T) {
 	secret := &registered.Secret{Username: "admin", Password: types.NewSensitive("hunter2")}
 
-	encoded, err := parser.EncodeForState([]any{secret})
+	encoded, _, err := parser.EncodeForState([]any{secret}, nil)
 	require.NoError(t, err)
 	require.Len(t, encoded, 1)
 

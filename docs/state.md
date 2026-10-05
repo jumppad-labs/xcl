@@ -129,10 +129,13 @@ text, err := xcl.EncodeSavedEntity(registry, record)
 
 The same record reaches an event receiver when a configuration asks for
 `xcl.EventDataProcessed`, so the same call works on either. The one difference
-is sensitive values: state holds their real values, while event data shows
-each as `(sensitive)`. Text made from event data therefore shows the marker
-for them, even with `xcl.RevealSensitive()`, since event data has no real
-value to show.
+is sensitive values, which state and events mask separately: state holds them
+plainly or encrypted by the state masker, while event data writes them through
+the event masker, by default as `{"xcl_masked":"redact","value":"(sensitive)"}`.
+Processed event data and the state record are therefore the same only where
+both mask alike. `EncodeSavedEntity` shows every masked value as
+`(sensitive)`, from state or from events, never as ciphertext or a hash, and
+even with `xcl.RevealSensitive()`, since it does not open masked values.
 
 Each saved record also carries `meta.references`, the text the user wrote for
 each field that referred to another entity, so
@@ -148,6 +151,36 @@ with `xcl.ErrUnregisteredType`, and one that cannot be read at all with
 
 The text is for reading rather than for feeding back to xcl; see
 [Converting to configuration text](../README.md#converting-to-configuration-text).
+
+## Sensitive values in state
+
+State holds the real value of every `types.Sensitive` field, so a later run
+can read it back. With no state masker it is held in plain text, and every
+`Apply` or `Destroy` that writes one emits a single warn-level log event:
+`sensitive values are stored unencrypted in state; use xcl.WithStateMask to
+encrypt them`.
+
+`xcl.WithStateMask(m)` masks each sensitive value as it is saved, with a
+masker that must implement `mask.Reversible`, usually
+`mask.EncryptAES256GCM(key)`. A one-way masker fails `NewConfig` with
+`xcl.ErrMaskNotReversible`. Only the sensitive values are masked, each written
+in place of its value as an envelope naming the masker:
+
+```json
+"password": {"xcl_masked": "aes-256-gcm", "value": "o8Rk1x...base64..."}
+```
+
+Every load, at the start of an apply and of a destroy, opens each envelope
+with the configured masker before the record is typed. An envelope that does
+not open fails the load with `xcl.ErrUnrecoverable`, naming the entity and the
+masker: state encrypted under another key, state masked by another masker, or
+masked state loaded with no masker configured. A masked value is never read
+back as the marker, because the next save would write that over the real
+value. Plain values load with or without a masker, so adding one to existing
+state works, and the next save encrypts it.
+
+A custom `StateStore` needs no change: with a state masker configured, the raw
+records it receives already hold envelopes in place of sensitive values.
 
 ## `StateStore` — the persistence contract
 
@@ -175,8 +208,10 @@ encoded, as a `json.RawMessage` holding its record with every
 to `(sensitive)` through `encoding/json`, so encoding the entities first is
 what lets a store that simply marshals what it is given keep the real values,
 and reload them unchanged. A store that inspected the typed entities must
-decode the raw records instead. The state file therefore holds secrets in
-plain text; protect it accordingly.
+decode the raw records instead. Without a state masker the state file
+therefore holds secrets in plain text; configure one with `xcl.WithStateMask`
+(see [Sensitive values in state](#sensitive-values-in-state)), or protect the
+file accordingly.
 
 `Parser.Apply` (and `Parser.Validate`) call `Exists()`/`Load()` at the
 start of every run to get the "previous state", the state saved by the last

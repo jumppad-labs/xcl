@@ -43,7 +43,7 @@ func reloadOutput(t *testing.T, store *state.FileStateStore, id string) *types.O
 	records, err := store.Load()
 	require.NoError(t, err)
 
-	loaded, err := savedentity.DecodeAll(newSecretRegistry(t), records)
+	loaded, err := savedentity.DecodeAll(newSecretRegistry(t), records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	for _, entity := range loaded {

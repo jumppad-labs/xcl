@@ -30,6 +30,8 @@ const (
 	// EventDataProcessed carries, on a success event, the resource as xcl
 	// records it in state, including the values the provider filled in. It is
 	// the form EncodeSavedEntity reads, so a receiver can turn it straight
-	// back into configuration text.
+	// back into configuration text. Sensitive values in it are masked by the
+	// event masker, so it matches the state record only where both mask
+	// alike.
 	EventDataProcessed = events.DataProcessed
 )
