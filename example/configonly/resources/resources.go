@@ -56,6 +56,8 @@ type Container struct {
 	Ports []Port   `xcl:"port,block" json:"port,omitempty"`
 	Env   []EnvVar `xcl:"env,block" json:"env,omitempty"`
 
+	Password types.Sensitive[string] `xcl:"password"`
+
 	// Resources appears at most once, so it is a pointer and is nil when the
 	// container does not set it
 	Resources *ResourceRequirements `xcl:"resources,block" json:"resources,omitempty"`

@@ -96,3 +96,4 @@
 - DONE + MERGED: user-depends-on (8/8). Knowledge candidates: xcl-tags-gate entry lists removed Parents; call-order tests flaky vs graph parents; Links are attribute paths; one unexplained flaky full-suite failure.
 - Created worktrees + started child: masking.
 - DONE + MERGED: masking (10/10). All 5 specs implemented and merged. Run complete.
+- Knowledge: user approved; wrote 13 entries to repo/xclconfig (2 updates, 11 new). Dropped #7 (processExpr already handles lists/conditionals/unary) and #8 (dup of meta-field-golden-schema).

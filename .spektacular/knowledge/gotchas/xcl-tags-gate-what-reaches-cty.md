@@ -13,7 +13,7 @@ The consequence is counter-intuitive: a struct can hold a field cty cannot
 represent and still encode cleanly.
 
 `types.Meta` is the case that bites. It holds `Properties map[string]any`, plus
-`Links`, `Parents` and `Status`, all with `json` tags and no `xcl` tag. Reading
+`Links`, `References` and `Status`, all with `json` tags and no `xcl` tag. Reading
 the Go struct, you would expect encoding a `meta` attribute to fail on that
 `map[string]any` — cty has no type for a map of untyped values, and the encoder
 does return an error for one in an `xcl`-tagged field. It does not fail, because
@@ -29,3 +29,4 @@ MPL-licensed fork — where, per `conventions/never-modify-dependencies.md`, it
 does not belong. Trimming `meta` is the root wrapper's job.
 
 Found on 2026-09-23 implementing Phase 1.1 of the hcl-encoding-helpers plan.
+`Meta.Parents` was removed and `Meta.References` added on 2026-10-05.

@@ -29,6 +29,7 @@ resource "deployment" "api" {
   container {
     name  = "api"
     image = "ghcr.io/example/api:${variable.image_tag}"
+    password = "my password"
 
     # port is repeated in turn, a block nested inside a block
     port {
@@ -74,6 +75,7 @@ resource "deployment" "api" {
   container {
     name  = "proxy"
     image = "ghcr.io/example/proxy:0.4.1"
+    password = "my password"
 
     port {
       name           = "proxy"

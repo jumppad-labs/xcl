@@ -22,6 +22,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
 	"github.com/jumppad-labs/xcl/example/prettylog"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -97,14 +99,26 @@ func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, di
 		return nil, err
 	}
 
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		panic(err)
+	}
+	masker, err := mask.EncryptAES256GCM(key)
+	if err != nil {
+		return nil, err
+	}
+
 	c, err := xcl.NewConfig(
 		xcl.WithPluginRegistry(r),
 		// Keep the state in a file, Destroy works from it alone
 		xcl.WithStatePath(stateDir),
+		// Encrypt sensitive values in the state
+		xcl.WithStateMask(masker),
 		xcl.WithEventHandler(handler),
 		// events carry nothing by default, this asks for each resource as
 		// state records it, which is what the receiver turns back into
 		// configuration text
+		// By default sensitive fields are redacted in the output
 		xcl.WithEventData(xcl.EventDataProcessed),
 	)
 	if err != nil {
