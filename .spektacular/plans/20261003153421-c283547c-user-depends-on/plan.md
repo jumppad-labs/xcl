@@ -173,7 +173,7 @@ All tests follow the project's conventions: testify `require`, no table-driven t
 
 **Validation point**: The full suite passes, with only the tests that read `Meta.Parents` rewritten to read the graph, and new tests prove that an entity depending on one entity through `depends_on` and another through a reference is created after both and, from loaded saved state, destroyed before both, even when its written list is empty; that a module-wide `depends_on` and resources inside a module destroy in the right order from saved state alone; and that saved state has no `parents`.
 
-#### - [ ] Task: Order creation from links
+#### - [x] Task: Order creation from links
 **Id:** d35dcc10-232f-484e-ad4e-c9becbed8a8f
 **Repo:** xclconfig
 **Depends on:** none
@@ -184,12 +184,12 @@ The create graph stops reading the user's dependency list and takes every depend
 *Technical detail:* [context.md#task-order-creation-from-links](./context.md#task-order-creation-from-links)
 
 **Acceptance criteria**:
-- [ ] An entity that depends on B only through its written list and on C only through a reference is created after B and C.
-- [ ] Its parents in the create graph are exactly B and C, even when its written dependency list is empty when the graph is built.
-- [ ] A `depends_on` naming a whole module still makes every resource in that module a parent.
-- [ ] Every existing test passes unchanged.
+- [x] An entity that depends on B only through its written list and on C only through a reference is created after B and C.
+- [x] Its parents in the create graph are exactly B and C, even when its written dependency list is empty when the graph is built.
+- [x] A `depends_on` naming a whole module still makes every resource in that module a parent.
+- [x] Every existing test passes unchanged.
 
-#### - [ ] Task: Order destruction from links with the create graph's builder
+#### - [x] Task: Order destruction from links with the create graph's builder
 **Id:** b3e94632-958e-4a2a-8309-5510e37f7827
 **Repo:** xclconfig
 **Depends on:**
@@ -201,13 +201,13 @@ The create graph's builder becomes the one builder for both directions. Destroy 
 *Technical detail:* [context.md#task-order-destruction-from-links-with-the-create-graphs-builder](./context.md#task-order-destruction-from-links-with-the-create-graphs-builder)
 
 **Acceptance criteria**:
-- [ ] Destroying from loaded saved state destroys an entity before B, which it names only in `depends_on`, and before C, which it only references, even when its written dependency list is empty.
-- [ ] Destroying from loaded saved state destroys an entity whose `depends_on` names a whole module before every resource in that module, and each resource in a module before the module.
-- [ ] A resource that references another inside the same module by its module-relative address is destroyed first, from saved state alone.
-- [ ] When only some entities are destroyed, dependencies outside that set are ignored, and a missing parent module does not stop the destroy.
-- [ ] Every existing destroy and removal test passes unchanged.
+- [x] Destroying from loaded saved state destroys an entity before B, which it names only in `depends_on`, and before C, which it only references, even when its written dependency list is empty.
+- [x] Destroying from loaded saved state destroys an entity whose `depends_on` names a whole module before every resource in that module, and each resource in a module before the module.
+- [x] A resource that references another inside the same module by its module-relative address is destroyed first, from saved state alone.
+- [x] When only some entities are destroyed, dependencies outside that set are ignored, and a missing parent module does not stop the destroy.
+- [x] Every existing destroy and removal test passes unchanged.
 
-#### - [ ] Task: Stop recording parents in saved state
+#### - [x] Task: Stop recording parents in saved state
 **Id:** 5078beb1-14d6-4eb4-a2d9-503409e28785
 **Repo:** xclconfig
 **Depends on:**
@@ -219,11 +219,11 @@ With nothing reading it, the recorded parents field is removed from entity metad
 *Technical detail:* [context.md#task-stop-recording-parents-in-saved-state](./context.md#task-stop-recording-parents-in-saved-state)
 
 **Acceptance criteria**:
-- [ ] Entity metadata has no parents field and saved state carries no `parents` key.
-- [ ] The parents, destroy, removal and subtype tests keep their intent, reading each entity's parents from the graph built from saved state.
-- [ ] A saved record that still carries a `parents` key decodes, the key ignored.
-- [ ] The state, overview, parser lifecycle and plugin developer guides no longer mention recorded parents and describe destroy as the create graph walked backwards.
-- [ ] The full suite passes, including the golden schema test.
+- [x] Entity metadata has no parents field and saved state carries no `parents` key.
+- [x] The parents, destroy, removal and subtype tests keep their intent, reading each entity's parents from the graph built from saved state.
+- [x] A saved record that still carries a `parents` key decodes, the key ignored.
+- [x] The state, overview, parser lifecycle and plugin developer guides no longer mention recorded parents and describe destroy as the create graph walked backwards.
+- [x] The full suite passes, including the golden schema test.
 
 ### Milestone 2: A written `depends_on` list is kept and shown exactly as written
 
@@ -231,7 +231,7 @@ With nothing reading it, the recorded parents field is removed from entity metad
 
 **Validation point**: The full suite passes. New tests prove that the list is unchanged by parsing, applying and reloading; that configuration text shows a written list and no list when none was written, identically for live and saved entities; and that boundary-checking of written entries still holds.
 
-#### - [ ] Task: Keep the written dependency list as written
+#### - [x] Task: Keep the written dependency list as written
 **Id:** d9669e0e-376d-455a-9177-8ea10ee3e1ea
 **Repo:** xclconfig
 **Depends on:**
@@ -243,13 +243,13 @@ The parser and the graph stop copying worked-out dependencies into the user's `d
 *Technical detail:* [context.md#task-keep-the-written-dependency-list-as-written](./context.md#task-keep-the-written-dependency-list-as-written)
 
 **Acceptance criteria**:
-- [ ] An entity whose `depends_on` names B and whose fields reference C has a dependency list holding only B, as written, after parsing, after applying and when loaded back from state.
-- [ ] A disabled entity keeps its written list, and an entity with no `depends_on` has an empty list even when it holds references.
-- [ ] Creation and destruction still honour both B and C.
-- [ ] A `depends_on` entry reaching inside a module is still rejected by validation, and one naming the module itself still validates.
-- [ ] The new link helper adds a link once and leaves the dependency list untouched.
+- [x] An entity whose `depends_on` names B and whose fields reference C has a dependency list holding only B, as written, after parsing, after applying and when loaded back from state.
+- [x] A disabled entity keeps its written list, and an entity with no `depends_on` has an empty list even when it holds references.
+- [x] Creation and destruction still honour both B and C.
+- [x] A `depends_on` entry reaching inside a module is still rejected by validation, and one naming the module itself still validates.
+- [x] The new link helper adds a link once and leaves the dependency list untouched.
 
-#### - [ ] Task: Show the written dependency list in configuration text
+#### - [x] Task: Show the written dependency list in configuration text
 **Id:** d8b008f2-de08-45d7-9321-6501b8716092
 **Repo:** xclconfig
 **Depends on:**
@@ -261,10 +261,10 @@ Configuration text now writes `depends_on` when the author wrote one, exactly as
 *Technical detail:* [context.md#task-show-the-written-dependency-list-in-configuration-text](./context.md#task-show-the-written-dependency-list-in-configuration-text)
 
 **Acceptance criteria**:
-- [ ] The text for an entity that wrote `depends_on` naming B and references C contains a dependency list naming only B.
-- [ ] The text for an entity with no written dependency list contains no dependency list.
-- [ ] Text from the live entity and from its saved data is byte-identical.
-- [ ] Bookkeeping inside an attribute holding a whole object is still left out.
+- [x] The text for an entity that wrote `depends_on` naming B and references C contains a dependency list naming only B.
+- [x] The text for an entity with no written dependency list contains no dependency list.
+- [x] Text from the live entity and from its saved data is byte-identical.
+- [x] Bookkeeping inside an attribute holding a whole object is still left out.
 
 ### Milestone 3: The documentation explains written dependency lists
 
@@ -272,7 +272,7 @@ Configuration text now writes `depends_on` when the author wrote one, exactly as
 
 **Validation point**: The README and CHANGELOG content tests pass, and they fail if the new text is removed. The site builds and type-checks. The knowledge entry describes the new split.
 
-#### - [ ] Task: Document written dependency lists in the library
+#### - [x] Task: Document written dependency lists in the library
 **Id:** 38a71b63-f8dc-4298-bf7f-81b5bba61fe4
 **Repo:** xclconfig
 **Depends on:**
@@ -284,12 +284,12 @@ The README's configuration-text section stops saying `depends_on` is never writt
 *Technical detail:* [context.md#task-document-written-dependency-lists-in-the-library](./context.md#task-document-written-dependency-lists-in-the-library)
 
 **Acceptance criteria**:
-- [ ] The README states that a written dependency list is preserved exactly and shown in configuration text, and that worked-out dependencies are not added to it.
-- [ ] The README no longer says `depends_on` is never written.
-- [ ] The changelog has an entry for this work listing the narrowed dependency list, the replaced helper and the removal of `meta.parents` / `types.Meta.Parents` as breaking changes, and saying destroy order now comes from links.
-- [ ] The content tests fail if the new README text or the changelog entry is removed.
+- [x] The README states that a written dependency list is preserved exactly and shown in configuration text, and that worked-out dependencies are not added to it.
+- [x] The README no longer says `depends_on` is never written.
+- [x] The changelog has an entry for this work listing the narrowed dependency list, the replaced helper and the removal of `meta.parents` / `types.Meta.Parents` as breaking changes, and saying destroy order now comes from links.
+- [x] The content tests fail if the new README text or the changelog entry is removed.
 
-#### - [ ] Task: Describe written dependency lists in the site's configuration-text guide
+#### - [x] Task: Describe written dependency lists in the site's configuration-text guide
 **Id:** 12852342-b3ac-4574-8a5a-82e61696e2c4
 **Repo:** xcl-website
 **Depends on:**
@@ -301,10 +301,10 @@ The site's configuration-text guide gains a short section saying that a written 
 *Technical detail:* [context.md#task-describe-written-dependency-lists-in-the-sites-configuration-text-guide](./context.md#task-describe-written-dependency-lists-in-the-sites-configuration-text-guide)
 
 **Acceptance criteria**:
-- [ ] The configuration-text guide states that a written dependency list is preserved exactly and shown, and that worked-out dependencies are not added to it, with an example.
-- [ ] The site builds and type-checks.
+- [x] The configuration-text guide states that a written dependency list is preserved exactly and shown, and that worked-out dependencies are not added to it, with an example.
+- [x] The site builds and type-checks.
 
-#### - [ ] Task: Bring the dependency-list knowledge entry into line
+#### - [x] Task: Bring the dependency-list knowledge entry into line
 **Id:** 361e4f02-4221-4eef-b5d9-99420e1ceb18
 **Repo:** xclconfig
 **Depends on:**
@@ -316,8 +316,8 @@ The project's knowledge entry on how the dependency list relates to links still 
 *Technical detail:* [context.md#task-bring-the-dependency-list-knowledge-entry-into-line](./context.md#task-bring-the-dependency-list-knowledge-entry-into-line)
 
 **Acceptance criteria**:
-- [ ] The knowledge entry describes the dependency list as holding only what the user wrote, and the links as the source for create and destroy ordering and for validation.
-- [ ] The entry no longer asks to be re-checked once this spec lands.
+- [x] The knowledge entry describes the dependency list as holding only what the user wrote, and the links as the source for create and destroy ordering and for validation.
+- [x] The entry no longer asks to be re-checked once this spec lands.
 
 ## Open Questions
 
@@ -333,3 +333,127 @@ The project's knowledge entry on how the dependency list relates to links still 
 - **Showing worked-out dependencies anywhere new.** The resource printer keeps printing the written list and the links separately; configuration text never shows worked-out dependencies.
 - **Recording `depends_on` as a reference for `ShowReferences()`.** It is not a reference expression; `20261003153421-bf87d907-references-as-written` keeps it out of `Meta.References`.
 - **Changes to `internal/xcl` (the copied HCL).** None are needed, so `UPSTREAM.md` is untouched.
+
+## Changelog
+
+### 2026-10-05 — Task: Order creation from links
+
+**What was done**: `getResourceDependencies` now reads every dependency from the entity's `Meta.Links` instead of its `DependsOn` list, so the create graph no longer depends on the user's written list. New graph-level and lifecycle tests pin create order for a dependency that exists only in `depends_on` and one that exists only as a reference, plus module-wide `depends_on`.
+
+**Deviations**: The graph tests build the create graph over the state returned by a real `Apply` (which implements `ResourceProvider`) rather than a parse-only result. The apply-order test lives in `dag_test.go` next to the new fixture constants instead of `lifecycle_test.go`.
+
+**Files changed**:
+- `xclconfig: internal/parser/util.go`
+- `xclconfig: internal/parser/dag_test.go`
+- `xclconfig: internal/test_fixtures/config/lifecycle/written_and_referenced/main.xcl`
+
+**Discoveries**: Until the mirror loop in `buildCreateDAG` is removed (task "Keep the written dependency list as written"), emptying `DependsOn` before building the graph is refilled by the mirror, so the "reads links" test only becomes discriminating after that task.
+
+### 2026-10-05 — Task: Order destruction from links with the create graph's builder
+
+**What was done**: The create graph's body became one builder, `buildDependencyGraph(rp, addresses, nodes, rootName, requireParentModule)`, which resolves each node's `Meta.Links` (and its parent module) against everything `rp` holds and keeps only edges between nodes. `buildCreateDAG` and `buildDestroyDAG` wrap it; the destroyer gained an `addresses` field set by `Apply`'s removal phase and `Destroy`, and builds its graph over its whole working state before walking it in reverse. `getResourceDependencies` gained `requireParentModule`, false for destroy so a missing parent module is ignored.
+
+**Deviations**: `buildCreateDAG` keeps the `Links`→`DependsOn` mirror and the `Meta.Parents` recording as a prelude before calling the shared builder (rather than inside it), so the builder itself is already in its final form. An extra graph-level test (`TestDestroyGraphResolvesModuleRelativeLinksFromSavedState`) was added because the call-order test for module-relative links could pass by chance.
+
+**Files changed**:
+- `xclconfig: internal/parser/dag.go`
+- `xclconfig: internal/parser/util.go`
+- `xclconfig: internal/parser/destroy.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/parser/destroy_test.go`
+- `xclconfig: internal/test_fixtures/config/lifecycle/module_internal_reference/main.xcl`
+- `xclconfig: internal/test_fixtures/config/lifecycle/module_internal_reference/module/networks.xcl`
+
+**Discoveries**: Provider call-order assertions between independent resources can pass by luck, because the walker runs unrelated vertices concurrently; graph-level parent assertions are the deterministic check. Builtin modules do emit destroy success events, so module ordering can be asserted from events.
+
+### 2026-10-05 — Task: Stop recording parents in saved state
+
+**What was done**: `types.Meta.Parents` and its `parents` JSON key were removed, along with the recording loop in `buildCreateDAG` and both golden-schema entries. The `Links` doc comment now says it holds every dependency and orders create and destroy. Tests that read `Meta.Parents` now read the destroy graph built from saved state through a new `savedGraphParents` helper, keeping their asserted IDs; new tests check saved state has no `parents` key and a legacy record carrying `parents` still decodes. The state, overview, parser lifecycle and plugin developer guides describe destroy as the create graph built from saved links and walked backwards.
+
+**Deviations**: `savedGraphParents` takes a `*Parser` (using its store and registry) instead of a harness, so one helper serves the lifecycle and registered-types harnesses. `docs/state.md` keeps one mention of `meta.parents` to say saved state no longer carries it and older state holding it still loads.
+
+**Files changed**:
+- `xclconfig: types/resource.go`
+- `xclconfig: internal/parser/dag.go`
+- `xclconfig: internal/schema/test_fixtures/embedded.go`
+- `xclconfig: internal/parser/dag_test.go`
+- `xclconfig: internal/parser/parents_test.go`
+- `xclconfig: internal/parser/destroy_test.go`
+- `xclconfig: internal/parser/removal_test.go`
+- `xclconfig: internal/parser/registered_types_test.go`
+- `xclconfig: internal/savedentity/savedentity_test.go`
+- `xclconfig: docs/state.md`
+- `xclconfig: docs/overview.md`
+- `xclconfig: docs/parser-lifecycle.md`
+- `xclconfig: docs/plugin-developer-guide.md`
+
+**Discoveries**: The test sub-agent saw one unexplained full-suite `FAIL` (output truncated) that did not recur in six later full runs; possibly a pre-existing intermittent test. The knowledge entry `gotchas/xcl-tags-gate-what-reaches-cty.md` lists `Parents` among `Meta`'s json-only fields and is now slightly out of date.
+
+### 2026-10-05 — Task: Keep the written dependency list as written
+
+**What was done**: `types.AppendUniqueDependency` was replaced by `types.AppendUniqueLink`, which appends to `Meta.Links` only. The parser's link discovery adds references and canonical `depends_on` entries to the links, and sets `DependsOn` once to the `depends_on` strings exactly as written; the create graph's `Links`→`DependsOn` mirror and the dead `setDependsOn` TODO block were deleted. New tests prove the list holds only the written entry after parse, apply and reload, stays empty when none is written, survives on a disabled entity, and that create and destroy still order by both written and referenced dependencies.
+
+**Deviations**: The module-boundary `depends_on` tests from the earlier spec (`TestValidateRejectsADependsOnNamingAModuleInternal`, `TestValidateAcceptsADependsOnNamingAChildModule`) already cover the boundary regression and pass unchanged, so none were duplicated. A disabled entity `off` was added to the `written_and_referenced` fixture.
+
+**Files changed**:
+- `xclconfig: types/resource_helpers.go`
+- `xclconfig: types/resource.go`
+- `xclconfig: types/resource_helpers_test.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/parser/dag.go`
+- `xclconfig: internal/parser/depends_on_test.go`
+- `xclconfig: internal/test_fixtures/config/lifecycle/written_and_referenced/main.xcl`
+- `xclconfig: config_test.go`
+
+**Discoveries**: The plan's open question is resolved: the walk's decode writes the same strings the parser recorded. References are stored in `Meta.Links` as full attribute paths (e.g. `resource.network.c.subnet`), not entity addresses. A disabled entity's `disabled` flag is only decoded during the walk, so at parse time `GetDisabled` reports false.
+
+### 2026-10-05 — Task: Show the written dependency list in configuration text
+
+**What was done**: `trimBookkeeping` now removes `depends_on` only when the entity's dependency list is empty, so configuration text shows a written list exactly as written and nothing xcl worked out. The encode fixture gained `resource.container.api`, which writes `depends_on` naming the database and references the network; new tests check its text shows only the database in `depends_on`, that an entity without a written list has none, and that live and saved text are byte-identical. `TestEncodeEntityOmitsDependsOn` was replaced.
+
+**Deviations**: None. No example expected output needed changing; the only example writing `depends_on` does not assert on configuration text.
+
+**Files changed**:
+- `xclconfig: encode.go`
+- `xclconfig: encode_test.go`
+- `xclconfig: internal/test_fixtures/config/encode/main.xcl`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Document written dependency lists in the library
+
+**What was done**: The README's configuration-text "What is left out" paragraph now says a `depends_on` list is written exactly as written, left out when none was written, and never gains the dependencies xcl works out, which still order creation and destruction. The parser lifecycle guide says every graph edge comes from `Meta.Links` and `DependsOn` is never altered; the overview's `ResourceBase` sketch notes `DependsOn` is what the user wrote. CHANGELOG gained a top entry for this spec with a `**Breaking:**` list (narrowed `DependsOn`, `AppendUniqueLink`, removal of `types.Meta.Parents` / `meta.parents`, `depends_on` in configuration text). Content tests guard the README text and the changelog entry.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xclconfig: README.md`
+- `xclconfig: CHANGELOG.md`
+- `xclconfig: docs/parser-lifecycle.md`
+- `xclconfig: docs/overview.md`
+- `xclconfig: readme_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Document the module boundary and output entities on the site
+
+**What was done**: On the home page, the Modules card now says outputs are the only way into a module, that anything else is rejected by validation, and that a nested module's value is exposed by re-exporting it. The Variables and outputs card says an output is an entity in Go, read with `Find[types.Output]` and `.Value`. The plugin example page gains a snippet of the program reading its outputs as `types.Output` entities (matching `example/plugin/main.go`), and a "What to notice" bullet on the module boundary with a re-export example. The printed output lines are unchanged.
+
+**Deviations**: None. The site has no content tests. It was verified with `npm ci`, `make check` (0 errors, 0 warnings) and `npm run build` (6 pages built).
+
+**Files changed**:
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+
+**Discoveries**: The site worktree had no `node_modules`, so `npm ci` had to run before `make check`.
+
+### 2026-10-05 — Task: Bring the dependency-list knowledge entry into line
+
+**What was done**: The knowledge entry `learnings/depends-on-mirrors-links.md` was rewritten through `spektacular knowledge write` and retitled "Meta.Links orders; DependsOn is as written". It says `DependsOn` holds only what the user wrote, set at parse time; `Meta.Links` holds every dependency and is what create and destroy ordering (one builder, destroy from saved links walked in reverse, no `Meta.Parents`), validation, the module boundary check and the evaluation context read; and `AppendUniqueLink` replaced `AppendUniqueDependency`. The "re-check once this lands" line is gone.
+
+**Deviations**: The entry keeps its path (`learnings/depends-on-mirrors-links.md`) and only its title changed, so nothing that points at it breaks. Being an orchestrated run with a planned task, the write was made without a separate propose-then-confirm round.
+
+**Files changed**:
+- `xclconfig: .spektacular/knowledge/learnings/depends-on-mirrors-links.md`
+
+**Discoveries**: `gotchas/xcl-tags-gate-what-reaches-cty.md` still lists `Parents` among `Meta`'s json-only fields and could be updated.

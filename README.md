@@ -701,8 +701,9 @@ Both write exactly one block, so convert several entities by calling once for
 each.
 
 **What is left out.** The text shows what a person wrote. xcl's own bookkeeping
-is not written, and neither is `depends_on`, which by the time a configuration
-is parsed holds the references xcl resolved as well as anything you wrote.
+is not written. A `depends_on` list is written exactly as you wrote it, and
+left out when you wrote none: the dependencies xcl works out from references
+are never added to it, though they still order creation and destruction.
 Values a provider filled in are left out too. Ask for them with
 `IncludeComputed`, and each one is marked so a reader can tell it apart:
 

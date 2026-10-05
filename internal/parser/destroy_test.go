@@ -12,6 +12,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
+	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,11 @@ const (
 
 	dependentVariableID = "variable.independent_subnet"
 	dependentOutputID   = "output.first_name"
+
+	lifecycleModuleInternalReferenceConfig = "../test_fixtures/config/lifecycle/module_internal_reference/main.xcl"
+
+	moduleInternalReferenceOneID = "module.inner.resource.network.one"
+	moduleInternalReferenceTwoID = "module.inner.resource.network.two"
 )
 
 // dependentProviderIDs are the resources of the dependent fixture a provider
@@ -540,7 +546,7 @@ func TestDestroyNeverDestroysParentOfFailedChild(t *testing.T) {
 		}
 
 		failed++
-		for _, parent := range meta.Parents {
+		for _, parent := range savedGraphParents(t, h.newParser(t, nil), meta.ID) {
 			require.NotContains(t, calls, parent, "%s was destroyed after its child %s failed", parent, meta.ID)
 		}
 	}
@@ -622,4 +628,202 @@ func contains(ids []string, id string) bool {
 	}
 
 	return false
+}
+
+// loadSavedState loads the entities the harness store last saved into a fresh
+// working state, and returns it with the address parser of a fresh parser,
+// just as Parser.Destroy prepares them.
+func loadSavedState(t *testing.T, h *lifecycleHarness) (*State, *resources.AddressParser) {
+	t.Helper()
+
+	p := h.newParser(t, nil)
+
+	err := p.loadPlugins()
+	require.NoError(t, err)
+
+	working := NewState()
+	for _, entity := range h.loadSaved(t) {
+		err := working.AppendResource(entity)
+		require.NoError(t, err)
+	}
+
+	return working, p.addressParser()
+}
+
+// eventIndex returns the position in recorded of the event with the given
+// resource ID, operation and phase, failing the test when there is none.
+func eventIndex(t *testing.T, recorded []events.Event, resourceID string, operation string, phase string) int {
+	t.Helper()
+
+	for i, event := range recorded {
+		if event.ResourceID == resourceID && event.Operation == operation && event.Phase == phase {
+			return i
+		}
+	}
+
+	require.Failf(t, "event not found", "no %s %s event for %s", operation, phase, resourceID)
+
+	return -1
+}
+
+// Destroying from saved state destroys an entity before the resource it names
+// in depends_on.
+func TestDestroyFromSavedStateDestroysBeforeWrittenDependency(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, lifecycleWrittenAndReferencedConfig)
+	h.plugin.ResetCalls()
+
+	_, err := destroyAll(t, h, nil)
+	require.NoError(t, err)
+
+	calls := destroyCalls(h.plugin)
+	requireBefore(t, writtenAndReferencedAID, writtenAndReferencedBID, calls)
+}
+
+// Destroying from saved state destroys an entity before the resource it
+// references.
+func TestDestroyFromSavedStateDestroysBeforeReferencedDependency(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, lifecycleWrittenAndReferencedConfig)
+	h.plugin.ResetCalls()
+
+	_, err := destroyAll(t, h, nil)
+	require.NoError(t, err)
+
+	calls := destroyCalls(h.plugin)
+	requireBefore(t, writtenAndReferencedAID, writtenAndReferencedCID, calls)
+}
+
+// The destroy graph takes an entity's dependencies from the links it saved, so
+// clearing its written dependency list does not change its parents.
+func TestDestroyFromSavedStateIgnoresWrittenDependsOnList(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, lifecycleWrittenAndReferencedConfig)
+
+	working, addresses := loadSavedState(t, h)
+	a := requireEntity(t, working, writtenAndReferencedAID)
+
+	err := types.SetDependencies(a, nil)
+	require.NoError(t, err)
+
+	graph, err := buildDestroyDAG(working, addresses, working.GetResources())
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		[]string{writtenAndReferencedBID, writtenAndReferencedCID},
+		graphParentIDs(t, graph, a),
+	)
+}
+
+// Destroying from saved state destroys an entity that depends on a whole module
+// before every resource in that module.
+func TestDestroyFromSavedStateDestroysModuleWideDependentFirst(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, lifecycleModuleReferenceConfig)
+
+	collector := &eventCollector{}
+
+	_, err := destroyAll(t, h, collector.collect)
+	require.NoError(t, err)
+
+	recorded := collector.all()
+	consumer := eventIndex(t, recorded, moduleReferenceConsumerID, events.OperationDestroy, events.PhaseSuccess)
+	one := eventIndex(t, recorded, moduleReferenceOneID, events.OperationDestroy, events.PhaseSuccess)
+	two := eventIndex(t, recorded, moduleReferenceTwoID, events.OperationDestroy, events.PhaseSuccess)
+
+	require.Less(t, consumer, one)
+	require.Less(t, consumer, two)
+}
+
+// Destroying from saved state destroys the resources in a module before the
+// module itself.
+func TestDestroyFromSavedStateDestroysModuleResourcesBeforeModule(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, lifecycleModuleReferenceConfig)
+
+	collector := &eventCollector{}
+
+	_, err := destroyAll(t, h, collector.collect)
+	require.NoError(t, err)
+
+	recorded := collector.all()
+	module := eventIndex(t, recorded, moduleReferenceModuleID, events.OperationDestroy, events.PhaseSuccess)
+	one := eventIndex(t, recorded, moduleReferenceOneID, events.OperationDestroy, events.PhaseSuccess)
+	two := eventIndex(t, recorded, moduleReferenceTwoID, events.OperationDestroy, events.PhaseSuccess)
+
+	require.Less(t, one, module)
+	require.Less(t, two, module)
+}
+
+// Destroying from saved state resolves a reference written relative to the
+// module it sits in, and destroys the referencing resource first.
+func TestDestroyFromSavedStateResolvesModuleRelativeLinks(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, lifecycleModuleInternalReferenceConfig)
+	h.plugin.ResetCalls()
+
+	_, err := destroyAll(t, h, nil)
+	require.NoError(t, err)
+
+	calls := destroyCalls(h.plugin)
+	requireBefore(t, moduleInternalReferenceTwoID, moduleInternalReferenceOneID, calls)
+}
+
+// The module-relative link a resource inside a module saved resolves from
+// saved state alone, so the resource it references is one of its parents in
+// the destroy graph alongside the module.
+func TestDestroyGraphResolvesModuleRelativeLinksFromSavedState(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, lifecycleModuleInternalReferenceConfig)
+
+	working, addresses := loadSavedState(t, h)
+	two := requireEntity(t, working, moduleInternalReferenceTwoID)
+
+	graph, err := buildDestroyDAG(working, addresses, working.GetResources())
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		[]string{"module.inner", moduleInternalReferenceOneID},
+		graphParentIDs(t, graph, two),
+	)
+}
+
+// The destroy graph orders only the entities being destroyed, a dependency
+// that stays in the state is not one of an entity's parents.
+func TestDestroyGraphIgnoresDependenciesOutsideTheSet(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, lifecycleWrittenAndReferencedConfig)
+
+	working, addresses := loadSavedState(t, h)
+	a := requireEntity(t, working, writtenAndReferencedAID)
+	c := requireEntity(t, working, writtenAndReferencedCID)
+
+	graph, err := buildDestroyDAG(working, addresses, []any{a, c})
+	require.NoError(t, err)
+
+	require.Equal(t, []string{writtenAndReferencedCID}, graphParentIDs(t, graph, a))
+}
+
+// The destroy graph builds when the module a resource sits in is no longer in
+// the state, and the resource then hangs off the root.
+func TestDestroyGraphIgnoresMissingParentModule(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, lifecycleModuleReferenceConfig)
+
+	working, addresses := loadSavedState(t, h)
+	module := requireEntity(t, working, moduleReferenceModuleID)
+	one := requireEntity(t, working, moduleReferenceOneID)
+
+	err := working.RemoveResource(module)
+	require.NoError(t, err)
+
+	targets := append([]any{}, working.GetResources()...)
+
+	graph, err := buildDestroyDAG(working, addresses, targets)
+	require.NoError(t, err)
+
+	require.Empty(t, graphParentIDs(t, graph, one))
+	require.True(t, graphHasRootParent(graph, one))
 }

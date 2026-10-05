@@ -1,5 +1,18 @@
 # Changelog
 
+## 20261003153421-c283547c-user-depends-on
+
+A `depends_on` list now holds exactly what the user wrote, after parsing, after applying and when loaded back from saved state. The dependencies xcl works out from references are no longer added to it, so state, plugin calls and event data carry the author's list as written. Configuration text from `EncodeEntity` and `EncodeSavedEntity` now includes `depends_on` when one was written, exactly as written, and leaves it out otherwise; it never shows a dependency xcl worked out.
+
+Ordering still honours every dependency. Create and destroy order both come from each entity's `Meta.Links`, which hold the references xcl found and each written `depends_on` entry. Destroy builds the same graph as create, from the links each resource saved, and walks it backwards, so it no longer needs a separately recorded list of parents. State saved before `meta.parents` existed is now destroyed children first too. A `depends_on` entry that reaches inside a module is still rejected by validation.
+
+**Breaking:**
+
+- `types.ResourceBase.DependsOn` holds only the written list. Code that read it to learn every dependency reads `Meta.Links` instead.
+- `types.AppendUniqueDependency` is replaced by `types.AppendUniqueLink`, which appends to `Meta.Links` only and never touches `DependsOn`.
+- `types.Meta.Parents` is removed, and saved state no longer carries `meta.parents`. Destroy builds the create graph from each saved resource's `meta.links` and walks it backwards; code reading `Meta.Parents` reads `Meta.Links`. Older state carrying `parents` still loads, the key ignored.
+- Configuration text now includes `depends_on` when the author wrote one.
+
 ## 20261003153421-bf87d907-references-as-written
 
 Configuration text can show references as the user wrote them. `xcl.ShowReferences()`, passed to `EncodeEntity` or `EncodeSavedEntity`, writes each field that referred to another entity exactly as written, such as `x = resource.b.one.y`, a template like `"${variable.region}-a"`, or a reference inside a nested block, instead of the value it resolved to. Without the option the text is unchanged and shows resolved values. Text from a live entity and from its saved data is byte-identical, with and without the option, and the option combines with `xcl.IncludeComputed()`.

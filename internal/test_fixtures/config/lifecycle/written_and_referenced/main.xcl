@@ -1,0 +1,29 @@
+# a depends on b through a written depends_on, and on c through a reference to
+# c's subnet. b and c depend on nothing. alone depends on nothing and nothing
+# depends on it. off is disabled, so no provider is ever reached for it, but it
+# still names b in a written depends_on.
+
+resource "network" "b" {
+  subnet = "10.0.1.0/24"
+}
+
+resource "network" "c" {
+  subnet = "10.0.2.0/24"
+}
+
+resource "network" "a" {
+  depends_on = ["resource.network.b"]
+
+  subnet = resource.network.c.subnet
+}
+
+resource "network" "alone" {
+  subnet = "10.0.3.0/24"
+}
+
+resource "network" "off" {
+  disabled   = true
+  depends_on = ["resource.network.b"]
+
+  subnet = "10.0.4.0/24"
+}

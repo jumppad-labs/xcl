@@ -747,16 +747,22 @@ func TestApplyResolvesReferencesToEntitiesOfOtherTypesFromAResource(t *testing.T
 	require.Equal(t, "eu-west", typed.SharedLocation)
 }
 
-func TestApplyRecordsAnEntityWithASubtypeAsAParentOfWhatReferencesIt(t *testing.T) {
+func TestApplyOrdersAnEntityWithASubtypeBeforeWhatReferencesIt(t *testing.T) {
 	h := setupRegisteredTypes(t)
 	p := h.newParser(t, nil)
 
 	st, err := p.Apply(context.Background(), registeredSubtypedConfig)
 	require.NoError(t, err)
 
-	require.Contains(t, requireMeta(t, st.GetResources(), registeredCacheID).Parents, registeredServerID)
-	require.Contains(t, requireMeta(t, st.GetResources(), registeredAPIID).Parents, registeredServerID)
-	require.Contains(t, requireMeta(t, st.GetResources(), registeredAPIID).Parents, registeredCacheID)
+	graph, err := buildCreateDAG(st, p.addressParser())
+	require.NoError(t, err)
+
+	cacheParents := graphParentIDs(t, graph, requireEntity(t, st, registeredCacheID))
+	apiParents := graphParentIDs(t, graph, requireEntity(t, st, registeredAPIID))
+
+	require.Contains(t, cacheParents, registeredServerID)
+	require.Contains(t, apiParents, registeredServerID)
+	require.Contains(t, apiParents, registeredCacheID)
 }
 
 func TestApplyReadsAnEntityWithASubtypeBackFromSavedState(t *testing.T) {

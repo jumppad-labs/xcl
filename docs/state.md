@@ -18,15 +18,14 @@ nothing to construct. The parser keeps its own working container internally
 index or status table — a resource's operational status lives on its own
 `types.Meta.Status` field (see [Resource statuses](#resource-statuses)).
 
-Each saved resource also records its parents in `meta.parents`
-([`types/resource.go`](../types/resource.go#L42)): the sorted IDs of the
-resources it depends on, resolved when the create graph is built. They cover
-explicit `depends_on`, references (including to variables and outputs),
-module-wide references expanded to the module's resources, and the module the
-resource sits in. The field is internal, cannot be set from configuration, and
-is omitted when empty. It is what lets `Destroy` order resources from the
-saved state alone; state saved before it existed has no parents, and is
-destroyed with no ordering guarantee.
+Each saved resource keeps its `meta.links` and `meta.module`
+([`types/resource.go`](../types/resource.go#L47)): every dependency it has,
+written in `depends_on` or worked out from a reference, as an address relative
+to the module it sits in. `Destroy` resolves them against the saved state with
+the same builder that orders creation, and walks that graph backwards, so it
+needs no configuration. Saved state no longer carries `meta.parents`; state
+written by earlier versions that still holds it loads, the key ignored, and is
+ordered from its links.
 
 Every lookup is a **linear scan** comparing `types.GetMeta(r)` fields against a
 parsed FQRN (fully-qualified resource name, `internal/resources/fqrn.go`) —

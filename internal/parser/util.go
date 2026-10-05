@@ -504,11 +504,14 @@ func getNameAndIndex(path []string) (name string, index int, remainingPath []str
 	return path[0], -1, path[1:], nil
 }
 
-func getResourceDependencies(rp ResourceProvider, addresses *resources.AddressParser, resource any, resourceMeta *types.Meta) (map[any]bool, error) {
-	deps, err := types.GetDependencies(resource)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get dependencies for resource %s: %w", resourceMeta.ID, err)
-	}
+// getResourceDependencies resolves the entities resource depends on. Every
+// dependency is read from its Meta.Links, which hold both the references xcl
+// worked out and the entries the user wrote in depends_on, so the dependency
+// list itself is never read. When requireParentModule is false a parent
+// module missing from rp is ignored instead of failing, a destroy must never
+// refuse to start over an incomplete state.
+func getResourceDependencies(rp ResourceProvider, addresses *resources.AddressParser, resource any, resourceMeta *types.Meta, requireParentModule bool) (map[any]bool, error) {
+	deps := resourceMeta.Links
 
 	// create a map to keep track of unique dependencies
 	// a map is easier than a slice for this purpose
@@ -565,6 +568,10 @@ func getResourceDependencies(rp ResourceProvider, addresses *resources.AddressPa
 		fqdnString := fmt.Sprintf("module.%s", resourceMeta.Module)
 
 		d, err := findByAddress(rp, addresses, fqdnString)
+		if err != nil && !requireParentModule {
+			return dependencies, nil
+		}
+
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				resource,

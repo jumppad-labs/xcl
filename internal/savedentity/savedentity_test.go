@@ -300,3 +300,20 @@ func TestDecodeFailsForRecordWithoutMeta(t *testing.T) {
 
 	require.ErrorIs(t, err, xclerrors.ErrInvalidSavedData)
 }
+
+// State saved before parents were dropped from meta still carries a parents
+// list on every record. Reading it back has to ignore that key rather than
+// fail, so an older state can still be destroyed. No apply writes the key any
+// more, so the record is hand written.
+func TestDecodeIgnoresLegacyParentsKey(t *testing.T) {
+	reg := registry.NewPluginRegistry()
+
+	record := []byte(`{"meta":{"id":"variable.example","name":"example","type":"variable","parents":["x"]}}`)
+
+	entity, err := savedentity.Decode(reg, record)
+	require.NoError(t, err)
+
+	variable, ok := entity.(*resources.Variable)
+	require.True(t, ok, "expected *resources.Variable, got %T", entity)
+	require.Equal(t, "variable.example", variable.Meta.ID)
+}

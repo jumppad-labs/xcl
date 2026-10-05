@@ -9,6 +9,7 @@ import (
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/dag"
+	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -36,6 +37,10 @@ type destroyer struct {
 	types    TypeRegistry
 	options  *ParserOptions
 
+	// addresses resolves the links each resource saved when the destroy
+	// graph is built
+	addresses *resources.AddressParser
+
 	// mu guards working and the store, the walk visits unrelated resources
 	// concurrently
 	mu sync.Mutex
@@ -49,7 +54,9 @@ func (d *destroyer) destroy(targets []any) error {
 		return nil
 	}
 
-	graph, err := buildDestroyDAG(targets)
+	// the graph is built from the links each target saved, resolved against
+	// the whole working state, before the walk starts removing resources
+	graph, err := buildDestroyDAG(d.working, d.addresses, targets)
 	if err != nil {
 		emitOperationError(d.options, events.OperationDestroy, err)
 		return err

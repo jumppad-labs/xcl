@@ -275,3 +275,35 @@ func TestChangelogSaysTheReferencesOptionBreaksNothing(t *testing.T) {
 	require.Contains(t, entry, "There are no breaking changes.")
 	require.NotContains(t, entry, "**Breaking:**")
 }
+
+func TestReadmeDocumentsWrittenDependsOnIsShown(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "A `depends_on` list is written exactly as you wrote it, and\nleft out when you wrote none")
+	require.Contains(t, text, "the dependencies xcl works out from references\nare never added to it, though they still order creation and destruction.")
+}
+
+func TestReadmeNoLongerSaysDependsOnIsNeverWritten(t *testing.T) {
+	text := readme(t)
+
+	require.NotContains(t, text, "and neither is `depends_on`")
+}
+
+func TestChangelogRecordsUserDependsOn(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	changelog := string(data)
+	start := strings.Index(changelog, "## 20261003153421-c283547c-user-depends-on")
+	require.GreaterOrEqual(t, start, 0)
+
+	end := strings.Index(changelog[start+3:], "\n## ")
+	require.Greater(t, end, 0)
+
+	entry := changelog[start : start+3+end]
+	require.Contains(t, entry, "**Breaking:**")
+	require.Contains(t, entry, "`types.AppendUniqueLink`")
+	require.Contains(t, entry, "`meta.parents`")
+	require.Contains(t, entry, "`types.Meta.Parents`")
+	require.Contains(t, entry, "Create and destroy order both come from each entity's `Meta.Links`")
+}

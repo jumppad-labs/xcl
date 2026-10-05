@@ -440,8 +440,8 @@ Resources are processed in dependency order. By the time your provider is
 called for a resource, everything it references has already been through its
 own lifecycle, and the references hold the values those providers returned.
 
-Destroys run in the reverse order: children first, using the parents each
-resource recorded in `meta.parents` when it was applied. `Destroy` is called
+Destroys run in the reverse order: children first, the create order reversed,
+built from the links each resource saved. `Destroy` is called
 for a resource only after everything that depends on it has been destroyed,
 so it is never called for a parent once a child's destroy has failed.
 Resources that don't depend on each other are destroyed in parallel.

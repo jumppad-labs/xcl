@@ -24,7 +24,9 @@ const (
 	encodeCacheID     = "cache.main"
 	encodeNetworkID   = "resource.network.main"
 	encodeContainerID = "resource.container.web"
-	encodeVariableID  = "variable.region"
+	// writes depends_on naming the database and references the network
+	encodeDependentContainerID = "resource.container.api"
+	encodeVariableID           = "variable.region"
 )
 
 // applyEncodeFixture applies the encode fixture with a file state store and
@@ -235,7 +237,25 @@ func TestEncodeEntityIncludesComputedWhenAsked(t *testing.T) {
 	require.Contains(t, string(out), `provider_id = "id-main"`)
 }
 
-func TestEncodeEntityOmitsDependsOn(t *testing.T) {
+func TestEncodeEntityWritesWrittenDependsOn(t *testing.T) {
+	c, _, _ := applyEncodeFixture(t)
+
+	api := encodeEntityByID(t, c, encodeDependentContainerID)
+
+	out, err := EncodeEntity(api)
+	require.NoError(t, err)
+
+	text := string(out)
+
+	require.Regexp(t, `depends_on\s+= \["resource\.database\.main"\]`, text)
+
+	// the container also references the network, a dependency xcl works out
+	// for itself and keeps out of what the author wrote
+	dependsOnLine := encodeLineContaining(t, text, "depends_on")
+	require.NotContains(t, dependsOnLine, encodeNetworkID)
+}
+
+func TestEncodeEntityOmitsDependsOnWhenNoneWritten(t *testing.T) {
 	c, _, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
@@ -243,9 +263,45 @@ func TestEncodeEntityOmitsDependsOn(t *testing.T) {
 	out, err := EncodeEntity(container)
 	require.NoError(t, err)
 
-	// by the time an entity is parsed depends_on holds the references xcl
-	// resolved as well as anything the author wrote, so it is never written
-	require.NotContains(t, string(out), "depends_on")
+	text := string(out)
+
+	// the container references the network, so it depends on it, but the
+	// author wrote no depends_on and the text shows none
+	require.Contains(t, text, "network {")
+	require.NotContains(t, text, "depends_on")
+}
+
+func TestEncodeSavedEntityMatchesLiveWithDependsOn(t *testing.T) {
+	c, reg, statePath := applyEncodeFixture(t)
+
+	api := encodeEntityByID(t, c, encodeDependentContainerID)
+
+	fromEntity, err := EncodeEntity(api)
+	require.NoError(t, err)
+
+	record := encodeSavedRecordByID(t, statePath, encodeDependentContainerID)
+
+	fromSaved, err := EncodeSavedEntity(reg, record)
+	require.NoError(t, err)
+
+	require.Equal(t, string(fromEntity), string(fromSaved))
+	require.Contains(t, string(fromSaved), "depends_on")
+}
+
+// encodeLineContaining returns the first line of text holding part, and fails
+// the test when no line holds it
+func encodeLineContaining(t *testing.T, text, part string) string {
+	t.Helper()
+
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, part) {
+			return line
+		}
+	}
+
+	require.Failf(t, "no line found", "no line contains %q in:\n%s", part, text)
+
+	return ""
 }
 
 func TestEncodeEntityOmitsBookkeepingInsideObjectAttribute(t *testing.T) {

@@ -273,12 +273,13 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
 		}
 
 		d := &destroyer{
-			ctx:      ctx,
-			working:  working,
-			store:    p.stateStore,
-			resolver: p.providerResolver,
-			types:    p.typeRegistry,
-			options:  &p.options,
+			ctx:       ctx,
+			working:   working,
+			store:     p.stateStore,
+			resolver:  p.providerResolver,
+			types:     p.typeRegistry,
+			options:   &p.options,
+			addresses: p.addressParser(),
 		}
 
 		// a failed removal stops the apply, the working state holds the
@@ -330,8 +331,7 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
 
 // Destroy destroys every resource in saved, working only from the saved state:
 // it needs no configuration. Resources are destroyed children first, in the
-// reverse of their create order, read from the parents each resource recorded
-// when it was applied. Builtin, registered and disabled resources never reach
+// reverse of their create order, built from the links each resource saved. Builtin, registered and disabled resources never reach
 // a provider.
 //
 // The state is saved through the configured StateStore after every resource,
@@ -369,12 +369,13 @@ func (p *Parser) Destroy(ctx context.Context, saved []any) (*State, error) {
 	}
 
 	d := &destroyer{
-		ctx:      ctx,
-		working:  working,
-		store:    p.stateStore,
-		resolver: p.providerResolver,
-		types:    p.typeRegistry,
-		options:  &p.options,
+		ctx:       ctx,
+		working:   working,
+		store:     p.stateStore,
+		resolver:  p.providerResolver,
+		types:     p.typeRegistry,
+		options:   &p.options,
+		addresses: p.addressParser(),
 	}
 
 	// copy the targets, destroying a resource removes it from the working
@@ -882,23 +883,6 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 		}
 	}
 
-	// TODO: It may be posible to remove this code as depends_on is only
-	// designed to provide graph dependencies, and we have already processed those above
-	// however, if depends on is not serialized to the state, this could cause issues.
-	// code removed for now until tests are passing.
-
-	// depends on is a property of the embedded type we need to set this manually
-	//err = setDependsOn(nil, rt, b.Body, dependsOn)
-	//if err != nil {
-	//	de := &errors.ParserError{}
-	//	de.Line = b.TypeRange.Start.Line
-	//	de.Column = b.TypeRange.Start.Column
-	//	de.Filename = file
-	//	de.Message = fmt.Sprintf(`unable to set depends_on, %s`, err)
-
-	//	return de
-	//}
-
 	// add the resource to the cache
 	p.parsedResources.store(rtMeta.ID, b.Body, rt)
 
@@ -1091,7 +1075,7 @@ func (p *Parser) getUniqueResourceLinks(resource any, b *hclsyntax.Block, src []
 	}
 
 	for _, d := range dr {
-		if err := types.AppendUniqueDependency(resource, d); err != nil {
+		if err := types.AppendUniqueLink(resource, d); err != nil {
 			return fmt.Errorf("failed to add dependency %s: %w", d, err)
 		}
 	}
@@ -1110,17 +1094,26 @@ func (p *Parser) getUniqueResourceLinks(resource any, b *hclsyntax.Block, src []
 			return fmt.Errorf("unable to read depends_on attribute: %s", diags.Error())
 		}
 
-		// depends on is a slice of string
+		// depends on is a slice of string, each entry is validated as an
+		// address and added to the links in its canonical form, while the
+		// dependency list keeps the strings exactly as written
 		dependsOnSlice := dependsOnVal.AsValueSlice()
+		written := make([]string, 0, len(dependsOnSlice))
 		for _, d := range dependsOnSlice {
 			fqdn, err := p.addressParser().Parse(d.AsString())
 			if err != nil {
 				return fmt.Errorf("invalid dependency %s, %s", d.AsString(), err)
 			}
 
-			if err := types.AppendUniqueDependency(resource, fqdn.String()); err != nil {
+			if err := types.AppendUniqueLink(resource, fqdn.String()); err != nil {
 				return fmt.Errorf("failed to add dependency %s: %w", d, err)
 			}
+
+			written = append(written, d.AsString())
+		}
+
+		if err := types.SetDependencies(resource, written); err != nil {
+			return fmt.Errorf("unable to set depends_on: %w", err)
 		}
 	}
 

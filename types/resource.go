@@ -44,7 +44,11 @@ type Meta struct {
 	// Properties holds a collection that can be used to store adhoc data
 	Properties map[string]any `json:"properties,omitempty"`
 
-	// Linked resources which must be set before this config can be processed
+	// Links holds every dependency of this entity: each reference found in
+	// its attributes and nested blocks, and each depends_on entry in its
+	// canonical address form, relative to the module the entity sits in.
+	// Create and destroy ordering, validation and the evaluation context all
+	// read it; destroy builds the same graph from the links saved in state
 	// this is an internal property that can not be set with hcl
 	Links []string `json:"links,omitempty"`
 
@@ -54,13 +58,6 @@ type Meta struct {
 	// text shows it in place of the resolved value when asked to
 	// this is an internal property that can not be set with hcl
 	References map[string]string `json:"references,omitempty"`
-
-	// Parents holds the IDs of the resources this resource depends on, resolved
-	// when the create graph is built. It covers explicit depends_on, references,
-	// module-wide references and the module the resource sits in, and is what
-	// orders a destroy from the saved state alone
-	// this is an internal property that can not be set with hcl
-	Parents []string `json:"parents,omitempty"`
 
 	// Status tracks the operational state of the resource
 	// Possible values: "created", "updated", "failed", "destroyed", "destroy_failed"
@@ -83,7 +80,9 @@ func (m *Meta) AddressType() string {
 // ResourceBase is the embedded type for any config resources
 // it defines common meta data that all resources share
 type ResourceBase struct {
-	// DependsOn is a user configurable list of dependencies for this resource
+	// DependsOn holds the dependencies the user wrote in depends_on, exactly
+	// as written. Dependencies xcl works out from references are never added;
+	// the full set used for ordering is Meta.Links.
 	DependsOn []string `xcl:"depends_on,optional" json:"depends_on,omitempty"`
 
 	// Enabled determines if a resource is enabled and should be processed

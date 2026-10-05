@@ -221,7 +221,7 @@ func TestRemovalNeverDestroysParentOfFailedChild(t *testing.T) {
 		}
 
 		failed++
-		for _, parent := range meta.Parents {
+		for _, parent := range savedGraphParents(t, h.newParser(t, nil), meta.ID) {
 			require.NotContains(t, calls, parent, "%s was destroyed after its child %s failed", parent, meta.ID)
 		}
 	}
