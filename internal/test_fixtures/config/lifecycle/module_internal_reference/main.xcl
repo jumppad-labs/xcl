@@ -1,0 +1,5 @@
+# inner holds two networks, two references one by its module-relative address.
+
+module "inner" {
+  source = "./module"
+}

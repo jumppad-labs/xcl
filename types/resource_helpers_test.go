@@ -134,21 +134,30 @@ func TestCanSetDependenciesOnBasicResource(t *testing.T) {
 	require.Contains(t, newDeps, "dependency3")
 }
 
-func TestCanSetUniqueDependencyOnBasicResource(t *testing.T) {
+func TestAppendUniqueLinkAddsOnce(t *testing.T) {
 	te := testCreateBasicResource()
 
-	err := AppendUniqueDependency(te, "dependency3")
+	err := AppendUniqueLink(te, "resource.network.b")
 	require.NoError(t, err)
-	err = AppendUniqueDependency(te, "dependency3")
+	err = AppendUniqueLink(te, "resource.network.b")
+	require.NoError(t, err)
+
+	meta, err := GetMeta(te)
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"resource.network.b"}, meta.Links)
+}
+
+func TestAppendUniqueLinkLeavesDependsOnUntouched(t *testing.T) {
+	te := testCreateBasicResource()
+
+	err := AppendUniqueLink(te, "resource.network.b")
 	require.NoError(t, err)
 
 	deps, err := GetDependencies(te)
 	require.NoError(t, err)
 
-	require.Len(t, deps, 3) // Should not add duplicate
-	require.Contains(t, deps, "dependency1")
-	require.Contains(t, deps, "dependency2")
-	require.Contains(t, deps, "dependency3")
+	require.Equal(t, []string{"dependency1", "dependency2"}, deps)
 }
 
 func TestCanGetDependenciesOnExtendedResource(t *testing.T) {

@@ -56,7 +56,7 @@ func testSetupConfig(t *testing.T) (*Config, []any) {
 	net1, _ := typs.CreateResource(structs.TypeNetwork, "cloud")
 
 	mod1, _ := typs.CreateResource(resources.TypeModule, "module1")
-	types.AppendUniqueDependency(mod1, "resource.network.cloud")
+	types.AppendUniqueLink(mod1, "resource.network.cloud")
 
 	var2, _ := typs.CreateResource(resources.TypeVariable, "var2")
 	meta, _ := types.GetMeta(var2)
@@ -69,7 +69,7 @@ func testSetupConfig(t *testing.T) (*Config, []any) {
 	// depending on a module should return all resources and
 	// all child resources
 	con1, _ := typs.CreateResource(structs.TypeContainer, "test_dev")
-	types.AppendUniqueDependency(con1, "module.module1")
+	types.AppendUniqueLink(con1, "module.module1")
 
 	// con2 is embedded in module1
 	con2, _ := typs.CreateResource(structs.TypeContainer, "test_dev")
@@ -89,15 +89,15 @@ func testSetupConfig(t *testing.T) (*Config, []any) {
 	// depends on would be added relative as a resource
 	// when a resource is defined, it has no idea on its
 	// module
-	types.AppendUniqueDependency(con4, "resource.container.test_dev")
+	types.AppendUniqueLink(con4, "resource.container.test_dev")
 
 	out1, _ := typs.CreateResource(resources.TypeOutput, "fqdn")
 	meta, _ = types.GetMeta(out1)
 	meta.Module = "module1.module2"
 
 	out2, _ := typs.CreateResource(resources.TypeOutput, "out")
-	types.AppendUniqueDependency(out2, "resource.network.cloud.id")
-	types.AppendUniqueDependency(out2, "resource.container.test_dev")
+	types.AppendUniqueLink(out2, "resource.network.cloud.id")
+	types.AppendUniqueLink(out2, "resource.container.test_dev")
 
 	c, err := NewConfig()
 	require.NoError(t, err)

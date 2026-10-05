@@ -86,11 +86,6 @@ var EmbeddedJson = `{
         "tags": "json:\"references,omitempty\""
        },
        {
-        "name": "Parents",
-        "type": "[]string",
-        "tags": "json:\"parents,omitempty\""
-       },
-       {
         "name": "Status",
         "type": "string",
         "tags": "json:\"status,omitempty\""
@@ -194,11 +189,6 @@ var EmbeddedInEmbeddedJson = `{
           "name": "References",
           "type": "map[string]string",
           "tags": "json:\"references,omitempty\""
-         },
-         {
-          "name": "Parents",
-          "type": "[]string",
-          "tags": "json:\"parents,omitempty\""
          },
          {
           "name": "Status",

@@ -1,0 +1,10 @@
+# two references one with an address relative to this module, so it depends on
+# one.
+
+resource "network" "one" {
+  subnet = "10.0.1.0/24"
+}
+
+resource "network" "two" {
+  subnet = resource.network.one.subnet
+}

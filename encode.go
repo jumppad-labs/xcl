@@ -226,15 +226,18 @@ func sensitiveReplacement(reveal bool) func(cty.Value) cty.Value {
 // trimBookkeeping removes what ResourceBase records about an entity but nobody
 // wrote in the configuration, so the text shows only what a person put there.
 //
-// meta is xcl's own account of where the entity came from. depends_on is not
-// written at all: by the time an entity is parsed it holds the references xcl
-// resolved as well as anything the author wrote, and the two cannot be told
-// apart, so writing it would show reference paths nobody typed. disabled is
-// written only when something is disabled, which is how a person would leave
-// it out.
+// meta is xcl's own account of where the entity came from. depends_on holds
+// only what the author wrote, exactly as written, since the dependencies xcl
+// works out from references are kept in meta's links and never added to it,
+// so it is shown when the author wrote one and left out otherwise. disabled
+// is written only when something is disabled, which is how a person would
+// leave it out.
 func trimBookkeeping(entity any, body *hclwrite.Body) {
 	body.RemoveAttribute("meta")
-	body.RemoveAttribute("depends_on")
+
+	if dependencies, err := types.GetDependencies(entity); err != nil || len(dependencies) == 0 {
+		body.RemoveAttribute("depends_on")
+	}
 
 	if disabled, err := types.GetDisabled(entity); err == nil && !disabled {
 		body.RemoveAttribute("disabled")

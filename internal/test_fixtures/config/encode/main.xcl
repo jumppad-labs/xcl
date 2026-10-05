@@ -1,8 +1,8 @@
 # Covers every shape the conversion to configuration text has to handle:
 # a kind led registered type with a nested block, a bare registered type that
 # leads its own declaration, a plugin type whose provider fills in a computed
-# value, a plugin type with a repeated block, and a builtin that conversion
-# refuses.
+# value, a plugin type with a repeated block, a plugin type that writes
+# depends_on, and a builtin that conversion refuses.
 
 variable "region" {
   default = "us-east"
@@ -39,5 +39,19 @@ resource "container" "web" {
   network {
     name       = resource.network.main.meta.name
     ip_address = "10.0.0.11"
+  }
+}
+
+# writes depends_on naming the database, and references the network through
+# an attribute, so its configuration text shows the written dependency and
+# never the one worked out from the reference
+resource "container" "api" {
+  depends_on = ["resource.database.main"]
+
+  command = ["api"]
+
+  network {
+    name       = resource.network.main.meta.name
+    ip_address = "10.0.0.20"
   }
 }

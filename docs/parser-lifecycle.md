@@ -25,10 +25,11 @@ in order:
    configuration ([`removedResources`](../internal/parser/parser.go#L332)),
    children first, before anything is created or changed. This uses the same
    destroyer as `Destroy`, see [Destroy](#destroy).
-4. Build a DAG from resource dependencies (`internal/parser/dag.go`) —
-   explicit `depends_on`, plus implicit edges from cross-resource
-   references discovered during parsing (`Meta.Links`). The parents each
-   resource ends up with are recorded in `Meta.Parents`.
+4. Build a DAG from resource dependencies (`internal/parser/dag.go`). Every
+   edge comes from `Meta.Links`, which hold both the cross-resource
+   references discovered during parsing and each written `depends_on` entry
+   in its canonical form. `DependsOn` itself keeps only what was written and
+   is never altered.
 5. Walk the DAG in dependency order.
 6. Decode each resource body (`gohcl.DecodeBody`) once its dependencies'
    values are available.
@@ -145,11 +146,13 @@ The work is done by the
 [`destroyer`](../internal/parser/destroy.go#L22), which the removal phase of
 `Apply` uses too:
 
-- [`buildDestroyDAG`](../internal/parser/dag.go#L124) builds a graph with the
-  same shape as the create graph, from each resource's recorded
-  `Meta.Parents`: an edge from each parent in the set to the resource, and
-  resources with no parent in the set hang off a root. Parents that are not
-  being destroyed are ignored.
+- [`buildDestroyDAG`](../internal/parser/dag.go) builds the create graph with
+  the same builder, over the working state: each target's `Meta.Links` and
+  the module it sits in are resolved against everything the state holds, an
+  edge runs from each dependency that is itself being destroyed to the
+  resource, and resources with no such dependency hang off a root.
+  Dependencies that are not being destroyed are ignored, and so is a parent
+  module missing from the state.
 - The graph is walked with `dag.Walker{Reverse: true}`, so every child is
   destroyed before its parents and unrelated resources are destroyed in
   parallel. A parent is never visited once one of its children has failed.
@@ -171,8 +174,8 @@ destroyed. The error names every failed resource (`destroy failed for <id>:
 returns the remaining state, never nil, and `Config.Destroy` adopts it as its
 current state.
 
-Resources saved before `Meta.Parents` was recorded have no parents, so they
-are destroyed with no ordering guarantee between them.
+State saved by earlier versions is ordered from its links, which every
+version has saved; a `parents` key it still carries is ignored.
 
 ## Resolving the provider: `ProviderResolver`
 

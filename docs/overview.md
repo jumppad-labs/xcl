@@ -103,8 +103,8 @@ consequences of a problem already reported.
    when there is none). Nothing saved, or an empty state, returns nil and
    writes nothing; a load error is returned as `failed to load state: ...`.
 2. Construct a `parser.Parser` and call `p.Destroy(saved)`, which destroys
-   every resource children first, using the parents each resource recorded
-   in `meta.parents` when it was applied. Unrelated resources are destroyed
+   every resource children first, from the same dependency graph as create,
+   built from the links each resource saved. Unrelated resources are destroyed
    in parallel. Variables, outputs, modules, registered types and disabled
    blocks never reach a provider.
 3. The state is saved after every resource, so an interrupted destroy
@@ -124,7 +124,7 @@ which in turn embeds [`types.Meta`](../types/resource.go#L5):
 
 ```go
 type ResourceBase struct {
-    DependsOn []string `xcl:"depends_on,optional"`
+    DependsOn []string `xcl:"depends_on,optional"` // exactly what the user wrote
     Disabled  bool     `xcl:"disabled,optional"`
     Meta      Meta     `xcl:"meta,optional"`
 }
@@ -133,8 +133,7 @@ type Meta struct {
     ID, Name, Type, Module, File string
     Line, Column                 int
     Properties                   map[string]any
-    Links                        []string // unresolved cross-resource references
-    Parents                      []string // resolved dependencies, orders a destroy
+    Links                        []string // every dependency, orders create and destroy
     Status                       string   // see below
 }
 ```

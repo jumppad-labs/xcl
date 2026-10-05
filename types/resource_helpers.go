@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"reflect"
+	"slices"
 )
 
 // findResourceBase uses reflection to find the embedded ResourceBase field in a resource.
@@ -71,42 +72,20 @@ func GetDependencies(resource any) ([]string, error) {
 	return dependsOnField.Interface().([]string), nil
 }
 
-func AppendUniqueDependency(resource any, dependency string) error {
-	// Get metadata to update Links
+// AppendUniqueLink adds link to the entity's Meta.Links when it is not
+// already present. It never touches the entity's DependsOn, which holds only
+// what the user wrote.
+func AppendUniqueLink(resource any, link string) error {
 	meta, err := GetMeta(resource)
 	if err != nil {
 		return fmt.Errorf("failed to get metadata: %w", err)
 	}
 
-	// Check if dependency already exists in Links
-	for _, link := range meta.Links {
-		if link == dependency {
-			return nil // Dependency already exists
-		}
+	if slices.Contains(meta.Links, link) {
+		return nil
 	}
 
-	// Append to Links
-	meta.Links = append(meta.Links, dependency)
-
-	// Also update DependsOn for backwards compatibility
-	deps, err := GetDependencies(resource)
-	if err != nil {
-		return fmt.Errorf("failed to get dependencies: %w", err)
-	}
-
-	// Check if already in DependsOn
-	alreadyInDeps := false
-	for _, d := range deps {
-		if d == dependency {
-			alreadyInDeps = true
-			break
-		}
-	}
-
-	if !alreadyInDeps {
-		deps = append(deps, dependency)
-		return SetDependencies(resource, deps)
-	}
+	meta.Links = append(meta.Links, link)
 
 	return nil
 }
