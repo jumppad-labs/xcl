@@ -74,3 +74,25 @@
 - Run 3: all 5 DONE (verified). Decisions settled by user: (1) ShowReferences bare ref shown for sensitive field (A); (2) envelope always incl. Redact; (3) CHANGELOG Breaking only vs last release (masking dropped 2 items). Applied to plans; summary + decisions written. epic order added nothing (chain already present). Next: end-of-planning review.
 - Review closed: user approved summary; declined all knowledge saves this run.
 - Review change: user chose destroy graph from Meta.Links (create builder, reverse walk), Meta.Parents removed. user-depends-on plan revised (new tasks b3e94632, 5078beb1); summary section + decisions updated.
+
+## Implement-epic run 1 (2026-10-05) — orchestrator notes
+
+- Epic: 20261003134528-327e0657-references-and-secrets. Repos: xclconfig (this repo), xcl-website.
+- Start: 0/5 implemented; ready: module-boundary; rest blocked in chain order.
+- dirty=true (plans, epic, knowledge untracked in xcl). Asked user to commit: answer "Don't commit" —
+  proceed; uncommitted plans won't be in worktrees. Don't re-ask.
+- Created worktrees + started child: module-boundary-and-output-entities.
+- DONE: module-boundary (8/8 tasks, go test + site build pass, changes uncommitted in worktrees).
+  Merge refused: worktree_failed — xclconfig worktree has uncommitted work; next_action: commit or
+  discard in the worktree, then retry. Not committing (user rule: no commits unless asked). Run stopped
+  awaiting user; worktrees left in place.
+- User (2026-10-05): "ok commit and keep going" — orchestrator commits each spec's worktree (git commit -s + Co-Authored-By) on DONE, then merges. Plans were already committed on main (09a33f3).
+- MERGED: module-boundary (xclconfig 9eccfe1, xcl-website 7ced5b6).
+- Created worktrees + started child: references-and-secrets.
+- DONE + MERGED: references-and-secrets (16/16 tasks; xclconfig 0a51046, xcl-website d28667b). Knowledge candidates kept for final report (EncodeForState, Output.Format, go vet json-tag, registered-type conversion).
+- Created worktrees + started child: references-as-written.
+- DONE + MERGED: references-as-written (4/4 tasks). Knowledge candidates: processExpr link coverage gaps; Meta field → embedded.go schema snapshot.
+- Created worktrees + started child: user-depends-on.
+- DONE + MERGED: user-depends-on (8/8). Knowledge candidates: xcl-tags-gate entry lists removed Parents; call-order tests flaky vs graph parents; Links are attribute paths; one unexplained flaky full-suite failure.
+- Created worktrees + started child: masking.
+- DONE + MERGED: masking (10/10). All 5 specs implemented and merged. Run complete.
