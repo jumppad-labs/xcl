@@ -48,6 +48,13 @@ type Meta struct {
 	// this is an internal property that can not be set with hcl
 	Links []string `json:"links,omitempty"`
 
+	// References holds, for each attribute whose value refers to another
+	// entity, the expression exactly as the user wrote it, keyed by the
+	// attribute's path, i.e. "location" or "network[1].name". Configuration
+	// text shows it in place of the resolved value when asked to
+	// this is an internal property that can not be set with hcl
+	References map[string]string `json:"references,omitempty"`
+
 	// Parents holds the IDs of the resources this resource depends on, resolved
 	// when the create graph is built. It covers explicit depends_on, references,
 	// module-wide references and the module the resource sits in, and is what

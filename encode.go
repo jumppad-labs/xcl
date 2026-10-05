@@ -2,12 +2,19 @@ package xcl
 
 import (
 	"fmt"
+	"maps"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
+	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
+	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclwrite"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
@@ -22,10 +29,11 @@ const computedComment = "set by the provider"
 type encodeOptions struct {
 	includeComputed bool
 	revealSensitive bool
+	showReferences  bool
 }
 
 // EncodeOption configures how an entity is written as configuration text.
-// Construct one with IncludeComputed or RevealSensitive.
+// Construct one with IncludeComputed, RevealSensitive or ShowReferences.
 type EncodeOption func(*encodeOptions)
 
 // IncludeComputed also writes the fields a provider fills in, such as an
@@ -53,6 +61,26 @@ func RevealSensitive() EncodeOption {
 	}
 }
 
+// ShowReferences writes each field whose value referred to another entity as
+// the user wrote it, such as x = resource.b.one.y or a template mixing a
+// reference with text, instead of the value it resolved to. Only the fields the
+// text already holds are changed, so a field that is left out stays out.
+//
+// Text written this way is still for reading. A sensitive field shows its
+// reference only when it was written as a single bare reference, such as
+// password = variable.db_password, since an address holds no secret. Written
+// any other way it is still shown as types.SensitiveMarker, unless
+// RevealSensitive is also given.
+//
+// The references come from the entity's own bookkeeping, so the text is the
+// same from a live entity and from its saved data. Data saved by an earlier
+// version of xcl holds no references and is written with resolved values.
+func ShowReferences() EncodeOption {
+	return func(o *encodeOptions) {
+		o.showReferences = true
+	}
+}
+
 // EncodeEntity returns entity as configuration text in xcl's own syntax,
 // formatted and ready to print or write to a .xcl file.
 //
@@ -65,7 +93,7 @@ func RevealSensitive() EncodeOption {
 // Fields a provider filled in are left out unless IncludeComputed is given, so
 // the text reads back to the same configured values. Values are written as the
 // literals they resolved to, not as the expressions the original configuration
-// used.
+// used, unless ShowReferences is given.
 //
 // It fails with ErrNotEncodable when entity is not an entity, when it is a
 // builtin such as a variable, output or module, or when it holds a value that
@@ -167,6 +195,10 @@ func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 
 	trimBookkeeping(entity, block.Body())
 
+	if opts.showReferences {
+		showReferences(meta, block.Body(), opts)
+	}
+
 	file := hclwrite.NewEmptyFile()
 	file.Body().AppendBlock(block)
 
@@ -207,6 +239,129 @@ func trimBookkeeping(entity any, body *hclwrite.Body) {
 	if disabled, err := types.GetDisabled(entity); err == nil && !disabled {
 		body.RemoveAttribute("disabled")
 	}
+}
+
+// referencePathSegment matches one segment of a recorded reference's path, a
+// nested block written as <type>[<index>]
+var referencePathSegment = regexp.MustCompile(`^(.+)\[(\d+)\]$`)
+
+// showReferences replaces the value of each attribute the entity recorded a
+// reference for with the text the user wrote. It runs after the resolved text
+// is written and trimmed, and changes only attributes that text holds, so it
+// never adds a line the resolved text would not have. The paths are visited
+// in sorted order so the text is the same on every call.
+func showReferences(meta *types.Meta, body *hclwrite.Body, opts encodeOptions) {
+	for _, path := range slices.Sorted(maps.Keys(meta.References)) {
+		written := meta.References[path]
+
+		attributeBody, name := findReferenceBody(body, path)
+		if attributeBody == nil {
+			continue
+		}
+
+		attribute := attributeBody.GetAttribute(name)
+		if attribute == nil {
+			continue
+		}
+
+		// a sensitive value is written as the marker, and keeps it unless the
+		// user wrote a single bare reference, an address that holds no
+		// secret, or real values were asked for
+		if !opts.revealSensitive && holdsSensitiveMarker(attribute) && !isBareReference(written) {
+			continue
+		}
+
+		tokens, ok := writtenTokens(written)
+		if !ok {
+			// text the parser accepted always re-lexes, this is a guard: the
+			// attribute keeps its resolved value rather than failing a
+			// conversion that is only for reading
+			continue
+		}
+
+		attributeBody.SetAttributeRaw(name, tokens)
+	}
+}
+
+// findReferenceBody returns the body holding the attribute a recorded path
+// names, and the attribute's name. A path is the attribute's name, led by the
+// nested blocks it sits in, i.e. "network[1].name". It returns nil when the
+// text holds no such block.
+func findReferenceBody(body *hclwrite.Body, path string) (*hclwrite.Body, string) {
+	segments := strings.Split(path, ".")
+
+	current := body
+	for _, segment := range segments[:len(segments)-1] {
+		match := referencePathSegment.FindStringSubmatch(segment)
+		if match == nil {
+			return nil, ""
+		}
+
+		index, err := strconv.Atoi(match[2])
+		if err != nil {
+			return nil, ""
+		}
+
+		var found *hclwrite.Block
+		position := 0
+		for _, block := range current.Blocks() {
+			if block.Type() != match[1] {
+				continue
+			}
+
+			if position == index {
+				found = block
+				break
+			}
+
+			position++
+		}
+
+		if found == nil {
+			return nil, ""
+		}
+
+		current = found.Body()
+	}
+
+	return current, segments[len(segments)-1]
+}
+
+// holdsSensitiveMarker reports whether the written value of attribute holds
+// the sensitive marker anywhere, including inside an object or a list
+func holdsSensitiveMarker(attribute *hclwrite.Attribute) bool {
+	written := attribute.Expr().BuildTokens(nil).Bytes()
+
+	return strings.Contains(string(written), strconv.Quote(types.SensitiveMarker))
+}
+
+// isBareReference reports whether text is a single reference and nothing
+// else, i.e. variable.db_password
+func isBareReference(text string) bool {
+	expression, diags := hclsyntax.ParseExpression([]byte(text), "", hcl.InitialPos)
+	if diags.HasErrors() {
+		return false
+	}
+
+	_, ok := expression.(*hclsyntax.ScopeTraversalExpr)
+
+	return ok
+}
+
+// writtenTokens lexes text the user wrote as an attribute's value into the
+// tokens that write it, so the formatter can lay it out
+func writtenTokens(text string) (hclwrite.Tokens, bool) {
+	file, diags := hclwrite.ParseConfig([]byte("value = "+text+"\n"), "", hcl.InitialPos)
+	if diags.HasErrors() {
+		return nil, false
+	}
+
+	attribute := file.Body().GetAttribute("value")
+	if attribute == nil {
+		return nil, false
+	}
+
+	return attribute.Expr().BuildTokens(nil), true
 }
 
 // entityName names an entity in an error, by its address where it has one

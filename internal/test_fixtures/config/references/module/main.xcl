@@ -1,0 +1,18 @@
+# A module whose entity refers to the module's own variable and resource, the
+# text recorded for it must stay as written here, never scoped to the module.
+
+variable "region" {
+  default = "eu-west"
+}
+
+resource "network" "inner" {
+  subnet = "10.1.0.0/16"
+}
+
+resource "container" "app" {
+  default = variable.region
+
+  network {
+    name = resource.network.inner.meta.name
+  }
+}

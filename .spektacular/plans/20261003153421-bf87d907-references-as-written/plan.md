@@ -142,7 +142,7 @@ All tests follow the project's conventions. They use testify `require`, there ar
 
 **Validation point**: The full test suite passes unchanged. New parser tests prove what is recorded for each expression shape. New encoder tests prove three things: references are shown with the option and resolved values without it; live and saved text are byte-identical with and without it; and sensitive fields follow the marker rule.
 
-#### - [ ] Task: Record references as written while parsing
+#### - [x] Task: Record references as written while parsing
 **Id:** 6a8abd6c-73c5-4bb3-92f5-b0bb1ae98fb9
 **Repo:** xclconfig
 **Depends on:** none
@@ -153,13 +153,13 @@ While the parser finds the links between entities, it also records the exact tex
 *Technical detail:* [context.md#task-record-references-as-written-while-parsing](./context.md#task-record-references-as-written-while-parsing)
 
 **Acceptance criteria**:
-- [ ] After parsing, an entity with a field written as a reference records that field's text exactly as written, including templates, function calls, multi-line values and references inside nested blocks.
-- [ ] Fields with no reference are not recorded, and an entity without references records nothing.
-- [ ] A reference written inside a module is recorded as written, not rewritten to the module's scope.
-- [ ] After apply, the saved record of the entity holds the same references as the live entity.
-- [ ] Every existing test passes unchanged, and state written before this change still loads.
+- [x] After parsing, an entity with a field written as a reference records that field's text exactly as written, including templates, function calls, multi-line values and references inside nested blocks.
+- [x] Fields with no reference are not recorded, and an entity without references records nothing.
+- [x] A reference written inside a module is recorded as written, not rewritten to the module's scope.
+- [x] After apply, the saved record of the entity holds the same references as the live entity.
+- [x] Every existing test passes unchanged, and state written before this change still loads.
 
-#### - [ ] Task: Show references in configuration text on request
+#### - [x] Task: Show references in configuration text on request
 **Id:** 9730d38c-61b6-42d2-86b8-add18fd3e98e
 **Repo:** xclconfig
 **Depends on:**
@@ -171,11 +171,11 @@ A new option, `xcl.ShowReferences()`, makes configuration text show each referen
 *Technical detail:* [context.md#task-show-references-in-configuration-text-on-request](./context.md#task-show-references-in-configuration-text-on-request)
 
 **Acceptance criteria**:
-- [ ] With the option, an entity whose field is written as `x = resource.b.one.y` produces text containing `x = resource.b.one.y`, not the resolved value.
-- [ ] Without the option, the same entity's text shows the resolved value, exactly as before this change.
-- [ ] After apply, the text from the live entity and from its saved data are byte-identical, both with and without the option.
-- [ ] A sensitive field written as a bare reference shows the reference, while one written any other way shows `(sensitive)` unless real values are also requested.
-- [ ] The text is the same on every call and works together with the option for provider-filled values.
+- [x] With the option, an entity whose field is written as `x = resource.b.one.y` produces text containing `x = resource.b.one.y`, not the resolved value.
+- [x] Without the option, the same entity's text shows the resolved value, exactly as before this change.
+- [x] After apply, the text from the live entity and from its saved data are byte-identical, both with and without the option.
+- [x] A sensitive field written as a bare reference shows the reference, while one written any other way shows `(sensitive)` unless real values are also requested.
+- [x] The text is the same on every call and works together with the option for provider-filled values.
 
 ### Milestone 2: The documentation explains how to show references
 
@@ -183,7 +183,7 @@ A new option, `xcl.ShowReferences()`, makes configuration text show each referen
 
 **Validation point**: The README and CHANGELOG content tests pass, and they fail if the new text is removed. The site builds and type-checks, and the new guide is reachable from the navigation.
 
-#### - [ ] Task: Document showing references in the library
+#### - [x] Task: Document showing references in the library
 **Id:** dc1e3875-837b-4e20-b8d8-461596e8839d
 **Repo:** xclconfig
 **Depends on:**
@@ -195,12 +195,12 @@ The README's configuration-text section explains how to ask for references and s
 *Technical detail:* [context.md#task-document-showing-references-in-the-library](./context.md#task-document-showing-references-in-the-library)
 
 **Acceptance criteria**:
-- [ ] The README describes requesting references, with an example showing a reference exactly as written.
-- [ ] The README no longer says, without qualification, that references always come out as resolved values.
-- [ ] The changelog has an entry for this work naming the option and saying there are no breaking changes.
-- [ ] The content tests fail if the new README text or the changelog entry is removed.
+- [x] The README describes requesting references, with an example showing a reference exactly as written.
+- [x] The README no longer says, without qualification, that references always come out as resolved values.
+- [x] The changelog has an entry for this work naming the option and saying there are no breaking changes.
+- [x] The content tests fail if the new README text or the changelog entry is removed.
 
-#### - [ ] Task: Add the configuration-text guide to the site
+#### - [x] Task: Add the configuration-text guide to the site
 **Id:** 762508e1-3e8b-46dc-a306-aac8e9559d0e
 **Repo:** xcl-website
 **Depends on:**
@@ -212,9 +212,9 @@ The documentation site gains a configuration-text guide, linked from the navigat
 *Technical detail:* [context.md#task-add-the-configuration-text-guide-to-the-site](./context.md#task-add-the-configuration-text-guide-to-the-site)
 
 **Acceptance criteria**:
-- [ ] The site has a configuration-text guide reachable from the navigation.
-- [ ] The guide describes requesting references, with an example showing a reference written as the user wrote it, next to the default resolved form.
-- [ ] The site builds and type-checks.
+- [x] The site has a configuration-text guide reachable from the navigation.
+- [x] The guide describes requesting references, with an example showing a reference written as the user wrote it, next to the default resolved form.
+- [x] The site builds and type-checks.
 
 ## Open Questions
 
@@ -228,3 +228,62 @@ The documentation site gains a configuration-text guide, linked from the navigat
 - **Showing references for variables, outputs and modules.** These are not encodable as configuration text. Their references are recorded like any entity's, but are never written.
 - **Restoring comments or original layout.** Only the expression after `=` is reproduced, and the formatter lays it out. Comments outside it and the original spacing are not kept.
 - **Showing references in the resource printer or event data.** Only configuration text gains the option. Event data and state carry the recorded map as part of `meta`, but nothing displays it.
+
+## Changelog
+
+### 2026-10-05 — Task: Record references as written while parsing
+
+**What was done**: `types.Meta` gained `References map[string]string` (json `references,omitempty`, no `xcl` tag). The parser now passes each file's bytes from `parseResourcesInFile` through `parseResource`/`parseModule` to `getUniqueResourceLinks`, and the link walk records, via a new `recordWrittenText` helper, the text after `=` for every attribute `processExpr` finds a reference in, keyed by `name` or `type[n].name` (recursively for deeper blocks). The map is set on `Meta` only when non-empty.
+
+**Deviations**: Adding a field to `Meta` changed the schema snapshot in `internal/schema/test_fixtures/embedded.go`; both `Meta` occurrences gained the `References` entry. That existing test expectation had to change, which the plan did not anticipate. Tests for the module case use a dedicated module fixture rather than the shared `single` module.
+
+**Files changed**:
+- `xclconfig: types/resource.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/parser/exp.go`
+- `xclconfig: internal/schema/test_fixtures/embedded.go`
+- `xclconfig: internal/parser/references_written_test.go`
+- `xclconfig: internal/test_fixtures/config/references/main.xcl`
+- `xclconfig: internal/test_fixtures/config/references/module/main.xcl`
+- `xclconfig: config_test.go`
+
+**Discoveries**: `processExpr` only recognises templates, function calls, scope traversals and object constructors; tuples, conditionals and unary expressions (e.g. `[resource.x.y]`, `!variable.enabled`) produce no link and are therefore not recorded either. Any new `Meta` field changes the plugin schema snapshot in `internal/schema/test_fixtures/embedded.go`.
+
+### 2026-10-05 — Task: Show references in configuration text on request
+
+**What was done**: Added `xcl.ShowReferences()` beside `IncludeComputed()` and `RevealSensitive()`. Under the option, `encodeEntity` runs `showReferences` after `trimBookkeeping`: it walks `Meta.References` in sorted path order, finds each attribute in the `hclwrite` body (descending into the n-th nested block of each type), skips paths the text does not hold, and replaces the attribute's tokens with the recorded text re-lexed through `hclwrite.ParseConfig`. A marker-holding attribute is replaced only for a single bare reference unless `RevealSensitive()` is also given.
+
+**Deviations**: The plan's open question (does the marker always show in the attribute's tokens?) was settled by checking for the quoted marker anywhere in the attribute's tokens, which covers markers nested inside objects and lists; the fallback to the Go field was not needed. `TestStateWithoutReferencesStillLoads` was extended to also encode with `ShowReferences()`. A few extra tests were added beyond the plan's list (nested-block default, template formatter stability, saved-entity sensitive template).
+
+**Files changed**:
+- `xclconfig: encode.go`
+- `xclconfig: encode_references_test.go`
+- `xclconfig: config_test.go`
+
+**Discoveries**: `hclwrite.Body.SetAttributeRaw` replaces only the expression, so a line comment such as the computed-value comment survives the replacement. `disabled = variable.off` is recorded as a reference, yet stays trimmed under the option because replacement runs after `trimBookkeeping` and only touches attributes still present.
+
+### 2026-10-05 — Task: Document showing references in the library
+
+**What was done**: The README's "Converting to configuration text" section gained a "Showing references as written" paragraph with a configuration, the `xcl.ShowReferences()` call, the text it produces and the default resolved form, plus the saved-data, `IncludeComputed`, sensitive and older-state notes. The "for reading" note now says references are resolved by default unless `ShowReferences` is asked for. `CHANGELOG.md` has a new top entry for this spec ending "There are no breaking changes.", and `docs/state.md` notes that saved records carry `meta.references`.
+
+**Deviations**: Content tests go beyond the plan's two: they also guard the reworded "for reading" note, the `docs/state.md` sentence and the absence of a `**Breaking:**` list in this entry.
+
+**Files changed**:
+- `xclconfig: README.md`
+- `xclconfig: CHANGELOG.md`
+- `xclconfig: docs/state.md`
+- `xclconfig: readme_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Add the configuration-text guide to the site
+
+**What was done**: Added `src/pages/configuration-text.mdx`, a guide in the existing Hero/Prose/CtaBanner shape. It covers converting an entity, converting saved data, provider-filled values, sensitive values, showing references as written (with the configuration, the `ShowReferences()` call, its output and the default resolved form), and the "for reading, not reprocessing" note. Its wording mirrors the README. It is linked as "Configuration text" in the navigation's Guides menu.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-website: src/pages/configuration-text.mdx`
+- `xcl-website: src/components/Nav.astro`
+
+**Discoveries**: None. `npm ci`, `astro check` (0 errors, 0 warnings) and `npm run build` pass, and the built home page links the new guide.

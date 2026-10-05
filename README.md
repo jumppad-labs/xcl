@@ -718,9 +718,53 @@ resource "postgres" "main" {
 }
 ```
 
-**This text is for reading, not for reprocessing.** References come out as the
-literal values they resolved to, comments and layout from the original file are
-not kept, and output including provider-filled values does not validate, since
+**Showing references as written.** By default a field that referred to another
+entity shows the value it resolved to. Ask for `ShowReferences` and each such
+field is written exactly as the user wrote it instead, whether a bare reference,
+a template or a nested block. Given this configuration:
+
+```hcl
+resource "app" "web" {
+  db_location = resource.postgres.main.location
+  url         = "https://${resource.postgres.main.location}/app"
+}
+```
+
+```go
+text, err := xcl.EncodeEntity(app, xcl.ShowReferences())
+```
+
+the text shows each reference as it was written:
+
+```hcl
+resource "app" "web" {
+  db_location = resource.postgres.main.location
+  url         = "https://${resource.postgres.main.location}/app"
+}
+```
+
+Without the option the same entity is written with its resolved values:
+
+```hcl
+resource "app" "web" {
+  db_location = "localhost"
+  url         = "https://localhost/app"
+}
+```
+
+It works the same from saved data,
+`xcl.EncodeSavedEntity(registry, record, xcl.ShowReferences())`, and the two
+give byte-identical text, since the references are kept in each entity's saved
+record. It combines with `IncludeComputed`. A sensitive field shows its
+reference only when it was written as a single bare reference, such as
+`password = variable.db_password`; written any other way it keeps
+`"(sensitive)"` unless `RevealSensitive` is also given. State saved by an
+earlier version of xcl holds no references, so its text shows resolved values
+until the configuration is applied again.
+
+**This text is for reading, not for reprocessing.** By default references come
+out as the literal values they resolved to, unless you ask for
+`ShowReferences`. Comments and layout from the original file are not kept, and output including provider-filled values does not validate, since
 xcl refuses a configuration that sets them. A sensitive value is written as
 `"(sensitive)"`; see [Sensitive values](#sensitive-values) for showing the
 real value.
