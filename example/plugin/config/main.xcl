@@ -7,7 +7,7 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  default = "password"
+  default = "pg-s3cret-example"
 }
 
 resource "postgres" "main" {

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl"
+	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -17,8 +18,8 @@ import (
 // memoryStore is a StateStore that keeps the entities it is given in memory.
 //
 // It is written against the public contract alone: the four methods exchange
-// plain entities, so nothing here names a library type or constructs one, and
-// the zero value is usable.
+// plain values, each entity arriving as its raw JSON record, so nothing here
+// names a library type or constructs one, and the zero value is usable.
 type memoryStore struct {
 	mu       sync.Mutex
 	entities []any
@@ -76,7 +77,11 @@ func TestCustomStateStoreRoundTripsAnApply(t *testing.T) {
 
 	require.True(t, store.Exists())
 
-	loaded, err := store.Load()
+	records, err := store.Load()
+	require.NoError(t, err)
+
+	// the store is handed raw JSON records, typing them needs the registry
+	loaded, err := savedentity.DecodeAll(reg, records)
 	require.NoError(t, err)
 
 	require.ElementsMatch(t, testAppliedIDs, testLoadedIDs(t, loaded))
@@ -98,7 +103,11 @@ func TestCustomStateStoreIsHandedEntitiesWithBothAxes(t *testing.T) {
 	err = c.Apply(appliedConfig)
 	require.NoError(t, err)
 
-	loaded, err := store.Load()
+	records, err := store.Load()
+	require.NoError(t, err)
+
+	// the store is handed raw JSON records, typing them needs the registry
+	loaded, err := savedentity.DecodeAll(reg, records)
 	require.NoError(t, err)
 
 	database, err := entityByID(loaded, "resource.database.main")
@@ -146,7 +155,11 @@ func TestCustomStateStoreIsReadBackByALaterRun(t *testing.T) {
 
 	require.Equal(t, len(testAppliedIDs), second.EntityCount())
 
-	loaded, err := store.Load()
+	records, err := store.Load()
+	require.NoError(t, err)
+
+	// the store is handed raw JSON records, typing them needs the registry
+	loaded, err := savedentity.DecodeAll(reg, records)
 	require.NoError(t, err)
 	require.ElementsMatch(t, testAppliedIDs, testLoadedIDs(t, loaded))
 }

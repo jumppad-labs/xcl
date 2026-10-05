@@ -125,9 +125,9 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 		case exprType.AssignableTo(field.Type):
 			fieldV.Set(reflect.ValueOf(attr.Expr))
 		default:
-			diags = append(diags, DecodeExpression(
+			diags = append(diags, nameAttributeInDiagnostics(name, DecodeExpression(
 				attr.Expr, ctx, fieldV.Addr().Interface(),
-			)...)
+			))...)
 		}
 	}
 
@@ -318,6 +318,21 @@ func DecodeExpression(expr hcl.Expression, ctx *hcl.EvalContext, val interface{}
 			Subject:  expr.StartRange().Ptr(),
 			Context:  expr.Range().Ptr(),
 		})
+	}
+
+	return diags
+}
+
+// nameAttributeInDiagnostics prefixes the detail of each error diagnostic
+// with the name of the attribute being decoded, so an unsuitable value is
+// reported against the field it was assigned to.
+func nameAttributeInDiagnostics(name string, diags hcl.Diagnostics) hcl.Diagnostics {
+	for _, diag := range diags {
+		if diag.Severity != hcl.DiagError {
+			continue
+		}
+
+		diag.Detail = fmt.Sprintf("Attribute %q: %s", name, diag.Detail)
 	}
 
 	return diags

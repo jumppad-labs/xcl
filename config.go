@@ -311,7 +311,12 @@ func (c *Config) Apply(paths ...string) error {
 
 		// Save to store
 		if c.stateStore != nil {
-			if saveErr := c.stateStore.Save(c.entities); saveErr != nil {
+			encoded, encodeErr := parser.EncodeForState(c.entities)
+			if encodeErr != nil {
+				return errors.Join(err, fmt.Errorf("failed to save state: %w", encodeErr))
+			}
+
+			if saveErr := c.stateStore.Save(encoded); saveErr != nil {
 				return errors.Join(err, fmt.Errorf("failed to save state: %w", saveErr))
 			}
 		}

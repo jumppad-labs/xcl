@@ -21,7 +21,11 @@ type PostgreSQL struct {
 	Port     int    `xcl:"port" json:"port"`
 	DBName   string `xcl:"db_name" json:"db_name"`
 	Username string `xcl:"username" json:"username"`
-	Password string `xcl:"password" json:"password"`
+
+	// Password is sensitive: it shows as "(sensitive)" wherever it is
+	// printed, logged or reported, and the provider reads the real value
+	// with Reveal only where it connects
+	Password types.Sensitive[string] `xcl:"password" json:"password"`
 
 	// Timeouts is a nested block, block fields must be pointers
 	Timeouts *Timeouts `xcl:"timeouts,block" json:"timeouts,omitempty"`

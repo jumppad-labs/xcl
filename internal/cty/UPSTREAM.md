@@ -54,3 +54,15 @@ to `github.com/jumppad-labs/xcl/internal/cty/...`.
 - `gocty/type_implied.go`: error message refers to `xcl` field tags.
 - `gocty/in.go`: gofmt.
 - `gocty` test files: struct tags changed from `cty` and `hcl` to `xcl`.
+- `gocty/wrapper.go` (new), `gocty/type_implied.go`, `gocty/in.go`,
+  `gocty/out.go`: a generic hook for wrapper types, `RegisterWrapper`. A
+  registered wrapper is a Go type that holds one inner value and carries a
+  mark: `ImpliedType` gives the inner type's cty type, `ToCtyValue` converts
+  the inner value and applies the mark (plus any `ExtraMarks` the wrapper
+  reports for that value), and `FromCtyValue` into a wrapper
+  removes the marks and wraps the decoded inner value. The hook knows nothing
+  about XCL; `types` registers `types.Sensitive` with it.
+- `gocty/out.go`: `FromCtyValue` of a marked value into a target that is not
+  a `cty.Value` or a registered wrapper returns a path error ("value is
+  sensitive and cannot be assigned to a field not declared sensitive") instead
+  of panicking when the value is read.

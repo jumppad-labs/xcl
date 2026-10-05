@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"github.com/jumppad-labs/xcl/internal/wire"
 )
 
 // resourceBaseKeys are the JSON keys of types.ResourceBase. They hold xcl's own
@@ -39,7 +41,7 @@ func (DefaultChanged[T]) Changed(ctx context.Context, old T, new T) (bool, error
 // comparableJSON returns the JSON form of a resource with xcl's metadata removed.
 // A nil resource returns nil.
 func comparableJSON(resource any) (any, error) {
-	data, err := json.Marshal(resource)
+	data, err := wire.Marshal(resource)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,10 @@
 // registered on the plugin registry.
 //
 // The program prints the configuration as a tree, then prints the same
-// resource as JSON, which is the document this configuration replaces.
+// resource as JSON, which is the document this configuration replaces. The
+// database password is declared sensitive, so it prints as "(sensitive)"; the
+// program reads the real value with Reveal only to build the database
+// connection string, which it never prints.
 //
 // Run it from this directory with `make run`, see the Makefile for the other
 // targets. The configuration directory can be passed as an argument:
@@ -21,7 +24,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/jumppad-labs/xcl"
@@ -92,6 +98,14 @@ func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, di
 	app, err := xcl.Find[resources.Application](c, "resource.application.api")
 	if err != nil {
 		return nil, err
+	}
+
+	// Reveal gives the real password. It is used here, where the program
+	// needs it, and the connection string holding it is never printed
+	if app.Database != nil {
+		if err := checkConnectionString(databaseURL(app.Database)); err != nil {
+			return nil, err
+		}
 	}
 
 	printApplication(out, app)
@@ -171,9 +185,37 @@ func printApplication(out io.Writer, app *resources.Application) {
 	}
 }
 
+// databaseURL builds the connection string for the database. It holds the real
+// password, read with Reveal, so it must not be printed or logged.
+func databaseURL(db *resources.Database) string {
+	connection := url.URL{
+		Scheme: db.Driver,
+		User:   url.UserPassword(db.Username, db.Password.Reveal()),
+		Host:   net.JoinHostPort(db.Host, strconv.Itoa(db.Port)),
+		Path:   "/" + db.Name,
+	}
+
+	return connection.String()
+}
+
+// checkConnectionString stands in for opening the database: it checks the
+// connection string is complete without ever showing it
+func checkConnectionString(connection string) error {
+	parsed, err := url.Parse(connection)
+	if err != nil {
+		return fmt.Errorf("invalid database connection string")
+	}
+
+	if _, hasPassword := parsed.User.Password(); !hasPassword {
+		return fmt.Errorf("database connection string has no password")
+	}
+
+	return nil
+}
+
 // printJSON writes the application as JSON. The json tags on the Go types
-// name the fields, so this is the document the configuration replaces, and
-// what is saved to state.
+// name the fields, so this is the document the configuration replaces. A
+// sensitive field is written as "(sensitive)"; state keeps the real value.
 func printJSON(out io.Writer, app *resources.Application) error {
 	d, err := json.MarshalIndent(app, "", "  ")
 	if err != nil {

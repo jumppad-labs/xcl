@@ -7,6 +7,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
+	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/logger"
@@ -283,4 +284,28 @@ func TestWarnChangedConfiguredValuesEmitsNothingWhenUnchanged(t *testing.T) {
 	warnChangedConfiguredValues(log, "resource.network.one", body, networkType, toJSON(t, before), toJSON(t, after))
 
 	require.Empty(t, collector.all())
+}
+
+func TestChangedConfiguredValuesReportsChangedSensitiveField(t *testing.T) {
+	body := parseResourceBody(t, `password = "b"`)
+
+	// json.Marshal writes the marker for a sensitive value, so the state
+	// documents are written by hand with the real values.
+	before := []byte(`{"password":"a"}`)
+	after := []byte(`{"password":"b"}`)
+
+	changed := changedConfiguredValues(body, reflect.TypeOf(&registered.Secret{}), before, after)
+
+	require.Equal(t, []string{"password"}, changed)
+}
+
+func TestChangedConfiguredValuesIgnoresUnchangedSensitiveField(t *testing.T) {
+	body := parseResourceBody(t, `password = "a"`)
+
+	before := []byte(`{"password":"a"}`)
+	after := []byte(`{"password":"a"}`)
+
+	changed := changedConfiguredValues(body, reflect.TypeOf(&registered.Secret{}), before, after)
+
+	require.Empty(t, changed)
 }

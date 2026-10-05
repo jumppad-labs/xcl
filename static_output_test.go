@@ -425,3 +425,69 @@ func TestOnlyLoggerPackageImplementsLogger(t *testing.T) {
 	slices.Sort(offenders)
 	require.Empty(t, offenders, "library types outside the logger package implement logger.Logger")
 }
+
+// wireImportPath is the internal package that writes sensitive values revealed
+const wireImportPath = "github.com/jumppad-labs/xcl/internal/wire"
+
+// wireAllowedDirectories are the directories, relative to the module root,
+// whose library files may import the wire package, each one is a hop that must
+// keep the real value of a sensitive field
+var wireAllowedDirectories = []string{
+	"internal/parser",
+	"internal/schema",
+	"internal/wire",
+	"plugins",
+	"plugins/testing",
+	// the resource printer, when revealing is asked for
+	"logger",
+}
+
+// wireImporters returns the library files that import the wire package
+func wireImporters(t *testing.T, root string) []string {
+	t.Helper()
+
+	importers := []string{}
+	for _, relative := range libraryFiles(t, root) {
+		file := parseLibraryFile(t, root, relative)
+
+		for _, spec := range file.Imports {
+			path, err := strconv.Unquote(spec.Path.Value)
+			require.NoError(t, err)
+
+			if path == wireImportPath {
+				importers = append(importers, relative)
+			}
+		}
+	}
+
+	return importers
+}
+
+// TestWireImportScanFindsKnownImporters asserts the scan below sees the files
+// known to import wire, so it cannot pass by looking at nothing
+func TestWireImportScanFindsKnownImporters(t *testing.T) {
+	root := moduleRoot(t)
+
+	importers := wireImporters(t, root)
+
+	require.Contains(t, importers, "plugins/changed.go")
+	require.Contains(t, importers, "plugins/adapter.go")
+	require.Contains(t, importers, "internal/parser/state_encode.go")
+	require.Contains(t, importers, "internal/schema/unmarshal.go")
+}
+
+// TestOnlyAllowedPackagesImportWire asserts only the packages that carry a
+// sensitive value across an internal hop import wire, anywhere else would
+// reveal a secret
+func TestOnlyAllowedPackagesImportWire(t *testing.T) {
+	root := moduleRoot(t)
+
+	offenders := []string{}
+	for _, relative := range wireImporters(t, root) {
+		if !slices.Contains(wireAllowedDirectories, filepath.ToSlash(filepath.Dir(relative))) {
+			offenders = append(offenders, relative)
+		}
+	}
+
+	require.Empty(t, offenders, "library files outside the allowed packages import internal/wire")
+}

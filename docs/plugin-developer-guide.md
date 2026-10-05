@@ -65,6 +65,55 @@ Identity fields are why `Read` gets `old`: you can't always find the real
 resource from configuration alone. Any field the user must not set, identity
 in particular, should be marked computed.
 
+## Sensitive fields
+
+A field holding a password, token or other secret is declared with the type
+`types.Sensitive[T]`:
+
+```go
+type Database struct {
+    types.ResourceBase `xcl:",remain"`
+
+    Username string                  `xcl:"username" json:"username"`
+    Password types.Sensitive[string] `xcl:"password" json:"password"`
+}
+```
+
+Users set it exactly as they set any other field. xcl shows it only as
+`(sensitive)` in logs, events, errors and printed output, and keeps the real
+value in state. Your provider receives the real value and returns it unchanged
+unless you change it, and a change to it is detected like any other.
+
+A plugin type is rebuilt on the host from its schema, and Go cannot build a
+generic type at run time, so a plugin type may use only these instantiations:
+`types.Sensitive[string]`, `[int]`, `[int64]`, `[float64]`, `[bool]`,
+`[[]string]` and `[map[string]string]`. A plugin type with any other fails to
+load, with an error naming the type and the field. Rebuild an external plugin
+against the version of xcl it is loaded by, so its type names match the
+host's.
+
+Read the real value with `Reveal()`, only where it is needed, such as when
+connecting to the service the provider manages:
+
+```go
+func (p *DatabaseProvider) Create(ctx context.Context, db *Database) (*Database, error) {
+    conn, err := p.client.Connect(db.Username, db.Password.Reveal())
+    if err != nil {
+        return nil, err
+    }
+    defer conn.Close()
+
+    // ...
+    return db, nil
+}
+```
+
+Once you call `Reveal()`, the value is an ordinary value: it is no longer
+protected and must not be logged or otherwise emitted. Do not pass it to
+`plugins.Logger(ctx)`, put it in an error, or copy it into a field that is not
+sensitive. Passing the sensitive value itself is safe: logging `db.Password` or
+`db` writes `(sensitive)`.
+
 ## The lifecycle
 
 On every apply, xcl walks the resources in dependency order. For each
@@ -426,6 +475,9 @@ external plugin; for an external plugin, detail values cross the process
 boundary as text. Outside a provider call, `plugins.Logger(ctx)` emits
 nothing; use the plugin scoped logger from `Init` there. See
 [Plugin logging](plugins.md#plugin-logging).
+
+Log a sensitive field as the field itself, which writes `(sensitive)`, never as
+the value `Reveal()` returns; see [Sensitive fields](#sensitive-fields).
 
 ## Events
 

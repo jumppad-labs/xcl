@@ -168,7 +168,7 @@ func TestInProcessPluginSchemaValidation(t *testing.T) {
 	require.NotEmpty(t, types[0].Schema, "Schema should not be empty")
 
 	// Verify schema can create a concrete type
-	wireType, err := schema.CreateInstanceFromSchema(types[0].Schema, nil)
+	wireType, err := schema.CreateInstanceFromSchema(types[0].Schema, schema.KnownTypes())
 	require.NoError(t, err, "Should be able to create struct from schema")
 	require.NotNil(t, wireType, "Wire type should not be nil")
 }
@@ -268,7 +268,7 @@ func TestExternalPluginSchemaValidation(t *testing.T) {
 	require.NotEmpty(t, types[0].Schema, "Schema should not be empty")
 
 	// Verify schema can create a concrete type
-	wireType, err := schema.CreateInstanceFromSchema(types[0].Schema, nil)
+	wireType, err := schema.CreateInstanceFromSchema(types[0].Schema, schema.KnownTypes())
 	require.NoError(t, err, "Should be able to create struct from schema")
 	require.NotNil(t, wireType, "Wire type should not be nil")
 }

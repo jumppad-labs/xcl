@@ -14,7 +14,10 @@ type StateStore interface {
 	// Returns an error if a saved state exists but cannot be loaded.
 	Load() ([]any, error)
 
-	// Save persists the entities a run produced.
+	// Save persists the entities a run produced. Each element is the entity's
+	// JSON record as a json.RawMessage, with every sensitive value written as
+	// its real value, so marshalling the slice with encoding/json stores the
+	// real values. Load may return the same raw messages.
 	// The implementation should ensure atomic writes to prevent corruption.
 	Save(entities []any) error
 

@@ -2,12 +2,12 @@ package parser
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
+	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -435,6 +435,22 @@ func (p *TestPlugin) Init(logger logger.Logger, state plugins.State) error {
 		return err
 	}
 
+	// Register Credential resource, a type with sensitive fields
+	credentialResource := &structs.Credential{}
+	credentialProvider := &TestResourceProvider[*structs.Credential]{plugin: p}
+	err = plugins.RegisterResourceProvider(
+		&p.PluginBase,
+		logger,
+		state,
+		"resource",
+		structs.TypeCredential,
+		credentialResource,
+		credentialProvider,
+	)
+	if err != nil {
+		return err
+	}
+
 	// Register Template resource
 	templateResource := &structs.Template{}
 	templateProvider := &TestResourceProvider[*structs.Template]{plugin: p}
@@ -555,12 +571,12 @@ func (p *TestResourceProvider[T]) Read(ctx context.Context, old T, resource T) (
 		return resource, err
 	}
 
-	oldData, err := json.Marshal(old)
+	oldData, err := wire.Marshal(old)
 	if err != nil {
 		return resource, err
 	}
 
-	newData, err := json.Marshal(resource)
+	newData, err := wire.Marshal(resource)
 	if err != nil {
 		return resource, err
 	}

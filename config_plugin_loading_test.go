@@ -301,7 +301,7 @@ func TestValidateEmitsLoadEventsForRegisteredPlugin(t *testing.T) {
 	require.Len(t, succeeded, 1)
 	require.Equal(t, events.SourceCore, succeeded[0].Source)
 	require.Equal(t, "TestPlugin", succeeded[0].Meta["plugin"])
-	require.Equal(t, "container, sidecar, network, template", succeeded[0].Meta["block_types"])
+	require.Equal(t, "container, sidecar, network, credential, template", succeeded[0].Meta["block_types"])
 }
 
 // TestSecondValidateEmitsNoLoadEvents asserts plugins load once, the second

@@ -10,6 +10,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/resources"
+	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -130,7 +131,7 @@ func (l *resourceLifecycle) create(r any, adapter plugins.ProviderAdapter) error
 		return err
 	}
 
-	data, err := json.Marshal(r)
+	data, err := wire.Marshal(r)
 	if err != nil {
 		return fmt.Errorf("unable to serialize resource %s: %w", meta.ID, err)
 	}
@@ -175,12 +176,12 @@ func (l *resourceLifecycle) read(r any, old any, adapter plugins.ProviderAdapter
 	}
 
 	// the previous resource is never modified, it is only serialized
-	oldData, err := json.Marshal(old)
+	oldData, err := wire.Marshal(old)
 	if err != nil {
 		return fmt.Errorf("unable to serialize previous resource %s: %w", meta.ID, err)
 	}
 
-	configuredData, err := json.Marshal(r)
+	configuredData, err := wire.Marshal(r)
 	if err != nil {
 		return fmt.Errorf("unable to serialize resource %s: %w", meta.ID, err)
 	}
@@ -192,7 +193,7 @@ func (l *resourceLifecycle) read(r any, old any, adapter plugins.ProviderAdapter
 		return err
 	}
 
-	newData, err := json.Marshal(r)
+	newData, err := wire.Marshal(r)
 	if err != nil {
 		return fmt.Errorf("unable to serialize resource %s: %w", meta.ID, err)
 	}
@@ -220,7 +221,7 @@ func (l *resourceLifecycle) read(r any, old any, adapter plugins.ProviderAdapter
 
 	emitLifecycle(l.options, meta, events.OperationRead, events.PhaseSuccess, duration, nil, newData, r)
 
-	readData, err := json.Marshal(r)
+	readData, err := wire.Marshal(r)
 	if err != nil {
 		return fmt.Errorf("unable to serialize read resource %s: %w", meta.ID, err)
 	}
@@ -283,7 +284,7 @@ func (l *resourceLifecycle) rebuild(r any, old any, adapter plugins.ProviderAdap
 	}
 
 	// the previous resource is never modified, it is only serialized
-	oldData, err := json.Marshal(old)
+	oldData, err := wire.Marshal(old)
 	if err != nil {
 		return fmt.Errorf("unable to serialize previous resource %s: %w", meta.ID, err)
 	}
@@ -366,7 +367,7 @@ func (l *resourceLifecycle) warnChangedConfiguredValues(operation string, r any,
 		return
 	}
 
-	after, err := json.Marshal(r)
+	after, err := wire.Marshal(r)
 	if err != nil {
 		return
 	}

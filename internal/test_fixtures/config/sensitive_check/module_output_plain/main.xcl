@@ -1,0 +1,7 @@
+module "child" {
+  source = "./mod"
+}
+
+resource "secret_consumer" "c" {
+  note = module.child.output.pw
+}

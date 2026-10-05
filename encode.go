@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
@@ -20,10 +21,11 @@ const computedComment = "set by the provider"
 // unexported so the set of options stays closed to the functions below.
 type encodeOptions struct {
 	includeComputed bool
+	revealSensitive bool
 }
 
 // EncodeOption configures how an entity is written as configuration text.
-// Construct one with IncludeComputed.
+// Construct one with IncludeComputed or RevealSensitive.
 type EncodeOption func(*encodeOptions)
 
 // IncludeComputed also writes the fields a provider fills in, such as an
@@ -36,6 +38,18 @@ type EncodeOption func(*encodeOptions)
 func IncludeComputed() EncodeOption {
 	return func(o *encodeOptions) {
 		o.includeComputed = true
+	}
+}
+
+// RevealSensitive writes the real value of each sensitive field. Without it,
+// each sensitive value is written as the string "(sensitive)",
+// types.SensitiveMarker.
+//
+// A value read back from the marker, such as from event data, has no real
+// value to show, so it is written as the marker even with this option.
+func RevealSensitive() EncodeOption {
+	return func(o *encodeOptions) {
+		o.revealSensitive = true
 	}
 }
 
@@ -68,7 +82,9 @@ func EncodeEntity(entity any, options ...EncodeOption) ([]byte, error) {
 // EncodeSavedEntity returns the configuration text for one entity's saved
 // data, exactly as state stores it and as events carry it at
 // EventDataProcessed. The text is identical to what EncodeEntity returns for
-// the same entity.
+// the same entity. Event data carries each sensitive value as
+// types.SensitiveMarker rather than its real value, so text from event data
+// shows the marker for it.
 //
 // registry resolves the record's type. A plugin's types resolve only once the
 // registry has loaded, so this loads it if it has not been loaded already.
@@ -140,6 +156,7 @@ func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 	err = gohcl.EncodeBody(entity, block.Body(), gohcl.EncodeOptions{
 		IncludeComputed: opts.includeComputed,
 		ComputedComment: computedComment,
+		ReplaceMarked:   sensitiveReplacement(opts.revealSensitive),
 	})
 	if err != nil {
 		return nil, &xclerrors.NotEncodableError{
@@ -155,6 +172,23 @@ func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 
 	// Bytes runs the formatter, so the text is ready to write as it is
 	return file.Bytes(), nil
+}
+
+// sensitiveReplacement returns how a sensitive value is written in
+// configuration text: as the marker, or as its real value when reveal is set.
+// A value read back from the marker is written as the marker either way.
+func sensitiveReplacement(reveal bool) func(cty.Value) cty.Value {
+	return func(value cty.Value) cty.Value {
+		if !value.HasMark(types.SensitiveMark) {
+			return value
+		}
+
+		if reveal && !value.HasMark(types.RedactedMark) {
+			return value
+		}
+
+		return cty.StringVal(types.SensitiveMarker)
+	}
 }
 
 // trimBookkeeping removes what ResourceBase records about an entity but nobody

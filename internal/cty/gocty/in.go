@@ -39,6 +39,13 @@ func toCtyValue(val reflect.Value, ty cty.Type, path cty.Path) (cty.Value, error
 		return toCtyPassthrough(val, ty, path)
 	}
 
+	// A registered wrapper type converts as its inner value, marked.
+	if unwrapped := toCtyUnwrapPointer(val); unwrapped.IsValid() {
+		if wrapper, inner, ok := wrapperFor(unwrapped.Type()); ok {
+			return toCtyWrapper(wrapper, inner, unwrapped, ty, path)
+		}
+	}
+
 	switch ty {
 	case cty.Bool:
 		return toCtyBool(val, path)

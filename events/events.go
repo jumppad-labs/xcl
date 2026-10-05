@@ -134,7 +134,10 @@ const (
 
 	// DataProcessed carries, on a success event, the resource as xcl records
 	// it in state, including the values the provider filled in and the status
-	// it ended with. Other phases carry the same data as DataRaw, because no
-	// result exists before the call returns.
+	// it ended with, except that every sensitive value shows
+	// types.SensitiveMarker. Other phases carry the same data as DataRaw,
+	// because no result exists before the call returns.
+	//
+	// At every level, event data shows sensitive values only as the marker.
 	DataProcessed
 )

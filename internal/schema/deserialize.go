@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 )
 
@@ -58,7 +57,10 @@ func parseAttribute(attribute *Attribute, typeMapping map[string]reflect.Type) (
 				return nil, err
 			}
 
-			embeddedType := parseInnerType(t, a, typeMapping)
+			embeddedType, err := parseInnerType(t, a, typeMapping)
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", fieldName, err)
+			}
 
 			field := reflect.StructField{
 				Name:      fieldName, // Anonymous fields need the type name
@@ -82,7 +84,10 @@ func parseAttribute(attribute *Attribute, typeMapping map[string]reflect.Type) (
 		}
 
 		if t.Slice {
-			innerType := parseInnerType(t, a, typeMapping)
+			innerType, err := parseInnerType(t, a, typeMapping)
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", a.Name, err)
+			}
 			sliceType := reflect.SliceOf(innerType)
 
 			if t.OuterPointer {
@@ -98,7 +103,10 @@ func parseAttribute(attribute *Attribute, typeMapping map[string]reflect.Type) (
 			fields = append(fields, nf)
 
 		} else if t.Map {
-			innerType := parseInnerType(t, a, typeMapping)
+			innerType, err := parseInnerType(t, a, typeMapping)
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", a.Name, err)
+			}
 
 			keyType := reflect.TypeOf(t.MapKey)
 			mapType := reflect.MapOf(keyType, innerType)
@@ -115,7 +123,10 @@ func parseAttribute(attribute *Attribute, typeMapping map[string]reflect.Type) (
 
 			fields = append(fields, field)
 		} else {
-			innerType := parseInnerType(t, a, typeMapping)
+			innerType, err := parseInnerType(t, a, typeMapping)
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", a.Name, err)
+			}
 
 			field := reflect.StructField{
 				Name: a.Name,
@@ -135,53 +146,71 @@ func parseAttribute(attribute *Attribute, typeMapping map[string]reflect.Type) (
 }
 
 func parseType(t string) (*PropertyType, error) {
-	/*
-		^                         start of type
-		(?P<outerpointer>\*)?     is the outer type a pointer?
-		(
-			(?P<slice>\[])          is the outer type a slice?
-			|                       or
-			(
-				(?P<map>map)          is the outer type a map?
-				(?:\[)                ignore the [
-				(?P<mapkey>.+)        key type of the map
-				(?:])                 ignore the ]
-			)
-		)?                        optional
-		(?P<innerpointer>\*)?     is the inner type a pointer?
-		(?P<type>.+)              type of the attribute
-		$                         end of type
-	*/
-
-	expr := regexp.MustCompile(`^(?P<outerpointer>\*)?((?P<slice>\[])|((?P<map>map)(?:\[)(?P<mapkey>.+)(?:])))?(?P<innerpointer>\*)?(?P<type>.+)$`)
-	matches := expr.FindAllStringSubmatch(t, -1)
-	if len(matches) == 0 {
+	if t == "" {
 		return nil, fmt.Errorf("unable to parse type: %s", t)
 	}
 
-	parts := make(map[string]string)
-	for i, name := range expr.SubexpNames() {
-		if i != 0 && name != "" {
-			parts[name] = matches[0][i]
+	tp := PropertyType{}
+	rest := t
+
+	if strings.HasPrefix(rest, "*") {
+		tp.OuterPointer = true
+		rest = rest[1:]
+	}
+
+	switch {
+	case strings.HasPrefix(rest, "[]"):
+		tp.Slice = true
+		rest = rest[2:]
+
+	case strings.HasPrefix(rest, "map["):
+		// the key ends at the bracket that closes "map[", which a scan of the
+		// bracket depth finds even when the key or value is generic, such as
+		// map[string]types.Sensitive[string]
+		closing := matchingBracket(rest, len("map"))
+		if closing < 0 {
+			return nil, fmt.Errorf("unable to parse type: %s", t)
 		}
+
+		tp.Map = true
+		tp.MapKey = rest[len("map["):closing]
+		rest = rest[closing+1:]
 	}
 
-	tp := PropertyType{
-		OuterPointer: parts["outerpointer"] != "",
-		Slice:        parts["slice"] != "",
-		Map:          parts["map"] != "",
-		InnerPointer: parts["innerpointer"] != "",
-		Type:         parts["type"],
+	if strings.HasPrefix(rest, "*") {
+		tp.InnerPointer = true
+		rest = rest[1:]
 	}
 
-	if parts["mapkey"] != "" {
-		tp.MapKey = parts["mapkey"]
+	if rest == "" {
+		return nil, fmt.Errorf("unable to parse type: %s", t)
 	}
+
+	tp.Type = rest
 
 	return &tp, nil
 }
 
-func parseInnerType(t *PropertyType, a *Attribute, typeMapping map[string]reflect.Type) reflect.Type {
+// matchingBracket returns the index of the bracket that closes the one at
+// open, counting nested brackets, or -1 when it is not closed.
+func matchingBracket(s string, open int) int {
+	depth := 0
+	for i := open; i < len(s); i++ {
+		switch s[i] {
+		case '[':
+			depth++
+		case ']':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+
+	return -1
+}
+
+func parseInnerType(t *PropertyType, a *Attribute, typeMapping map[string]reflect.Type) (reflect.Type, error) {
 	var innerType reflect.Type
 
 	switch t.Type {
@@ -226,6 +255,12 @@ func parseInnerType(t *PropertyType, a *Attribute, typeMapping map[string]reflec
 			}
 		}
 
+		// a sensitive instantiation can not be built at run time, so one the
+		// host does not know fails rather than silently losing its value
+		if strings.HasPrefix(t.Type, sensitiveTypePrefix) {
+			return nil, fmt.Errorf("unsupported sensitive type %s, supported sensitive types are types.Sensitive[string], [int], [int64], [float64], [bool], [[]string] and [map[string]string]", t.Type)
+		}
+
 		// Handle interface{} and other unrecognized types
 		if strings.Contains(t.Type, "interface") {
 			innerType = reflect.TypeOf((*interface{})(nil)).Elem()
@@ -255,7 +290,7 @@ func parseInnerType(t *PropertyType, a *Attribute, typeMapping map[string]reflec
 		if !hasTypeMapping {
 			se, err := parseAttribute(a, typeMapping)
 			if err != nil {
-				return nil
+				return nil, err
 			}
 
 			innerType = reflect.TypeOf(se)
@@ -268,7 +303,7 @@ func parseInnerType(t *PropertyType, a *Attribute, typeMapping map[string]reflec
 		}
 	}
 
-	return innerType
+	return innerType, nil
 }
 
 // extractTypeName extracts the type name from a full type string

@@ -1,0 +1,12 @@
+resource "secret" "a" {
+  username = "admin"
+  password = "pw"
+}
+
+module "child" {
+  source = "./mod"
+
+  variables = {
+    pw = resource.secret.a.password
+  }
+}

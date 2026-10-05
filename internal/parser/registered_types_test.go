@@ -114,7 +114,10 @@ func (h *registeredHarness) applyAndSave(t *testing.T, path string) *State {
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	err = h.store.Save(st.GetResources())
+	encoded, err := EncodeForState(st.GetResources())
+	require.NoError(t, err)
+
+	err = h.store.Save(encoded)
 	require.NoError(t, err)
 
 	return st
@@ -302,7 +305,10 @@ func TestApplyAfterRemovingRegisteredBlockSucceedsWithoutProvider(t *testing.T) 
 	_, err = findByID(st.GetResources(), registeredRemovedID)
 	require.Error(t, err)
 
-	err = h.store.Save(st.GetResources())
+	encoded, err := EncodeForState(st.GetResources())
+	require.NoError(t, err)
+
+	err = h.store.Save(encoded)
 	require.NoError(t, err)
 
 	saved := loadTyped(t, h.store, h.registry)

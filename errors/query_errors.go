@@ -121,13 +121,22 @@ func (e *NotRegisteredError) Unwrap() error { return ErrNotRegistered }
 
 // TypeMismatchError reports the entity asked for, the Go type requested, and
 // the type the entity actually is.
+//
+// Field is set when the types otherwise match but a field the entity declares
+// sensitive would land in a field the requested type declares plain. It is the
+// dotted path of that field.
 type TypeMismatchError struct {
 	Address string
 	Want    reflect.Type
 	Got     string
+	Field   string
 }
 
 func (e *TypeMismatchError) Error() string {
+	if e.Field != "" {
+		return fmt.Sprintf("entity %q field %q is sensitive, %s declares it as a plain value", e.Address, e.Field, typeName(e.Want))
+	}
+
 	return fmt.Sprintf("entity %q is %s, not %s", e.Address, e.Got, typeName(e.Want))
 }
 

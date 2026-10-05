@@ -121,3 +121,14 @@ Import paths were rewritten from `github.com/hashicorp/hcl/v2/...` to
   attribute's children: setting a lead comment deleted the whole attribute.
   `SetLineComment` escaped only because `lineComments` is neither first nor
   last. Another upstream defect, present in hashicorp/hcl.
+- `gohcl/decode.go`: an error decoding an attribute's value names the
+  attribute in the diagnostic detail (`Attribute "password": ...`), so an
+  unsuitable value, such as a marked value meeting a plain field, is reported
+  against the field it was assigned to.
+- `gohcl/encode.go`: `EncodeOptions.ReplaceMarked`, a generic option for how
+  marked values are written. `hclwrite` cannot write a marked value, so each
+  marked part of an attribute's value is replaced with what the callback
+  returns, or unmarked when there is no callback. A collection holding a
+  replaced part is rebuilt as an object or tuple, which are written the same
+  way. `EncodeIntoBody` and `EncodeAsBlock` keep their signatures and write
+  marked values unmarked.

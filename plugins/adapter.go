@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/logger"
 )
 
@@ -124,7 +125,7 @@ func (a *TypedProviderAdapter[T]) Create(ctx context.Context, entityData []byte)
 	}
 
 	// Serialize the mutated resource back to JSON
-	mutatedData, err := json.Marshal(mutatedResource)
+	mutatedData, err := wire.Marshal(mutatedResource)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +172,7 @@ func (a *TypedProviderAdapter[T]) Read(ctx context.Context, oldEntityData []byte
 	}
 
 	// Serialize the read resource back to JSON
-	readData, err := json.Marshal(readResource)
+	readData, err := wire.Marshal(readResource)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +196,7 @@ func (a *TypedProviderAdapter[T]) Update(ctx context.Context, entityData []byte)
 	}
 
 	// Serialize the updated resource back to JSON
-	updatedData, err := json.Marshal(updatedResource)
+	updatedData, err := wire.Marshal(updatedResource)
 	if err != nil {
 		return nil, err
 	}

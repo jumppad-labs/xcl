@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"encoding/json"
 	goerrors "errors"
 	"fmt"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/resources"
+	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -190,7 +190,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		case resources.TypeOutput:
 			out := r.(*types.Output)
 			if !out.CtyValue.IsNull() {
-				out.Value = convertCtyToGo(out.CtyValue)
+				out.Value, out.SensitivePaths = convertOutputValue(out.CtyValue)
 			}
 		}
 
@@ -267,7 +267,7 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 		}
 
 		// Serialize the resource to JSON for provider call
-		resourceJSON, err := json.Marshal(r)
+		resourceJSON, err := wire.Marshal(r)
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				r,

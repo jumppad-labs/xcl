@@ -1,0 +1,10 @@
+# A function called with the secret fails; the error must not reveal it.
+
+resource "secret" "a" {
+  username = "admin"
+  password = "s3cr3t-leak-check-7f1d"
+}
+
+resource "secret_consumer" "b" {
+  password = file(resource.secret.a.password)
+}

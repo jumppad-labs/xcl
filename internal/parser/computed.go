@@ -21,9 +21,16 @@ import (
 //     saved and configured copies are paired by their key fields, or by position
 //     when the element type has none.
 var (
-	resourceBaseType = reflect.TypeOf(types.ResourceBase{})
-	ctyValueType     = reflect.TypeOf(cty.Value{})
+	resourceBaseType   = reflect.TypeOf(types.ResourceBase{})
+	ctyValueType       = reflect.TypeOf(cty.Value{})
+	sensitiveValueType = reflect.TypeOf((*types.SensitiveValue)(nil)).Elem()
 )
+
+// isSensitiveType returns true when t is a types.Sensitive value. A sensitive
+// value is a single leaf: it is compared and copied whole, never walked into.
+func isSensitiveType(t reflect.Type) bool {
+	return t != nil && t.Kind() == reflect.Struct && t.Implements(sensitiveValueType)
+}
 
 // structField is a field of a struct type that configuration can name
 type structField struct {
@@ -110,7 +117,7 @@ func blockElement(t reflect.Type) reflect.Type {
 	}
 
 	t = dereference(t)
-	if t.Kind() != reflect.Struct || t == ctyValueType || t == resourceBaseType {
+	if t.Kind() != reflect.Struct || t == ctyValueType || t == resourceBaseType || isSensitiveType(t) {
 		return nil
 	}
 

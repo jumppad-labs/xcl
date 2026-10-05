@@ -74,7 +74,11 @@ func applyPeople(t *testing.T, reg *registry.PluginRegistry, store *state.FileSt
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	err = store.Save(st.GetResources())
+	// save the way Config does: each entity encoded with its real values
+	encoded, err := parser.EncodeForState(st.GetResources())
+	require.NoError(t, err)
+
+	err = store.Save(encoded)
 	require.NoError(t, err)
 
 	return st.GetResources(), collector

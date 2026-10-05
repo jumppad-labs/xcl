@@ -77,3 +77,45 @@ type Server struct {
 	Location string `xcl:"location" json:"location"`
 	Size     int    `xcl:"size,optional" json:"size,omitempty"`
 }
+
+// TypeSecret is the type of Secret entities
+const TypeSecret = "secret"
+
+// TypeSecretConsumer is the type of SecretConsumer entities
+const TypeSecretConsumer = "secret_consumer"
+
+// Secret holds a sensitive password beside a plain username
+type Secret struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Username string                  `xcl:"username,optional" json:"username,omitempty"`
+	Password types.Sensitive[string] `xcl:"password" json:"password"`
+}
+
+// SecretConsumer reads values that may be sensitive into a sensitive field
+// and a plain field
+type SecretConsumer struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Password types.Sensitive[string] `xcl:"password,optional" json:"password"`
+	Note     string                  `xcl:"note,optional" json:"note,omitempty"`
+}
+
+// TypeSecretShapes is the type of SecretShape entities
+const TypeSecretShapes = "secret_shape"
+
+// SecretShape has plain and sensitive fields of object and list shapes
+type SecretShape struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Tags    map[string]string                  `xcl:"tags,optional" json:"tags,omitempty"`
+	Items   []string                           `xcl:"items,optional" json:"items,omitempty"`
+	Secrets map[string]types.Sensitive[string] `xcl:"secrets,optional" json:"secrets,omitempty"`
+	Login   *SecretLogin                       `xcl:"login,optional" json:"login,omitempty"`
+}
+
+// SecretLogin has a plain and a sensitive inner field
+type SecretLogin struct {
+	User     string                  `xcl:"user,optional" json:"user,omitempty"`
+	Password types.Sensitive[string] `xcl:"password,optional" json:"password,omitempty"`
+}

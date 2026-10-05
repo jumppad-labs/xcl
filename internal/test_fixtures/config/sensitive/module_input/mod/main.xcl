@@ -1,0 +1,7 @@
+variable "pw" {
+  default = ""
+}
+
+resource "secret_consumer" "inner" {
+  password = variable.pw
+}

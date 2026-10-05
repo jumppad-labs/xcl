@@ -21,11 +21,11 @@ import (
 // resolves values, decodes bodies, or reaches a provider. An empty result means
 // the configuration is valid.
 //
-// The stages run in order - structure, then references, then properties - and
-// each gathers all of its own findings before the next is considered. Stopping
-// between stages is deliberate: once references are known to be broken,
-// checking properties on them would report confusing consequences of a problem
-// that has already been reported.
+// The stages run in order - structure, then references, then sensitivity, then
+// properties - and each gathers all of its own findings before the next is
+// considered. Stopping between stages is deliberate: once references are known
+// to be broken, checking properties on them would report confusing
+// consequences of a problem that has already been reported.
 func (p *Parser) validate() []error {
 	problems := []error{}
 
@@ -44,7 +44,14 @@ func (p *Parser) validate() []error {
 		return problems
 	}
 
-	// Stage 3: properties. Every reference that resolves must name properties
+	// Stage 3: sensitivity. A sensitive value, or one derived from it, may
+	// only be assigned to a field declared sensitive.
+	problems = append(problems, p.validateSensitive()...)
+	if len(problems) > 0 {
+		return problems
+	}
+
+	// Stage 4: properties. Every reference that resolves must name properties
 	// its target's type actually has.
 	problems = append(problems, p.validateProperties()...)
 

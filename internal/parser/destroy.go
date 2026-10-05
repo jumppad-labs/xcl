@@ -127,7 +127,11 @@ func (d *destroyer) save(r any) error {
 		return nil
 	}
 
-	err := d.store.Save(d.working.GetResources())
+	encoded, err := EncodeForState(d.working.GetResources())
+	if err == nil {
+		err = d.store.Save(encoded)
+	}
+
 	if err != nil {
 		id := ""
 		if meta, metaErr := types.GetMeta(r); metaErr == nil {

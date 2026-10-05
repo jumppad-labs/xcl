@@ -137,7 +137,10 @@ func (h *lifecycleHarness) applyAndSave(t *testing.T, path string) *State {
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	err = h.store.Save(st.GetResources())
+	encoded, err := EncodeForState(st.GetResources())
+	require.NoError(t, err)
+
+	err = h.store.Save(encoded)
 	require.NoError(t, err)
 
 	return st
@@ -155,7 +158,10 @@ func (h *lifecycleHarness) applyAndSaveExpectingFailure(t *testing.T, path strin
 	require.Error(t, err)
 
 	if st != nil {
-		saveErr := h.store.Save(st.GetResources())
+		encoded, encodeErr := EncodeForState(st.GetResources())
+		require.NoError(t, encodeErr)
+
+		saveErr := h.store.Save(encoded)
 		require.NoError(t, saveErr)
 	}
 

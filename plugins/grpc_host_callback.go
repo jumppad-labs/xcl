@@ -2,7 +2,7 @@ package plugins
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/logger"
 	"strconv"
 
@@ -87,7 +87,7 @@ func (s *GRPCHostCallbackServer) Get(ctx context.Context, req *proto.StateGetReq
 	}
 
 	// Serialize the resource to bytes
-	resourceData, err := json.Marshal(resource)
+	resourceData, err := wire.Marshal(resource)
 	if err != nil {
 		return &proto.StateGetResponse{Error: err.Error()}, nil
 	}
@@ -108,7 +108,7 @@ func (s *GRPCHostCallbackServer) Find(ctx context.Context, req *proto.StateFindR
 	// Serialize all resources to bytes
 	resourcesData := make([][]byte, len(resources))
 	for i, resource := range resources {
-		data, err := json.Marshal(resource)
+		data, err := wire.Marshal(resource)
 		if err != nil {
 			return &proto.StateFindResponse{Error: err.Error()}, nil
 		}

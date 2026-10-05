@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/mitchellh/go-wordwrap"
 )
@@ -37,6 +38,9 @@ type PrinterOptions struct {
 	ShowEmpty bool
 	// Verbosity level (0=basic, 1=detailed, 2=all)
 	Verbosity int
+	// RevealSensitive prints the real value of sensitive fields instead of
+	// types.SensitiveMarker
+	RevealSensitive bool
 }
 
 // PrinterOption is a functional option for configuring the printer
@@ -67,6 +71,14 @@ func WithMaxWidth(width int) PrinterOption {
 func WithShowEmpty(show bool) PrinterOption {
 	return func(o *PrinterOptions) {
 		o.ShowEmpty = show
+	}
+}
+
+// WithRevealSensitive prints the real value of each sensitive field, in
+// every format, instead of types.SensitiveMarker. It is off by default.
+func WithRevealSensitive(reveal bool) PrinterOption {
+	return func(o *PrinterOptions) {
+		o.RevealSensitive = reveal
 	}
 }
 
@@ -178,6 +190,10 @@ func (p *ResourcePrinter) formatValue(value interface{}) string {
 		return ""
 	}
 
+	if sensitive, ok := value.(types.SensitiveValue); ok {
+		return p.formatSensitive(sensitive)
+	}
+
 	v := reflect.ValueOf(value)
 	switch v.Kind() {
 	case reflect.String:
@@ -192,7 +208,7 @@ func (p *ResourcePrinter) formatValue(value interface{}) string {
 		}
 		var items []string
 		for i := 0; i < v.Len(); i++ {
-			items = append(items, fmt.Sprintf("%v", v.Index(i).Interface()))
+			items = append(items, p.formatElement(v.Index(i).Interface()))
 		}
 		return fmt.Sprintf("[%s]", strings.Join(items, ", "))
 	case reflect.Map:
@@ -202,7 +218,7 @@ func (p *ResourcePrinter) formatValue(value interface{}) string {
 		var items []string
 		for _, key := range v.MapKeys() {
 			val := v.MapIndex(key)
-			items = append(items, fmt.Sprintf("%v: %v", key.Interface(), val.Interface()))
+			items = append(items, fmt.Sprintf("%v: %s", key.Interface(), p.formatElement(val.Interface())))
 		}
 		sort.Strings(items) // Sort for consistent output
 		return fmt.Sprintf("{%s}", strings.Join(items, ", "))
@@ -216,6 +232,26 @@ func (p *ResourcePrinter) formatValue(value interface{}) string {
 	default:
 		return fmt.Sprintf("%v", value)
 	}
+}
+
+// formatSensitive prints the marker, or the real value when revealing is
+// asked for. A value read back from the marker has no real value to reveal.
+func (p *ResourcePrinter) formatSensitive(sensitive types.SensitiveValue) string {
+	if !p.options.RevealSensitive || types.IsRedacted(sensitive) {
+		return types.SensitiveMarker
+	}
+
+	return fmt.Sprintf("%v", sensitive.RevealAny())
+}
+
+// formatElement prints an element of a list or map as %v does, except that a
+// sensitive element follows the reveal option.
+func (p *ResourcePrinter) formatElement(value any) string {
+	if sensitive, ok := value.(types.SensitiveValue); ok {
+		return p.formatSensitive(sensitive)
+	}
+
+	return fmt.Sprintf("%v", value)
 }
 
 // visualLength returns the visual length of a string, excluding ANSI escape codes
@@ -515,7 +551,14 @@ func (p *ResourcePrinter) addEmbeddedFields(embeddedStruct reflect.Value, fields
 // printJSON prints a resource in JSON format with basic syntax highlighting
 func (p *ResourcePrinter) printJSON(resource any) error {
 	// Convert resource to JSON
-	data, err := json.MarshalIndent(resource, "", "  ")
+	// encoding/json shows each sensitive value as the marker; the internal
+	// encoder writes real values and is used only when revealing is asked for
+	marshalIndent := json.MarshalIndent
+	if p.options.RevealSensitive {
+		marshalIndent = wire.MarshalIndent
+	}
+
+	data, err := marshalIndent(resource, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal resource to JSON: %w", err)
 	}

@@ -1,0 +1,9 @@
+# A sensitive module output read by the caller.
+
+module "child" {
+  source = "./mod"
+}
+
+resource "secret_consumer" "c" {
+  password = module.child.output.pw
+}

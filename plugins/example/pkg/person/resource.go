@@ -14,6 +14,10 @@ type Person struct {
 	Address     string `xcl:"address,optional" json:"address,omitempty"`
 	Description string `xcl:"description,optional" json:"description,omitempty"`
 
+	// Token is sensitive: it shows only as "(sensitive)" anywhere it is
+	// printed, logged or reported, and the provider reads it with Reveal
+	Token types.Sensitive[string] `xcl:"token,optional" json:"token"`
+
 	// PersonID is owned by the provider: it is set when the person is created,
 	// can not be set in configuration, and is carried over by xcl on every apply
 	PersonID string `xcl:"person_id,optional,computed" json:"person_id,omitempty"`

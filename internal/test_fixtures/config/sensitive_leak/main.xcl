@@ -1,0 +1,26 @@
+# One secret value, s3cr3t-leak-check-7f1d, held by a registered type and a
+# plugin type, referenced into another sensitive field and published through
+# outputs. No output path may reveal it.
+
+resource "secret" "a" {
+  username = "admin"
+  password = "s3cr3t-leak-check-7f1d"
+}
+
+resource "credential" "b" {
+  username = "admin"
+  password = "s3cr3t-leak-check-7f1d"
+  pin      = 4821
+}
+
+resource "secret_consumer" "interpolated" {
+  password = "x-${resource.secret.a.password}"
+}
+
+output "secret" {
+  value = resource.secret.a.password
+}
+
+output "entity" {
+  value = resource.secret.a
+}

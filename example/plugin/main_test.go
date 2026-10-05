@@ -1175,3 +1175,31 @@ func TestPluginExampleEveryEntityConverts(t *testing.T) {
 
 	require.NotZero(t, converted, "nothing converted, so the check proves nothing")
 }
+
+// TestPluginExamplePrintsNoSecret asserts neither the password configured
+// through the variable's default nor the literal one in the module appears
+// anywhere the example writes, the report, the process's standard streams or
+// the events rendered by the pretty printer
+func TestPluginExamplePrintsNoSecret(t *testing.T) {
+	const variablePassword = "pg-s3cret-example"
+	const modulePassword = "pg-an4lytics-example"
+
+	r := registry.NewPluginRegistry()
+	out := &bytes.Buffer{}
+	rendered := &bytes.Buffer{}
+
+	var runErr error
+	captured := captureStandardStreams(t, func() {
+		runErr = func() error {
+			_, err := run(out, prettylog.Handler(rendered, slog.LevelDebug, r), r, configDir, externalPlugin, t.TempDir())
+			return err
+		}()
+	})
+
+	require.NoError(t, runErr)
+
+	for _, written := range []string{captured.stdout, captured.stderr, out.String(), rendered.String()} {
+		require.NotContains(t, written, variablePassword)
+		require.NotContains(t, written, modulePassword)
+	}
+}
