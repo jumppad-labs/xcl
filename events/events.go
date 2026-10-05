@@ -101,7 +101,8 @@ type Event struct {
 	// Data is the serialized resource, set only when the configuration asks
 	// for it with an event data level. It carries nothing by default, so
 	// configuration and state do not travel through event handlers unless an
-	// application opts in. See DataLevel.
+	// application opts in. Sensitive values in it are masked by the
+	// configured event masker, see DataLevel.
 	Data []byte
 
 	// Meta holds the event's details. A log event carries its severity under
@@ -134,10 +135,13 @@ const (
 
 	// DataProcessed carries, on a success event, the resource as xcl records
 	// it in state, including the values the provider filled in and the status
-	// it ended with, except that every sensitive value shows
-	// types.SensitiveMarker. Other phases carry the same data as DataRaw,
-	// because no result exists before the call returns.
+	// it ended with, except that every sensitive value is masked. Other
+	// phases carry the same data as DataRaw, because no result exists before
+	// the call returns.
 	//
-	// At every level, event data shows sensitive values only as the marker.
+	// At every level, each sensitive value in event data is written through
+	// the configured event masker, as an envelope naming the masker, by
+	// default {"xcl_masked":"redact","value":"(sensitive)"}. Processed data
+	// is therefore what state holds only where state and events mask alike.
 	DataProcessed
 )

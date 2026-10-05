@@ -292,7 +292,7 @@ A developer can also write their own by implementing `Masker`. Masked data names
 
 **Validation point**: Unit tests prove each built-in behaves as named and that `Unmask` refuses one-way, mismatched and wrong-key data. Encoder and reader tests prove envelopes are written and recognised at every depth. The full existing suite passes unchanged.
 
-#### - [ ] Task: Add the masking package and its built-in maskers
+#### - [x] Task: Add the masking package and its built-in maskers
 **Id:** 63dd046a-f9af-47cc-9ee6-de20de649e9f
 **Repo:** xclconfig
 **Depends on:** none
@@ -303,14 +303,14 @@ A new public `mask` package defines the `Masker` interface developers implement,
 *Technical detail:* [context.md#task-add-the-masking-package-and-its-built-in-maskers](./context.md#task-add-the-masking-package-and-its-built-in-maskers)
 
 **Acceptance criteria**:
-- [ ] The encryption masker's output differs from its input, opens to the original with the same key, and fails to open with a different key.
-- [ ] The keyed hash gives the same output for the same input and key, and a different output for a different key.
-- [ ] The omit masker leaves no value, and the redact masker gives the fixed marker.
-- [ ] Every masked value names the masker that produced it.
-- [ ] Opening data produced by a one-way masker, by a different masker, or under the wrong key reports it as unrecoverable and returns no value.
-- [ ] A developer-written type with a name and a mask method satisfies the masker interface.
+- [x] The encryption masker's output differs from its input, opens to the original with the same key, and fails to open with a different key.
+- [x] The keyed hash gives the same output for the same input and key, and a different output for a different key.
+- [x] The omit masker leaves no value, and the redact masker gives the fixed marker.
+- [x] Every masked value names the masker that produced it.
+- [x] Opening data produced by a one-way masker, by a different masker, or under the wrong key reports it as unrecoverable and returns no value.
+- [x] A developer-written type with a name and a mask method satisfies the masker interface.
 
-#### - [ ] Task: Mask sensitive values in the internal encoder
+#### - [x] Task: Mask sensitive values in the internal encoder
 **Id:** bd389804-35d5-4b1a-b162-c80d2af8c8e3
 **Repo:** xclconfig
 **Depends on:**
@@ -322,11 +322,11 @@ The internal encoder that writes entities with their real sensitive values gains
 *Technical detail:* [context.md#task-mask-sensitive-values-in-the-internal-encoder](./context.md#task-mask-sensitive-values-in-the-internal-encoder)
 
 **Acceptance criteria**:
-- [ ] With a masker, every sensitive value is written as that masker's envelope, at the top level, nested, embedded, and inside lists, maps and dynamic values.
-- [ ] Without a masker, the output is byte-identical to before.
-- [ ] The encoder reports correctly whether an entity held any sensitive value.
+- [x] With a masker, every sensitive value is written as that masker's envelope, at the top level, nested, embedded, and inside lists, maps and dynamic values.
+- [x] Without a masker, the output is byte-identical to before.
+- [x] The encoder reports correctly whether an entity held any sensitive value.
 
-#### - [ ] Task: Recognise masked values when reading saved data
+#### - [x] Task: Recognise masked values when reading saved data
 **Id:** d6ea57af-4fe8-4fcc-8167-68ff75ca644c
 **Repo:** xclconfig
 **Depends on:**
@@ -338,10 +338,10 @@ The one reader of saved records learns to find masked values before it types a r
 *Technical detail:* [context.md#task-recognise-masked-values-when-reading-saved-data](./context.md#task-recognise-masked-values-when-reading-saved-data)
 
 **Acceptance criteria**:
-- [ ] A record holding values masked by the state masker reads back with the real values.
-- [ ] A record holding a value masked by another masker, by a one-way masker, or under a different key fails to load with an unrecoverable-value error naming the entity and the masker.
-- [ ] Read for display, any masked value reads back as the marker, and never as ciphertext or a hash.
-- [ ] A record holding plain sensitive values reads as before, with or without a state masker.
+- [x] A record holding values masked by the state masker reads back with the real values.
+- [x] A record holding a value masked by another masker, by a one-way masker, or under a different key fails to load with an unrecoverable-value error naming the entity and the masker.
+- [x] Read for display, any masked value reads back as the marker, and never as ciphertext or a hash.
+- [x] A record holding plain sensitive values reads as before, with or without a state masker.
 
 ### Milestone 2: State encrypts sensitive values when given a key, and warns when it holds them in plain text
 
@@ -349,7 +349,7 @@ The one reader of saved records learns to find masked values before it types a r
 
 **Validation point**: End-to-end tests apply a configuration holding a known secret with the encryption masker and find no trace of it in the state file. They reload the state with the same key and fail it under another. They show the one-way rejection, the warning with plain state, and the absence of the warning when there is nothing sensitive.
 
-#### - [ ] Task: Encrypt sensitive values in state
+#### - [x] Task: Encrypt sensitive values in state
 **Id:** 7a0b0774-b861-400c-9056-bb43cb73d3f5
 **Repo:** xclconfig
 **Depends on:**
@@ -362,13 +362,13 @@ The one reader of saved records learns to find masked values before it types a r
 *Technical detail:* [context.md#task-encrypt-sensitive-values-in-state](./context.md#task-encrypt-sensitive-values-in-state)
 
 **Acceptance criteria**:
-- [ ] After applying a configuration holding a known secret with the encryption masker, the state file does not contain the secret anywhere, including after destroy's saves.
-- [ ] A new configuration with the same key loads that state and reads back the real value. With a different key, or with no masker, loading fails with an unrecoverable-value error.
-- [ ] A developer's own reversible masker configured for state puts its output in state for each sensitive value and reads it back.
-- [ ] Setting up xcl with a one-way masker for state fails with an error saying the state masker must be reversible.
-- [ ] State written in plain text loads once a masker is configured, and the next save encrypts it.
+- [x] After applying a configuration holding a known secret with the encryption masker, the state file does not contain the secret anywhere, including after destroy's saves.
+- [x] A new configuration with the same key loads that state and reads back the real value. With a different key, or with no masker, loading fails with an unrecoverable-value error.
+- [x] A developer's own reversible masker configured for state puts its output in state for each sensitive value and reads it back.
+- [x] Setting up xcl with a one-way masker for state fails with an error saying the state masker must be reversible.
+- [x] State written in plain text loads once a masker is configured, and the next save encrypts it.
 
-#### - [ ] Task: Warn when state holds sensitive values in plain text
+#### - [x] Task: Warn when state holds sensitive values in plain text
 **Id:** bc117ce9-4307-4c5c-846d-0346cbc35e55
 **Repo:** xclconfig
 **Depends on:**
@@ -380,9 +380,9 @@ When no state masker is configured and an apply or destroy writes a sensitive va
 *Technical detail:* [context.md#task-warn-when-state-holds-sensitive-values-in-plain-text](./context.md#task-warn-when-state-holds-sensitive-values-in-plain-text)
 
 **Acceptance criteria**:
-- [ ] Applying a configuration holding a sensitive value with no state masker writes it in plain text and emits exactly one warning saying sensitive values are stored unencrypted.
-- [ ] A configuration with no sensitive values emits no such warning.
-- [ ] With a state masker configured, or with no state store, no such warning is emitted.
+- [x] Applying a configuration holding a sensitive value with no state masker writes it in plain text and emits exactly one warning saying sensitive values are stored unencrypted.
+- [x] A configuration with no sensitive values emits no such warning.
+- [x] With a state masker configured, or with no state store, no such warning is emitted.
 
 ### Milestone 3: Events redact sensitive values by default, and developers choose how, or turn it off
 
@@ -395,7 +395,7 @@ Errors and log details keep showing only the marker whatever is chosen. Turning 
 
 **Validation point**: End-to-end tests at both event data levels show the redact envelope by default, a custom masker's output when one is chosen, and real values when masking is off. They show errors and log details still redacted with masking off, and configuration text showing the marker for masked data. The extended leak suite passes.
 
-#### - [ ] Task: Mask event data with the configured event masker
+#### - [x] Task: Mask event data with the configured event masker
 **Id:** d6e49599-822b-495b-9369-d76f8a497267
 **Repo:** xclconfig
 **Depends on:**
@@ -408,12 +408,12 @@ Resource data on events is written through the configured event masker. That is 
 *Technical detail:* [context.md#task-mask-event-data-with-the-configured-event-masker](./context.md#task-mask-event-data-with-the-configured-event-masker)
 
 **Acceptance criteria**:
-- [ ] With events carrying resource data and no event masker chosen, every such event shows each sensitive value as the marker, named as redacted, and never the real value, at both data levels.
-- [ ] A developer's own event masker's output appears in event data for each sensitive value.
-- [ ] With event masking turned off, event data carries the real sensitive values.
-- [ ] Masked event data and encrypted state each turn into configuration text that shows the marker.
+- [x] With events carrying resource data and no event masker chosen, every such event shows each sensitive value as the marker, named as redacted, and never the real value, at both data levels.
+- [x] A developer's own event masker's output appears in event data for each sensitive value.
+- [x] With event masking turned off, event data carries the real sensitive values.
+- [x] Masked event data and encrypted state each turn into configuration text that shows the marker.
 
-#### - [ ] Task: Prove errors and every output stay redacted whatever the event masking
+#### - [x] Task: Prove errors and every output stay redacted whatever the event masking
 **Id:** 2f0a47bf-6508-4afa-93b3-9ee472f95ad3
 **Repo:** xclconfig
 **Depends on:**
@@ -426,9 +426,9 @@ With event masking turned off, xcl errors that mention a sensitive value, and pl
 *Technical detail:* [context.md#task-prove-errors-and-every-output-stay-redacted-whatever-the-event-masking](./context.md#task-prove-errors-and-every-output-stay-redacted-whatever-the-event-masking)
 
 **Acceptance criteria**:
-- [ ] With event masking turned off, an error whose message includes a sensitive value contains the marker and not the real value.
-- [ ] With event masking turned off, plugin log details still show the marker.
-- [ ] Under default settings with state encrypted, no captured event, log, error, configuration text, printed output or state file contains the known secret.
+- [x] With event masking turned off, an error whose message includes a sensitive value contains the marker and not the real value.
+- [x] With event masking turned off, plugin log details still show the marker.
+- [x] Under default settings with state encrypted, no captured event, log, error, configuration text, printed output or state file contains the known secret.
 
 ### Milestone 4: The examples encrypt their state and the documentation explains masking
 
@@ -442,7 +442,7 @@ The documentation site's events guide gains a masking section, and a new state m
 
 **Validation point**: The example tests find no known secret in state or event data with a key set. The README and changelog content tests pass, and fail if the new text is removed. The site builds and type-checks.
 
-#### - [ ] Task: Encrypt the examples' state
+#### - [x] Task: Encrypt the examples' state
 **Id:** c6bb82ad-918f-4bdb-85bf-d7e6948a2676
 **Repo:** xclconfig
 **Depends on:**
@@ -455,11 +455,11 @@ The application-config and plugin examples, which hold passwords, encrypt their 
 *Technical detail:* [context.md#task-encrypt-the-examples-state](./context.md#task-encrypt-the-examples-state)
 
 **Acceptance criteria**:
-- [ ] With a key set, running each of the two examples leaves no password or secret in its state file or in any event data it prints.
-- [ ] Without a key, each of the two examples still runs and prints the plaintext-state warning.
-- [ ] The configuration-only example, which holds no secret, prints no warning.
+- [x] With a key set, running each of the two examples leaves no password or secret in its state file or in any event data it prints.
+- [x] Without a key, each of the two examples still runs and prints the plaintext-state warning.
+- [x] The configuration-only example, which holds no secret, prints no warning.
 
-#### - [ ] Task: Document masking in the library
+#### - [x] Task: Document masking in the library
 **Id:** 957cadca-2015-4bb2-8297-769cdd4bfbd9
 **Repo:** xclconfig
 **Depends on:**
@@ -480,12 +480,12 @@ The state guide stops saying processed event data is identical to state, and exp
 *Technical detail:* [context.md#task-document-masking-in-the-library](./context.md#task-document-masking-in-the-library)
 
 **Acceptance criteria**:
-- [ ] The README describes configuring state and event maskers, the four built-in maskers, the plaintext-state warning, turning event masking off and writing a custom masker.
-- [ ] The state guide describes masked state and no longer says event data is always byte for byte what state holds.
-- [ ] The changelog has an entry for this spec that lists its breaking changes.
-- [ ] Content tests fail if any of these sections or the changelog entry is removed.
+- [x] The README describes configuring state and event maskers, the four built-in maskers, the plaintext-state warning, turning event masking off and writing a custom masker.
+- [x] The state guide describes masked state and no longer says event data is always byte for byte what state holds.
+- [x] The changelog has an entry for this spec that lists its breaking changes.
+- [x] Content tests fail if any of these sections or the changelog entry is removed.
 
-#### - [ ] Task: Document masking on the site
+#### - [x] Task: Document masking on the site
 **Id:** c6c7a600-ee67-4ea5-845b-f3110a25f0c4
 **Repo:** xcl-website
 **Depends on:**
@@ -497,9 +497,9 @@ The events guide gains a section on what event data shows for sensitive values. 
 *Technical detail:* [context.md#task-document-masking-on-the-site](./context.md#task-document-masking-on-the-site)
 
 **Acceptance criteria**:
-- [ ] The events guide describes event masking by default, choosing a masker and turning masking off.
-- [ ] The site has a state masking page, reachable from the navigation, covering configuring the state masker, the built-in maskers and the plaintext-state warning.
-- [ ] The site builds and type-checks.
+- [x] The events guide describes event masking by default, choosing a masker and turning masking off.
+- [x] The site has a state masking page, reachable from the navigation, covering configuring the state masker, the built-in maskers and the plaintext-state warning.
+- [x] The site builds and type-checks.
 
 ## Open Questions
 
@@ -516,3 +516,187 @@ The events guide gains a section on what event data shows for sensitive values. 
 - **Opening masked data inside `EncodeSavedEntity`.** Configuration text from masked data always shows the marker. A receiver that needs the real value opens it with `mask.Unmask`.
 - **Masking values in fields not declared sensitive, and declaring a `variable` sensitive.** These are left out, as in the sensitive-values plan `20261003134528-327e0657-references-and-secrets`.
 - **Changes to the copied cty and HCL libraries.** None are planned.
+
+## Changelog
+
+
+### 2026-10-05 — Task: Add the masking package and its built-in maskers
+
+**What was done**: Added the public `mask` package with the `Masker` and `Reversible` interfaces, the `Masked` envelope (`{"xcl_masked":...,"value":...}`), `Envelope`, `IsMasked`, `IsMaskedObject`, `Unmask`, `Open`, and the four built-ins `EncryptAES256GCM`, `HashHMACSHA256`, `Omit` and `Redact` (standard library crypto only). The `errors` package gained `ErrUnrecoverable`/`UnrecoverableError` and `ErrMaskNotReversible`/`MaskNotReversibleError`, re-exported from `xcl`.
+
+**Deviations**: Added small helpers beyond the plan's surface: `mask.Envelope` (masks one value and wraps it, used by the wire encoder), `mask.IsMaskedObject` and `mask.Open` (for the saved-entity reader, which holds decoded maps), and exported name constants (`AES256GCMName`, `HMACSHA256Name`, `OmitName`, `RedactName`, `EnvelopeKey`). `UnrecoverableError.Unwrap` returns both the sentinel and the underlying cause.
+
+**Files changed**:
+- `xclconfig: mask/mask.go`
+- `xclconfig: mask/aes.go`
+- `xclconfig: mask/hmac.go`
+- `xclconfig: mask/omit.go`
+- `xclconfig: mask/redact.go`
+- `xclconfig: mask/aes_test.go`
+- `xclconfig: mask/hmac_test.go`
+- `xclconfig: mask/omit_test.go`
+- `xclconfig: mask/redact_test.go`
+- `xclconfig: mask/unmask_test.go`
+- `xclconfig: mask/custom_test.go`
+- `xclconfig: errors/mask_errors.go`
+- `xclconfig: errors/mask_errors_test.go`
+- `xclconfig: config.go`
+
+**Discoveries**: `Open` checks the masker name before reversibility, so a one-way envelope opened with a different masker reports "different masker" rather than "one way".
+
+### 2026-10-05 — Task: Mask sensitive values in the internal encoder
+
+**What was done**: `internal/wire` gained `Options{Mask}`, `Result{Data, Sensitive}` and `Encode`. The recursive walk now runs on a per-call `encoder` value carrying the options and a "sensitive written" flag; with a masker, each sensitive value is written as `mask.Envelope(<real value JSON>, masker)`, and a redacted value masks the marker. `Marshal` is `Encode` with zero options, so every existing hop is byte-identical.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xclconfig: internal/wire/wire.go`
+- `xclconfig: internal/wire/wire_test.go`
+
+**Discoveries**: The real value handed to a masker is encoded by a fresh, maskless inner encoder, so a masker always receives the real JSON regardless of nesting.
+
+### 2026-10-05 — Task: Recognise masked values when reading saved data
+
+**What was done**: `savedentity.Decode` and `DecodeAll` take a `ReadOptions{Mask, ForDisplay}`. Before typing a record, `openMasked` walks the decoded tree and replaces every envelope: with the marker for display, otherwise with the value the state masker opens it to. Anything that cannot be opened fails with `*xclerrors.UnrecoverableError` naming the record and masker; `DecodeAll` returns it directly instead of folding it into `state.UnknownTypesError`. Every caller passes `savedentity.ReadOptions{}` for now.
+
+**Deviations**: None. Callers updated mechanically, including test files across the repo (state, plugins/example, parser, root tests).
+
+**Files changed**:
+- `xclconfig: internal/savedentity/savedentity.go`
+- `xclconfig: internal/savedentity/savedentity_test.go`
+- `xclconfig: internal/savedentity/decode_all_test.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: encode.go`
+- `xclconfig: internal/parser/dag_test.go`
+- `xclconfig: internal/parser/lifecycle_test.go`
+- `xclconfig: config_destroy_test.go`
+- `xclconfig: config_outputs_sensitive_test.go`
+- `xclconfig: config_sensitive_roundtrip_test.go`
+- `xclconfig: config_sensitive_state_test.go`
+- `xclconfig: config_test.go`
+- `xclconfig: config_validate_test.go`
+- `xclconfig: encode_errors_test.go`
+- `xclconfig: plugins/example/apply_test.go`
+- `xclconfig: plugins/example/sensitive_test.go`
+- `xclconfig: state/custom_store_test.go`
+- `xclconfig: state/file_state_store_apply_test.go`
+
+**Discoveries**: `registered.Secret` (`resource`/`secret`, `Password types.Sensitive[string]`) is the existing fixture type for sensitive-record tests.
+
+### 2026-10-05 — Task: Encrypt sensitive values in state
+
+**What was done**: Added `xcl.WithStateMask` (rejects nil and non-`Reversible` maskers with `ErrMaskNotReversible`), a `stateMask` field on `Config` and `StateMask` on `ParserOptions`, threaded through all three parser constructions. `parser.EncodeForState(entities, stateMask)` now encodes through `wire.Encode` with the state masker and also returns whether a sensitive value was written unmasked; both save sites pass the masker, and both load paths read with `ReadOptions{Mask: StateMask}`.
+
+**Deviations**: The nil-masker rejection wraps `ErrMaskNotReversible` (with "no masker was given") rather than a separate error, so one sentinel covers every invalid state masker. Existing test callers of `EncodeForState` pass `nil` and ignore the new bool.
+
+**Files changed**:
+- `xclconfig: options.go`
+- `xclconfig: config.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/parser/state_encode.go`
+- `xclconfig: internal/parser/destroy.go`
+- `xclconfig: config_state_mask_test.go`
+- `xclconfig: config_options_test.go`
+- `xclconfig: config_sensitive_state_test.go`
+- `xclconfig: internal/parser/lifecycle_test.go`
+- `xclconfig: internal/parser/registered_types_test.go`
+- `xclconfig: plugins/example/apply_test.go`
+- `xclconfig: plugins/example/sensitive_test.go`
+
+**Discoveries**: The file state store writes indented JSON, so string assertions on a state file must match `"xcl_masked": "aes-256-gcm"` with a space; a recording store sees the compact form.
+
+### 2026-10-05 — Task: Warn when state holds sensitive values in plain text
+
+**What was done**: Apply and Destroy emit one warn-level log event per operation (Source `core`, the operation's name, Phase `log`) with the message `parser.PlaintextStateWarning` when a save to a configured store wrote a sensitive value with no state masker. Apply uses the flag `EncodeForState` returns; Destroy's `destroyer` records it across its per-resource saves and `Parser.Destroy` warns once after the walk.
+
+**Deviations**: `example/plugin/main_test.go` assumed a run emits no warnings. Until the examples task gives the example a state key, `TestPluginExampleReportsNoWarnings` skips the plaintext warning and `TestPluginExampleReportsProviderCallLogsAtInfo` counts only non-core log events.
+
+**Files changed**:
+- `xclconfig: internal/parser/state_encode.go`
+- `xclconfig: internal/parser/destroy.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: config.go`
+- `xclconfig: config_state_mask_test.go`
+- `xclconfig: example/plugin/main_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Mask event data with the configured event masker
+
+**What was done**: Added `xcl.WithEventMask` (nil fails `NewConfig`) and `xcl.WithNoEventMask()`, last one wins; `NewConfig` defaults the event masker to `mask.Redact()` and passes it as `ParserOptions.EventMask`. `eventData` now encodes through `wire.Encode` with the event masker, and the pre-call snapshot is re-read into the resource's type and masked (`maskedSnapshot`, formerly `redactedSnapshot`). `EncodeSavedEntity` reads in display mode, so masked event data and encrypted state show the marker. Docs on `Event.Data`, `DataProcessed`, `EventDataProcessed` and `WithEventData` updated.
+
+**Deviations**: `parser.DefaultOptions()` also sets `EventMask: mask.Redact()`, so a standalone parser built from its defaults redacts event data like `Config` does; a zero `ParserOptions` still means real values. With masking off, a pre-call snapshot is passed on as is. The planned test that every lifecycle emission passes the entity was not added: inspection shows every lifecycle emission with data passes `r`; the one site passing nil (`callbacks.go`, apply error) carries no data.
+
+**Files changed**:
+- `xclconfig: options.go`
+- `xclconfig: config.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/parser/events.go`
+- `xclconfig: encode.go`
+- `xclconfig: events.go`
+- `xclconfig: events/events.go`
+- `xclconfig: config_event_mask_test.go`
+- `xclconfig: config_event_sensitive_test.go`
+- `xclconfig: config_sensitive_roundtrip_test.go`
+- `xclconfig: internal/parser/events_sensitive_test.go`
+- `xclconfig: plugins/example/sensitive_test.go`
+
+**Discoveries**: Event consumers now see a sensitive value as `{"xcl_masked":"redact","value":"(sensitive)"}` rather than the bare marker string.
+
+### 2026-10-05 — Task: Prove errors and every output stay redacted whatever the event masking
+
+**What was done**: The end-to-end leak suite now applies its fixtures with state encrypted by AES-256-GCM (`applyLeakFixtureWithOptions`), and `TestLeakSuiteStateFileHoldsNoSecret` checks the state file holds no secret and holds envelopes. New tests show that with `WithNoEventMask()` function errors, validation errors and plugin log details still never contain the secret.
+
+**Deviations**: No production code changed (a proof task). The validation-error test asserts the secret is absent but not the marker, because that error prints no value at all, as the existing leak test for the same fixture does.
+
+**Files changed**:
+- `xclconfig: sensitive_leak_test.go`
+- `xclconfig: config_event_mask_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Encrypt the examples' state
+
+**What was done**: The application-config and plugin examples read `XCL_STATE_KEY` (base64, 32 bytes) and, when it is set, add `xcl.WithStateMask(mask.EncryptAES256GCM(key))`; `run` takes the key as a new last parameter. Without a key they run as before and xcl's plaintext-state warning shows. Their tests run with a fixed test key and assert no password reaches the state file or any event data; separate tests check the warning without a key, and that the configuration-only example never warns. The plugin example's warning tolerances added in the warning task were removed again.
+
+**Deviations**: The plugin example destroys before `run` returns, so its state test reads the state files when the apply success event arrives. Also fixed a flaky assertion in `TestPluginEventDataShowsTheMarkerForTheSensitiveInteger`, which searched the whole event data for "1234" and could match the random temp path; it now checks only the `pin` field.
+
+**Files changed**:
+- `xclconfig: example/appconfig/main.go`
+- `xclconfig: example/appconfig/main_test.go`
+- `xclconfig: example/plugin/main.go`
+- `xclconfig: example/plugin/main_test.go`
+- `xclconfig: example/configonly/main_test.go`
+- `xclconfig: config_sensitive_roundtrip_test.go`
+
+**Discoveries**: Event data includes `meta.file`, a temp path in tests, so a leak assertion for a short or numeric secret must target the field, not the whole payload.
+
+### 2026-10-05 — Task: Document masking in the library
+
+**What was done**: The README's Sensitive values section gained subsections on encrypting state, the plaintext state warning, masking events, the built-in maskers (a table) and writing your own masker, and "Resource data on events" now says sensitive values in `Data` are masked. `docs/state.md` replaced the "event data shows the marker, state holds real values" passage, gained a "Sensitive values in state" section, and points the plain-text note at `WithStateMask`. `CHANGELOG.md` has a top entry for this spec with its breaking changes. Ten content tests in `readme_test.go` guard all of it.
+
+**Deviations**: The CHANGELOG Breaking list names only changes against the last release (epic decision); the earlier, unreleased references-and-secrets entry that describes bare-marker event data was left as written, and this entry states the envelope format.
+
+**Files changed**:
+- `xclconfig: README.md`
+- `xclconfig: docs/state.md`
+- `xclconfig: CHANGELOG.md`
+- `xclconfig: readme_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Document masking on the site
+
+**What was done**: The events guide gained "Sensitive values in event data" (default redact envelope, `xcl.WithEventMask` with a keyed-hash example, `xcl.WithNoEventMask()`, errors and log details always redacted, `mask.Unmask`). A new State masking page covers the plaintext warning, encrypting state with `mask.EncryptAES256GCM` and key handling, the reversible-only rule, reloading and the wrong-key error, the built-in masker table and a custom reversible masker; it is linked from the Guides navigation, the site README's Pages table and the Sensitive values page.
+
+**Deviations**: The site has no content tests, so the test step wrote none; `npm ci`, `npm run build` and `npx astro check` (0 errors, 0 warnings) are the gate.
+
+**Files changed**:
+- `xcl-website: src/pages/events.mdx`
+- `xcl-website: src/pages/state-masking.mdx`
+- `xcl-website: src/pages/sensitive-values.mdx`
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: README.md`
+
+**Discoveries**: None.

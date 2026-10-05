@@ -108,7 +108,7 @@ func savedGraphParents(t *testing.T, p *Parser, id string) []string {
 	loaded, err := p.stateStore.Load()
 	require.NoError(t, err)
 
-	saved, err := savedentity.DecodeAll(p.pluginRegistry, loaded)
+	saved, err := savedentity.DecodeAll(p.pluginRegistry, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	working := NewState()

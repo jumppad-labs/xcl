@@ -41,6 +41,10 @@ type destroyer struct {
 	// graph is built
 	addresses *resources.AddressParser
 
+	// unmaskedSensitive is set once any save wrote a sensitive value in
+	// plain text, so Destroy can warn once for the whole operation
+	unmaskedSensitive bool
+
 	// mu guards working and the store, the walk visits unrelated resources
 	// concurrently
 	mu sync.Mutex
@@ -134,7 +138,10 @@ func (d *destroyer) save(r any) error {
 		return nil
 	}
 
-	encoded, err := EncodeForState(d.working.GetResources())
+	encoded, unmasked, err := EncodeForState(d.working.GetResources(), d.options.StateMask)
+	if unmasked {
+		d.unmaskedSensitive = true
+	}
 	if err == nil {
 		err = d.store.Save(encoded)
 	}

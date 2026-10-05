@@ -557,7 +557,7 @@ func TestStateWithoutReferencesStillLoads(t *testing.T) {
 	records, err := store.Load()
 	require.NoError(t, err)
 
-	loaded, err := savedentity.DecodeAll(reg, records)
+	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	var database *registered.Database

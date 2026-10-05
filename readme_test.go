@@ -307,3 +307,95 @@ func TestChangelogRecordsUserDependsOn(t *testing.T) {
 	require.Contains(t, entry, "`types.Meta.Parents`")
 	require.Contains(t, entry, "Create and destroy order both come from each entity's `Meta.Links`")
 }
+
+func TestReadmeDocumentsStateMasking(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "### Encrypting sensitive values in state")
+	require.Contains(t, text, "xcl.WithStateMask(")
+	require.Contains(t, text, "mask.EncryptAES256GCM(")
+	require.Contains(t, text, "xcl.ErrMaskNotReversible")
+	require.Contains(t, text, "xcl.ErrUnrecoverable")
+}
+
+func TestReadmeDocumentsThePlaintextStateWarning(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "### The plaintext state warning")
+	require.Contains(t, text, "sensitive values are stored unencrypted in state; use xcl.WithStateMask to encrypt them")
+}
+
+func TestReadmeDocumentsEventMasking(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "### Masking sensitive values in events")
+	require.Contains(t, text, "xcl.WithEventMask(")
+	require.Contains(t, text, `"xcl_masked": "redact"`)
+}
+
+func TestReadmeDocumentsTurningEventMaskingOff(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "xcl.WithNoEventMask()")
+}
+
+func TestReadmeDocumentsTheBuiltInMaskers(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "### Built-in maskers")
+	require.Contains(t, text, "| `mask.EncryptAES256GCM(key)` | `aes-256-gcm` |")
+	require.Contains(t, text, "| `mask.HashHMACSHA256(key)` | `hmac-sha256` |")
+	require.Contains(t, text, "| `mask.Omit()` | `omit` |")
+	require.Contains(t, text, "| `mask.Redact()` | `redact` |")
+}
+
+func TestReadmeDocumentsCustomMaskers(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "### Writing your own masker")
+	require.Contains(t, text, "mask.Masker")
+	require.Contains(t, text, "mask.Reversible")
+	require.Contains(t, text, "mask.Unmask(")
+}
+
+func TestStateGuideDocumentsMaskedState(t *testing.T) {
+	data, err := os.ReadFile("docs/state.md")
+	require.NoError(t, err)
+
+	guide := string(data)
+	require.Contains(t, guide, "## Sensitive values in state")
+	require.Contains(t, guide, "xcl.WithStateMask")
+}
+
+func TestStateGuideNoLongerSaysEventDataIsByteForByteState(t *testing.T) {
+	data, err := os.ReadFile("docs/state.md")
+	require.NoError(t, err)
+
+	guide := string(data)
+	require.NotContains(t, guide, "byte for byte what the state file holds")
+	require.NotContains(t, guide, "state holds their real values, while event data shows\neach as `(sensitive)`.")
+}
+
+func TestChangelogRecordsMasking(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	require.Contains(t, string(data), "## 20261003153421-9fa72edd-masking")
+}
+
+func TestChangelogListsTheEncryptedStateKeyBreakingChange(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	changelog := string(data)
+	start := strings.Index(changelog, "## 20261003153421-9fa72edd-masking")
+	require.GreaterOrEqual(t, start, 0)
+
+	end := strings.Index(changelog[start+3:], "\n## ")
+	require.Greater(t, end, 0)
+
+	entry := changelog[start : start+3+end]
+	require.Contains(t, entry, "**Breaking:**")
+	require.Contains(t, entry, "cannot be loaded without the same masker and key")
+	require.Contains(t, entry, "xcl.ErrUnrecoverable")
+}

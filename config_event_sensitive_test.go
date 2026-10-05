@@ -56,7 +56,7 @@ func TestRawEventDataShowsOnlyTheSensitiveMarker(t *testing.T) {
 	succeeded := eventDataSingleEvent(t, recorder, eventSensitiveSecretID, "create", "success")
 	require.NotEmpty(t, succeeded.Data)
 
-	require.Contains(t, string(succeeded.Data), `"password":"(sensitive)"`)
+	require.Contains(t, string(succeeded.Data), `"password":{"xcl_masked":"redact","value":"(sensitive)"}`)
 	require.NotContains(t, string(succeeded.Data), "from-literal")
 }
 
@@ -66,7 +66,7 @@ func TestProcessedEventDataShowsOnlyTheSensitiveMarker(t *testing.T) {
 	succeeded := eventDataSingleEvent(t, recorder, eventSensitiveSecretID, "create", "success")
 	require.NotEmpty(t, succeeded.Data)
 
-	require.Contains(t, string(succeeded.Data), `"password":"(sensitive)"`)
+	require.Contains(t, string(succeeded.Data), `"password":{"xcl_masked":"redact","value":"(sensitive)"}`)
 	require.NotContains(t, string(succeeded.Data), "from-literal")
 }
 
@@ -76,7 +76,7 @@ func TestProcessedEventDataShowsOnlyTheMarkerForAReferencedSensitiveValue(t *tes
 	succeeded := eventDataSingleEvent(t, recorder, "resource.secret_consumer.reference", "create", "success")
 	require.NotEmpty(t, succeeded.Data)
 
-	require.Contains(t, string(succeeded.Data), `"password":"(sensitive)"`)
+	require.Contains(t, string(succeeded.Data), `"password":{"xcl_masked":"redact","value":"(sensitive)"}`)
 	require.NotContains(t, string(succeeded.Data), "from-literal")
 }
 

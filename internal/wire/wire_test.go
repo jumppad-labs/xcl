@@ -2,11 +2,13 @@ package wire_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/internal/wire"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -354,4 +356,218 @@ func TestEncodingJSONStillWritesTheMarkerForSensitiveHeldInAnyField(t *testing.T
 	require.NoError(t, err)
 
 	require.Equal(t, `{"value":"(sensitive)"}`, string(data))
+}
+
+// wrappingMasker is a deterministic masker for tests: it wraps the JSON it
+// receives as {"masked":<input>}, so the expected output shows exactly what
+// the masker was given.
+type wrappingMasker struct{}
+
+func (wrappingMasker) Name() string { return "test" }
+
+func (wrappingMasker) Mask(value json.RawMessage) (json.RawMessage, error) {
+	return json.RawMessage(`{"masked":` + string(value) + `}`), nil
+}
+
+// failingMasker always fails to mask.
+type failingMasker struct{}
+
+func (failingMasker) Name() string { return "failing" }
+
+func (failingMasker) Mask(json.RawMessage) (json.RawMessage, error) {
+	return nil, errors.New("masking failed")
+}
+
+func TestEncodeWithMaskerWritesTopLevelSensitiveAsEnvelope(t *testing.T) {
+	result, err := wire.Encode(types.NewSensitive("hunter2"), wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"xcl_masked":"test","value":{"masked":"hunter2"}}`, string(result.Data))
+}
+
+func TestEncodeWithMaskerWritesSensitiveStructFieldAsEnvelope(t *testing.T) {
+	value := withSensitiveField{Name: "admin", Password: types.NewSensitive("hunter2")}
+
+	result, err := wire.Encode(value, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"name":"admin","password":{"xcl_masked":"test","value":{"masked":"hunter2"}}}`, string(result.Data))
+}
+
+func TestEncodeWithMaskerWritesSensitiveInNestedStructAsEnvelope(t *testing.T) {
+	value := nestedSensitive{Inner: withSensitiveField{Name: "admin", Password: types.NewSensitive("hunter2")}}
+
+	result, err := wire.Encode(&value, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"inner":{"name":"admin","password":{"xcl_masked":"test","value":{"masked":"hunter2"}}}}`, string(result.Data))
+}
+
+func TestEncodeWithMaskerWritesSensitiveInEmbeddedStructAsEnvelope(t *testing.T) {
+	value := embeddedSensitive{
+		withSensitiveField: withSensitiveField{Name: "admin", Password: types.NewSensitive("hunter2")},
+		Other:              "x",
+	}
+
+	result, err := wire.Encode(value, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"name":"admin","password":{"xcl_masked":"test","value":{"masked":"hunter2"}},"other":"x"}`, string(result.Data))
+}
+
+func TestEncodeWithMaskerWritesSensitiveSliceElementsAsEnvelopes(t *testing.T) {
+	value := withSensitiveSlice{Items: []types.Sensitive[string]{
+		types.NewSensitive("one"),
+		types.NewSensitive("two"),
+	}}
+
+	result, err := wire.Encode(value, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"items":[{"xcl_masked":"test","value":{"masked":"one"}},{"xcl_masked":"test","value":{"masked":"two"}}]}`, string(result.Data))
+}
+
+func TestEncodeWithMaskerWritesSensitiveMapValuesAsEnvelopes(t *testing.T) {
+	value := withSensitiveMap{Items: map[string]types.Sensitive[string]{
+		"b": types.NewSensitive("two"),
+		"a": types.NewSensitive("one"),
+	}}
+
+	result, err := wire.Encode(value, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"items":{"a":{"xcl_masked":"test","value":{"masked":"one"}},"b":{"xcl_masked":"test","value":{"masked":"two"}}}}`, string(result.Data))
+}
+
+func TestEncodeWithMaskerWritesSensitiveHeldInAnyFieldAsEnvelope(t *testing.T) {
+	value := withAnyField{Value: types.NewSensitive("hunter2")}
+
+	result, err := wire.Encode(value, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"value":{"xcl_masked":"test","value":{"masked":"hunter2"}}}`, string(result.Data))
+}
+
+func TestEncodeWithMaskerPassesSensitiveIntJSONToMasker(t *testing.T) {
+	value := withSensitiveInt{Count: types.NewSensitive(42)}
+
+	result, err := wire.Encode(value, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"count":{"xcl_masked":"test","value":{"masked":42}}}`, string(result.Data))
+}
+
+func TestEncodeWithMaskerMasksTheMarkerOfRedactedSensitive(t *testing.T) {
+	var value withSensitiveField
+	err := json.Unmarshal([]byte(`{"name":"admin","password":"(sensitive)"}`), &value)
+	require.NoError(t, err)
+
+	result, err := wire.Encode(value, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"name":"admin","password":{"xcl_masked":"test","value":{"masked":"(sensitive)"}}}`, string(result.Data))
+}
+
+func TestEncodeWithRedactMaskerWritesRedactEnvelope(t *testing.T) {
+	value := withSensitiveField{Name: "admin", Password: types.NewSensitive("hunter2")}
+
+	result, err := wire.Encode(value, wire.Options{Mask: mask.Redact()})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"name":"admin","password":{"xcl_masked":"redact","value":"(sensitive)"}}`, string(result.Data))
+}
+
+func TestEncodeWithOmitMaskerWritesEnvelopeWithoutValue(t *testing.T) {
+	value := withSensitiveField{Name: "admin", Password: types.NewSensitive("hunter2")}
+
+	result, err := wire.Encode(value, wire.Options{Mask: mask.Omit()})
+	require.NoError(t, err)
+
+	require.Equal(t, `{"name":"admin","password":{"xcl_masked":"omit"}}`, string(result.Data))
+}
+
+func TestEncodeWithZeroOptionsMatchesMarshalForSensitiveValues(t *testing.T) {
+	value := withSensitiveMap{Items: map[string]types.Sensitive[string]{
+		"b": types.NewSensitive("two"),
+		"a": types.NewSensitive("one"),
+	}}
+
+	expected, err := wire.Marshal(value)
+	require.NoError(t, err)
+
+	result, err := wire.Encode(value, wire.Options{})
+	require.NoError(t, err)
+
+	require.Equal(t, string(expected), string(result.Data))
+	require.Equal(t, `{"items":{"a":"one","b":"two"}}`, string(result.Data))
+}
+
+func TestEncodeWithZeroOptionsMatchesEncodingJSONForRegisteredDatabase(t *testing.T) {
+	database := &registered.Database{
+		Location: "eu",
+		Port:     5432,
+		Timeouts: &registered.Timeouts{Connect: 5, Read: 10},
+	}
+	database.Meta.ID = "resource.database.main"
+
+	expected, err := json.Marshal(database)
+	require.NoError(t, err)
+
+	result, err := wire.Encode(database, wire.Options{})
+	require.NoError(t, err)
+
+	require.Equal(t, string(expected), string(result.Data))
+}
+
+func TestEncodeReportsNothingSensitiveForEntityWithoutSensitiveValues(t *testing.T) {
+	database := &registered.Database{Location: "eu", Port: 5432}
+
+	result, err := wire.Encode(database, wire.Options{})
+	require.NoError(t, err)
+
+	require.False(t, result.Sensitive)
+}
+
+func TestEncodeWithMaskerReportsNothingSensitiveForEntityWithoutSensitiveValues(t *testing.T) {
+	database := &registered.Database{Location: "eu", Port: 5432}
+
+	result, err := wire.Encode(database, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.False(t, result.Sensitive)
+}
+
+func TestEncodeReportsSensitiveForValueHoldingSensitiveWithoutMasker(t *testing.T) {
+	value := withSensitiveField{Name: "admin", Password: types.NewSensitive("hunter2")}
+
+	result, err := wire.Encode(value, wire.Options{})
+	require.NoError(t, err)
+
+	require.True(t, result.Sensitive)
+}
+
+func TestEncodeWithMaskerReportsSensitiveForValueHoldingSensitive(t *testing.T) {
+	value := withSensitiveField{Name: "admin", Password: types.NewSensitive("hunter2")}
+
+	result, err := wire.Encode(value, wire.Options{Mask: wrappingMasker{}})
+	require.NoError(t, err)
+
+	require.True(t, result.Sensitive)
+}
+
+func TestEncodeReportsSensitiveForSensitiveHeldInAnyField(t *testing.T) {
+	value := withAnyField{Value: types.NewSensitive("hunter2")}
+
+	result, err := wire.Encode(value, wire.Options{})
+	require.NoError(t, err)
+
+	require.True(t, result.Sensitive)
+}
+
+func TestEncodeReturnsErrorWhenMaskerFails(t *testing.T) {
+	value := withSensitiveField{Name: "admin", Password: types.NewSensitive("hunter2")}
+
+	_, err := wire.Encode(value, wire.Options{Mask: failingMasker{}})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "masking failed")
 }

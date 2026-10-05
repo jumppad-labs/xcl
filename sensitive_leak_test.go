@@ -14,6 +14,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -30,6 +31,7 @@ type leakFixture struct {
 	registry *registry.PluginRegistry
 	plugin   *parser.TestPlugin
 	store    *state.FileStateStore
+	stateDir string
 	recorder *eventRecorder
 	err      error
 }
@@ -44,10 +46,23 @@ func leakPath(t *testing.T, name string) string {
 	return path
 }
 
+// leakStateMaskKey is the fixed 32 byte AES-256-GCM key the leak fixtures
+// encrypt sensitive values in state with
+var leakStateMaskKey = []byte("leak-suite-aes-256-gcm-key-32byt")
+
 // applyLeakFixture applies the named fixture with the registered secret types
-// and the test plugin, recording every event at the given level. The apply
-// error is returned in the fixture so a test can inspect a failure.
+// and the test plugin, recording every event at the given level. Sensitive
+// values in state are encrypted with AES-256-GCM under leakStateMaskKey. The
+// apply error is returned in the fixture so a test can inspect a failure.
 func applyLeakFixture(t *testing.T, name string, level EventDataLevel, messages ...parser.LogMessage) *leakFixture {
+	t.Helper()
+
+	return applyLeakFixtureWithOptions(t, name, level, messages)
+}
+
+// applyLeakFixtureWithOptions is applyLeakFixture with extra configuration
+// options, which are added after the defaults so they can override them
+func applyLeakFixtureWithOptions(t *testing.T, name string, level EventDataLevel, messages []parser.LogMessage, options ...ConfigOption) *leakFixture {
 	t.Helper()
 
 	t.Setenv("HOME", t.TempDir())
@@ -60,17 +75,25 @@ func applyLeakFixture(t *testing.T, name string, level EventDataLevel, messages 
 	plugin.SetLogOnCreate(messages...)
 	require.NoError(t, reg.RegisterPlugin(plugin))
 
-	store, err := state.NewFileStateStore(t.TempDir())
+	stateDir := t.TempDir()
+	store, err := state.NewFileStateStore(stateDir)
+	require.NoError(t, err)
+
+	stateMasker, err := mask.EncryptAES256GCM(leakStateMaskKey)
 	require.NoError(t, err)
 
 	recorder := &eventRecorder{}
 
-	c, err := NewConfig(
+	all := []ConfigOption{
 		WithPluginRegistry(reg),
 		WithStateStore(store),
+		WithStateMask(stateMasker),
 		WithEventHandler(recorder.handle),
 		WithEventData(level),
-	)
+	}
+	all = append(all, options...)
+
+	c, err := NewConfig(all...)
 	require.NoError(t, err)
 
 	return &leakFixture{
@@ -78,6 +101,7 @@ func applyLeakFixture(t *testing.T, name string, level EventDataLevel, messages 
 		registry: reg,
 		plugin:   plugin,
 		store:    store,
+		stateDir: stateDir,
 		recorder: recorder,
 		err:      c.Apply(leakPath(t, name)),
 	}
@@ -501,4 +525,18 @@ func TestLeakOutputEntitiesFormattedWithPercentHashV(t *testing.T) {
 		require.NotContains(t, text, knownSecret)
 		require.Contains(t, text, types.SensitiveMarker)
 	}
+}
+
+// TestLeakSuiteStateFileHoldsNoSecret reads every byte the state store wrote
+// after applying the main leak fixture: the secret is encrypted, so only the
+// masked envelope is on disk.
+func TestLeakSuiteStateFileHoldsNoSecret(t *testing.T) {
+	f := applyLeakMain(t, EventDataNone)
+
+	contents := readStateDir(t, f.stateDir)
+
+	require.NotEmpty(t, contents)
+	require.NotContains(t, contents, knownSecret)
+	require.Contains(t, contents, mask.EnvelopeKey)
+	require.Contains(t, contents, mask.AES256GCMName)
 }

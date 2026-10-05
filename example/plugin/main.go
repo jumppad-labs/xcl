@@ -15,6 +15,11 @@
 // The Go types are in ./resources and the configuration it applies is in
 // ./config.
 //
+// Set XCL_STATE_KEY to a base64 encoded 32 byte key, for example
+// `XCL_STATE_KEY=$(openssl rand -base64 32) make run`, to encrypt the
+// passwords in state. Without it xcl warns that state holds them in plain
+// text.
+//
 // Build the external plugin and run the example from this directory with
 // `make run`, see the Makefile for the other targets. The configuration
 // directory and the external plugin binary can be passed as arguments:
@@ -23,6 +28,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -32,9 +38,48 @@ import (
 	"github.com/jumppad-labs/xcl/example/plugin/internal"
 	"github.com/jumppad-labs/xcl/example/plugin/resources"
 	"github.com/jumppad-labs/xcl/example/prettylog"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 )
+
+// stateKeyEnv names the environment variable holding the key the example
+// encrypts the sensitive values in its state with: 32 bytes, base64 encoded,
+// for example the output of `openssl rand -base64 32`. In a real application
+// the key comes from a secret store and is never committed. Without it the
+// example still runs, and xcl warns that state holds sensitive values in
+// plain text.
+const stateKeyEnv = "XCL_STATE_KEY"
+
+// stateKeyFromEnv returns the key in stateKeyEnv, or nil when it is not set
+func stateKeyFromEnv() ([]byte, error) {
+	encoded := os.Getenv(stateKeyEnv)
+	if encoded == "" {
+		return nil, nil
+	}
+
+	key, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not base64: %w", stateKeyEnv, err)
+	}
+
+	return key, nil
+}
+
+// stateMaskOptions returns the option that encrypts state with stateKey, or
+// none when there is no key
+func stateMaskOptions(stateKey []byte) ([]xcl.ConfigOption, error) {
+	if stateKey == nil {
+		return nil, nil
+	}
+
+	masker, err := mask.EncryptAES256GCM(stateKey)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", stateKeyEnv, err)
+	}
+
+	return []xcl.ConfigOption{xcl.WithStateMask(masker)}, nil
+}
 
 func main() {
 	dir := "./config"
@@ -45,6 +90,13 @@ func main() {
 	externalPlugin := "./build/external"
 	if len(os.Args) > 2 {
 		externalPlugin = os.Args[2]
+	}
+
+	// The state is encrypted when a key is given, see stateKeyEnv
+	stateKey, err := stateKeyFromEnv()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
 	}
 
 	// Keep the state in a temporary directory, removed when the example ends
@@ -59,7 +111,7 @@ func main() {
 	// shows each resource's configuration as it is created
 	r := registry.NewPluginRegistry()
 
-	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), r), r, dir, externalPlugin, stateDir)
+	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), r), r, dir, externalPlugin, stateDir, stateKey)
 	os.RemoveAll(stateDir)
 
 	if err != nil {
@@ -73,8 +125,10 @@ func main() {
 // in a file in stateDir. It writes the resources and query results to out,
 // then destroys everything through the providers and returns the resources
 // that were applied. Every event xcl produces, including the plugins' log
-// messages, goes to handler, a nil handler leaves xcl silent.
-func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, dir string, externalPlugin string, stateDir string) ([]any, error) {
+// messages, goes to handler, a nil handler leaves xcl silent. The sensitive
+// values in state are encrypted with stateKey, or written in plain text, with
+// a warning, when it is nil.
+func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, dir string, externalPlugin string, stateDir string, stateKey []byte) ([]any, error) {
 	// The external plugin runs as a separate process, stop it when done
 	defer func() {
 		for _, host := range r.GetPluginHosts() {
@@ -94,16 +148,24 @@ func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, di
 		return nil, err
 	}
 
-	c, err := xcl.NewConfig(
+	masking, err := stateMaskOptions(stateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	options := []xcl.ConfigOption{
 		xcl.WithPluginRegistry(r),
 		// Keep the state in a file, Destroy works from it alone
 		xcl.WithStatePath(stateDir),
 		xcl.WithEventHandler(handler),
 		// events carry nothing by default, this asks for each resource as
 		// state records it, which is what the receiver turns back into
-		// configuration text
+		// configuration text. Passwords are redacted in it.
 		xcl.WithEventData(xcl.EventDataProcessed),
-	)
+	}
+
+	// with a key, the passwords are encrypted in the state file
+	c, err := xcl.NewConfig(append(options, masking...)...)
 	if err != nil {
 		return nil, err
 	}

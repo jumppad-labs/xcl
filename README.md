@@ -605,9 +605,12 @@ c, err := xcl.NewConfig(
 | `EventDataRaw` | on every lifecycle event, the resource as it was before the provider was called |
 | `EventDataProcessed` | on a success event, the resource as xcl records it in state, including the values the provider filled in and the status it ended with. Other phases carry the same as `EventDataRaw` |
 
-`EventDataProcessed` is byte for byte what state stores, so it goes straight to
+`EventDataProcessed` is the record state stores, so it goes straight to
 `EncodeSavedEntity` below. This is how the examples show each resource as it is
-created.
+created. Sensitive values in `Data` are masked, by default as
+`{"xcl_masked":"redact","value":"(sensitive)"}`, so processed data matches
+the state record only where state and events mask alike; see
+[Masking sensitive values in events](#masking-sensitive-values-in-events).
 
 If you read `Event.Data` today, add `xcl.WithEventData(xcl.EventDataRaw)` to
 keep what you had.
@@ -789,8 +792,9 @@ if errors.Is(err, xcl.ErrUnregisteredType) {
 Passwords, tokens and other secrets are declared sensitive in the Go type that
 holds them. xcl then shows them only as the fixed marker `(sensitive)` in its
 logs, events, errors, configuration text and printed resources, and in your own
-`fmt`, `log/slog` and `encoding/json` output. State keeps the real value, and
-your code reaches it only by asking for it.
+`fmt`, `log/slog` and `encoding/json` output. State keeps the real value,
+encrypted when you give it a key, and your code reaches it only by asking for
+it.
 
 ### Declaring a sensitive field
 
@@ -882,6 +886,140 @@ printer := logger.NewResourcePrinter(logger.WithRevealSensitive(true))
 
 A value read back from event data has no real value to show, so it is written
 as the marker even when revealing.
+
+### Encrypting sensitive values in state
+
+State must hold the real value of every sensitive field, so a later run can
+read it back. Without a state masker it holds them in plain text. Give xcl a
+key and it encrypts each sensitive value before it is saved, and decrypts it
+when state is loaded:
+
+```go
+// a 32 byte key, kept wherever the application keeps its secrets and never
+// committed, for example decoded from an environment variable
+key, err := base64.StdEncoding.DecodeString(os.Getenv("XCL_STATE_KEY"))
+
+stateMask, err := mask.EncryptAES256GCM(key)
+
+c, err := xcl.NewConfig(
+	xcl.WithStatePath("./state"),
+	xcl.WithStateMask(stateMask),
+)
+```
+
+Only the sensitive values are encrypted, everything else in state stays
+readable. Each one is written as an envelope naming the masker that produced
+it:
+
+```json
+"password": {"xcl_masked": "aes-256-gcm", "value": "o8Rk1x...base64..."}
+```
+
+The state masker must be able to recover what it masks, so it must implement
+`mask.Reversible`. `mask.EncryptAES256GCM` does. Giving a one-way masker, such
+as `mask.HashHMACSHA256`, `mask.Omit` or `mask.Redact`, fails `NewConfig` with
+`xcl.ErrMaskNotReversible`:
+
+```text
+the state masker must be reversible: "hmac-sha256" cannot recover the values it masks
+```
+
+Loading state holding a value that cannot be opened fails with
+`xcl.ErrUnrecoverable`, naming the entity and the masker, rather than losing
+the value: state encrypted under a different key, state encrypted while no
+masker is configured now, or state masked by a different masker. The
+`*xcl.UnrecoverableError` detail carries the entity's `ID`, the `MaskedBy`
+masker and the reason.
+
+State written in plain text still loads once a masker is added, and the next
+save encrypts it. There is no key rotation: changing the key makes existing
+encrypted state unreadable, so keep the key for as long as the state exists.
+
+### The plaintext state warning
+
+When no state masker is configured and an `Apply` or `Destroy` writes a
+sensitive value to a state store, xcl emits one warning for that operation, a
+warn-level log event from `core`:
+
+```text
+sensitive values are stored unencrypted in state; use xcl.WithStateMask to encrypt them
+```
+
+A configuration with no sensitive values, a configuration with no state store,
+and one with a state masker emit no such warning.
+
+### Masking sensitive values in events
+
+Resource data on events, see [Resource data on events](#resource-data-on-events),
+writes each sensitive value through the event masker. The default is
+`mask.Redact()`, which shows the marker inside an envelope naming it:
+
+```json
+"password": {"xcl_masked": "redact", "value": "(sensitive)"}
+```
+
+Choose another masker with `xcl.WithEventMask(...)`. A keyed hash lets a
+receiver tell whether two events carry the same value without ever seeing it:
+
+```go
+eventMask, err := mask.HashHMACSHA256(correlationKey)
+
+c, err := xcl.NewConfig(
+	xcl.WithEventHandler(handler),
+	xcl.WithEventData(xcl.EventDataProcessed),
+	xcl.WithEventMask(eventMask),
+)
+```
+
+When every receiver is trusted with secrets, turn masking off with
+`xcl.WithNoEventMask()`, and event data carries the real values. When both
+options are given, the last one wins.
+
+Event masking changes only `Event.Data`. Errors and log details always show
+`(sensitive)`, whatever the event masker, because the sensitive type formats
+itself as the marker. `EncodeSavedEntity` shows the marker for any masked
+value, from state or from events, never ciphertext or a hash.
+
+### Built-in maskers
+
+| Masker | Name | Reversible | What it writes |
+|---|---|---|---|
+| `mask.EncryptAES256GCM(key)` | `aes-256-gcm` | yes | AES-256-GCM ciphertext under a 32 byte key, base64, with a fresh nonce each time |
+| `mask.HashHMACSHA256(key)` | `hmac-sha256` | no | the hex HMAC-SHA256 of the value under a non-empty key, the same for the same value and key |
+| `mask.Omit()` | `omit` | no | no value at all, only the envelope naming the masker |
+| `mask.Redact()` | `redact` | no | the marker `(sensitive)` |
+
+Only a reversible masker can be used for state. Any masker can be used for
+events.
+
+### Writing your own masker
+
+A masker is any type implementing `mask.Masker`. `Mask` receives the JSON of
+the real value and returns the JSON to write as the envelope's `value`, or nil
+to write none:
+
+```go
+type upperMasker struct{}
+
+func (upperMasker) Name() string { return "upper" }
+
+func (upperMasker) Mask(value json.RawMessage) (json.RawMessage, error) {
+	return json.Marshal(strings.ToUpper(string(value)))
+}
+```
+
+To use it for state it must also implement `mask.Reversible`, adding
+`Unmask(masked json.RawMessage) (json.RawMessage, error)`, which returns the
+original JSON or an error when the value does not open.
+
+A receiver opens a masked value in event data with `mask.Unmask(data, m)`,
+given the envelope's JSON and a reversible masker with the same name. Data
+produced by a one-way masker, by a different masker, or under a different key
+fails with `xcl.ErrUnrecoverable` and returns no value, never a wrong one.
+`mask.IsMasked` reports whether some JSON is an envelope.
+
+The key `xcl_masked` is reserved for envelopes: an object holding it, with at
+most a `value` beside it, is always read as masked data.
 
 ## Struct Tags
 

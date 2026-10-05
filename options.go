@@ -3,6 +3,8 @@ package xcl
 import (
 	"fmt"
 
+	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 )
@@ -41,6 +43,34 @@ func WithStatePath(dir string) ConfigOption {
 		}
 
 		c.stateStore = store
+		return nil
+	}
+}
+
+// WithStateMask encrypts every sensitive value written to state with m, and
+// opens it again when state is loaded. State then never holds a sensitive
+// value in plain text. m is usually mask.EncryptAES256GCM, with a key kept
+// wherever the application keeps its secrets.
+//
+// m must implement mask.Reversible, since state is read back to the real
+// value. A one-way masker, such as mask.HashHMACSHA256, mask.Omit or
+// mask.Redact, fails NewConfig with ErrMaskNotReversible, and so does nil.
+//
+// Loading state that holds a value this masker cannot open, because it was
+// written under a different key or by a different masker, fails with
+// ErrUnrecoverable rather than losing the value. State written in plain text
+// still loads, and is encrypted on the next save.
+func WithStateMask(m mask.Masker) ConfigOption {
+	return func(c *Config) error {
+		if m == nil {
+			return fmt.Errorf("%w: no masker was given", xclerrors.ErrMaskNotReversible)
+		}
+
+		if _, ok := m.(mask.Reversible); !ok {
+			return &xclerrors.MaskNotReversibleError{Masker: m.Name()}
+		}
+
+		c.stateMask = m
 		return nil
 	}
 }
@@ -95,9 +125,48 @@ func WithVariables(vars map[string]any) ConfigOption {
 // EventDataRaw carries the resource as it was before the provider was called.
 // EventDataProcessed carries, on a success event, the resource as xcl records
 // it in state, which is the form EncodeSavedEntity reads.
+//
+// Sensitive values in event data are masked by the event masker, see
+// WithEventMask, and in state by the state masker, see WithStateMask. Processed
+// event data is therefore what state holds only where both mask alike.
 func WithEventData(level EventDataLevel) ConfigOption {
 	return func(c *Config) error {
 		c.eventData = level
+		return nil
+	}
+}
+
+// WithEventMask masks every sensitive value in the resource data events carry
+// with m, for example mask.HashHMACSHA256, which lets a receiver correlate
+// values without seeing them. The default is mask.Redact(), which shows each
+// sensitive value as an envelope holding the marker:
+//
+//	{"xcl_masked":"redact","value":"(sensitive)"}
+//
+// Only Event.Data is affected: errors and log details always show the marker.
+// A nil masker fails NewConfig. When WithEventMask and WithNoEventMask are
+// both given, the one given last is used.
+func WithEventMask(m mask.Masker) ConfigOption {
+	return func(c *Config) error {
+		if m == nil {
+			return fmt.Errorf("no event masker was given, use WithNoEventMask to turn event masking off")
+		}
+
+		c.eventMask = m
+		c.eventMaskOff = false
+		return nil
+	}
+}
+
+// WithNoEventMask turns event masking off, so the resource data events carry
+// holds real sensitive values. Use it only when every event receiver is
+// trusted with secrets. Errors and log details still show the marker. When
+// WithEventMask and WithNoEventMask are both given, the one given last is
+// used.
+func WithNoEventMask() ConfigOption {
+	return func(c *Config) error {
+		c.eventMask = nil
+		c.eventMaskOff = true
 		return nil
 	}
 }

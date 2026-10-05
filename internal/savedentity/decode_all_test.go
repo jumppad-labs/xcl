@@ -9,9 +9,11 @@ import (
 	"errors"
 	"testing"
 
+	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -83,7 +85,7 @@ const stateWithUnknownType = `[
 // Decoding a state holding a type nobody registered fails naming that type,
 // rather than returning a state that silently drops the resource.
 func TestDecodeAllFailsWhenStateHoldsUnknownType(t *testing.T) {
-	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithUnknownType))
+	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithUnknownType), savedentity.ReadOptions{})
 	require.Error(t, err)
 	require.Nil(t, s)
 
@@ -96,7 +98,7 @@ func TestDecodeAllFailsWhenStateHoldsUnknownType(t *testing.T) {
 // Every unknown type is named once, in sorted order, however many resources
 // of that type the state holds.
 func TestDecodeAllNamesEachUnknownTypeOnceInSortedOrder(t *testing.T) {
-	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithUnknownTypes))
+	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithUnknownTypes), savedentity.ReadOptions{})
 	require.Error(t, err)
 	require.Nil(t, s)
 
@@ -192,7 +194,7 @@ const stateWithSeveralUnreadableRecords = `[
 // A record with no meta at all is reported by its position in the state, and
 // decoding returns nothing rather than a configuration missing that record.
 func TestDecodeAllFailsWhenRecordHasNoMeta(t *testing.T) {
-	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordMissingMeta))
+	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordMissingMeta), savedentity.ReadOptions{})
 	require.Error(t, err)
 	require.Nil(t, s)
 
@@ -204,7 +206,7 @@ func TestDecodeAllFailsWhenRecordHasNoMeta(t *testing.T) {
 // A record that does not say which kind declared it is reported by its id, and
 // decoding returns nothing rather than a configuration missing that record.
 func TestDecodeAllFailsWhenRecordHasNoType(t *testing.T) {
-	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordMissingType))
+	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordMissingType), savedentity.ReadOptions{})
 	require.Error(t, err)
 	require.Nil(t, s)
 
@@ -215,7 +217,7 @@ func TestDecodeAllFailsWhenRecordHasNoType(t *testing.T) {
 
 // An empty kind is reported in the same way as a missing one.
 func TestDecodeAllFailsWhenRecordHasEmptyType(t *testing.T) {
-	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordEmptyType))
+	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordEmptyType), savedentity.ReadOptions{})
 	require.Error(t, err)
 	require.Nil(t, s)
 
@@ -227,7 +229,7 @@ func TestDecodeAllFailsWhenRecordHasEmptyType(t *testing.T) {
 // A record that does not say what the entity is called is reported by its id,
 // and decoding returns nothing rather than a configuration missing it.
 func TestDecodeAllFailsWhenRecordHasNoName(t *testing.T) {
-	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordMissingName))
+	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordMissingName), savedentity.ReadOptions{})
 	require.Error(t, err)
 	require.Nil(t, s)
 
@@ -238,7 +240,7 @@ func TestDecodeAllFailsWhenRecordHasNoName(t *testing.T) {
 
 // An empty name is reported in the same way as a missing one.
 func TestDecodeAllFailsWhenRecordHasEmptyName(t *testing.T) {
-	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordEmptyName))
+	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithRecordEmptyName), savedentity.ReadOptions{})
 	require.Error(t, err)
 	require.Nil(t, s)
 
@@ -250,7 +252,7 @@ func TestDecodeAllFailsWhenRecordHasEmptyName(t *testing.T) {
 // A record that is not an object at all is reported by its position, and
 // decoding returns nothing rather than a configuration missing that record.
 func TestDecodeAllFailsWhenRecordIsMalformed(t *testing.T) {
-	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithMalformedRecord))
+	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithMalformedRecord), savedentity.ReadOptions{})
 	require.Error(t, err)
 	require.Nil(t, s)
 
@@ -262,7 +264,7 @@ func TestDecodeAllFailsWhenRecordIsMalformed(t *testing.T) {
 // Every record that can not be understood is named once, in sorted order,
 // whichever way each of them failed.
 func TestDecodeAllNamesEveryUnreadableRecordOnceInSortedOrder(t *testing.T) {
-	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithSeveralUnreadableRecords))
+	s, err := savedentity.DecodeAll(registry.NewPluginRegistry(), testRecords(t, stateWithSeveralUnreadableRecords), savedentity.ReadOptions{})
 	require.Error(t, err)
 	require.Nil(t, s)
 
@@ -302,7 +304,7 @@ func TestDecodeAllTypesWhatAFileStoreLoaded(t *testing.T) {
 	loaded, err := store.Load()
 	require.NoError(t, err)
 
-	decoded, err := savedentity.DecodeAll(reg, loaded)
+	decoded, err := savedentity.DecodeAll(reg, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 	require.Len(t, decoded, 2)
 
@@ -327,7 +329,7 @@ func TestDecodeAllReturnsTypedEntitiesUnchanged(t *testing.T) {
 	variable, err := reg.CreateEntity(resources.TypeVariable, "", "environment")
 	require.NoError(t, err)
 
-	decoded, err := savedentity.DecodeAll(reg, []any{variable})
+	decoded, err := savedentity.DecodeAll(reg, []any{variable}, savedentity.ReadOptions{})
 	require.NoError(t, err)
 	require.Len(t, decoded, 1)
 	require.Same(t, variable, decoded[0])
@@ -340,7 +342,7 @@ func TestDecodeAllTypesRecordsHeldAsMaps(t *testing.T) {
 		"meta": map[string]any{"id": "variable.example", "type": "variable", "name": "example"},
 	}
 
-	decoded, err := savedentity.DecodeAll(registry.NewPluginRegistry(), []any{record})
+	decoded, err := savedentity.DecodeAll(registry.NewPluginRegistry(), []any{record}, savedentity.ReadOptions{})
 	require.NoError(t, err)
 	require.Len(t, decoded, 1)
 
@@ -351,7 +353,7 @@ func TestDecodeAllTypesRecordsHeldAsMaps(t *testing.T) {
 
 // Nothing loaded decodes to no entities.
 func TestDecodeAllReturnsNoEntitiesForNothingLoaded(t *testing.T) {
-	decoded, err := savedentity.DecodeAll(registry.NewPluginRegistry(), []any{})
+	decoded, err := savedentity.DecodeAll(registry.NewPluginRegistry(), []any{}, savedentity.ReadOptions{})
 	require.NoError(t, err)
 	require.Empty(t, decoded)
 }
@@ -359,7 +361,7 @@ func TestDecodeAllReturnsNoEntitiesForNothingLoaded(t *testing.T) {
 // Records can not be typed without a registry, and decoding says so rather
 // than failing on a nil registry.
 func TestDecodeAllFailsForRecordsWithoutARegistry(t *testing.T) {
-	_, err := savedentity.DecodeAll(nil, testRecords(t, stateWithUnknownType))
+	_, err := savedentity.DecodeAll(nil, testRecords(t, stateWithUnknownType), savedentity.ReadOptions{})
 	require.ErrorContains(t, err, "no plugin registry")
 }
 
@@ -387,7 +389,7 @@ func TestDecodeAllTypesABareTypeWhatAFileStoreLoaded(t *testing.T) {
 	loaded, err := store.Load()
 	require.NoError(t, err)
 
-	decoded, err := savedentity.DecodeAll(reg, loaded)
+	decoded, err := savedentity.DecodeAll(reg, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 	require.Len(t, decoded, 1)
 
@@ -396,4 +398,47 @@ func TestDecodeAllTypesABareTypeWhatAFileStoreLoaded(t *testing.T) {
 	require.Equal(t, registered.TypeDatabase, loadedDatabase.Meta.Type)
 	require.Empty(t, loadedDatabase.Meta.Subtype)
 	require.Equal(t, "main", loadedDatabase.Meta.Name)
+}
+
+// A masked value that cannot be opened is not one more unreadable record to
+// fold into the unknown types: the load fails at once as unrecoverable, naming
+// the record and the masker, so a secret is never dropped and saved over.
+func TestDecodeAllFailsAsUnrecoverableForEnvelopeThatDoesNotOpen(t *testing.T) {
+	reg := testSecretRegistry(t)
+
+	variable := json.RawMessage(`{"meta":{"id":"variable.example","type":"variable","name":"example"}}`)
+	secret := json.RawMessage(testSecretRecord(t, testEnvelope(t, testAESMasker(t, 1))))
+
+	decoded, err := savedentity.DecodeAll(reg, []any{variable, secret}, savedentity.ReadOptions{Mask: testAESMasker(t, 2)})
+	require.Error(t, err)
+	require.Nil(t, decoded)
+
+	require.ErrorIs(t, err, xclerrors.ErrUnrecoverable)
+
+	unknown := state.UnknownTypesError{}
+	require.False(t, errors.As(err, &unknown))
+
+	var unrecoverable *xclerrors.UnrecoverableError
+	require.True(t, errors.As(err, &unrecoverable))
+	require.Equal(t, testSecretID, unrecoverable.ID)
+	require.Equal(t, mask.AES256GCMName, unrecoverable.MaskedBy)
+}
+
+// A masked record held as a json.RawMessage, the way a file store loads it,
+// opens through DecodeAll with the state masker, so a loaded state holds the
+// real secret.
+func TestDecodeAllOpensMaskedRecordWithTheMasker(t *testing.T) {
+	reg := testSecretRegistry(t)
+	masker := testAESMasker(t, 1)
+
+	secret := json.RawMessage(testSecretRecord(t, testEnvelope(t, masker)))
+
+	decoded, err := savedentity.DecodeAll(reg, []any{secret}, savedentity.ReadOptions{Mask: masker})
+	require.NoError(t, err)
+	require.Len(t, decoded, 1)
+
+	loaded, ok := testEntityByID(t, decoded, testSecretID).(*registered.Secret)
+	require.True(t, ok)
+	require.Equal(t, "admin", loaded.Username)
+	require.Equal(t, "hunter2", loaded.Password.Reveal())
 }

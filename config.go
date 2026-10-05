@@ -11,6 +11,8 @@ import (
 	"github.com/jumppad-labs/xcl/internal/eventstream"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/resources"
+	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -90,6 +92,21 @@ var (
 	ErrNotEncodable = xclerrors.ErrNotEncodable
 )
 
+// The errors below name the ways masking a sensitive value can fail. Check
+// for them with errors.Is, and recover the detail with errors.As.
+var (
+	// ErrUnrecoverable means a masked value cannot be turned back into its
+	// real value: its masker is one way, it was masked by a different masker,
+	// or it does not open, for example under a different key. Loading state
+	// that holds such a value fails with it, rather than losing the secret.
+	ErrUnrecoverable = xclerrors.ErrUnrecoverable
+
+	// ErrMaskNotReversible means a masker that cannot recover the values it
+	// masks was given to WithStateMask. The MaskNotReversibleError detail
+	// names the masker.
+	ErrMaskNotReversible = xclerrors.ErrMaskNotReversible
+)
+
 // The detail carried by each of the errors above, recovered with errors.As.
 // These are aliases, so a caller names them here without importing a second
 // package called errors.
@@ -108,6 +125,9 @@ type (
 	UnregisteredTypeError = xclerrors.UnregisteredTypeError
 	InvalidSavedDataError = xclerrors.InvalidSavedDataError
 	NotEncodableError     = xclerrors.NotEncodableError
+
+	UnrecoverableError     = xclerrors.UnrecoverableError
+	MaskNotReversibleError = xclerrors.MaskNotReversibleError
 )
 
 // Config defines the stack config
@@ -121,6 +141,9 @@ type Config struct {
 	eventHandler    EventHandler             // Receives every event of Validate, Apply and Destroy
 	eventBufferSize int                      // Undelivered events held before emitting waits, 0 is the default
 	eventData       events.DataLevel         // What resource data events carry, none by default
+	stateMask       mask.Masker              // Masks sensitive values written to state, nil writes them plainly
+	eventMask       mask.Masker              // Masks sensitive values in event data, mask.Redact() by default
+	eventMaskOff    bool                     // Event data carries real sensitive values, set by WithNoEventMask
 
 	addresses *resources.AddressParser // resolves addresses against the known types
 }
@@ -168,6 +191,12 @@ func NewConfig(opts ...ConfigOption) (*Config, error) {
 
 	if c.pluginRegistry == nil {
 		c.pluginRegistry = registry.NewPluginRegistry()
+	}
+
+	// event data is redacted unless the application chose another masker
+	// or turned masking off
+	if c.eventMask == nil && !c.eventMaskOff {
+		c.eventMask = mask.Redact()
 	}
 
 	return c, nil
@@ -259,6 +288,8 @@ func (c *Config) Validate(paths ...string) error {
 		p := parser.NewParser(&parser.ParserOptions{
 			EventData:      c.eventData,
 			StateStore:     c.stateStore,
+			StateMask:      c.stateMask,
+			EventMask:      c.eventMask,
 			PluginRegistry: c.pluginRegistry,
 			Variables:      convertVariablesToStringMap(c.variables),
 			Emit:           emit,
@@ -291,6 +322,8 @@ func (c *Config) Apply(paths ...string) error {
 		p := parser.NewParser(&parser.ParserOptions{
 			EventData:      c.eventData,
 			StateStore:     c.stateStore,
+			StateMask:      c.stateMask,
+			EventMask:      c.eventMask,
 			PluginRegistry: c.pluginRegistry,
 			Variables:      convertVariablesToStringMap(c.variables),
 			Emit:           emit,
@@ -311,9 +344,18 @@ func (c *Config) Apply(paths ...string) error {
 
 		// Save to store
 		if c.stateStore != nil {
-			encoded, encodeErr := parser.EncodeForState(c.entities)
+			encoded, unmaskedSensitive, encodeErr := parser.EncodeForState(c.entities, c.stateMask)
 			if encodeErr != nil {
 				return errors.Join(err, fmt.Errorf("failed to save state: %w", encodeErr))
+			}
+
+			// a sensitive value written in plain text is warned about once
+			// per apply
+			if unmaskedSensitive {
+				logger.New(emit, events.Event{
+					Source:    events.SourceCore,
+					Operation: events.OperationApply,
+				}).Warn(parser.PlaintextStateWarning)
 			}
 
 			if saveErr := c.stateStore.Save(encoded); saveErr != nil {
@@ -363,6 +405,8 @@ func (c *Config) Destroy() error {
 		p := parser.NewParser(&parser.ParserOptions{
 			EventData:      c.eventData,
 			StateStore:     c.stateStore,
+			StateMask:      c.stateMask,
+			EventMask:      c.eventMask,
 			PluginRegistry: c.pluginRegistry,
 			Emit:           emit,
 		})

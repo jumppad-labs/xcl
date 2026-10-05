@@ -858,3 +858,22 @@ func TestConfigOnlyExampleEntityAndStateAgree(t *testing.T) {
 
 	require.NotZero(t, compared, "no record was encodable, so the comparison proves nothing")
 }
+
+// plaintextStateWarning is the warning xcl emits when it writes sensitive
+// values to state in plain text
+const plaintextStateWarning = "sensitive values are stored unencrypted in state; use xcl.WithStateMask to encrypt them"
+
+// TestConfigOnlyExampleDoesNotWarnAboutPlainState asserts a run reports no
+// warning that state holds sensitive values in plain text. This example sets
+// no state mask, but its configuration holds no sensitive value, so there is
+// nothing to warn about
+func TestConfigOnlyExampleDoesNotWarnAboutPlainState(t *testing.T) {
+	recorder := runRecordingEvents(t)
+
+	recorded := recorder.snapshot()
+	require.NotEmpty(t, recorded)
+
+	for _, e := range recorded {
+		require.NotEqual(t, plaintextStateWarning, e.Meta[events.KeyMessage], "unexpected plain text warning: %+v", e)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
@@ -104,4 +105,11 @@ func TestNewConfigWithStateStoreAfterStatePathUsesStateStore(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, store, cfg.stateStore)
+}
+
+func TestNewConfigWithNilStateMaskFails(t *testing.T) {
+	cfg, err := NewConfig(WithStateMask(nil))
+
+	require.ErrorIs(t, err, xclerrors.ErrMaskNotReversible)
+	require.Nil(t, cfg)
 }

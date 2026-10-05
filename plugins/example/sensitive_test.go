@@ -10,6 +10,7 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	plugintesting "github.com/jumppad-labs/xcl/plugins/testing"
@@ -36,6 +37,7 @@ func applyTokenPerson(t *testing.T, reg *registry.PluginRegistry, store *state.F
 	options.StateStore = store
 	options.Emit = collector.collect
 	options.EventData = level
+	options.EventMask = mask.Redact()
 
 	p := parser.NewParser(options)
 
@@ -43,7 +45,7 @@ func applyTokenPerson(t *testing.T, reg *registry.PluginRegistry, store *state.F
 	require.NoError(t, err)
 	require.NotNil(t, st)
 
-	encoded, err := parser.EncodeForState(st.GetResources())
+	encoded, _, err := parser.EncodeForState(st.GetResources(), nil)
 	require.NoError(t, err)
 	require.NoError(t, store.Save(encoded))
 
@@ -123,7 +125,7 @@ func TestExamplePersonTokenRevealsInDecodedState(t *testing.T) {
 	records, err := reloaded.Load()
 	require.NoError(t, err)
 
-	saved, err := savedentity.DecodeAll(reg, records)
+	saved, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	require.Equal(t, "tok-s3cret", findPerson(t, saved, tokenPersonID).Token.Reveal())
@@ -168,7 +170,7 @@ func TestExamplePersonProcessedEventDataShowsOnlyTheMarker(t *testing.T) {
 	data := collector.eventData(t, "create")
 	require.NotEmpty(t, data)
 
-	require.Contains(t, string(data), `"token":"(sensitive)"`)
+	require.Contains(t, string(data), `"token":{"xcl_masked":"redact","value":"(sensitive)"}`)
 	require.NotContains(t, string(data), "tok-s3cret")
 }
 
@@ -183,7 +185,7 @@ func TestExamplePersonRawEventDataShowsOnlyTheMarker(t *testing.T) {
 	data := collector.eventData(t, "create")
 	require.NotEmpty(t, data)
 
-	require.Contains(t, string(data), `"token":"(sensitive)"`)
+	require.Contains(t, string(data), `"token":{"xcl_masked":"redact","value":"(sensitive)"}`)
 	require.NotContains(t, string(data), "tok-s3cret")
 }
 

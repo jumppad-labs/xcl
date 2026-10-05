@@ -81,7 +81,7 @@ func TestCustomStateStoreRoundTripsAnApply(t *testing.T) {
 	require.NoError(t, err)
 
 	// the store is handed raw JSON records, typing them needs the registry
-	loaded, err := savedentity.DecodeAll(reg, records)
+	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	require.ElementsMatch(t, testAppliedIDs, testLoadedIDs(t, loaded))
@@ -107,7 +107,7 @@ func TestCustomStateStoreIsHandedEntitiesWithBothAxes(t *testing.T) {
 	require.NoError(t, err)
 
 	// the store is handed raw JSON records, typing them needs the registry
-	loaded, err := savedentity.DecodeAll(reg, records)
+	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	database, err := entityByID(loaded, "resource.database.main")
@@ -159,7 +159,7 @@ func TestCustomStateStoreIsReadBackByALaterRun(t *testing.T) {
 	require.NoError(t, err)
 
 	// the store is handed raw JSON records, typing them needs the registry
-	loaded, err := savedentity.DecodeAll(reg, records)
+	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 	require.ElementsMatch(t, testAppliedIDs, testLoadedIDs(t, loaded))
 }

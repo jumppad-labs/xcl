@@ -20,6 +20,8 @@ import (
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclparse"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
+	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -102,6 +104,16 @@ type ParserOptions struct {
 	// and saving new state.
 	StateStore state.StateStore
 
+	// StateMask masks every sensitive value saved to the StateStore, and
+	// opens them again when state is loaded. Nil saves real values in plain
+	// text, and loading state holding a masked value then fails.
+	StateMask mask.Masker
+
+	// EventMask masks every sensitive value in the resource data events
+	// carry. Nil carries real values. Config always sets it, to mask.Redact()
+	// unless event masking was turned off.
+	EventMask mask.Masker
+
 	// EventData says what resource data lifecycle events carry. The zero
 	// value carries none, so nothing is serialized for an event unless the
 	// configuration asked for it.
@@ -141,6 +153,8 @@ func DefaultOptions() *ParserOptions {
 		ModuleCache:       cacheDir,
 		VariableEnvPrefix: "HCL_VAR_",
 		PluginRegistry:    registry.NewPluginRegistry(),
+		// event data is redacted by default, as Config does
+		EventMask: mask.Redact(),
 	}
 }
 
@@ -357,7 +371,7 @@ func (p *Parser) Destroy(ctx context.Context, saved []any) (*State, error) {
 	}
 
 	// saved is what a store loaded, the records it holds are typed here
-	saved, err := savedentity.DecodeAll(p.pluginRegistry, saved)
+	saved, err := savedentity.DecodeAll(p.pluginRegistry, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
 	if err != nil {
 		return working, err
 	}
@@ -383,6 +397,14 @@ func (p *Parser) Destroy(ctx context.Context, saved []any) (*State, error) {
 	targets := append([]any{}, working.GetResources()...)
 
 	err = d.destroy(targets)
+
+	if d.unmaskedSensitive && emitting(&p.options) {
+		logger.New(p.options.Emit, events.Event{
+			Source:    events.SourceCore,
+			Operation: events.OperationDestroy,
+		}).Warn(PlaintextStateWarning)
+	}
+
 	return working, err
 }
 
@@ -449,7 +471,7 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 
 		// the store only reads and writes records, typing them needs the
 		// registry
-		saved, err = savedentity.DecodeAll(p.pluginRegistry, saved)
+		saved, err = savedentity.DecodeAll(p.pluginRegistry, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load previous state: %w", err)
 		}

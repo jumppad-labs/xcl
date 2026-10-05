@@ -15,10 +15,30 @@ import (
 	"slices"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
+
+// ReadOptions say how a reader treats masked values in a saved record.
+//
+// A record holds each sensitive value either plainly or as a masker's
+// envelope (see the mask package). Plain values pass through unchanged in
+// every mode.
+type ReadOptions struct {
+	// Mask is the state masker, nil when none is configured. Loading state
+	// opens every envelope with it, and fails with
+	// *xclerrors.UnrecoverableError for any envelope it cannot open, so a
+	// secret is never silently replaced by a value that would then be saved
+	// back over it.
+	Mask mask.Masker
+
+	// ForDisplay turns every envelope into types.SensitiveMarker instead of
+	// opening it, so masked data shown to someone never presents ciphertext
+	// or a hash as a value.
+	ForDisplay bool
+}
 
 // Decode returns the typed entity for one saved record. registry resolves the
 // record's type, including the types a plugin provides, which are resolvable
@@ -28,7 +48,11 @@ import (
 // create the type the record names, and with *xclerrors.InvalidSavedDataError
 // when the record cannot be read at all. The error carries the record's id
 // where the record was readable enough to name itself.
-func Decode(registry *registry.PluginRegistry, data []byte) (any, error) {
+//
+// Masked values are treated as read says, before the record is typed. A
+// masked value that cannot be opened fails with
+// *xclerrors.UnrecoverableError naming the record and the masker.
+func Decode(registry *registry.PluginRegistry, data []byte, read ReadOptions) (any, error) {
 	var record map[string]any
 	if err := json.Unmarshal(data, &record); err != nil {
 		return nil, &xclerrors.InvalidSavedDataError{Err: err}
@@ -56,6 +80,12 @@ func Decode(registry *registry.PluginRegistry, data []byte) (any, error) {
 	if !ok || name == "" {
 		return nil, &xclerrors.InvalidSavedDataError{ID: id, Err: fmt.Errorf("record has no name")}
 	}
+
+	opened, err := openMasked(record, read, id)
+	if err != nil {
+		return nil, err
+	}
+	record = opened.(map[string]any)
 
 	// Create a typed entity using the registry
 	resource, err := registry.CreateEntity(entityType, subtype, name)
@@ -91,7 +121,12 @@ func Decode(registry *registry.PluginRegistry, data []byte) (any, error) {
 // gets saved back over it on the next save, losing whatever was dropped. Every
 // failure therefore accumulates into one state.UnknownTypesError naming what
 // could not be read.
-func DecodeAll(registry *registry.PluginRegistry, loaded []any) ([]any, error) {
+//
+// A masked value that cannot be opened with read's masker is not one more
+// unreadable record: it is returned at once as *xclerrors.UnrecoverableError,
+// so the load fails with xclerrors.ErrUnrecoverable naming the entity and the
+// masker.
+func DecodeAll(registry *registry.PluginRegistry, loaded []any, read ReadOptions) ([]any, error) {
 	entities := make([]any, 0, len(loaded))
 	unresolved := []string{}
 
@@ -114,11 +149,16 @@ func DecodeAll(registry *registry.PluginRegistry, loaded []any) ([]any, error) {
 
 		if err == nil {
 			var entity any
-			entity, err = Decode(registry, data)
+			entity, err = Decode(registry, data, read)
 			if err == nil {
 				entities = append(entities, entity)
 				continue
 			}
+		}
+
+		var unrecoverable *xclerrors.UnrecoverableError
+		if errors.As(err, &unrecoverable) {
+			return nil, err
 		}
 
 		// a type nobody registered names itself, so the error can say what to
@@ -161,4 +201,73 @@ func recordData(item any) ([]byte, bool, error) {
 	default:
 		return nil, false, nil
 	}
+}
+
+// openMasked walks a decoded record and replaces every envelope in it: with
+// the marker when reading for display, and otherwise with the value the state
+// masker opens it to. id names the record in any error.
+func openMasked(node any, read ReadOptions, id string) (any, error) {
+	switch value := node.(type) {
+	case map[string]any:
+		if masked, ok := mask.IsMaskedObject(value); ok {
+			return openEnvelope(masked, read, id)
+		}
+
+		for key, child := range value {
+			opened, err := openMasked(child, read, id)
+			if err != nil {
+				return nil, err
+			}
+
+			value[key] = opened
+		}
+
+		return value, nil
+
+	case []any:
+		for i, child := range value {
+			opened, err := openMasked(child, read, id)
+			if err != nil {
+				return nil, err
+			}
+
+			value[i] = opened
+		}
+
+		return value, nil
+	}
+
+	return node, nil
+}
+
+func openEnvelope(masked mask.Masked, read ReadOptions, id string) (any, error) {
+	if read.ForDisplay {
+		return types.SensitiveMarker, nil
+	}
+
+	if read.Mask == nil {
+		return nil, &xclerrors.UnrecoverableError{
+			ID:       id,
+			MaskedBy: masked.By,
+			Reason:   "no state masker is configured",
+		}
+	}
+
+	data, err := mask.Open(masked, read.Mask)
+	if err != nil {
+		var unrecoverable *xclerrors.UnrecoverableError
+		if errors.As(err, &unrecoverable) {
+			unrecoverable.ID = id
+			return nil, unrecoverable
+		}
+
+		return nil, &xclerrors.UnrecoverableError{ID: id, MaskedBy: masked.By, Err: err}
+	}
+
+	var value any
+	if err := json.Unmarshal(data, &value); err != nil {
+		return nil, &xclerrors.UnrecoverableError{ID: id, MaskedBy: masked.By, Reason: "it opened to invalid JSON", Err: err}
+	}
+
+	return value, nil
 }

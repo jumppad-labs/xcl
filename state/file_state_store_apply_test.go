@@ -97,7 +97,7 @@ func testLoadSavedState(t *testing.T, path string, reg *registry.PluginRegistry)
 	require.NotNil(t, loaded)
 
 	// the store hands back raw records, typing them needs the registry
-	s, err := savedentity.DecodeAll(reg, loaded)
+	s, err := savedentity.DecodeAll(reg, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	return s

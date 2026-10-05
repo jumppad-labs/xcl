@@ -1,5 +1,18 @@
 # Changelog
 
+## 20261003153421-9fa72edd-masking
+
+Sensitive values can be masked, in state and in events, through the new public `mask` package. A masker implements `mask.Masker`: `Name` identifies it and `Mask` turns the JSON of a real value into what is written in its place. A masker that can open what it produced also implements `mask.Reversible`. Four are built in: `mask.EncryptAES256GCM(key)`, reversible, under a 32 byte key; `mask.HashHMACSHA256(key)`, a one-way keyed hash that gives the same output for the same value and key; `mask.Omit()`, which writes no value; and `mask.Redact()`, which writes the marker `(sensitive)`. Every masked value is written as an envelope naming its masker, `{"xcl_masked":"<name>","value":<output>}`, so a reader can tell whether it can be recovered. `mask.Unmask` opens one with a reversible masker of the same name, and fails with the new `xcl.ErrUnrecoverable` for anything it cannot open faithfully. The key `xcl_masked` is reserved for envelopes.
+
+`xcl.WithStateMask(m)` encrypts every sensitive value saved to state and opens it again when state is loaded, so the state file never holds a secret in plain text. A one-way masker fails `NewConfig` with the new `xcl.ErrMaskNotReversible`. Loading state that holds a value the configured masker cannot open, under a different key, with no masker, or masked by a different masker, fails with `xcl.ErrUnrecoverable` naming the entity and the masker. Plain state still loads once a masker is added, and is encrypted on the next save. Without a state masker, each `Apply` or `Destroy` that writes a sensitive value to a state store emits one warn-level log event: `sensitive values are stored unencrypted in state; use xcl.WithStateMask to encrypt them`.
+
+Resource data on events writes each sensitive value through the event masker, `mask.Redact()` by default, so a sensitive value shows as `{"xcl_masked":"redact","value":"(sensitive)"}`. `xcl.WithEventMask(m)` chooses another masker, for example a keyed hash to correlate values without revealing them, and `xcl.WithNoEventMask()` sends real values to receivers that are trusted with them. Errors and log details always show the marker, whatever the event masker. `EncodeSavedEntity` shows the marker for every masked value, from state or from events. The application-config and plugin examples encrypt their state when `XCL_STATE_KEY` holds a base64 encoded 32 byte key, and show the plaintext warning when it does not.
+
+**Breaking:**
+
+- State encrypted with `xcl.WithStateMask` cannot be loaded without the same masker and key. Loading it with no masker, a different key or a different masker fails with `xcl.ErrUnrecoverable`. There is no key rotation.
+- Loading state can now fail with `xcl.ErrUnrecoverable`, in addition to the existing unreadable-state errors.
+
 ## 20261003153421-c283547c-user-depends-on
 
 A `depends_on` list now holds exactly what the user wrote, after parsing, after applying and when loaded back from saved state. The dependencies xcl works out from references are no longer added to it, so state, plugin calls and event data carry the author's list as written. Configuration text from `EncodeEntity` and `EncodeSavedEntity` now includes `depends_on` when one was written, exactly as written, and leaves it out otherwise; it never shows a dependency xcl worked out.

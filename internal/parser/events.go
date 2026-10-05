@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"reflect"
@@ -10,6 +9,7 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -38,10 +38,12 @@ func emitting(options *ParserOptions) bool {
 // caller already had to serialize it, and r is the resource itself. At
 // DataNone nothing is serialized at all, so the default costs no work.
 //
-// Event data is shown to whoever receives events, so it is always encoded
-// with encoding/json and every sensitive value shows types.SensitiveMarker.
-// pre holds real values, since it is what a provider receives, so it is
-// never passed on as it is when it holds a sensitive value.
+// Event data is shown to whoever receives events, so every sensitive value in
+// it is written through the configured event masker, options.EventMask. A nil
+// event masker carries real values, which only happens when event masking was
+// turned off. pre holds real values, since it is what a provider receives, so
+// it is never passed on as it is when it holds a sensitive value and a masker
+// is set.
 func eventData(options *ParserOptions, phase string, pre []byte, r any) []byte {
 	if options == nil {
 		return nil
@@ -52,20 +54,20 @@ func eventData(options *ParserOptions, phase string, pre []byte, r any) []byte {
 			return nil
 		}
 
-		data, err := json.Marshal(r)
+		result, err := wire.Encode(r, wire.Options{Mask: options.EventMask})
 		if err != nil {
 			// the event carries nothing rather than what reached a
 			// provider, which holds real sensitive values
 			return nil
 		}
 
-		return data
+		return result.Data
 	}
 
 	switch options.EventData {
 	case events.DataRaw:
 		if pre != nil {
-			return redactedSnapshot(pre, r)
+			return maskedSnapshot(pre, r, options.EventMask)
 		}
 
 		// a type handled without a provider was never serialized, so the raw
@@ -80,7 +82,7 @@ func eventData(options *ParserOptions, phase string, pre []byte, r any) []byte {
 		}
 
 		if pre != nil {
-			return redactedSnapshot(pre, r)
+			return maskedSnapshot(pre, r, options.EventMask)
 		}
 
 		return marshal()
@@ -89,12 +91,17 @@ func eventData(options *ParserOptions, phase string, pre []byte, r any) []byte {
 	return nil
 }
 
-// redactedSnapshot returns the pre-call snapshot pre as event data. pre was
-// written with real sensitive values, so it is read back into a value of r's
-// type and encoded again with encoding/json, which shows each sensitive value
-// as the marker. A snapshot that holds no sensitive value is returned as it
-// is, so event data for such an entity is unchanged.
-func redactedSnapshot(pre []byte, r any) []byte {
+// maskedSnapshot returns the pre-call snapshot pre as event data. pre was
+// written with real sensitive values, so when eventMask is set it is read back
+// into a value of r's type and encoded again with the masker. A snapshot that
+// holds no sensitive value, or one shown with masking turned off, is returned
+// as it is, so event data for it is unchanged. Without r's type the sensitive
+// values in pre cannot be found, so the event then carries nothing.
+func maskedSnapshot(pre []byte, r any, eventMask mask.Masker) []byte {
+	if eventMask == nil {
+		return pre
+	}
+
 	if r == nil {
 		return nil
 	}
@@ -109,21 +116,16 @@ func redactedSnapshot(pre []byte, r any) []byte {
 		return nil
 	}
 
-	redacted, err := json.Marshal(snapshot.Interface())
+	result, err := wire.Encode(snapshot.Interface(), wire.Options{Mask: eventMask})
 	if err != nil {
 		return nil
 	}
 
-	revealed, err := wire.Marshal(snapshot.Interface())
-	if err != nil {
-		return nil
-	}
-
-	if bytes.Equal(redacted, revealed) {
+	if !result.Sensitive {
 		return pre
 	}
 
-	return redacted
+	return result.Data
 }
 
 // lifecycleEvent builds an event for a step of a resource's lifecycle, with

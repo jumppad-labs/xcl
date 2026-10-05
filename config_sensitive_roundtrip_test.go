@@ -1,6 +1,7 @@
 package xcl
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -159,7 +160,7 @@ func TestPluginSensitiveFieldRevealsInDecodedState(t *testing.T) {
 	records, err := store.Load()
 	require.NoError(t, err)
 
-	loaded, err := savedentity.DecodeAll(reg, records)
+	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	// plugin types decode to a type built from the plugin's schema, so the
@@ -285,7 +286,7 @@ func TestPluginProcessedEventDataShowsOnlyTheSensitiveMarker(t *testing.T) {
 	succeeded := eventDataSingleEvent(t, recorder, "resource.credential.db", "create", "success")
 	require.NotEmpty(t, succeeded.Data)
 
-	require.Contains(t, string(succeeded.Data), `"password":"(sensitive)"`)
+	require.Contains(t, string(succeeded.Data), `"password":{"xcl_masked":"redact","value":"(sensitive)"}`)
 	require.NotContains(t, string(succeeded.Data), "s3cret")
 }
 
@@ -295,7 +296,7 @@ func TestPluginRawEventDataShowsOnlyTheSensitiveMarker(t *testing.T) {
 	succeeded := eventDataSingleEvent(t, recorder, "resource.credential.db", "create", "success")
 	require.NotEmpty(t, succeeded.Data)
 
-	require.Contains(t, string(succeeded.Data), `"password":"(sensitive)"`)
+	require.Contains(t, string(succeeded.Data), `"password":{"xcl_masked":"redact","value":"(sensitive)"}`)
 	require.NotContains(t, string(succeeded.Data), "s3cret")
 }
 
@@ -305,6 +306,13 @@ func TestPluginEventDataShowsTheMarkerForTheSensitiveInteger(t *testing.T) {
 	succeeded := eventDataSingleEvent(t, recorder, "resource.credential.db", "create", "success")
 	require.NotEmpty(t, succeeded.Data)
 
-	require.Contains(t, string(succeeded.Data), `"pin":"(sensitive)"`)
-	require.NotContains(t, string(succeeded.Data), "1234")
+	require.Contains(t, string(succeeded.Data), `"pin":{"xcl_masked":"redact","value":"(sensitive)"}`)
+
+	// only the pin field is checked for the value, the rest of the data
+	// holds a temporary path that can contain any digits
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(succeeded.Data, &record))
+	pin, err := json.Marshal(record["pin"])
+	require.NoError(t, err)
+	require.NotContains(t, string(pin), "1234")
 }

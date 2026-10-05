@@ -75,7 +75,7 @@ func applyPeople(t *testing.T, reg *registry.PluginRegistry, store *state.FileSt
 	require.NotNil(t, st)
 
 	// save the way Config does: each entity encoded with its real values
-	encoded, err := parser.EncodeForState(st.GetResources())
+	encoded, _, err := parser.EncodeForState(st.GetResources(), nil)
 	require.NoError(t, err)
 
 	err = store.Save(encoded)
@@ -143,7 +143,7 @@ func TestExampleProviderSecondApplyMakesNoCreateOrUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	// the store hands back raw records, typing them needs the registry
-	saved, err := savedentity.DecodeAll(reg, loaded)
+	saved, err := savedentity.DecodeAll(reg, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 	require.Equal(t, "person-test-user", findPerson(t, saved, testPersonID).PersonID)
 	require.Equal(t, "person-other-person", findPerson(t, saved, otherPersonID).PersonID)
