@@ -1,0 +1,9 @@
+# Reaches past the module's outputs to a resource declared inside it.
+
+module "m" {
+  source = "../module"
+}
+
+output "x" {
+  value = module.m.resource.network.n.subnet
+}

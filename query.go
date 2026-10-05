@@ -22,10 +22,10 @@ import (
 // entity that is not a T returns one wrapping ErrTypeMismatch, and never a
 // value with some of its fields unset.
 //
-// Where the address names a value the configuration publishes, the resolved
-// value is returned rather than the declaration that produced it, so a caller
-// does not need to know such values are held differently in order to ask for
-// one.
+// An output address returns the types.Output entity like any other entity,
+// and its Value holds the published value. Asking for an output as any other
+// type, a plain string for instance, returns an error wrapping
+// ErrTypeMismatch; Config.Outputs returns every published value at once.
 func Find[T any](c *Config, address string) (*T, error) {
 	return find[T](c, address)
 }
@@ -42,12 +42,6 @@ func find[T any](c *Config, address string) (*T, error) {
 	entity, found := resources.Match(c.Entities(), fqrn)
 	if !found {
 		return nil, &xclerrors.NotFoundError{Address: address}
-	}
-
-	// a published value is asked for by address like anything else, and
-	// yields the value rather than the declaration that produced it
-	if output, ok := entity.(*resources.Output); ok {
-		return As[T](output.Value)
 	}
 
 	return As[T](entity)
@@ -281,17 +275,12 @@ func oneOf(found []any, path []string) (any, bool, error) {
 //
 // Segment one names a type: one of the builtin keywords, "resource", or a type
 // registered under its own keyword. A type that takes a subtype spans every
-// subtype declared under it, so it needs a second segment to pin a Go type,
-// and published values span whatever the configuration publishes, so they are
-// never typeable and point at the call that does return them.
+// subtype declared under it, so it needs a second segment to pin a Go type.
 func (c *Config) typeable(path []string) error {
 	entityType := path[0]
 
 	switch entityType {
-	case resources.TypeOutput:
-		return &xclerrors.NotTypeableError{Segments: path, Use: "Outputs"}
-
-	case resources.TypeVariable, resources.TypeModule, resources.TypeRoot:
+	case resources.TypeVariable, resources.TypeOutput, resources.TypeModule, resources.TypeRoot:
 		// each is exactly one Go type
 		return nil
 	}

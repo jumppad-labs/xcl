@@ -1,0 +1,10 @@
+# One output published at the root and one published by a module, which is
+# what an output query needs to show it reaches every module depth.
+
+output "greeting" {
+  value = "hello"
+}
+
+module "inner" {
+  source = "./module"
+}

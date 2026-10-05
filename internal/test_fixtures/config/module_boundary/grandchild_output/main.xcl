@@ -1,0 +1,10 @@
+# Reaches through module a to the output of its child module b, which a does
+# not re-export.
+
+module "a" {
+  source = "../../module_reexport/a"
+}
+
+output "x" {
+  value = module.a.b.output.value
+}

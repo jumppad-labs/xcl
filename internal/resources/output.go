@@ -1,17 +1,5 @@
 package resources
 
-import (
-	"github.com/jumppad-labs/xcl/types"
-	"github.com/jumppad-labs/xcl/internal/cty"
-)
-
+// TypeOutput is the keyword that declares an output, a value a configuration
+// or module publishes. The entity itself is types.Output.
 const TypeOutput = "output"
-
-// Output defines an output variable which can be set by a module
-type Output struct {
-	types.ResourceBase `xcl:",remain"`
-
-	CtyValue    cty.Value `xcl:"value,optional"` // value of the output
-	Value       any       `json:"value"`
-	Description string    `xcl:"description,optional" json:"description,omitempty"` // description for the output
-}

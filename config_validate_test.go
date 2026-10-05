@@ -421,3 +421,28 @@ func TestValidateAcceptsUnsetComputedField(t *testing.T) {
 	err = c.Validate(path)
 	require.NoError(t, err)
 }
+
+// TestApplyRefusesAReferenceThatCrossesAModuleBoundary asserts that a
+// reference reaching past a module's outputs to a resource inside it stops the
+// apply before anything is created or persisted.
+func TestApplyRefusesAReferenceThatCrossesAModuleBoundary(t *testing.T) {
+	path, err := filepath.Abs("./internal/test_fixtures/config/module_boundary/internal_resource")
+	require.NoError(t, err)
+
+	c, testPlugin, ss := setupConfig(t)
+
+	err = c.Apply(path)
+	require.Error(t, err)
+
+	ce, ok := err.(*errors.ConfigError)
+	require.True(t, ok, "Apply should report failure as a *errors.ConfigError")
+	require.Len(t, ce.Errors, 1)
+	require.Contains(t, ce.Errors[0].Error(), "only a module's outputs can be referenced from outside it")
+
+	require.Empty(t, testPlugin.GetCreatedResources())
+	require.Empty(t, testPlugin.GetUpdatedResources())
+	require.Empty(t, testPlugin.GetDestroyedResources())
+
+	ss.AssertNotCalled(t, "Save", mock.Anything)
+	require.Equal(t, 0, c.ResourceCount())
+}

@@ -54,3 +54,30 @@ func setupQueryConfig(t *testing.T) *Config {
 
 	return c
 }
+
+// setupOutputEntitiesConfig applies the output entities fixture, which declares
+// one output at the root and one inside a module. It needs no registered or
+// plugin types, outputs and modules are kinds xcl interprets itself.
+func setupOutputEntitiesConfig(t *testing.T) *Config {
+	t.Helper()
+
+	t.Setenv("HOME", t.TempDir())
+
+	ss := &statemocks.MockStateStore{}
+	ss.On("Exists").Return(false)
+	ss.On("Load").Return(nil, nil)
+	ss.On("Save", mock.Anything).Return(nil)
+
+	c, err := NewConfig(
+		WithStateStore(ss),
+	)
+	require.NoError(t, err)
+
+	path, err := filepath.Abs("./internal/test_fixtures/config/output_entities/main.xcl")
+	require.NoError(t, err)
+
+	err = c.Apply(path)
+	require.NoError(t, err)
+
+	return c
+}

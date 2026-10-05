@@ -822,3 +822,155 @@ func TestApplyRejectsUndefinedReferenceNamingTheResourceThatMadeIt(t *testing.T)
 	require.Contains(t, pe.Message, "resource 'resource.database.main'")
 	require.Contains(t, pe.Message, "resource.database.missing")
 }
+
+// A module's outputs are the only way to reach inside it. A reference to
+// anything else inside a module, or to anything inside a module nested in it, is
+// reported once as crossing the module boundary and never also as undefined.
+
+func TestValidateRejectsAReferenceToAModuleResource(t *testing.T) {
+	dir, pathErr := filepath.Abs("../test_fixtures/config/module_boundary/internal_resource")
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+
+	p, _ := setupParser(t)
+
+	_, err := p.Apply(context.Background(), dir)
+	require.IsType(t, &errors.ConfigError{}, err)
+
+	ce := err.(*errors.ConfigError)
+	require.Len(t, ce.Errors, 1)
+
+	pe := ce.Errors[0].(*errors.ParserError)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
+	require.Equal(t, 7, pe.Line)
+	require.Equal(t, 1, pe.Column)
+	require.Equal(t, "resource 'output.x' refers to 'module.m.resource.network.n.subnet', which is inside module 'm'; only a module's outputs can be referenced from outside it", pe.Message)
+	require.Contains(t, pe.Message, "module.m.resource.network.n.subnet")
+	require.Contains(t, pe.Message, "only a module's outputs")
+	require.NotContains(t, pe.Message, "not defined")
+}
+
+func TestValidateAcceptsAReferenceToAModuleOutput(t *testing.T) {
+	dir, pathErr := filepath.Abs("../test_fixtures/config/module_boundary/through_output")
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+
+	p, _ := setupParser(t)
+
+	_, err := p.Apply(context.Background(), dir)
+	require.NoError(t, err)
+}
+
+func TestValidateRejectsAReferenceToAModuleVariable(t *testing.T) {
+	dir, pathErr := filepath.Abs("../test_fixtures/config/module_boundary/internal_variable")
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+
+	p, _ := setupParser(t)
+
+	_, err := p.Apply(context.Background(), dir)
+	require.IsType(t, &errors.ConfigError{}, err)
+
+	ce := err.(*errors.ConfigError)
+	require.Len(t, ce.Errors, 1)
+
+	pe := ce.Errors[0].(*errors.ParserError)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
+	require.Equal(t, 7, pe.Line)
+	require.Equal(t, 1, pe.Column)
+	require.Equal(t, "resource 'output.x' refers to 'module.m.variable.v', which is inside module 'm'; only a module's outputs can be referenced from outside it", pe.Message)
+	require.NotContains(t, pe.Message, "not defined")
+}
+
+func TestValidateRejectsADependsOnNamingAModuleInternal(t *testing.T) {
+	dir, pathErr := filepath.Abs("../test_fixtures/config/module_boundary/depends_on_internal")
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+
+	p, _ := setupParser(t)
+
+	_, err := p.Apply(context.Background(), dir)
+	require.IsType(t, &errors.ConfigError{}, err)
+
+	ce := err.(*errors.ConfigError)
+	require.Len(t, ce.Errors, 1)
+
+	pe := ce.Errors[0].(*errors.ParserError)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
+	require.Equal(t, 7, pe.Line)
+	require.Equal(t, 1, pe.Column)
+	require.Equal(t, "resource 'resource.network.consumer' refers to 'module.m.resource.network.n', which is inside module 'm'; only a module's outputs can be referenced from outside it", pe.Message)
+	require.NotContains(t, pe.Message, "not defined")
+}
+
+func TestValidateAcceptsADependsOnNamingAChildModule(t *testing.T) {
+	dir, pathErr := filepath.Abs("../test_fixtures/config/module_boundary/depends_on_module")
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+
+	p, _ := setupParser(t)
+
+	_, err := p.Apply(context.Background(), dir)
+	require.NoError(t, err)
+}
+
+func TestValidateRejectsAReferenceToAGrandchildModuleOutput(t *testing.T) {
+	dir, pathErr := filepath.Abs("../test_fixtures/config/module_boundary/grandchild_output")
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+
+	p, _ := setupParser(t)
+
+	_, err := p.Apply(context.Background(), dir)
+	require.IsType(t, &errors.ConfigError{}, err)
+
+	ce := err.(*errors.ConfigError)
+	require.Len(t, ce.Errors, 1)
+
+	pe := ce.Errors[0].(*errors.ParserError)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
+	require.Equal(t, 8, pe.Line)
+	require.Equal(t, 1, pe.Column)
+	require.Equal(t, "resource 'output.x' refers to 'module.a.b.output.value', which is inside module 'a.b'; only a module's outputs can be referenced from outside it", pe.Message)
+	require.NotContains(t, pe.Message, "not defined")
+}
+
+func TestValidateRejectsAReferenceToAGrandchildModule(t *testing.T) {
+	dir, pathErr := filepath.Abs("../test_fixtures/config/module_boundary/grandchild_module")
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+
+	p, _ := setupParser(t)
+
+	_, err := p.Apply(context.Background(), dir)
+	require.IsType(t, &errors.ConfigError{}, err)
+
+	ce := err.(*errors.ConfigError)
+	require.Len(t, ce.Errors, 1)
+
+	pe := ce.Errors[0].(*errors.ParserError)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
+	require.Equal(t, 7, pe.Line)
+	require.Equal(t, 1, pe.Column)
+	require.Equal(t, "resource 'resource.network.consumer' refers to 'module.a.b', which is inside module 'a'; only a module's outputs can be referenced from outside it", pe.Message)
+	require.NotContains(t, pe.Message, "not defined")
+}
+
+func TestValidateAcceptsAReExportedGrandchildOutput(t *testing.T) {
+	f, pathErr := filepath.Abs("../test_fixtures/config/module_reexport/main.xcl")
+	if pathErr != nil {
+		t.Fatal(pathErr)
+	}
+
+	p, _ := setupParser(t)
+
+	_, err := p.Apply(context.Background(), f)
+	require.NoError(t, err)
+}

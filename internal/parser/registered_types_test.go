@@ -597,8 +597,8 @@ func TestApplyGivesResourceTheValueOfAModuleOutput(t *testing.T) {
 
 	r, err := findByID(st.GetResources(), registeredModuleOutputID)
 	require.NoError(t, err)
-	out, ok := r.(*resources.Output)
-	require.True(t, ok, "expected *resources.Output, got %T", r)
+	out, ok := r.(*types.Output)
+	require.True(t, ok, "expected *types.Output, got %T", r)
 	require.Equal(t, "eu-west", out.CtyValue.AsString())
 
 	// and app.web, outside the module, reads module.shared.output.location

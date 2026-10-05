@@ -1,5 +1,16 @@
 # Changelog
 
+## 20261003153421-6ec0eab3-module-boundary-and-output-entities
+
+A module's outputs are now the only way to reach inside it from configuration, at every level of nesting. From its parent, a configuration can reference a module's outputs, `module.<name>.output.<name>`, and the module itself, as in `depends_on = ["module.<name>"]`. A reference to a module's resources, variables or nested modules, or to anything inside a module nested in it, fails validation with an error naming the reference, and both `Validate` and `Apply` refuse it before anything is created. A module can now re-export a value from a module it uses, `output "from_b" { value = module.b.output.value }`, which failed validation before, so a deeply nested value is reachable when each module in between re-exports it.
+
+Outputs are entities in the Go API. The output type is public as `types.Output`, and `xcl.Find[types.Output](c, "module.a.output.x")` returns the entity, with the published value on `.Value`. `xcl.FindByType[types.Output](c, "output")`, `xcl.All[types.Output](c)` and `Decode` into a `[]*types.Output` field return every declared output, at any module depth. `FindByType(..., "output")` no longer returns `ErrNotTypeable`. `c.Outputs()` still returns every published value in one call, keyed by address. Saved state is unchanged.
+
+**Breaking:**
+
+- `xcl.Find[string]`, or any type other than `types.Output`, on an output address now fails with an error matching `ErrTypeMismatch` instead of returning the value. Use `xcl.Find[types.Output](...)` and read `.Value`, or read `c.Outputs()[address]`.
+- Configurations that reference a module's resources, variables or nested modules, or a grandchild module's outputs, now fail validation. Re-export the value as an output of each module in between and reference that output.
+
 ## 20261003081552-e1e07cbe-config-decode
 
 A configuration can fill a struct of your own in one call, `c.Decode(&cfg)` or `xcl.Decode(c, &cfg)`, so an application gathers what a configuration declares without a lookup per block type, and reading a new block type needs only a new field. Fields are matched by their type alone, with no struct tags: a `[]*T` field, `T` a registered type, receives every entity of `T` exactly as `xcl.All[T]` returns them, in the order they were written, disabled entities included and as the configuration's own instances; a `*T` field receives the one entity of `T`, is `nil` when none is declared, and makes the call fail with the error `xcl.FindOne` returns, matching `xcl.ErrNotUnique`, when more than one is. Every other field keeps its value, and nested structs are not entered. `Decode` is not generic, so its method form works on every supported Go version.

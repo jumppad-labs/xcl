@@ -12,7 +12,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/resources"
-	hcl "github.com/jumppad-labs/xcl/internal/xcl"
+	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -188,7 +188,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		// Convert CtyValue to Value for output and local resources
 		switch rMeta.Type {
 		case resources.TypeOutput:
-			out := r.(*resources.Output)
+			out := r.(*types.Output)
 			if !out.CtyValue.IsNull() {
 				out.Value = convertCtyToGo(out.CtyValue)
 			}

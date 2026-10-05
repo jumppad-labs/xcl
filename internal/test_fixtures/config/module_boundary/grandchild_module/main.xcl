@@ -1,0 +1,11 @@
+# Names module a's child module b in depends_on.
+
+module "a" {
+  source = "../../module_reexport/a"
+}
+
+resource "network" "consumer" {
+  depends_on = ["module.a.b"]
+
+  subnet = "10.30.0.0/16"
+}

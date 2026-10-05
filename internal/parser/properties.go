@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jumppad-labs/xcl/internal/resources"
+	"github.com/jumppad-labs/xcl/types"
 )
 
 // bracketIndex matches a trailing collection selector on a path segment, either
@@ -148,7 +149,7 @@ func holdsDynamicValue(t reflect.Type) bool {
 	}
 
 	switch t {
-	case reflect.TypeOf(resources.Output{}), reflect.TypeOf(resources.Variable{}):
+	case reflect.TypeOf(types.Output{}), reflect.TypeOf(resources.Variable{}):
 		return true
 	default:
 		return false

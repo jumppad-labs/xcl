@@ -275,7 +275,7 @@ func setContextVariablesFromList(s ResourceProvider, addresses *resources.Addres
 
 		switch lMeta.Type {
 		case resources.TypeOutput:
-			out := l.(*resources.Output)
+			out := l.(*types.Output)
 			ctyRes = out.CtyValue
 		case resources.TypeVariable:
 			// For variables, only set if not already in context

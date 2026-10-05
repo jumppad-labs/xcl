@@ -1,6 +1,10 @@
 package parser
 
-import ()
+import (
+	"strings"
+
+	"github.com/jumppad-labs/xcl/internal/resources"
+)
 
 // resolvedReference is the outcome of matching a reference string against
 // everything the configuration defines.
@@ -34,6 +38,12 @@ type resolvedReference struct {
 // and against the global scope second. Resolving in that order is what lets a
 // module refer to its own resources while still being able to name anything
 // declared outside it.
+//
+// The module-scoped key is composed with FQRN.AppendParentModule, exactly as
+// the dependency graph and the evaluation context compose theirs, so a
+// reference written inside module a to its child's output, module.b.output.x,
+// resolves to module.a.b.output.x rather than to the string-joined
+// module.a.module.b.output.x that no entity is ever keyed by.
 func (p *Parser) resolveReference(reference string, fromModule string) resolvedReference {
 	fqrn, err := p.addressParser().Parse(reference)
 	if err != nil {
@@ -45,7 +55,8 @@ func (p *Parser) resolveReference(reference string, fromModule string) resolvedR
 
 	// A reference from inside a module names things in that module first.
 	if fromModule != "" {
-		scoped := "module." + fromModule + "." + base
+		scopedFQRN := fqrn.AppendParentModule(fromModule)
+		scoped := scopedFQRN.StringWithoutAttribute()
 		if target, ok := p.parsedResources.resources[scoped]; ok {
 			return resolvedReference{
 				target:    target,
@@ -66,4 +77,33 @@ func (p *Parser) resolveReference(reference string, fromModule string) resolvedR
 	}
 
 	return resolvedReference{attribute: fqrn.Attribute, found: false}
+}
+
+// crossesModuleBoundary reports whether a reference, as written, reaches
+// inside a module further than the module's outputs allow.
+//
+// A module's outputs are the only way to reach inside it from configuration.
+// The module part of a parsed reference is the path into child modules,
+// relative to the scope the reference is written in, so the rule needs nothing
+// but the reference itself:
+//
+//   - no module part, as in resource.container.c or module.a, stays within the
+//     scope it is written in and is always allowed;
+//   - a single child module whose output is the target, as in
+//     module.a.output.x, is allowed;
+//   - anything else inside a child module, such as module.a.resource.container.c,
+//     module.a.variable.v or the nested module module.a.b, crosses the boundary;
+//   - anything inside a grandchild, such as module.a.b.output.x, crosses it too.
+//     A value that deep is reached only when each module in between re-exports
+//     it as one of its own outputs.
+func crossesModuleBoundary(fqrn *resources.FQRN) bool {
+	if fqrn.Module == "" {
+		return false
+	}
+
+	if strings.Contains(fqrn.Module, ".") {
+		return true
+	}
+
+	return fqrn.Type != resources.TypeOutput
 }

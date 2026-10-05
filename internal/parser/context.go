@@ -6,7 +6,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/convert"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/resources"
-	hcl "github.com/jumppad-labs/xcl/internal/xcl"
+	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -83,7 +83,7 @@ func buildContextForResource(res *parsed, r any, addresses *resources.AddressPar
 			var ctyRes cty.Value
 			switch resourceMeta.Type {
 			case resources.TypeOutput:
-				out := resource.(*resources.Output)
+				out := resource.(*types.Output)
 				ctyRes = out.CtyValue
 			case resources.TypeVariable:
 				variable := resource.(*resources.Variable)

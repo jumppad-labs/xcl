@@ -137,7 +137,7 @@ All tests follow the project's conventions. They use testify `require`, there ar
 
 **Validation point**: The full test suite passes, including the retargeted parser, state and saved-entity tests. New query tests prove that finding, listing, `All` and `Decode` return output entities and that `Outputs()` returns values keyed by address. The plugin example's tests pass with its outputs read as entities.
 
-#### - [ ] Task: Move the output type into the public types package
+#### - [x] Task: Move the output type into the public types package
 **Id:** 1bee269b-f277-452b-be57-44c2c927a1d8
 **Repo:** xclconfig
 **Depends on:** none
@@ -148,11 +148,11 @@ The output declaration type moves from the internal resources package to the pub
 *Technical detail:* [context.md#task-move-the-output-type-into-the-public-types-package](./context.md#task-move-the-output-type-into-the-public-types-package)
 
 **Acceptance criteria**:
-- [ ] Applications can refer to `types.Output`, and the internal resources package no longer declares an output type.
-- [ ] Saved state and plugin payloads for outputs are byte-for-byte what they were before the move.
-- [ ] Every existing parser, state and saved-entity test passes with its assertions unchanged apart from the type name.
+- [x] Applications can refer to `types.Output`, and the internal resources package no longer declares an output type.
+- [x] Saved state and plugin payloads for outputs are byte-for-byte what they were before the move.
+- [x] Every existing parser, state and saved-entity test passes with its assertions unchanged apart from the type name.
 
-#### - [ ] Task: Return outputs as entities from every lookup
+#### - [x] Task: Return outputs as entities from every lookup
 **Id:** ac841670-bdfa-4261-8268-c6b6bd23eb9e
 **Repo:** xclconfig
 **Depends on:**
@@ -164,12 +164,12 @@ The query layer stops treating outputs specially. Looking up an output by addres
 *Technical detail:* [context.md#task-return-outputs-as-entities-from-every-lookup](./context.md#task-return-outputs-as-entities-from-every-lookup)
 
 **Acceptance criteria**:
-- [ ] Looking up a root output or a module output by address returns the output entity, and its value field holds the published value.
-- [ ] Asking for an output as a plain value fails with a type-mismatch error rather than returning the value.
-- [ ] Listing outputs by type, `All` and `Decode` each return every declared output, at any module depth, as entities.
-- [ ] `Outputs()` returns one entry per declared output, keyed by address, each holding that output's value.
+- [x] Looking up a root output or a module output by address returns the output entity, and its value field holds the published value.
+- [x] Asking for an output as a plain value fails with a type-mismatch error rather than returning the value.
+- [x] Listing outputs by type, `All` and `Decode` each return every declared output, at any module depth, as entities.
+- [x] `Outputs()` returns one entry per declared output, keyed by address, each holding that output's value.
 
-#### - [ ] Task: Read outputs as entities in the plugin example
+#### - [x] Task: Read outputs as entities in the plugin example
 **Id:** b989237b-cb9c-4d3b-9d86-5abefdfd2154
 **Repo:** xclconfig
 **Depends on:**
@@ -181,8 +181,8 @@ The plugin example reads its root output and its module output as `types.Output`
 *Technical detail:* [context.md#task-read-outputs-as-entities-in-the-plugin-example](./context.md#task-read-outputs-as-entities-in-the-plugin-example)
 
 **Acceptance criteria**:
-- [ ] The plugin example looks up its outputs as entities and prints the same published values as before.
-- [ ] The plugin example's tests pass.
+- [x] The plugin example looks up its outputs as entities and prints the same published values as before.
+- [x] The plugin example's tests pass.
 
 ### Milestone 2: Configurations reach into a module only through its outputs
 
@@ -190,7 +190,7 @@ The plugin example reads its root output and its module output as `types.Output`
 
 **Validation point**: New parser tests prove that each reference shape is accepted or rejected as the rule says, and that rejected references are reported once with the reference named. The three-level nesting test shows that a root reference into the grandchild module is rejected. It also shows that a root reference to a re-exported output validates and, after `Apply`, resolves to the grandchild's value. All example tests pass.
 
-#### - [ ] Task: Resolve re-exported outputs of nested modules
+#### - [x] Task: Resolve re-exported outputs of nested modules
 **Id:** 95adecca-887d-4b97-ad57-c5d7d85363f1
 **Repo:** xclconfig
 **Depends on:** none
@@ -201,10 +201,10 @@ Validation cannot currently resolve a reference, written inside a module, to tha
 *Technical detail:* [context.md#task-resolve-re-exported-outputs-of-nested-modules](./context.md#task-resolve-re-exported-outputs-of-nested-modules)
 
 **Acceptance criteria**:
-- [ ] A reference written inside a module to its child module's output resolves during validation.
-- [ ] Every reference that resolved before still resolves to the same entity.
+- [x] A reference written inside a module to its child module's output resolves during validation.
+- [x] Every reference that resolved before still resolves to the same entity.
 
-#### - [ ] Task: Reject references that cross a module boundary
+#### - [x] Task: Reject references that cross a module boundary
 **Id:** 27249cc8-0b54-4654-b714-f73b5d3d88ce
 **Repo:** xclconfig
 **Depends on:**
@@ -216,12 +216,12 @@ Validation gains a rule: a reference may reach into a module only to one of that
 *Technical detail:* [context.md#task-reject-references-that-cross-a-module-boundary](./context.md#task-reject-references-that-cross-a-module-boundary)
 
 **Acceptance criteria**:
-- [ ] A configuration that refers to anything inside a module other than one of its outputs fails validation, with an error naming the reference, and the same reference is not also reported as undefined.
-- [ ] The same configuration referring to the module's output instead validates.
-- [ ] With root using module A and A using module B, a root reference to anything inside B, including B's outputs, fails validation.
-- [ ] With the same nesting, a root reference to an output of A that re-exports B's output validates, and after apply it holds B's value.
-- [ ] `Apply` refuses a configuration that crosses a module boundary before anything is created.
-- [ ] Every bundled example and every existing test configuration still validates.
+- [x] A configuration that refers to anything inside a module other than one of its outputs fails validation, with an error naming the reference, and the same reference is not also reported as undefined.
+- [x] The same configuration referring to the module's output instead validates.
+- [x] With root using module A and A using module B, a root reference to anything inside B, including B's outputs, fails validation.
+- [x] With the same nesting, a root reference to an output of A that re-exports B's output validates, and after apply it holds B's value.
+- [x] `Apply` refuses a configuration that crosses a module boundary before anything is created.
+- [x] Every bundled example and every existing test configuration still validates.
 
 ### Milestone 3: Documentation describes the module boundary and output entities
 
@@ -229,7 +229,7 @@ Validation gains a rule: a reference may reach into a module only to one of that
 
 **Validation point**: The README and CHANGELOG content tests pass, and they fail if the new sections are removed. The website builds and type-checks. The `architecture/ux-flow.md` knowledge entry shows `Find[types.Output]` with `.Value` and the note on `Outputs()`.
 
-#### - [ ] Task: Document the module boundary and output entities in the library
+#### - [x] Task: Document the module boundary and output entities in the library
 **Id:** f0bb4c15-f1a7-4170-a129-0cd59a72daba
 **Repo:** xclconfig
 **Depends on:**
@@ -242,12 +242,12 @@ The README's published-values section is rewritten to read outputs as entities w
 *Technical detail:* [context.md#task-document-the-module-boundary-and-output-entities-in-the-library](./context.md#task-document-the-module-boundary-and-output-entities-in-the-library)
 
 **Acceptance criteria**:
-- [ ] The README shows reading an output as an entity and its value, and no longer shows reading an output as a plain value.
-- [ ] The README and the modules guide each state that only a module's outputs can be referenced from its parent, with a re-export example.
-- [ ] The changelog has an entry for this work that lists the two breaking changes.
-- [ ] The content tests fail if any of these sections or the changelog entry is removed.
+- [x] The README shows reading an output as an entity and its value, and no longer shows reading an output as a plain value.
+- [x] The README and the modules guide each state that only a module's outputs can be referenced from its parent, with a re-export example.
+- [x] The changelog has an entry for this work that lists the two breaking changes.
+- [x] The content tests fail if any of these sections or the changelog entry is removed.
 
-#### - [ ] Task: Document the module boundary and output entities on the site
+#### - [x] Task: Document the module boundary and output entities on the site
 **Id:** 13e60e8c-75ee-4fce-8914-78029607e0ce
 **Repo:** xcl-website
 **Depends on:**
@@ -259,11 +259,11 @@ The documentation site's Modules feature card says that only a module's outputs 
 *Technical detail:* [context.md#task-document-the-module-boundary-and-output-entities-on-the-site](./context.md#task-document-the-module-boundary-and-output-entities-on-the-site)
 
 **Acceptance criteria**:
-- [ ] The site describes the output-only module boundary with a re-export example.
-- [ ] The site shows an output being read as an entity with its value.
-- [ ] The site builds and type-checks.
+- [x] The site describes the output-only module boundary with a re-export example.
+- [x] The site shows an output being read as an entity with its value.
+- [x] The site builds and type-checks.
 
-#### - [ ] Task: Bring the user-flow knowledge entry into line with output entities
+#### - [x] Task: Bring the user-flow knowledge entry into line with output entities
 **Id:** 162163be-487d-4c55-a7e5-12f7ad9341b5
 **Repo:** xclconfig
 **Depends on:**
@@ -275,8 +275,8 @@ The knowledge entry `architecture/ux-flow.md` still says that looking up an outp
 *Technical detail:* [context.md#task-bring-the-user-flow-knowledge-entry-into-line-with-output-entities](./context.md#task-bring-the-user-flow-knowledge-entry-into-line-with-output-entities)
 
 **Acceptance criteria**:
-- [ ] The user-flow knowledge entry shows an output read with `Find[types.Output]` and its `.Value`, and no longer shows `Find[string]` for an output.
-- [ ] The entry notes that `Outputs()` returns every published value keyed by address.
+- [x] The user-flow knowledge entry shows an output read with `Find[types.Output]` and its `.Value`, and no longer shows `Find[string]` for an output.
+- [x] The entry notes that `Outputs()` returns every published value keyed by address.
 
 ## Open Questions
 
@@ -291,3 +291,135 @@ The knowledge entry `architecture/ux-flow.md` still says that looking up an outp
 - **A matchable error sentinel for boundary violations.** Violations are reported as validation problems like every other reference problem. No `errors.Is` sentinel is added.
 - **How `depends_on` relates to `Meta.Links`.** The user-depends-on spec in the same epic (`20261003153421-c283547c-user-depends-on`) owns this. It must keep user-written `depends_on` entries subject to this boundary check.
 - **Rewording the validation-stage description in `architecture/ux-flow.md`.** Only the published-values passage is rewritten, with the wording the user approved.
+
+## Changelog
+
+
+### 2026-10-05 — Task: Move the output type into the public types package
+
+**What was done**: `Output` moved from `internal/resources` to the public `types` package as `types.Output`, with identical fields and tags; `internal/resources/output.go` now holds only the `TypeOutput` keyword constant. Every internal use (builtin registration, parser, evaluator, property checks, root query/config code) and the tests were retargeted by name.
+
+**Deviations**: None. No new tests were written: the move is behaviour-neutral and the existing parser, saved-entity and state tests, retargeted by name, are the proof (all pass).
+
+**Files changed**:
+- `xclconfig: types/output.go`
+- `xclconfig: internal/resources/output.go`
+- `xclconfig: internal/resources/default.go`
+- `xclconfig: internal/resources/default_test.go`
+- `xclconfig: internal/parser/callbacks.go`
+- `xclconfig: internal/parser/context.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/parser/properties.go`
+- `xclconfig: internal/parser/util.go`
+- `xclconfig: internal/parser/parse_test.go`
+- `xclconfig: internal/parser/properties_test.go`
+- `xclconfig: internal/parser/registered_types_test.go`
+- `xclconfig: internal/savedentity/savedentity_test.go`
+- `xclconfig: config.go`
+- `xclconfig: query.go`
+- `xclconfig: query_test.go`
+- `xclconfig: query_all_test.go`
+- `xclconfig: query_by_type_test.go`
+
+**Discoveries**: Running `goimports` over parser files rewrites the `internal/xcl` import to an `hcl` alias; that churn was reverted by hand.
+
+### 2026-10-05 — Task: Return outputs as entities from every lookup
+
+**What was done**: Removed the two output special cases in the query layer: `find` no longer unwraps an output to its value, and `typeable` treats `output` as a single-Go-type builtin like `variable` and `module`. `Find`, `FindByType`, `All` and `Decode` now return `*types.Output` entities; `Outputs()` is unchanged in shape. Doc comments on `Find`, `typeable`, `Outputs`, `Decode` and `ErrNotTypeable` were updated. Old value-returning tests were replaced with entity tests on a new `output_entities` fixture applied through a real `Apply`.
+
+**Deviations**: None in code. Between this task and the next, `example/plugin` tests fail (the example still calls `Find[string]` on outputs); the plugin example task fixes that, so this task was verified on every package outside `example/`.
+
+**Files changed**:
+- `xclconfig: query.go`
+- `xclconfig: config.go`
+- `xclconfig: decode.go`
+- `xclconfig: errors/query_errors.go`
+- `xclconfig: query_setup_test.go`
+- `xclconfig: query_test.go`
+- `xclconfig: query_by_type_test.go`
+- `xclconfig: query_all_test.go`
+- `xclconfig: decode_test.go`
+- `xclconfig: internal/test_fixtures/config/output_entities/main.xcl`
+- `xclconfig: internal/test_fixtures/config/output_entities/module/inner.xcl`
+
+**Discoveries**: `FindByType`/`All` return outputs in declaration order (root first, then module) with no extra code, because builtins are reached through their registry prototype.
+
+### 2026-10-05 — Task: Read outputs as entities in the plugin example
+
+**What was done**: The plugin example now looks up `output.web_database` and `module.analytics.output.location` with `xcl.Find[types.Output]` and prints `.Value` with `%q`; the comment explains outputs are entities with the published value on `Value`. The printed lines are unchanged and `Outputs()` is still used for the total.
+
+**Deviations**: None. No test changes were needed: the existing example tests assert the identical printed lines and now pass again.
+
+**Files changed**:
+- `xclconfig: example/plugin/main.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Resolve re-exported outputs of nested modules
+
+**What was done**: `resolveReference` now composes its module-scoped key with `FQRN.AppendParentModule(fromModule).StringWithoutAttribute()` instead of string-joining `"module." + fromModule + "." + base`, matching the DAG builder and the evaluation context. Added the `module_reexport` fixture (root uses `a`, `a` uses `b`, `a` re-exports `b`'s output, root re-exports `a`'s) and resolver tests for a child module's output from inside a module, a child module itself from inside a module, and an unqualified reference inside a module (regression). Removed the empty `import ()`.
+
+**Deviations**: Added one extra test, `TestResolveReferenceResolvesAChildModuleFromInsideAModule`: nested modules are keyed `module.a.b`, so a `module.b` reference from inside `a` was also unresolvable before this fix and now resolves to `module.a.b`. Tests were written in the main context because the task was small.
+
+**Files changed**:
+- `xclconfig: internal/parser/references.go`
+- `xclconfig: internal/parser/references_test.go`
+- `xclconfig: internal/test_fixtures/config/module_reexport/main.xcl`
+- `xclconfig: internal/test_fixtures/config/module_reexport/a/a.xcl`
+- `xclconfig: internal/test_fixtures/config/module_reexport/a/b/b.xcl`
+
+**Discoveries**: A nested module entity is keyed `module.a.b` (not `module.a.module.b`), the same shape `AppendParentModule` yields for a `module.b` reference made from inside `a`.
+
+### 2026-10-05 — Task: Reject references that cross a module boundary
+
+**What was done**: Added the pure predicate `crossesModuleBoundary` (module path empty, or a single child module whose target is an `output`, is allowed; anything else inside a module, or anything in a grandchild, crosses). Validation stage 2 judges every link, including user `depends_on` entries, against it before resolution and reports a crossing as one `ParserError` at the referring block: `resource '<id>' refers to '<ref>', which is inside module '<module>'; only a module's outputs can be referenced from outside it`, never also as undefined. Added `module_boundary` fixtures and tests: predicate tests per reference shape, validation tests per fixture (module resource, variable, depends_on internal, depends_on module, grandchild output, grandchild module, re-exported grandchild), `Apply` refusing a crossing configuration with nothing saved, and an end-to-end three-level re-export resolving to `"from-b"` through both `Outputs()` and `Find[types.Output]`.
+
+**Deviations**: None. The open question on nested re-export at walk time is answered: it evaluates correctly with no change to the evaluation context. The module fixtures use the test plugin's `network` type rather than `container`.
+
+**Files changed**:
+- `xclconfig: internal/parser/references.go`
+- `xclconfig: internal/parser/validate.go`
+- `xclconfig: internal/parser/references_test.go`
+- `xclconfig: internal/parser/validate_test.go`
+- `xclconfig: config_validate_test.go`
+- `xclconfig: config_module_boundary_test.go`
+- `xclconfig: internal/test_fixtures/config/module_boundary/` (module, internal_resource, through_output, internal_variable, depends_on_internal, depends_on_module, grandchild_output, grandchild_module)
+
+**Discoveries**: No existing fixture or bundled example crossed the boundary; the whole suite passed unchanged once the rule was in place.
+
+### 2026-10-05 — Task: Document the module boundary and output entities in the library
+
+**What was done**: Rewrote the README's "Reading values a configuration publishes" section to read outputs as `types.Output` entities with `.Value`, list them with `FindByType`/`All`, and keep `c.Outputs()`; it notes that `Find[string]` on an output now matches `ErrTypeMismatch`. Added a "### The module boundary" subsection under the README's Modules section and docs/modules.md, each with the rule, the error text, a re-export example through a nested module, and (in the guide) where the rule is enforced. Added the CHANGELOG entry with both breaking changes. Added README, modules-guide and CHANGELOG content tests.
+
+**Deviations**: Added two tests beyond the plan: `TestReadmeNoLongerReadsAnOutputAsAPlainValue` (split out so the positive and negative README checks stay in separate functions, per convention) and `TestModulesGuideDocumentsTheModuleBoundary`.
+
+**Files changed**:
+- `xclconfig: README.md`
+- `xclconfig: docs/modules.md`
+- `xclconfig: CHANGELOG.md`
+- `xclconfig: readme_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Document the module boundary and output entities on the site
+
+**What was done**: On the home page, the Modules card now says outputs are the only way into a module, that anything else is rejected by validation, and that a nested module's value is exposed by re-exporting it. The Variables and outputs card says an output is an entity in Go, read with `Find[types.Output]` and `.Value`. The plugin example page gains a snippet of the program reading its outputs as `types.Output` entities (matching `example/plugin/main.go`), and a "What to notice" bullet on the module boundary with a re-export example. The printed output lines are unchanged.
+
+**Deviations**: None. The site has no content tests. It was verified with `npm ci`, `make check` (0 errors, 0 warnings) and `npm run build` (6 pages built).
+
+**Files changed**:
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+
+**Discoveries**: The site worktree had no `node_modules`, so `npm ci` had to run before `make check`.
+
+### 2026-10-05 — Task: Bring the user-flow knowledge entry into line with output entities
+
+**What was done**: The published-values passage in section "3. Query the Configuration" of the `architecture/ux-flow.md` knowledge entry (repo tier, store `xclconfig`) now shows `out, err := xcl.Find[types.Output](config, "output.web_database")` and `url := out.Value`, followed by a note that `config.Outputs()` returns every published value in one call, keyed by address. It was written through `spektacular knowledge write` and read back to confirm. Nothing else in the entry changed, including its tags.
+
+**Deviations**: None. The write relied on the user's approval of this wording recorded at plan time (option A), because the orchestrated run cannot ask again.
+
+**Files changed**:
+- `xclconfig: knowledge architecture/ux-flow.md`
+
+**Discoveries**: None.

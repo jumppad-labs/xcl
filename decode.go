@@ -13,9 +13,10 @@ import (
 // target must be a non-nil pointer to a struct. Each of its exported fields is
 // matched by its type alone; no tags are read and field names play no part:
 //
-//   - A []*T field, where T is a registered type, receives every entity of T,
-//     exactly as All returns them: in declaration order, disabled entities
-//     included, and as the configuration's own instances rather than copies.
+//   - A []*T field, where T is a registered type or a builtin such as
+//     types.Output, receives every entity of T, exactly as All returns them:
+//     in declaration order, disabled entities included, and as the
+//     configuration's own instances rather than copies.
 //     None declared gives an empty, non-nil slice.
 //   - A *T field, where T is a registered type, receives the one entity of T.
 //     None declared sets it to nil. More than one makes the call fail with the

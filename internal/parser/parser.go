@@ -876,7 +876,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 	if err == nil && rtMeta.Type == resources.TypeOutput && b.Body.Attributes["description"] != nil {
 		desc, diags := b.Body.Attributes["description"].Expr.Value(nil)
 		if !diags.HasErrors() {
-			rt.(*resources.Output).Description = desc.AsString()
+			rt.(*types.Output).Description = desc.AsString()
 		}
 	}
 
