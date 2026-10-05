@@ -31,17 +31,17 @@ Today a configuration can reach directly into a module's internals, so a module'
 -->
 ## Requirements
 
-- [ ] **Only outputs are reachable from outside a module**
+- [x] **Only outputs are reachable from outside a module**
   A reference from outside a module to anything inside it other than one of its outputs is rejected when the configuration is validated, with an error naming the reference.
-- [ ] **The boundary holds at every level of nesting**
+- [x] **The boundary holds at every level of nesting**
   A parent can reach only its direct child modules' outputs; anything deeper is reachable only if each module in between re-exports it as one of its own outputs.
-- [ ] **Outputs are found as entities**
+- [x] **Outputs are found as entities**
   Looking up, listing or decoding outputs returns the output entities themselves, with the published value available on the entity, rather than the bare value.
-- [ ] **All published values remain available together**
+- [x] **All published values remain available together**
   Developers can still get every published value in one call, keyed by address.
-- [ ] **Bundled examples follow the module boundary**
+- [x] **Bundled examples follow the module boundary**
   Every bundled example that uses modules or outputs reaches into modules only through their outputs and reads outputs as entities.
-- [ ] **Module boundary and outputs are documented**
+- [x] **Module boundary and outputs are documented**
   The library's documentation and the documentation site describe that only a module's outputs can be referenced from its parent, how to re-export a nested module's value, and how to read outputs as entities.
 
 <!--
@@ -69,17 +69,17 @@ Today a configuration can reach directly into a module's internals, so a module'
 -->
 ## Acceptance Criteria
 
-- [ ] **Reference to a module internal is rejected**
+- [x] **Reference to a module internal is rejected**
   Given a configuration that references an entity inside a module other than one of the module's outputs, validation fails with an error naming that reference; the same configuration referencing the module's output instead validates.
-- [ ] **Nested modules expose only through outputs**
+- [x] **Nested modules expose only through outputs**
   Given a root configuration using module A, which uses module B: a root reference to anything inside B, including B's outputs, fails validation; a root reference to an output of A that re-exports a value from B's output validates and resolves to that value.
-- [ ] **Looking up an output returns the entity**
+- [x] **Looking up an output returns the entity**
   Looking up an output by its address returns the output entity, whose value field holds the published value; listing outputs by type returns every declared output as entities.
-- [ ] **All published values in one call**
+- [x] **All published values in one call**
   Requesting all published values returns one entry per declared output, keyed by address, each holding that output's value.
-- [ ] **Examples run under the module boundary**
+- [x] **Examples run under the module boundary**
   Every bundled example that uses modules or outputs validates and runs successfully.
-- [ ] **Module and output docs updated**
+- [x] **Module and output docs updated**
   The library's documentation and the site each describe the output-only module boundary with a re-export example, and show reading an output as an entity.
 
 <!--

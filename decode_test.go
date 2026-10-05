@@ -8,6 +8,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
+	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,6 +16,11 @@ import (
 type databasesAndApps struct {
 	Databases []*registered.Database
 	Apps      []*registered.App
+}
+
+// publishedOutputs gathers every declared output as a collection
+type publishedOutputs struct {
+	Outputs []*types.Output
 }
 
 // renamedDatabases holds databases under a name that says nothing about them
@@ -204,6 +210,26 @@ func TestDecodeFollowsTheOppositeDeclarationOrder(t *testing.T) {
 	require.Len(t, target.Caches, 2)
 	require.Equal(t, "cache.second", target.Caches[0].Meta.ID)
 	require.Equal(t, "cache.first", target.Caches[1].Meta.ID)
+}
+
+// Outputs are entities of one Go type, so a collection field of them is filled
+// like any other, with every output the configuration declares at any depth.
+
+func TestDecodeFillsAnOutputsField(t *testing.T) {
+	c := setupOutputEntitiesConfig(t)
+
+	target := publishedOutputs{}
+
+	err := Decode(c, &target)
+	require.NoError(t, err)
+
+	require.Len(t, target.Outputs, 2)
+
+	require.Equal(t, "output.greeting", target.Outputs[0].Meta.ID)
+	require.Equal(t, "hello", target.Outputs[0].Value)
+
+	require.Equal(t, "module.inner.output.location", target.Outputs[1].Meta.ID)
+	require.Equal(t, "eu-west", target.Outputs[1].Value)
 }
 
 // A collection field holds exactly what All returns for its type: the same

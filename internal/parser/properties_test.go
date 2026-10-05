@@ -6,6 +6,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
+	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -183,7 +184,7 @@ func TestCheckPropertyPathAcceptsAnyPropertyBeneathAnOutput(t *testing.T) {
 	// the Output declaration. That value's shape is decided while the
 	// configuration is applied, so nothing beneath it can be judged now. This is
 	// the shape `module.consul_1.output.combined_map.name` takes.
-	missing := checkPropertyPath(reflect.TypeOf(resources.Output{}), "combined_map.name")
+	missing := checkPropertyPath(reflect.TypeOf(types.Output{}), "combined_map.name")
 
 	require.Equal(t, "", missing)
 }
@@ -192,7 +193,7 @@ func TestCheckPropertyPathAcceptsPropertyThatIsNotAFieldOfOutput(t *testing.T) {
 	// `nosuch` is not a field of the Output struct at all. It must still be
 	// accepted, because what is being named is the held value rather than the
 	// declaration.
-	missing := checkPropertyPath(reflect.TypeOf(resources.Output{}), "nosuch")
+	missing := checkPropertyPath(reflect.TypeOf(types.Output{}), "nosuch")
 
 	require.Equal(t, "", missing)
 }

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -354,4 +355,102 @@ func TestResolveReferenceDoesNotResolveFromAModuleThatDoesNotDeclareIt(t *testin
 	require.False(t, resolved.found)
 	require.Equal(t, "", resolved.key)
 	require.Nil(t, resolved.target)
+}
+
+func TestResolveReferenceResolvesAChildModuleOutputFromInsideAModule(t *testing.T) {
+	// module a re-exports its own child's output, written as module.b.output.value
+	// inside a. That names the entity keyed module.a.b.output.value, never the
+	// string-joined module.a.module.b.output.value
+	p := parseFixture(t, "../test_fixtures/config/module_reexport/main.xcl")
+
+	resolved := p.resolveReference("module.b.output.value", "a")
+
+	require.True(t, resolved.found)
+	require.Equal(t, "module.a.b.output.value", resolved.key)
+	require.Equal(t, "", resolved.attribute)
+	require.NotNil(t, resolved.target)
+}
+
+func TestResolveReferenceResolvesAChildModuleFromInsideAModule(t *testing.T) {
+	p := parseFixture(t, "../test_fixtures/config/module_reexport/main.xcl")
+
+	resolved := p.resolveReference("module.b", "a")
+
+	require.True(t, resolved.found)
+	require.Equal(t, "module.a.b", resolved.key)
+	require.NotNil(t, resolved.target)
+}
+
+func TestResolveReferenceStillResolvesUnqualifiedReferencesInsideAModule(t *testing.T) {
+	p := parseFixture(t, "../test_fixtures/config/module_reexport/main.xcl")
+
+	resolved := p.resolveReference("output.from_b", "a")
+
+	require.True(t, resolved.found)
+	require.Equal(t, "module.a.output.from_b", resolved.key)
+	require.Equal(t, "", resolved.attribute)
+	require.NotNil(t, resolved.target)
+}
+
+// crossesModuleBoundary judges a reference by its parsed address alone. The
+// addresses below are parsed with the parser's own address parser, which knows
+// the test plugin's container and network types.
+
+func parseAddress(t *testing.T, address string) *resources.FQRN {
+	t.Helper()
+
+	p, _ := setupParser(t)
+
+	fqrn, err := p.addressParser().Parse(address)
+	require.NoError(t, err)
+
+	return fqrn
+}
+
+func TestCrossesModuleBoundaryAllowsAResourceInTheSameScope(t *testing.T) {
+	fqrn := parseAddress(t, "resource.container.c")
+
+	require.False(t, crossesModuleBoundary(fqrn))
+}
+
+func TestCrossesModuleBoundaryAllowsAChildModuleOutput(t *testing.T) {
+	fqrn := parseAddress(t, "module.a.output.x")
+
+	require.False(t, crossesModuleBoundary(fqrn))
+}
+
+func TestCrossesModuleBoundaryAllowsAChildModuleOutputWithAnAttribute(t *testing.T) {
+	fqrn := parseAddress(t, "module.a.output.x.y")
+
+	require.False(t, crossesModuleBoundary(fqrn))
+}
+
+func TestCrossesModuleBoundaryAllowsTheChildModuleItself(t *testing.T) {
+	fqrn := parseAddress(t, "module.a")
+
+	require.False(t, crossesModuleBoundary(fqrn))
+}
+
+func TestCrossesModuleBoundaryRejectsAResourceInsideAChildModule(t *testing.T) {
+	fqrn := parseAddress(t, "module.a.resource.container.c")
+
+	require.True(t, crossesModuleBoundary(fqrn))
+}
+
+func TestCrossesModuleBoundaryRejectsAVariableInsideAChildModule(t *testing.T) {
+	fqrn := parseAddress(t, "module.a.variable.v")
+
+	require.True(t, crossesModuleBoundary(fqrn))
+}
+
+func TestCrossesModuleBoundaryRejectsAModuleNestedInAChildModule(t *testing.T) {
+	fqrn := parseAddress(t, "module.a.b")
+
+	require.True(t, crossesModuleBoundary(fqrn))
+}
+
+func TestCrossesModuleBoundaryRejectsAGrandchildModuleOutput(t *testing.T) {
+	fqrn := parseAddress(t, "module.a.b.output.x")
+
+	require.True(t, crossesModuleBoundary(fqrn))
 }

@@ -56,6 +56,39 @@ Cross-module references during interpolation (`module.consul_1.output.x`)
 are resolved via a `module` namespace built in
 [`internal/parser/context.go`](../internal/parser/context.go).
 
+### The module boundary
+
+A module's outputs are the only way to reach inside it from configuration.
+From its parent, a reference may name a direct child module's output
+(`module.a.output.x`) or the child module itself (`module.a`, typically in
+`depends_on`). A reference to a child's resources, variables or nested modules,
+or to anything in a grandchild (`module.a.b.output.x`), is rejected.
+
+The rule is enforced in stage 2 of validation (`validateReferences` in
+[`internal/parser/validate.go`](../internal/parser/validate.go)), before any
+walk, so both `Validate` and `Apply` refuse a crossing reference. It is judged
+on the reference as written by `crossesModuleBoundary` in
+[`internal/parser/references.go`](../internal/parser/references.go): the
+parsed address's module part is the path into child modules, relative to the
+scope the reference is written in, so it must be empty or a single child whose
+target is an `output`. User-written `depends_on` entries are links too, so they
+are held to the same rule. A crossing reference is reported once, naming the
+reference, and is not also reported as undefined.
+
+A deeper value is exposed by re-exporting it through each module in between.
+Inside module `a`, which uses module `b`:
+
+```hcl
+output "from_b" {
+  value = module.b.output.value
+}
+```
+
+and at the root, `module.a.output.from_b` reads it. A reference written inside
+a module resolves against that module's scope with
+`FQRN.AppendParentModule`, so `module.b.output.value` inside `a` names the
+entity keyed `module.a.b.output.value`.
+
 ## Scaffolding that exists but isn't wired in
 
 `ParserOptions` ([`internal/parser/parser.go:44`](../internal/parser/parser.go#L44))

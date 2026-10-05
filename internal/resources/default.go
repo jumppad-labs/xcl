@@ -6,7 +6,7 @@ import "github.com/jumppad-labs/xcl/types"
 func DefaultResources() types.RegisteredTypes {
 	return types.RegisteredTypes{
 		"variable": &Variable{},
-		"output":   &Output{},
+		"output":   &types.Output{},
 		"module":   &Module{},
 		"root":     &Root{},
 	}

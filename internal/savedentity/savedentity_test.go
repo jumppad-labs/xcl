@@ -228,7 +228,7 @@ func TestDecodeReturnsTypedBuiltin(t *testing.T) {
 	outputEntity, err := savedentity.Decode(reg, outputRecord)
 	require.NoError(t, err)
 
-	output, ok := outputEntity.(*resources.Output)
+	output, ok := outputEntity.(*types.Output)
 	require.True(t, ok)
 
 	require.Equal(t, "module.shared.output.location", output.Meta.ID)

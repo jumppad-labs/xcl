@@ -1,0 +1,11 @@
+# Names a resource inside the module in depends_on.
+
+module "m" {
+  source = "../module"
+}
+
+resource "network" "consumer" {
+  depends_on = ["module.m.resource.network.n"]
+
+  subnet = "10.30.0.0/16"
+}

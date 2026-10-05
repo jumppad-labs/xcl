@@ -57,13 +57,15 @@ ingress, err := xcl.FindOne[Ingress](config, "resource", "ingress")
 all, err := xcl.All[PostgreSQL](config)
 ```
 
-Values the configuration publishes are read the same way, and come back as the
-value rather than the declaration that produced it:
+Values the configuration publishes are read the same way. An output is an
+entity like any other, and its published value is on `.Value`:
 
 ```go
-url, err := xcl.Find[string](config, "output.web_database")
-published := config.Outputs() // all of them, keyed by address
+out, err := xcl.Find[types.Output](config, "output.web_database")
+url := out.Value // the published value
 ```
+
+`config.Outputs()` returns every published value in one call, keyed by address.
 
 Everything declared can be enumerated without naming a type, and an entity from
 that enumeration converts in one call:

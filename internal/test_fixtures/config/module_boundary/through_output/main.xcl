@@ -1,0 +1,9 @@
+# Reads the same value through the output the module publishes.
+
+module "m" {
+  source = "../module"
+}
+
+output "x" {
+  value = module.m.output.subnet
+}

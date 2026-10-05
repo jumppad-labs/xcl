@@ -434,23 +434,30 @@ slice empty and every pointer `nil`.
 
 #### Reading values a configuration publishes
 
-An `output` is read by its address like anything else, and comes back as the
-value itself rather than the declaration that produced it. Nothing needs to
-know how outputs are stored.
+An `output` is an entity like any other. Looking one up by its address returns
+a `types.Output`, and the value it publishes is on its `Value` field.
 
 ```go
 // output "web_database" { ... } at the root
-url, err := xcl.Find[string](c, "output.web_database")
+out, err := xcl.Find[types.Output](c, "output.web_database")
+url := out.Value // the published value
 
 // an output published by a module
-location, err := xcl.Find[string](c, "module.analytics.output.location")
+location, err := xcl.Find[types.Output](c, "module.analytics.output.location")
+fmt.Println(location.Value)
 
-// or all of them at once, keyed by address
+// every declared output, at any module depth, as entities
+outputs, err := xcl.FindByType[types.Output](c, "output")
+outputs, err = xcl.All[types.Output](c)
+
+// or every published value at once, keyed by address
 published := c.Outputs()
 ```
 
 An output needs its complete address, including the module it belongs to. A
-bare name is not an address and is not inferred.
+bare name is not an address and is not inferred. Asking for an output as any
+type other than `types.Output`, such as `xcl.Find[string]`, returns an error
+matching `ErrTypeMismatch`; read `.Value`, or use `c.Outputs()`.
 
 #### When a lookup cannot be answered
 
@@ -1171,6 +1178,52 @@ output "connection_string_map_1" {
   value = output.connection_string_map.connection1
 }
 ```
+
+### The module boundary
+
+A module's outputs are the only way to reach inside it. From its parent you can
+reference a module's outputs, `module.<name>.output.<name>`, and the module
+itself, as in `depends_on = ["module.mymodule_1"]`, but nothing else. A
+reference to a module's resources, variables or nested modules, or to anything
+inside a module nested in it, fails validation with an error naming the
+reference:
+
+```
+resource 'output.x' refers to 'module.a.resource.postgres.db.connection_string', which is inside module 'a'; only a module's outputs can be referenced from outside it
+```
+
+The boundary holds at every level of nesting: a parent reaches only its direct
+children's outputs. To expose a value from a module nested further down, each
+module in between re-exports it as one of its own outputs. Here module `a` uses
+module `b` and re-exports `b`'s output, so the root can read it:
+
+```javascript
+// b/b.xcl
+output "value" {
+  value = "from-b"
+}
+
+// a/a.xcl
+module "b" {
+  source = "./b"
+}
+
+output "from_b" {
+  value = module.b.output.value
+}
+
+// main.xcl
+module "a" {
+  source = "./a"
+}
+
+output "deep" {
+  value = module.a.output.from_b // module.a.b.output.value would be rejected
+}
+```
+
+The boundary applies to references written in configuration. Application code
+can still look up any entity inside a module by its full address with `Find`.
 
 ## Functions
 

@@ -167,22 +167,21 @@ func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, di
 	fmt.Fprintln(out, "## Ingress")
 	fmt.Fprintf(out, "  %s hostname=%s app_url=%q\n", ingress.Meta.ID, ingress.Hostname, ingress.AppURL)
 
-	// A value the configuration publishes is read by its address like anything
-	// else, and comes back as the value itself rather than the declaration
-	// that produced it. Nothing here needs to know how outputs are stored
-	webDatabase, err := xcl.Find[string](c, "output.web_database")
+	// An output is an entity like everything else: it is found by its address
+	// as a types.Output, and the value it publishes is on its Value field
+	webDatabase, err := xcl.Find[types.Output](c, "output.web_database")
 	if err != nil {
 		return nil, err
 	}
 
-	moduleLocation, err := xcl.Find[string](c, "module.analytics.output.location")
+	moduleLocation, err := xcl.Find[types.Output](c, "module.analytics.output.location")
 	if err != nil {
 		return nil, err
 	}
 
 	fmt.Fprintln(out, "## Published")
-	fmt.Fprintf(out, "  output.web_database=%q\n", *webDatabase)
-	fmt.Fprintf(out, "  module.analytics.output.location=%q\n", *moduleLocation)
+	fmt.Fprintf(out, "  output.web_database=%q\n", webDatabase.Value)
+	fmt.Fprintf(out, "  module.analytics.output.location=%q\n", moduleLocation.Value)
 
 	// or every published value at once, keyed by address
 	fmt.Fprintf(out, "  %d published in total\n", len(c.Outputs()))

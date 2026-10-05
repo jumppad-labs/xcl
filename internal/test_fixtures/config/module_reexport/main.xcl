@@ -1,0 +1,7 @@
+module "a" {
+  source = "./a"
+}
+
+output "deep" {
+  value = module.a.output.from_b
+}

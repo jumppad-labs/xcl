@@ -37,7 +37,8 @@ func (p *Parser) validate() []error {
 	}
 
 	// Stage 2: references. Everything a resource refers to must be defined
-	// somewhere in the configuration.
+	// somewhere in the configuration, and may reach into a module only through
+	// one of that module's outputs.
 	problems = append(problems, p.validateReferences()...)
 	if len(problems) > 0 {
 		return problems
@@ -92,8 +93,16 @@ func (p *Parser) validateProperties() []error {
 }
 
 // validateReferences reports every reference in the configuration that names
-// something defined nowhere. It reports all of them rather than the first, so
-// an author is not made to fix one and rerun to discover the next.
+// something defined nowhere, and every reference that crosses a module
+// boundary. It reports all of them rather than the first, so an author is not
+// made to fix one and rerun to discover the next.
+//
+// A module's outputs are the only way to reach inside it: a reference to
+// anything else inside a module, or to anything inside a module nested in it,
+// is a problem whether or not its target exists. The boundary is judged first,
+// so such a reference is reported once, as crossing the boundary, and never
+// also as undefined. User written depends_on entries are among the links, so
+// they are held to the same rule.
 //
 // Problems are reported against the resource that holds the reference. The
 // references themselves are collected without their source positions, so the
@@ -114,6 +123,18 @@ func (p *Parser) validateReferences() []error {
 		}
 
 		for _, link := range meta.Links {
+			fqrn, parseErr := p.addressParser().Parse(link)
+			if parseErr == nil && crossesModuleBoundary(fqrn) {
+				problems = append(problems, errors.NewParserError(
+					meta.File,
+					meta.Line,
+					meta.Column,
+					fmt.Sprintf("resource '%s' refers to '%s', which is inside module '%s'; only a module's outputs can be referenced from outside it", meta.ID, link, fqrn.Module),
+				))
+
+				continue
+			}
+
 			if p.resolveReference(link, meta.Module).found {
 				continue
 			}

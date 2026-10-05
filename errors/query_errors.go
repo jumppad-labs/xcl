@@ -33,7 +33,7 @@ var (
 
 	// ErrNotTypeable is returned when the segments given match entities of
 	// more than one Go type, so the result cannot be typed. Querying the
-	// resource kind alone does this, as does querying published values.
+	// resource kind alone does this.
 	ErrNotTypeable = errors.New("query spans more than one type")
 
 	// ErrNotRegistered is returned when a Go type has no registered name to

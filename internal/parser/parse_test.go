@@ -14,10 +14,9 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
-	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
-	hcl "github.com/jumppad-labs/xcl/internal/xcl"
+	"github.com/jumppad-labs/xcl/internal/xcl"
 	pluginmocks "github.com/jumppad-labs/xcl/plugins/mocks"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
@@ -178,14 +177,14 @@ func TestParseResolvesArrayReferences(t *testing.T) {
 	require.NoError(t, err)
 
 	// check variable has been interpolated
-	out := findResource[resources.Output](t, c.GetResources(), "output.ip_address_1")
+	out := findResource[types.Output](t, c.GetResources(), "output.ip_address_1")
 	require.Equal(t, "10.6.0.200", out.Value)
 
 	// check variable has been interpolated
-	out = findResource[resources.Output](t, c.GetResources(), "output.ip_address_2")
+	out = findResource[types.Output](t, c.GetResources(), "output.ip_address_2")
 	require.Equal(t, "10.7.0.201", out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.ip_addresses")
+	out = findResource[types.Output](t, c.GetResources(), "output.ip_addresses")
 	require.Equal(t, "10.6.0.200", out.Value.([]any)[0].(string))
 	require.Equal(t, "10.7.0.201", out.Value.([]any)[1].(string))
 	require.Equal(t, float64(12), out.Value.([]any)[2].(float64))
@@ -298,30 +297,30 @@ func TestResourceReferencesInExpressionsAreEvaluated(t *testing.T) {
 
 	_ = findResource[structs.Container](t, c.GetResources(), "resource.container.consul")
 
-	out := findResource[resources.Output](t, c.GetResources(), "output.splat")
+	out := findResource[types.Output](t, c.GetResources(), "output.splat")
 	require.Equal(t, "/cache", out.Value.([]any)[0])
 	require.Equal(t, "/cache2", out.Value.([]any)[1])
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.splat_with_null")
+	out = findResource[types.Output](t, c.GetResources(), "output.splat_with_null")
 	// Since created_network is not populated in the config, this should return an empty array
 	require.Equal(t, []any{}, out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.function")
+	out = findResource[types.Output](t, c.GetResources(), "output.function")
 	require.Equal(t, float64(2), out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.binary")
+	out = findResource[types.Output](t, c.GetResources(), "output.binary")
 	require.Equal(t, false, out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.condition")
+	out = findResource[types.Output](t, c.GetResources(), "output.condition")
 	require.Equal(t, "/cache", out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.template")
+	out = findResource[types.Output](t, c.GetResources(), "output.template")
 	require.Equal(t, "abc/2", out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.index")
+	out = findResource[types.Output](t, c.GetResources(), "output.index")
 	require.Equal(t, "images.volume.shipyard.run", out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.index_interpolated")
+	out = findResource[types.Output](t, c.GetResources(), "output.index_interpolated")
 	require.Equal(t, "root/images.volume.shipyard.run", out.Value)
 
 }
@@ -403,26 +402,26 @@ func TestParseModuleCreatesOutputs(t *testing.T) {
 
 	require.Len(t, c.GetResources(), 41)
 
-	out := findResource[resources.Output](t, c.GetResources(), "output.module1_container_resources_cpu")
+	out := findResource[types.Output](t, c.GetResources(), "output.module1_container_resources_cpu")
 
 	// check output value from module is equal to the module variable
 	// which is set as an interpolated value of the container base
 	require.Equal(t, float64(4096), out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.module2_container_resources_cpu")
+	out = findResource[types.Output](t, c.GetResources(), "output.module2_container_resources_cpu")
 
 	// check output value from module is equal to the module variable
 	// which is set as the variable for the config
 	require.Equal(t, float64(512), out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.module3_container_resources_cpu")
+	out = findResource[types.Output](t, c.GetResources(), "output.module3_container_resources_cpu")
 
 	// check the output variable is set to the default value for the module
 	require.Equal(t, float64(2048), out.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.module1_from_list_1")
+	out = findResource[types.Output](t, c.GetResources(), "output.module1_from_list_1")
 
-	out2 := findResource[resources.Output](t, c.GetResources(), "output.module1_from_list_2")
+	out2 := findResource[types.Output](t, c.GetResources(), "output.module1_from_list_2")
 
 	// check an element can be obtained from a list of values
 	// returned from a output
@@ -431,16 +430,16 @@ func TestParseModuleCreatesOutputs(t *testing.T) {
 
 	// check an element can be obtained from a map of values
 	// returned from a output
-	out = findResource[resources.Output](t, c.GetResources(), "output.module1_from_map_1")
+	out = findResource[types.Output](t, c.GetResources(), "output.module1_from_map_1")
 
-	out2 = findResource[resources.Output](t, c.GetResources(), "output.module1_from_map_2")
+	out2 = findResource[types.Output](t, c.GetResources(), "output.module1_from_map_2")
 
 	// check element can be obtained from a map of values
 	// returned in the output
 	require.Equal(t, "consul", out.Value)
 	require.Equal(t, float64(4096), out2.Value)
 
-	out = findResource[resources.Output](t, c.GetResources(), "output.object")
+	out = findResource[types.Output](t, c.GetResources(), "output.object")
 
 	// check element can be obtained from a map of values
 	// returned in the output

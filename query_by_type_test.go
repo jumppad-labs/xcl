@@ -10,6 +10,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
+	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -170,16 +171,21 @@ func TestFindByTypeRejectsTheResourceKindOnItsOwn(t *testing.T) {
 	require.Contains(t, notTypeable.Use, "subtype")
 }
 
-func TestFindByTypeRejectsPublishedValuesAndNamesTheCallThatReturnsThem(t *testing.T) {
-	c := setupFindConfig(t)
+func TestFindByTypeReturnsEveryOutputAsAnEntity(t *testing.T) {
+	c := setupOutputEntitiesConfig(t)
 
-	outputs, err := FindByType[resources.Output](c, "output")
-	require.ErrorIs(t, err, ErrNotTypeable)
-	require.Nil(t, outputs)
+	// the output kind is exactly one Go type, so it is typeable, and the query
+	// reaches into modules as every kind query does
+	outputs, err := FindByType[types.Output](c, "output")
+	require.NoError(t, err)
+	require.Len(t, outputs, 2)
 
-	var notTypeable *NotTypeableError
-	require.True(t, errors.As(err, &notTypeable))
-	require.Equal(t, "Outputs", notTypeable.Use)
+	// in the order the configuration declared them, the root before the module
+	require.Equal(t, "output.greeting", outputs[0].Meta.ID)
+	require.Equal(t, "hello", outputs[0].Value)
+
+	require.Equal(t, "module.inner.output.location", outputs[1].Meta.ID)
+	require.Equal(t, "eu-west", outputs[1].Value)
 }
 
 func TestFindByTypeRejectsAQueryWithNoSegments(t *testing.T) {

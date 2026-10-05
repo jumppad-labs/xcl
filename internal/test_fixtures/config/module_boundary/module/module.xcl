@@ -1,0 +1,15 @@
+# The module every module_boundary fixture instantiates as module "m". From
+# outside, only its output "subnet" may be referenced; the network and the
+# variable are internal to it.
+
+variable "v" {
+  default = "10.20.0.0/16"
+}
+
+resource "network" "n" {
+  subnet = variable.v
+}
+
+output "subnet" {
+  value = resource.network.n.subnet
+}

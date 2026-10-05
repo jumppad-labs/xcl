@@ -1,0 +1,7 @@
+module "b" {
+  source = "./b"
+}
+
+output "from_b" {
+  value = module.b.output.value
+}

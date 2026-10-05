@@ -19,7 +19,7 @@ func TestDefaultTypes(t *testing.T) {
 
 	require.Equal(t, reflect.TypeOf(dt["variable"]), reflect.TypeOf(&Variable{}))
 	require.Equal(t, reflect.TypeOf(dt["module"]), reflect.TypeOf(&Module{}))
-	require.Equal(t, reflect.TypeOf(dt["output"]), reflect.TypeOf(&Output{}))
+	require.Equal(t, reflect.TypeOf(dt["output"]), reflect.TypeOf(&types.Output{}))
 }
 
 func TestCreateResourceCreatesType(t *testing.T) {

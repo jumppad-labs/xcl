@@ -104,3 +104,50 @@ func TestChangelogRecordsDecode(t *testing.T) {
 	require.Contains(t, entry, "xcl.Decode(")
 	require.Contains(t, entry, "ErrInvalidDecodeTarget")
 }
+
+func TestReadmeDocumentsReadingOutputsAsEntities(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "#### Reading values a configuration publishes")
+	require.Contains(t, text, `xcl.Find[types.Output](c, "output.web_database")`)
+	require.Contains(t, text, "out.Value")
+	require.Contains(t, text, `xcl.FindByType[types.Output](c, "output")`)
+	require.Contains(t, text, "c.Outputs()")
+}
+
+func TestReadmeNoLongerReadsAnOutputAsAPlainValue(t *testing.T) {
+	text := readme(t)
+
+	require.NotContains(t, text, `xcl.Find[string](c, "output.`)
+	require.NotContains(t, text, `xcl.Find[string](c, "module.analytics.output.`)
+}
+
+func TestReadmeDocumentsTheModuleBoundary(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "### The module boundary")
+	require.Contains(t, text, "only a module's outputs can be referenced from outside it")
+	require.Contains(t, text, "value = module.b.output.value")
+	require.Contains(t, text, "value = module.a.output.from_b")
+}
+
+func TestModulesGuideDocumentsTheModuleBoundary(t *testing.T) {
+	data, err := os.ReadFile("docs/modules.md")
+	require.NoError(t, err)
+
+	guide := string(data)
+	require.Contains(t, guide, "### The module boundary")
+	require.Contains(t, guide, "A module's outputs are the only way to reach inside it")
+	require.Contains(t, guide, "value = module.b.output.value")
+}
+
+func TestChangelogRecordsTheModuleBoundaryAndOutputEntities(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	entry := string(data)
+	require.Contains(t, entry, "## 20261003153421-6ec0eab3-module-boundary-and-output-entities")
+	require.Contains(t, entry, "xcl.Find[types.Output](")
+	require.Contains(t, entry, "now fail validation")
+	require.Contains(t, entry, "ErrTypeMismatch")
+}

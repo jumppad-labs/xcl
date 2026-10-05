@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/plugins/registry"
@@ -221,41 +220,42 @@ func TestFindResourceResolvesANonNormalisedAddress(t *testing.T) {
 	require.Same(t, want, got)
 }
 
-// A value the configuration publishes is asked for by address like anything
-// else, and the answer is the value, not the declaration that produced it.
+// An output is an entity like any other: asked for by address, the answer is
+// the output itself, carrying the value it publishes, wherever it is declared.
+// The published value on its own is not what the address names, so asking for
+// it as a plain value is refused rather than quietly converted.
 
-func TestFindReturnsThePublishedValueRatherThanItsDeclaration(t *testing.T) {
-	c := setupFindConfig(t)
+func TestFindReturnsARootOutputAsAnEntity(t *testing.T) {
+	c := setupOutputEntitiesConfig(t)
 
-	location, err := Find[string](c, "module.shared.output.location")
+	greeting, err := Find[types.Output](c, "output.greeting")
+	require.NoError(t, err)
+	require.NotNil(t, greeting)
+
+	require.IsType(t, &types.Output{}, greeting)
+	require.Equal(t, "output.greeting", greeting.Meta.ID)
+	require.Equal(t, "hello", greeting.Value)
+}
+
+func TestFindReturnsAModuleOutputAsAnEntity(t *testing.T) {
+	c := setupOutputEntitiesConfig(t)
+
+	location, err := Find[types.Output](c, "module.inner.output.location")
 	require.NoError(t, err)
 	require.NotNil(t, location)
 
-	require.Equal(t, "eu-west", *location)
+	require.IsType(t, &types.Output{}, location)
+	require.Equal(t, "module.inner.output.location", location.Meta.ID)
+	require.Equal(t, "eu-west", location.Value)
 }
 
-func TestFindDoesNotReturnThePublishedValuesDeclaration(t *testing.T) {
-	c := setupFindConfig(t)
+func TestFindRefusesAnOutputAsAPlainValue(t *testing.T) {
+	c := setupOutputEntitiesConfig(t)
 
-	// the configuration holds the address as an output declaration
-	declaration, err := c.FindResource("module.shared.output.location")
-	require.NoError(t, err)
-	require.IsType(t, &resources.Output{}, declaration)
-
-	// asking for that declaration by address does not yield it, because the
-	// address names the published value
-	output, err := Find[resources.Output](c, "module.shared.output.location")
+	greeting, err := Find[string](c, "output.greeting")
 	require.Error(t, err)
-	require.Nil(t, output)
-}
-
-func TestFindResolvesAPublishedValueDeclaredInsideAModule(t *testing.T) {
-	c := setupFindConfig(t)
-
-	location, err := Find[string](c, "module.shared.output.location")
-	require.NoError(t, err)
-	require.NotNil(t, location)
-	require.Equal(t, "eu-west", *location)
+	require.True(t, errors.Is(err, ErrTypeMismatch))
+	require.Nil(t, greeting)
 }
 
 func TestFindRejectsThePublishedValuesBareName(t *testing.T) {

@@ -1,0 +1,11 @@
+# Depends on the child module as a whole.
+
+module "m" {
+  source = "../module"
+}
+
+resource "network" "consumer" {
+  depends_on = ["module.m"]
+
+  subnet = "10.30.0.0/16"
+}

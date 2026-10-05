@@ -217,16 +217,15 @@ func (c *Config) ResourceCount() int {
 
 // Outputs returns every value the configuration publishes, keyed by address.
 //
-// There is one entry per published declaration, and each value is the resolved
-// value rather than the declaration that produced it, exactly as Find returns
-// it for the same address. It is the call FindByType names when asked for
-// published values, which it cannot type because they span whatever the
-// configuration publishes.
+// There is one entry per declared output, at any module depth, and each value
+// is the published value, the same value as
+// Find[types.Output](c, address).Value. Use Find, FindByType or All with
+// types.Output to work with the output entities themselves.
 func (c *Config) Outputs() map[string]any {
 	published := map[string]any{}
 
 	for _, e := range c.Entities() {
-		output, ok := e.(*resources.Output)
+		output, ok := e.(*types.Output)
 		if !ok {
 			continue
 		}

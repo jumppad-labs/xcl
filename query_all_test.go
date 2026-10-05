@@ -222,9 +222,25 @@ func TestAsConvertsAnEntityFromEntitiesToWhatFindReturns(t *testing.T) {
 	require.Equal(t, 5432, converted.Port)
 }
 
-// Published values span whatever the configuration publishes, so they are
-// never typeable as a collection. One call returns them all, keyed by address
-// and holding the resolved value rather than the declaration.
+// An output is an entity of one Go type, types.Output, so it is enumerated and
+// typed like any other entity, at any module depth, carrying the value it
+// publishes. Outputs is the shortcut for the values alone: one entry per
+// declared output, keyed by address and holding the resolved value rather than
+// the declaration.
+
+func TestAllReturnsEveryOutputAsAnEntity(t *testing.T) {
+	c := setupOutputEntitiesConfig(t)
+
+	outputs, err := All[types.Output](c)
+	require.NoError(t, err)
+	require.Len(t, outputs, 2)
+
+	require.Equal(t, "output.greeting", outputs[0].Meta.ID)
+	require.Equal(t, "hello", outputs[0].Value)
+
+	require.Equal(t, "module.inner.output.location", outputs[1].Meta.ID)
+	require.Equal(t, "eu-west", outputs[1].Value)
+}
 
 func TestOutputsReturnsEveryPublishedValueKeyedByAddress(t *testing.T) {
 	c := setupFindConfig(t)
@@ -237,18 +253,33 @@ func TestOutputsReturnsEveryPublishedValueKeyedByAddress(t *testing.T) {
 	require.Equal(t, "eu-west", value)
 }
 
+func TestOutputsHasOneEntryPerDeclaredOutput(t *testing.T) {
+	c := setupOutputEntitiesConfig(t)
+
+	published := c.Outputs()
+	require.Len(t, published, 2)
+
+	greeting, ok := published["output.greeting"]
+	require.True(t, ok)
+	require.Equal(t, "hello", greeting)
+
+	location, ok := published["module.inner.output.location"]
+	require.True(t, ok)
+	require.Equal(t, "eu-west", location)
+}
+
 func TestOutputsReturnsTheResolvedValueRatherThanItsDeclaration(t *testing.T) {
 	c := setupFindConfig(t)
 
 	published := c.Outputs()
 
-	_, isDeclaration := published["module.shared.output.location"].(*resources.Output)
+	_, isDeclaration := published["module.shared.output.location"].(*types.Output)
 	require.False(t, isDeclaration)
 
-	// the same value the address lookup gives for that address
-	location, err := Find[string](c, "module.shared.output.location")
+	// the same value the output entity at that address publishes
+	location, err := Find[types.Output](c, "module.shared.output.location")
 	require.NoError(t, err)
-	require.Equal(t, *location, published["module.shared.output.location"])
+	require.Equal(t, location.Value, published["module.shared.output.location"])
 }
 
 // The enumeration and the count were renamed, because they never counted only
