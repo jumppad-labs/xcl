@@ -1,0 +1,13 @@
+# A sensitive value passed to a module through its variables.
+
+resource "secret" "literal" {
+  password = "from-literal"
+}
+
+module "child" {
+  source = "./mod"
+
+  variables = {
+    pw = resource.secret.literal.password
+  }
+}

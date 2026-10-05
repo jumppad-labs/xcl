@@ -28,6 +28,11 @@ func ImpliedType(gv interface{}) (cty.Type, error) {
 }
 
 func impliedType(rt reflect.Type, path cty.Path) (cty.Type, error) {
+	// A registered wrapper type converts as its inner type.
+	if _, inner, ok := wrapperFor(rt); ok {
+		return impliedType(inner, path)
+	}
+
 	switch rt.Kind() {
 
 	case reflect.Ptr:

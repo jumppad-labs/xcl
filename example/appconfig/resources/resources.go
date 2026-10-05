@@ -92,7 +92,10 @@ type Database struct {
 	Port     int    `xcl:"port" json:"port"`
 	Name     string `xcl:"name" json:"name"`
 	Username string `xcl:"username" json:"username"`
-	Password string `xcl:"password" json:"password"`
+	// Password is sensitive: printing, logging or marshalling it shows
+	// "(sensitive)", and the program reads the real value with Reveal only
+	// where it is used
+	Password types.Sensitive[string] `xcl:"password" json:"password"`
 
 	Pool *Pool `xcl:"pool,block" json:"pool,omitempty"`
 

@@ -370,3 +370,35 @@ func TestConfigErrorStringIsUnchangedByAParserErrorCarryingACause(t *testing.T) 
 
 	require.Equal(t, plain.Error(), wrapping.Error())
 }
+
+func TestTypeMismatchErrorMessageWithoutFieldIsUnchanged(t *testing.T) {
+	err := &TypeMismatchError{
+		Address: "resource.container.web",
+		Want:    reflect.TypeOf(queryErrorFixture{}),
+		Got:     "resources.Network",
+	}
+
+	require.Equal(t, `entity "resource.container.web" is resources.Network, not errors.queryErrorFixture`, err.Error())
+}
+
+func TestTypeMismatchErrorMessageWithFieldNamesTheSensitiveField(t *testing.T) {
+	err := &TypeMismatchError{
+		Address: "resource.credential.db",
+		Want:    reflect.TypeOf(queryErrorFixture{}),
+		Got:     "anonymous",
+		Field:   "login.password",
+	}
+
+	require.Equal(t, `entity "resource.credential.db" field "login.password" is sensitive, errors.queryErrorFixture declares it as a plain value`, err.Error())
+}
+
+func TestTypeMismatchErrorWithFieldStillMatchesErrTypeMismatch(t *testing.T) {
+	err := &TypeMismatchError{
+		Address: "resource.credential.db",
+		Want:    reflect.TypeOf(queryErrorFixture{}),
+		Got:     "anonymous",
+		Field:   "password",
+	}
+
+	require.ErrorIs(t, err, ErrTypeMismatch)
+}

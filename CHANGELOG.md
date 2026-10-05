@@ -1,5 +1,21 @@
 # Changelog
 
+## 20261003134528-327e0657-references-and-secrets
+
+A field can be declared sensitive, for application types and plugin types alike, by giving it the type `types.Sensitive[T]`, as in `Password types.Sensitive[string]`. Configuration sets it exactly as before. xcl shows a sensitive value only as the fixed marker `(sensitive)` in its logs, events, errors, configuration text and printed resources, and so do the application's own `fmt`, `log/slog`, `encoding/json` and template output, because the type formats and marshals itself as the marker. `.Reveal()` is the only way to the real value; application code calls it where the value is used, and `types.NewSensitive(value)` builds one, for example in tests. State keeps real values, so a reloaded configuration reads them back unchanged, and plugins receive and return the real value.
+
+Sensitivity follows the value. A value referenced from a sensitive field, interpolated into a string, passed through a function, passed into a module input or published by an output is itself sensitive. Assigning such a value to a field that is not declared sensitive fails validation with an error naming the field, so `Validate` and `Apply` refuse the configuration before anything is created. An output holds exactly its sensitive parts as `types.Sensitive` values, recorded in the new `types.Output.SensitivePaths` so they are wrapped again after a reload. Converting or looking up an entity into a Go type whose matching field is plain fails with `xcl.ErrTypeMismatch`, and the `*xcl.TypeMismatchError` detail names the field in its new `Field` member; there is no automatic unwrap. A function that fails on a sensitive argument shows the marker in place of the value in its error.
+
+Configuration text from `EncodeEntity` and `EncodeSavedEntity` writes each sensitive value as `"(sensitive)"`; `xcl.RevealSensitive()` writes the real value. The resource printer shows the marker in every format; `logger.WithRevealSensitive(true)` shows real values. A value read back from event data has no real value and always shows the marker.
+
+Plugin types may use `types.Sensitive[string]`, `[int]`, `[int64]`, `[float64]`, `[bool]`, `[[]string]` and `[map[string]string]`; a plugin type using any other instantiation fails to load with an error naming the type and field. The plugin developer guide explains that a value, once revealed, is no longer protected and must not be logged or emitted. The application-config and plugin examples declare their database passwords sensitive and print no secret.
+
+**Breaking:**
+
+- `StateStore.Save` receives each entity as a `json.RawMessage` holding its record with real sensitive values, not the typed entity. A store that persisted with `json.Marshal` keeps working; a store that inspected the typed entities must decode the raw records instead. Code that saves state itself must encode the same way, or a sensitive value is stored as the marker.
+- Event data, at both `EventDataRaw` and `EventDataProcessed`, shows sensitive values as `(sensitive)`, so processed event data is no longer byte-identical to state for entities with sensitive fields. `EncodeSavedEntity` still reads it.
+- An external plugin that adds a `types.Sensitive` field must be rebuilt against this version so its schema type names match the host's.
+
 ## 20261003153421-6ec0eab3-module-boundary-and-output-entities
 
 A module's outputs are now the only way to reach inside it from configuration, at every level of nesting. From its parent, a configuration can reference a module's outputs, `module.<name>.output.<name>`, and the module itself, as in `depends_on = ["module.<name>"]`. A reference to a module's resources, variables or nested modules, or to anything inside a module nested in it, fails validation with an error naming the reference, and both `Validate` and `Apply` refuse it before anything is created. A module can now re-export a value from a module it uses, `output "from_b" { value = module.b.output.value }`, which failed validation before, so a deeply nested value is reachable when each module in between re-exports it.
@@ -27,7 +43,7 @@ An entity can be turned back into configuration text in xcl's own syntax. `xcl.E
 
 The text shows what a person wrote. xcl's own bookkeeping is left out, at every depth, including inside an attribute whose value is a whole object, and `depends_on` is not written at all, because by the time a configuration is parsed it holds the references xcl resolved as well as anything the author wrote and the two cannot be told apart. Values a provider filled in are left out too; `xcl.IncludeComputed()` writes them and marks each one with a comment saying the provider set it.
 
-**This text is for reading, not for reprocessing.** References come out as the literal values they resolved to, the original comments and layout are not kept, and output including provider-filled values does not validate, because xcl refuses a configuration that sets them. Values are shown as they are held, so a password or other secret is shown too (tracked in jumppad-labs/xcl#1).
+**This text is for reading, not for reprocessing.** References come out as the literal values they resolved to, the original comments and layout are not kept, and output including provider-filled values does not validate, because xcl refuses a configuration that sets them. Values are written as they are held; a field declared `types.Sensitive` is written as `"(sensitive)"` since `20261003134528-327e0657-references-and-secrets` (tracked in jumppad-labs/xcl#1).
 
 Three errors say why a conversion failed, each matched with `errors.Is` and carrying a detail recovered with `errors.As`: `xcl.ErrUnregisteredType` (`*xcl.UnregisteredTypeError` names the type), `xcl.ErrInvalidSavedData` (`*xcl.InvalidSavedDataError`) and `xcl.ErrNotEncodable` (`*xcl.NotEncodableError`), which is what a `variable`, `output` or `module` returns, since those are never written as configuration. A failure returns no text.
 

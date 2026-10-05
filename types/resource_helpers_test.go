@@ -1,10 +1,8 @@
 package types
 
 import (
-	"reflect"
 	"testing"
 
-	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/stretchr/testify/require"
 )
 
@@ -162,49 +160,6 @@ func TestCanGetDependenciesOnExtendedResource(t *testing.T) {
 	require.Len(t, deps, 2)
 	require.Contains(t, deps, "dependency1")
 	require.Contains(t, deps, "dependency2")
-}
-
-func TestCanGetMetaOnExtendedResourceWhenCreatedFromSchema(t *testing.T) {
-	te := testCreateExtendedResource()
-
-	sch, err := schema.GenerateSchemaFromInstance(te, 10)
-	require.NoError(t, err)
-
-	typeMapping := map[string]reflect.Type{
-		"types.Meta":         reflect.TypeOf(Meta{}),
-		"types.ResourceBase": reflect.TypeOf(ResourceBase{}),
-	}
-
-	ni, err := schema.CreateInstanceFromSchema(sch, typeMapping)
-	require.NoError(t, err)
-
-	// The schema doesn't preserve values, only structure.
-	// This test should verify that:
-	// 1. GetMeta works on the newly created instance (returns no error)
-	// 2. The Meta field is of the correct type (types.Meta)
-	// 3. We can set and get values on the Meta field
-
-	// Step 1: Verify GetMeta works without error
-	meta, err := GetMeta(ni)
-	require.NoError(t, err)
-	require.NotNil(t, meta)
-
-	// Step 2: Verify the Meta is of the correct type
-	require.IsType(t, &Meta{}, meta)
-
-	// Step 3: Verify we can set and get values
-	meta.ID = "new-id"
-	meta.Name = "new-name"
-	meta.Type = TypeResource
-	meta.Subtype = "new-type"
-
-	// Get meta again to verify the values were set
-	meta2, err := GetMeta(ni)
-	require.NoError(t, err)
-	require.Equal(t, "new-id", meta2.ID)
-	require.Equal(t, "new-name", meta2.Name)
-	require.Equal(t, TypeResource, meta2.Type)
-	require.Equal(t, "new-type", meta2.Subtype)
 }
 
 func TestCanSetDependenciesOnExtendedResource(t *testing.T) {

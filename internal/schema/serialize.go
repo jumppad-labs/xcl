@@ -22,6 +22,12 @@ func GenerateSchemaFromInstance(v any, depth int) ([]byte, error) {
 
 func serializeAttribute(v reflect.Value, currentDepth, maxDepth int) (*Attribute, error) {
 
+	// a sensitive value is written by its type name alone; the host rebuilds
+	// it from KnownTypes, so its unexported value is never described
+	if isSensitiveType(v.Type()) {
+		return &Attribute{Type: v.Type().String()}, nil
+	}
+
 	switch v.Kind() {
 	case reflect.Struct:
 		if currentDepth == maxDepth {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -579,6 +580,97 @@ func getResourceDependencies(rp ResourceProvider, addresses *resources.AddressPa
 }
 
 // convertCtyToGo recursively converts a cty.Value to a Go value
+// convertOutputValue converts an output's evaluated value to the Go value
+// applications read. Exactly the parts marked sensitive become Sensitive
+// values, and their paths are returned so state can wrap them again on
+// reload. An empty path means the whole value is sensitive.
+func convertOutputValue(val cty.Value) (any, [][]string) {
+	unmarked, pathMarks := val.UnmarkDeepWithPaths()
+
+	paths := [][]string{}
+	for _, pathMark := range pathMarks {
+		if _, sensitive := pathMark.Marks[types.SensitiveMark]; !sensitive {
+			continue
+		}
+
+		path, ok := goValuePath(pathMark.Path)
+		if !ok {
+			continue
+		}
+
+		paths = append(paths, path)
+	}
+
+	// a part inside one that is already sensitive is protected by it, so
+	// only the outermost sensitive parts are recorded
+	sort.Slice(paths, func(i, j int) bool { return len(paths[i]) < len(paths[j]) })
+	outermost := [][]string{}
+	for _, path := range paths {
+		covered := false
+		for _, kept := range outermost {
+			if hasPathPrefix(path, kept) {
+				covered = true
+				break
+			}
+		}
+
+		if !covered {
+			outermost = append(outermost, path)
+		}
+	}
+
+	if len(outermost) == 0 {
+		return convertCtyToGo(unmarked), nil
+	}
+
+	output := types.Output{Value: convertCtyToGo(unmarked), SensitivePaths: outermost}
+	output.WrapSensitivePaths()
+
+	return output.Value, outermost
+}
+
+// goValuePath renders a cty path as the keys and indices of the Go value
+// convertCtyToGo builds, indices as decimal strings.
+func goValuePath(path cty.Path) ([]string, bool) {
+	rendered := []string{}
+	for _, step := range path {
+		switch step := step.(type) {
+		case cty.GetAttrStep:
+			rendered = append(rendered, step.Name)
+
+		case cty.IndexStep:
+			switch step.Key.Type() {
+			case cty.String:
+				rendered = append(rendered, step.Key.AsString())
+			case cty.Number:
+				index, _ := step.Key.AsBigFloat().Int64()
+				rendered = append(rendered, strconv.FormatInt(index, 10))
+			default:
+				return nil, false
+			}
+
+		default:
+			return nil, false
+		}
+	}
+
+	return rendered, true
+}
+
+func hasPathPrefix(path, prefix []string) bool {
+	if len(prefix) > len(path) {
+		return false
+	}
+
+	for i := range prefix {
+		if path[i] != prefix[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
 func convertCtyToGo(val cty.Value) any {
 	if val.IsNull() {
 		return nil

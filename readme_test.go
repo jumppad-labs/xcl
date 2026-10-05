@@ -151,3 +151,80 @@ func TestChangelogRecordsTheModuleBoundaryAndOutputEntities(t *testing.T) {
 	require.Contains(t, entry, "now fail validation")
 	require.Contains(t, entry, "ErrTypeMismatch")
 }
+
+func TestReadmeDocumentsSensitiveValues(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "## Sensitive values")
+	require.Contains(t, text, "types.Sensitive[string]")
+	require.Contains(t, text, "types.NewSensitive(")
+}
+
+func TestReadmeDocumentsRevealingASensitiveValue(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, ".Reveal()")
+}
+
+func TestReadmeDocumentsTheSensitiveToPlainValidationError(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "is not declared sensitive and cannot be")
+}
+
+func TestReadmeDocumentsTheSensitiveToPlainTypeError(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "xcl.ErrTypeMismatch")
+	require.Contains(t, text, "is sensitive,")
+}
+
+func TestReadmeDocumentsTheMarkerInTheApplicationsOwnOutput(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "### Your own JSON and templates")
+	require.Contains(t, text, `"password":"(sensitive)"`)
+}
+
+func TestReadmeDocumentsTheRevealSensitiveOption(t *testing.T) {
+	text := readme(t)
+
+	require.Contains(t, text, "xcl.RevealSensitive()")
+	require.Contains(t, text, "logger.WithRevealSensitive(true)")
+}
+
+func TestReadmeNoLongerSaysSecretsAreShown(t *testing.T) {
+	text := readme(t)
+
+	require.NotContains(t, text, "anything secret is shown too")
+}
+
+func TestPluginGuideWarnsThatRevealedValuesAreUnprotected(t *testing.T) {
+	data, err := os.ReadFile("docs/plugin-developer-guide.md")
+	require.NoError(t, err)
+
+	guide := string(data)
+	require.Contains(t, guide, "## Sensitive fields")
+	require.Contains(t, guide, "it is no longer\nprotected and must not be logged or otherwise emitted")
+}
+
+func TestChangelogRecordsSensitiveValues(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	require.Contains(t, string(data), "## 20261003134528-327e0657-references-and-secrets")
+}
+
+func TestChangelogListsTheStateStoreBreakingChange(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	require.Contains(t, string(data), "`StateStore.Save` receives each entity as a `json.RawMessage`")
+}
+
+func TestChangelogNoLongerSaysSecretsAreShown(t *testing.T) {
+	data, err := os.ReadFile("CHANGELOG.md")
+	require.NoError(t, err)
+
+	require.NotContains(t, string(data), "so a password or other secret is shown too")
+}

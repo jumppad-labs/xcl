@@ -8,6 +8,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/parser"
+	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/jumppad-labs/xcl/types"
@@ -272,13 +273,17 @@ func TestApplySavesStateWhenProviderFails(t *testing.T) {
 
 	ss.AssertCalled(t, "Save", mock.Anything)
 
-	var saved []any
+	var savedRecords []any
 	for _, call := range ss.Calls {
 		if call.Method == "Save" {
-			saved = call.Arguments.Get(0).([]any)
+			savedRecords = call.Arguments.Get(0).([]any)
 		}
 	}
-	require.NotNil(t, saved)
+	require.NotNil(t, savedRecords)
+
+	// a store is handed each entity's raw JSON record
+	saved, err := savedentity.DecodeAll(c.pluginRegistry, savedRecords)
+	require.NoError(t, err)
 
 	consul, err := entityByID(saved, "resource.container.consul")
 	require.NoError(t, err)

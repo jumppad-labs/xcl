@@ -1,0 +1,8 @@
+# One person with a sensitive token, for following the token through apply
+# and state.
+
+resource "person" "token_person" {
+  first_name = "Token"
+  last_name  = "Holder"
+  token      = "tok-s3cret"
+}

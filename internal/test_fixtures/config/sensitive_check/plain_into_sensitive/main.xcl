@@ -1,0 +1,12 @@
+resource "secret" "a" {
+  username = "admin"
+  password = "pw"
+}
+
+resource "secret_consumer" "literal" {
+  password = "plain-literal"
+}
+
+resource "secret_consumer" "reference" {
+  password = resource.secret.a.username
+}

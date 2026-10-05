@@ -8,7 +8,7 @@ resource "postgres" "analytics" {
   port     = 5432
   db_name  = "analytics"
   username = variable.db_username
-  password = "analytics"
+  password = "pg-an4lytics-example"
 }
 
 output "location" {

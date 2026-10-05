@@ -84,6 +84,17 @@ func asType(entity any, want reflect.Type) (any, error) {
 		return nil, err
 	}
 
+	// a sensitive value is never copied into a plain field, there is no way
+	// to unwrap one automatically
+	if field, blocked := sensitiveFieldBlocked(reflect.TypeOf(entity), want); blocked {
+		return nil, &xclerrors.TypeMismatchError{
+			Address: entityAddress(entity),
+			Want:    want,
+			Got:     describeType(entity),
+			Field:   field,
+		}
+	}
+
 	typed := reflect.New(want).Interface()
 	if err := schema.UnmarshalUntyped(entity, typed); err != nil {
 		// the copy is the last word on whether the entity can be a T, so a

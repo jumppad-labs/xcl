@@ -1,0 +1,11 @@
+# The secret is assigned to a plain field; validation must reject it without
+# revealing it.
+
+resource "secret" "a" {
+  username = "admin"
+  password = "s3cr3t-leak-check-7f1d"
+}
+
+resource "secret_consumer" "c" {
+  note = resource.secret.a.password
+}

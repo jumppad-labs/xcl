@@ -1,0 +1,10 @@
+# An output whose whole value is sensitive.
+
+resource "secret" "a" {
+  username = "admin"
+  password = "hunter2"
+}
+
+output "x" {
+  value = resource.secret.a.password
+}

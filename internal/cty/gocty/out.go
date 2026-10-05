@@ -56,6 +56,17 @@ func fromCtyValue(val cty.Value, target reflect.Value, path cty.Path) error {
 		return nil
 	}
 
+	// A registered wrapper type takes the unmarked value, marked or not.
+	if wrapper, inner, ok := wrapperFor(deepTarget.Type()); ok {
+		return fromCtyWrapper(wrapper, inner, val, deepTarget, path)
+	}
+
+	// Any other target cannot take a marked value: report it with its path
+	// rather than panicking when the value is read.
+	if val.IsMarked() {
+		return path.NewErrorf("value is sensitive and cannot be assigned to a field not declared sensitive")
+	}
+
 	// Lists and maps can be nil without indirection, but everything else
 	// requires a pointer and we set it immediately to nil.
 	// We also make an exception for capsule types because we want to handle

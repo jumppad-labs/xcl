@@ -303,6 +303,10 @@ active operation (see `Activate` above); with neither, they are dropped.
 
 ### Across the process boundary
 
+Detail values cross the process boundary as their text, so a
+`types.Sensitive` detail crosses as `(sensitive)` and the real value never
+leaves the plugin through a log message.
+
 An external plugin's messages cross gRPC through the host callback service
 ([`plugins/grpc_host_callback.go`](../plugins/grpc_host_callback.go)):
 

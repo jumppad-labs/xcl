@@ -1,0 +1,10 @@
+# A function called with a sensitive value fails; the error must not reveal it.
+
+resource "secret" "a" {
+  username = "admin"
+  password = "s3cr3t-leak-path"
+}
+
+resource "secret_consumer" "b" {
+  password = file(resource.secret.a.password)
+}

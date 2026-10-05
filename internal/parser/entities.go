@@ -1,10 +1,10 @@
 package parser
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 
+	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -86,7 +86,7 @@ func (s *State) Bytes() ([]byte, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return json.MarshalIndent(s.resources, "", "  ")
+	return wire.MarshalIndent(s.resources, "", "  ")
 }
 
 // addResource is the internal unlocked version

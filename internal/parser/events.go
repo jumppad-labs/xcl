@@ -1,11 +1,14 @@
 package parser
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"reflect"
 	"time"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -34,6 +37,11 @@ func emitting(options *ParserOptions) bool {
 // pre is the resource as it was before the provider was called, where the
 // caller already had to serialize it, and r is the resource itself. At
 // DataNone nothing is serialized at all, so the default costs no work.
+//
+// Event data is shown to whoever receives events, so it is always encoded
+// with encoding/json and every sensitive value shows types.SensitiveMarker.
+// pre holds real values, since it is what a provider receives, so it is
+// never passed on as it is when it holds a sensitive value.
 func eventData(options *ParserOptions, phase string, pre []byte, r any) []byte {
 	if options == nil {
 		return nil
@@ -41,15 +49,14 @@ func eventData(options *ParserOptions, phase string, pre []byte, r any) []byte {
 
 	marshal := func() []byte {
 		if r == nil {
-			return pre
+			return nil
 		}
 
 		data, err := json.Marshal(r)
 		if err != nil {
-			// the resource has already been serialized once to reach a
-			// provider, so this is not a failure worth stopping an operation
-			// for. The event carries what there is
-			return pre
+			// the event carries nothing rather than what reached a
+			// provider, which holds real sensitive values
+			return nil
 		}
 
 		return data
@@ -58,7 +65,7 @@ func eventData(options *ParserOptions, phase string, pre []byte, r any) []byte {
 	switch options.EventData {
 	case events.DataRaw:
 		if pre != nil {
-			return pre
+			return redactedSnapshot(pre, r)
 		}
 
 		// a type handled without a provider was never serialized, so the raw
@@ -73,13 +80,50 @@ func eventData(options *ParserOptions, phase string, pre []byte, r any) []byte {
 		}
 
 		if pre != nil {
-			return pre
+			return redactedSnapshot(pre, r)
 		}
 
 		return marshal()
 	}
 
 	return nil
+}
+
+// redactedSnapshot returns the pre-call snapshot pre as event data. pre was
+// written with real sensitive values, so it is read back into a value of r's
+// type and encoded again with encoding/json, which shows each sensitive value
+// as the marker. A snapshot that holds no sensitive value is returned as it
+// is, so event data for such an entity is unchanged.
+func redactedSnapshot(pre []byte, r any) []byte {
+	if r == nil {
+		return nil
+	}
+
+	resourceType := reflect.TypeOf(r)
+	if resourceType.Kind() != reflect.Pointer {
+		return nil
+	}
+
+	snapshot := reflect.New(resourceType.Elem())
+	if err := json.Unmarshal(pre, snapshot.Interface()); err != nil {
+		return nil
+	}
+
+	redacted, err := json.Marshal(snapshot.Interface())
+	if err != nil {
+		return nil
+	}
+
+	revealed, err := wire.Marshal(snapshot.Interface())
+	if err != nil {
+		return nil
+	}
+
+	if bytes.Equal(redacted, revealed) {
+		return pre
+	}
+
+	return redacted
 }
 
 // lifecycleEvent builds an event for a step of a resource's lifecycle, with

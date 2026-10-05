@@ -1,0 +1,8 @@
+resource "secret" "inner" {
+  username = "admin"
+  password = "hunter2"
+}
+
+output "pw" {
+  value = resource.secret.inner.password
+}

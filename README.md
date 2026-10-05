@@ -721,8 +721,9 @@ resource "postgres" "main" {
 **This text is for reading, not for reprocessing.** References come out as the
 literal values they resolved to, comments and layout from the original file are
 not kept, and output including provider-filled values does not validate, since
-xcl refuses a configuration that sets them. Values are shown as they are held,
-so anything secret is shown too.
+xcl refuses a configuration that sets them. A sensitive value is written as
+`"(sensitive)"`; see [Sensitive values](#sensitive-values) for showing the
+real value.
 
 **When it fails** no text is returned, and the error says why:
 
@@ -737,6 +738,105 @@ if errors.Is(err, xcl.ErrUnregisteredType) {
 	// register the type or its plugin
 }
 ```
+
+## Sensitive values
+
+Passwords, tokens and other secrets are declared sensitive in the Go type that
+holds them. xcl then shows them only as the fixed marker `(sensitive)` in its
+logs, events, errors, configuration text and printed resources, and in your own
+`fmt`, `log/slog` and `encoding/json` output. State keeps the real value, and
+your code reaches it only by asking for it.
+
+### Declaring a sensitive field
+
+Give the field the type `types.Sensitive[T]`. Configuration sets it exactly as
+it would set a plain field:
+
+```go
+type Postgres struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Username string                  `xcl:"username" json:"username"`
+	Password types.Sensitive[string] `xcl:"password" json:"password"`
+}
+```
+
+```hcl
+resource "postgres" "main" {
+  username = "admin"
+  password = env("DB_PASSWORD")
+}
+```
+
+The same declaration works on a plugin's types. In tests, build one with
+`types.NewSensitive("hunter2")`.
+
+### Reading the real value
+
+`.Reveal()` is the only way to the real value. Call it where the value is
+used, such as when opening a connection, and do not print or log what it
+returns: a revealed value is an ordinary value and is no longer protected.
+
+```go
+db, err := xcl.Find[Postgres](c, "resource.postgres.main")
+if err != nil {
+	return err
+}
+
+conn, err := sql.Open("postgres", dsn(db.Username, db.Password.Reveal()))
+```
+
+Sensitivity follows the value through the configuration. A value referenced
+from a sensitive field, interpolated into a string, passed through a function,
+passed into a module, or published by an output, is sensitive too. An output
+holds its sensitive parts as `types.Sensitive` values, so
+`xcl.Find[types.Output](c, "output.db").Value` may be a map whose `password`
+entry is a `types.Sensitive[string]`.
+
+### When a sensitive value meets a plain field
+
+Assigning a sensitive value, or one derived from it, to a field that is not
+declared sensitive fails validation, so `Validate` and `Apply` refuse the
+configuration before anything is created:
+
+```text
+field "note" of resource.audit.main is not declared sensitive and cannot be
+assigned a sensitive value
+```
+
+In Go, converting or looking up an entity into a type whose matching field is
+plain fails with `xcl.ErrTypeMismatch`, and the `*xcl.TypeMismatchError`
+detail names the field. There is no option to unwrap automatically; declare
+the field `types.Sensitive[T]` in your type too.
+
+```go
+_, err := xcl.Find[PlainPostgres](c, "resource.postgres.main")
+// entity "resource.postgres.main" field "password" is sensitive,
+// main.PlainPostgres declares it as a plain value
+```
+
+### Your own JSON and templates
+
+A sensitive value formats as `(sensitive)` everywhere Go formats it:
+`fmt.Sprintf("%v")`, `%+v` and every other verb, `log/slog`,
+`encoding/json` and `text/template`. So `json.Marshal(db)` writes
+`"password":"(sensitive)"`. To put the real value in your own output, unwrap
+it with `.Reveal()` first, knowing it is then unprotected.
+
+### Showing real values
+
+xcl's own output can show the real value when you ask for it explicitly:
+
+```go
+// configuration text with the real value instead of "(sensitive)"
+text, err := xcl.EncodeEntity(db, xcl.RevealSensitive())
+
+// the resource printer, in every format
+printer := logger.NewResourcePrinter(logger.WithRevealSensitive(true))
+```
+
+A value read back from event data has no real value to show, so it is written
+as the marker even when revealing.
 
 ## Struct Tags
 
@@ -1097,7 +1197,8 @@ module "mymodule_1" {
 
   variables = {
     db_username = variable.db_username
-    db_password = "topsecret"
+    # the module assigns it to a field declared types.Sensitive[string]
+    db_password = env("DB_PASSWORD")
   }
 }
 ```

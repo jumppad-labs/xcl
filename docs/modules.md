@@ -89,6 +89,13 @@ a module resolves against that module's scope with
 `FQRN.AppendParentModule`, so `module.b.output.value` inside `a` names the
 entity keyed `module.a.b.output.value`.
 
+Sensitivity crosses the boundary with the value. A value passed into a module
+input from a `types.Sensitive` field stays sensitive inside the module, and an
+output whose value is sensitive stays sensitive for the caller: it carries the
+sensitive mark into the caller's expressions, its Go `Value` holds the
+sensitive parts as `types.Sensitive` values, and assigning it to a field that
+is not declared sensitive fails validation.
+
 ## Scaffolding that exists but isn't wired in
 
 `ParserOptions` ([`internal/parser/parser.go:44`](../internal/parser/parser.go#L44))

@@ -276,7 +276,7 @@ The same shapes into a sensitive field each validate, and so does a plain value 
 
 **Validation point**: The full existing suite passes unchanged. New tests prove every formatting and marshalling path shows only the marker. They prove an application type and a plugin type, in-process and external, round-trip the real value through apply, state and reload. They also prove event data at both levels contains no real value.
 
-#### - [ ] Task: Add the sensitive value type
+#### - [x] Task: Add the sensitive value type
 **Id:** 0f8904f5-98be-4b5b-a16d-dfc606dcc015
 **Repo:** xclconfig
 **Depends on:** none
@@ -287,12 +287,12 @@ The public `types` package gains `Sensitive[T]`, a field type that holds a real 
 *Technical detail:* [context.md#task-add-the-sensitive-value-type](./context.md#task-add-the-sensitive-value-type)
 
 **Acceptance criteria**:
-- [ ] A sensitive value built from a plain value returns that value from `Reveal()`.
-- [ ] Every `fmt` verb, `String`, `slog` text and JSON output, `MarshalText` and `json.Marshal` produce the marker and never the real value.
-- [ ] Unmarshalling the real value's JSON gives a sensitive value that reveals it, and unmarshalling the marker gives one that still prints as the marker.
-- [ ] Code outside the `types` package cannot implement the sensitive-value interface.
+- [x] A sensitive value built from a plain value returns that value from `Reveal()`.
+- [x] Every `fmt` verb, `String`, `slog` text and JSON output, `MarshalText` and `json.Marshal` produce the marker and never the real value.
+- [x] Unmarshalling the real value's JSON gives a sensitive value that reveals it, and unmarshalling the marker gives one that still prints as the marker.
+- [x] Code outside the `types` package cannot implement the sensitive-value interface.
 
-#### - [ ] Task: Carry sensitive values through configuration evaluation
+#### - [x] Task: Carry sensitive values through configuration evaluation
 **Id:** cb6e4c6d-ddb8-4c2f-badf-150627067251
 **Repo:** xclconfig
 **Depends on:**
@@ -304,12 +304,12 @@ The copied cty conversion library gains a generic hook for wrapper types, and th
 *Technical detail:* [context.md#task-carry-sensitive-values-through-configuration-evaluation](./context.md#task-carry-sensitive-values-through-configuration-evaluation)
 
 **Acceptance criteria**:
-- [ ] A configuration sets a sensitive field from a literal, a variable and a reference, and after apply each reveals the expected value.
-- [ ] A reference to another entity's sensitive field evaluates to a value of the inner type that carries the sensitive mark.
-- [ ] A marked value decoded into a plain field produces an error naming the field instead of a panic.
-- [ ] The cty conversion library's documentation of local changes records the new hook.
+- [x] A configuration sets a sensitive field from a literal, a variable and a reference, and after apply each reveals the expected value.
+- [x] A reference to another entity's sensitive field evaluates to a value of the inner type that carries the sensitive mark.
+- [x] A marked value decoded into a plain field produces an error naming the field instead of a panic.
+- [x] The cty conversion library's documentation of local changes records the new hook.
 
-#### - [ ] Task: Keep real sensitive values on every internal hop
+#### - [x] Task: Keep real sensitive values on every internal hop
 **Id:** 574ca9e3-9c3d-4e09-a743-4711e529ef18
 **Repo:** xclconfig
 **Depends on:**
@@ -327,12 +327,12 @@ State is saved by encoding each entity first and handing the store raw JSON, so 
 *Technical detail:* [context.md#task-keep-real-sensitive-values-on-every-internal-hop](./context.md#task-keep-real-sensitive-values-on-every-internal-hop)
 
 **Acceptance criteria**:
-- [ ] An entity with no sensitive field encodes to exactly the same bytes as before.
-- [ ] Sensitive values at any depth, including inside `any` values, maps and slices, are written as their real values.
-- [ ] State written after apply and during destroy holds real sensitive values, and a custom state store receives each entity as raw JSON.
-- [ ] A provider receives the real value, and changing only a sensitive value is detected as a change.
+- [x] An entity with no sensitive field encodes to exactly the same bytes as before.
+- [x] Sensitive values at any depth, including inside `any` values, maps and slices, are written as their real values.
+- [x] State written after apply and during destroy holds real sensitive values, and a custom state store receives each entity as raw JSON.
+- [x] A provider receives the real value, and changing only a sensitive value is detected as a change.
 
-#### - [ ] Task: Show only the marker in event data
+#### - [x] Task: Show only the marker in event data
 **Id:** 6bb6948f-d66a-4aa8-b388-d248fe7744cc
 **Repo:** xclconfig
 **Depends on:**
@@ -344,11 +344,11 @@ Event data no longer reuses the bytes sent to a provider, which now hold real va
 *Technical detail:* [context.md#task-show-only-the-marker-in-event-data](./context.md#task-show-only-the-marker-in-event-data)
 
 **Acceptance criteria**:
-- [ ] Raw and processed event data for an entity with a sensitive field contain the marker and not the real value, at every phase.
-- [ ] Event data for entities without sensitive fields is unchanged.
-- [ ] Processed event data with a sensitive field can still be converted to configuration text.
+- [x] Raw and processed event data for an entity with a sensitive field contain the marker and not the real value, at every phase.
+- [x] Event data for entities without sensitive fields is unchanged.
+- [x] Processed event data with a sensitive field can still be converted to configuration text.
 
-#### - [ ] Task: Support sensitive fields on plugin types
+#### - [x] Task: Support sensitive fields on plugin types
 **Id:** 5df9c560-db27-4028-a9ac-229ddea691e9
 **Repo:** xclconfig
 **Depends on:**
@@ -361,11 +361,11 @@ Plugin types are rebuilt on the host from a schema, so the host learns the suppo
 *Technical detail:* [context.md#task-support-sensitive-fields-on-plugin-types](./context.md#task-support-sensitive-fields-on-plugin-types)
 
 **Acceptance criteria**:
-- [ ] A plugin type with a field of each supported sensitive instantiation is rebuilt on the host with that field typed as the sensitive type.
-- [ ] A plugin type using an unsupported instantiation fails plugin loading with an error naming the type and the field.
-- [ ] The plugin test helpers rebuild plugin types the same way the host does.
+- [x] A plugin type with a field of each supported sensitive instantiation is rebuilt on the host with that field typed as the sensitive type.
+- [x] A plugin type using an unsupported instantiation fails plugin loading with an error naming the type and the field.
+- [x] The plugin test helpers rebuild plugin types the same way the host does.
 
-#### - [ ] Task: Prove sensitive fields round-trip through apply and state
+#### - [x] Task: Prove sensitive fields round-trip through apply and state
 **Id:** 74c057c9-b1e7-4082-af0e-f4e850d5d013
 **Repo:** xclconfig
 **Depends on:**
@@ -380,9 +380,9 @@ End-to-end tests configure and apply an application type and a plugin type, in-p
 *Technical detail:* [context.md#task-prove-sensitive-fields-round-trip-through-apply-and-state](./context.md#task-prove-sensitive-fields-round-trip-through-apply-and-state)
 
 **Acceptance criteria**:
-- [ ] An application type's sensitive field reveals the configured value after apply and after reloading state.
-- [ ] A plugin type's sensitive field does the same, for an in-process and for an external plugin.
-- [ ] Events for those entities contain the marker and not the value.
+- [x] An application type's sensitive field reveals the configured value after apply and after reloading state.
+- [x] A plugin type's sensitive field does the same, for an in-process and for an external plugin.
+- [x] Events for those entities contain the marker and not the value.
 
 ### Milestone 2: Sensitivity follows a value through the configuration and cannot reach a plain field
 
@@ -390,7 +390,7 @@ End-to-end tests configure and apply an application type and a plugin type, in-p
 
 **Validation point**: Validation tests show each sensitive-to-plain shape rejected with the field named, and each sensitive-to-sensitive shape accepted. End-to-end tests show interpolated, function-derived and module-output values arriving as sensitive. Partly and wholly sensitive outputs read correctly before and after a reload. Conversion tests show the plain-field type error and the sensitive-field success.
 
-#### - [ ] Task: Reject sensitive values assigned to plain fields during validation
+#### - [x] Task: Reject sensitive values assigned to plain fields during validation
 **Id:** cd312385-6c76-43e1-a41c-baba9cf9858e
 **Repo:** xclconfig
 **Depends on:**
@@ -407,12 +407,12 @@ Any sensitive part landing in a field that is not declared sensitive is reported
 *Technical detail:* [context.md#task-reject-sensitive-values-assigned-to-plain-fields-during-validation](./context.md#task-reject-sensitive-values-assigned-to-plain-fields-during-validation)
 
 **Acceptance criteria**:
-- [ ] Assigning a sensitive value to a plain field directly, by interpolation, through a function, or inside an object or list fails validation, and each error names the field.
-- [ ] Assigning a child module's sensitive output to a plain field in the caller fails validation, and assigning it to a sensitive field validates.
-- [ ] A sensitive value passed into a module input and used in a plain field inside the module fails validation.
-- [ ] The same values assigned to sensitive fields validate, and `Apply` creates nothing when validation fails.
+- [x] Assigning a sensitive value to a plain field directly, by interpolation, through a function, or inside an object or list fails validation, and each error names the field.
+- [x] Assigning a child module's sensitive output to a plain field in the caller fails validation, and assigning it to a sensitive field validates.
+- [x] A sensitive value passed into a module input and used in a plain field inside the module fails validation.
+- [x] The same values assigned to sensitive fields validate, and `Apply` creates nothing when validation fails.
 
-#### - [ ] Task: Keep sensitivity in output values
+#### - [x] Task: Keep sensitivity in output values
 **Id:** a87feb82-b463-4e59-8f00-2d94d7c37138
 **Repo:** xclconfig
 **Depends on:**
@@ -429,13 +429,13 @@ The output records which paths are sensitive, so reading it back from state wrap
 *Technical detail:* [context.md#task-keep-sensitivity-in-output-values](./context.md#task-keep-sensitivity-in-output-values)
 
 **Acceptance criteria**:
-- [ ] An output whose value is an entity with one sensitive and one plain field holds the sensitive field as a sensitive value and the plain field as a plain value.
-- [ ] An output whose whole value is sensitive holds a sensitive value.
-- [ ] Both read the same after state is saved and reloaded.
-- [ ] A module output whose value is sensitive arrives in a caller's sensitive field as a sensitive value revealing the real value.
-- [ ] A sensitive value interpolated into a string or passed through a function arrives in a sensitive field holding the combined result.
+- [x] An output whose value is an entity with one sensitive and one plain field holds the sensitive field as a sensitive value and the plain field as a plain value.
+- [x] An output whose whole value is sensitive holds a sensitive value.
+- [x] Both read the same after state is saved and reloaded.
+- [x] A module output whose value is sensitive arrives in a caller's sensitive field as a sensitive value revealing the real value.
+- [x] A sensitive value interpolated into a string or passed through a function arrives in a sensitive field holding the combined result.
 
-#### - [ ] Task: Refuse converting a sensitive field into a plain Go field
+#### - [x] Task: Refuse converting a sensitive field into a plain Go field
 **Id:** 2d4c69fd-e26b-4160-8512-39ba48baf4fb
 **Repo:** xclconfig
 **Depends on:**
@@ -447,8 +447,8 @@ Before an entity is converted into a different Go type, the two types are compar
 *Technical detail:* [context.md#task-refuse-converting-a-sensitive-field-into-a-plain-go-field](./context.md#task-refuse-converting-a-sensitive-field-into-a-plain-go-field)
 
 **Acceptance criteria**:
-- [ ] Finding, listing, `All`, `As` and `Decode` into a type whose matching field is plain each fail with a type-mismatch error naming the field.
-- [ ] The same calls into a type whose matching field is sensitive succeed and reveal the real value.
+- [x] Finding, listing, `All`, `As` and `Decode` into a type whose matching field is plain each fail with a type-mismatch error naming the field.
+- [x] The same calls into a type whose matching field is sensitive succeed and reveal the real value.
 
 ### Milestone 3: Errors, configuration text and printed resources never show a secret unless asked
 
@@ -456,7 +456,7 @@ Before an entity is converted into a different Go type, the two types are compar
 
 **Validation point**: The leak suite passes. The error, encoder and printer tests cover the default and the revealing case, each in its own test.
 
-#### - [ ] Task: Redact sensitive arguments in function errors
+#### - [x] Task: Redact sensitive arguments in function errors
 **Id:** 2814aae7-c890-46f4-a372-0009484d02bf
 **Repo:** xclconfig
 **Depends on:**
@@ -468,11 +468,11 @@ Functions build their error messages from their arguments. So every function the
 *Technical detail:* [context.md#task-redact-sensitive-arguments-in-function-errors](./context.md#task-redact-sensitive-arguments-in-function-errors)
 
 **Acceptance criteria**:
-- [ ] A failing function called with a sensitive argument produces an error containing the marker and not the value.
-- [ ] A failing function called with plain arguments produces the same error as before.
-- [ ] A successful call on a sensitive argument still returns a sensitive result.
+- [x] A failing function called with a sensitive argument produces an error containing the marker and not the value.
+- [x] A failing function called with plain arguments produces the same error as before.
+- [x] A successful call on a sensitive argument still returns a sensitive result.
 
-#### - [ ] Task: Redact sensitive values in configuration text
+#### - [x] Task: Redact sensitive values in configuration text
 **Id:** b36f9bb6-6670-4478-8fc1-21f00b713e89
 **Repo:** xclconfig
 **Depends on:**
@@ -484,11 +484,11 @@ Converting an entity, or its saved data, to configuration text writes each sensi
 *Technical detail:* [context.md#task-redact-sensitive-values-in-configuration-text](./context.md#task-redact-sensitive-values-in-configuration-text)
 
 **Acceptance criteria**:
-- [ ] Configuration text for an entity with a sensitive field shows the marker by default, from a live entity and from saved data alike.
-- [ ] With `RevealSensitive()`, the text shows the real value.
-- [ ] Text for entities without sensitive fields is unchanged.
+- [x] Configuration text for an entity with a sensitive field shows the marker by default, from a live entity and from saved data alike.
+- [x] With `RevealSensitive()`, the text shows the real value.
+- [x] Text for entities without sensitive fields is unchanged.
 
-#### - [ ] Task: Redact sensitive values in the resource printer
+#### - [x] Task: Redact sensitive values in the resource printer
 **Id:** a04e28f4-4fac-4c22-a3df-29e3d30a81d4
 **Repo:** xclconfig
 **Depends on:**
@@ -501,10 +501,10 @@ The resource printer's table, tree, card and JSON formats recognise a sensitive 
 *Technical detail:* [context.md#task-redact-sensitive-values-in-the-resource-printer](./context.md#task-redact-sensitive-values-in-the-resource-printer)
 
 **Acceptance criteria**:
-- [ ] Each printer format shows the marker for a sensitive field by default.
-- [ ] Each printer format shows the real value when revealing is requested.
+- [x] Each printer format shows the marker for a sensitive field by default.
+- [x] Each printer format shows the real value when revealing is requested.
 
-#### - [ ] Task: Prove no secret leaks from any output path
+#### - [x] Task: Prove no secret leaks from any output path
 **Id:** afefb347-064b-48e9-afef-86b7306f7c64
 **Repo:** xclconfig
 **Depends on:**
@@ -529,8 +529,8 @@ Each capture is checked for the secret and for the marker.
 *Technical detail:* [context.md#task-prove-no-secret-leaks-from-any-output-path](./context.md#task-prove-no-secret-leaks-from-any-output-path)
 
 **Acceptance criteria**:
-- [ ] No captured log, event, error, configuration text or printer output contains the known secret under default settings.
-- [ ] Each of those outputs contains the marker where the secret would have been.
+- [x] No captured log, event, error, configuration text or printer output contains the known secret under default settings.
+- [x] Each of those outputs contains the marker where the secret would have been.
 
 ### Milestone 4: The examples stop printing secrets and the documentation explains sensitive values
 
@@ -544,7 +544,7 @@ The state guide says state keeps real values. The changelog records the feature 
 
 **Validation point**: Every example's no-secret test passes. So does the static check that example secrets are sensitive and read with `Reveal()`. The README and changelog content tests pass and fail if the new text is removed. The site builds and type-checks.
 
-#### - [ ] Task: Declare the examples' secrets sensitive
+#### - [x] Task: Declare the examples' secrets sensitive
 **Id:** a827d510-e864-46fd-aa95-8fc27261ad9b
 **Repo:** xclconfig
 **Depends on:**
@@ -559,11 +559,11 @@ The application-config example's database password and the plugin example's data
 *Technical detail:* [context.md#task-declare-the-examples-secrets-sensitive](./context.md#task-declare-the-examples-secrets-sensitive)
 
 **Acceptance criteria**:
-- [ ] Running each bundled example prints no password or secret from its configuration, on standard output or standard error.
-- [ ] Every example field holding a password or secret is declared sensitive and read with `Reveal()`, with no other workaround keeping it out of output.
-- [ ] The examples' existing output tests pass, with any password line now showing the marker.
+- [x] Running each bundled example prints no password or secret from its configuration, on standard output or standard error.
+- [x] Every example field holding a password or secret is declared sensitive and read with `Reveal()`, with no other workaround keeping it out of output.
+- [x] The examples' existing output tests pass, with any password line now showing the marker.
 
-#### - [ ] Task: Document sensitive values in the library
+#### - [x] Task: Document sensitive values in the library
 **Id:** 16a3ab8d-b234-4bb0-bb2a-6b8e4128259a
 **Repo:** xclconfig
 **Depends on:**
@@ -582,13 +582,13 @@ Statements that secrets are shown are removed. The plugin developer guide explai
 *Technical detail:* [context.md#task-document-sensitive-values-in-the-library](./context.md#task-document-sensitive-values-in-the-library)
 
 **Acceptance criteria**:
-- [ ] The README describes declaring sensitive fields, unwrapping, both sensitive-to-plain errors, the marker in the application's own serialisation and templates, and the reveal options.
-- [ ] The README and changelog no longer say secrets are shown in configuration text.
-- [ ] The plugin developer guide states that an explicitly unwrapped value is no longer protected and must not be logged or otherwise emitted.
-- [ ] The changelog has an entry for this spec that lists the breaking change.
-- [ ] Content tests fail if any of these sections or the changelog entry is removed.
+- [x] The README describes declaring sensitive fields, unwrapping, both sensitive-to-plain errors, the marker in the application's own serialisation and templates, and the reveal options.
+- [x] The README and changelog no longer say secrets are shown in configuration text.
+- [x] The plugin developer guide states that an explicitly unwrapped value is no longer protected and must not be logged or otherwise emitted.
+- [x] The changelog has an entry for this spec that lists the breaking change.
+- [x] Content tests fail if any of these sections or the changelog entry is removed.
 
-#### - [ ] Task: Document sensitive values on the site
+#### - [x] Task: Document sensitive values on the site
 **Id:** e4fdf6fa-045c-4646-84df-9bd6ed537cc4
 **Repo:** xcl-website
 **Depends on:**
@@ -605,9 +605,9 @@ The home page and example pages that quote the password fields, configuration or
 *Technical detail:* [context.md#task-document-sensitive-values-on-the-site](./context.md#task-document-sensitive-values-on-the-site)
 
 **Acceptance criteria**:
-- [ ] The site has a Sensitive values page, reachable from the navigation, covering declaring, unwrapping, both errors and the marker in the application's own output.
-- [ ] Every example code and output quoted on the site matches what the examples now contain and print.
-- [ ] The site builds and type-checks.
+- [x] The site has a Sensitive values page, reachable from the navigation, covering declaring, unwrapping, both errors and the marker in the application's own output.
+- [x] Every example code and output quoted on the site matches what the examples now contain and print.
+- [x] The site builds and type-checks.
 
 ## Open Questions
 
@@ -625,3 +625,289 @@ The home page and example pages that quote the password fields, configuration or
 - **Arbitrary `Sensitive[T]` instantiations on plugin types.** Plugins support a fixed set, because Go cannot build generic types at run time. Application-registered types may use any `T` that cty can represent.
 - **Showing references as written and keeping user-written `depends_on`.** These belong to `20261003153421-bf87d907-references-as-written` and `20261003153421-c283547c-user-depends-on`.
 - **Cleaning up stale content on the site beyond what this feature changes**, such as the old `prettylog.Handler` form quoted on the events page.
+
+## Changelog
+
+### 2026-10-05 — Task: Add the sensitive value type
+
+**What was done**: Added `types.Sensitive[T]` with `NewSensitive`, `Reveal`, and redacting `String`/`GoString`/`Format`/`LogValue`/`MarshalText`/`MarshalJSON`; `UnmarshalJSON` reads the real value or, for the bare marker, a redacted value. Added the sealed `SensitiveValue` interface, `IsRedacted`, `SensitiveMarker` and `SensitiveMark`.
+
+**Deviations**: None. The external sealed-interface test lives in its own `types_test` file.
+
+**Files changed**:
+- `xclconfig: types/sensitive.go`
+- `xclconfig: types/sensitive_test.go`
+- `xclconfig: types/sensitive_sealed_test.go`
+
+**Discoveries**: `SensitiveMark` is declared as `any` holding an unexported struct value so it is comparable and unforgeable as a cty mark.
+
+### 2026-10-05 — Task: Carry sensitive values through configuration evaluation
+
+**What was done**: Added a generic wrapper hook to the copied `gocty` (`RegisterWrapper`): a wrapper implies and converts as its inner type, is marked on the way into cty and unmarked and wrapped on the way out. A marked value meeting any other Go target now returns a path error instead of panicking. `types` registers `Sensitive` with `SensitiveMark`. The parser's computed and configured-value walks treat a sensitive value as one leaf.
+
+**Deviations**: `gohcl` attribute-decode diagnostics did not name the attribute, so `decodeBodyToStruct` now prefixes their detail with `Attribute "<name>":` (generic, recorded in `internal/xcl/UPSTREAM.md`). Test fixture types `Secret` and `SecretConsumer` were added to `internal/test_fixtures/registered`.
+
+**Files changed**:
+- `xclconfig: internal/cty/gocty/wrapper.go`
+- `xclconfig: internal/cty/gocty/type_implied.go`
+- `xclconfig: internal/cty/gocty/in.go`
+- `xclconfig: internal/cty/gocty/out.go`
+- `xclconfig: internal/cty/gocty/wrapper_test.go`
+- `xclconfig: internal/cty/UPSTREAM.md`
+- `xclconfig: internal/xcl/gohcl/decode.go`
+- `xclconfig: internal/xcl/UPSTREAM.md`
+- `xclconfig: types/sensitive.go`
+- `xclconfig: internal/parser/computed.go`
+- `xclconfig: internal/parser/configured_check_test.go`
+- `xclconfig: internal/convert/sensitive_test.go`
+- `xclconfig: internal/test_fixtures/registered/types.go`
+- `xclconfig: internal/test_fixtures/config/sensitive/`
+- `xclconfig: config_sensitive_eval_test.go`
+
+**Discoveries**: A sensitive value inside a module `variables` object leaves the container unmarked (only leaves are marked), so `AsValueMap` does not panic; the plan's open question on this resolves without extra unmarking. Outputs holding a marked value still panic in `convertCtyToGo` until the output-values task.
+
+### 2026-10-05 — Task: Keep real sensitive values on every internal hop
+
+**What was done**: Added `internal/wire`, a reflect-based encoder that follows `encoding/json`'s field rules but writes each `types.Sensitive` as its real value, and delegates whole to `encoding/json` for any type that cannot hold one. Provider calls, change detection, the host state callback, query conversion and the plugin test helpers now use it. Both state save sites encode each entity through the new `parser.EncodeForState` and hand the store `json.RawMessage` elements.
+
+**Deviations**: `types/resource_helpers_test.go`'s schema test moved to an external test package (`types/resource_helpers_schema_test.go`), because `internal/schema` now imports `internal/wire`, which imports `types`, and the internal test would form an import cycle. The custom-store and provider-failure tests were adjusted to decode the raw records with `savedentity.DecodeAll`.
+
+**Files changed**:
+- `xclconfig: internal/wire/wire.go`
+- `xclconfig: internal/wire/wire_test.go`
+- `xclconfig: internal/parser/state_encode.go`
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/callbacks.go`
+- `xclconfig: internal/parser/test_plugin.go`
+- `xclconfig: internal/parser/destroy.go`
+- `xclconfig: internal/parser/entities.go`
+- `xclconfig: internal/schema/unmarshal.go`
+- `xclconfig: plugins/adapter.go`
+- `xclconfig: plugins/changed.go`
+- `xclconfig: plugins/grpc_host_callback.go`
+- `xclconfig: plugins/testing/helpers.go`
+- `xclconfig: plugins/changed_sensitive_test.go`
+- `xclconfig: config.go`
+- `xclconfig: state/state_store.go`
+- `xclconfig: state/custom_store_test.go`
+- `xclconfig: config_validate_test.go`
+- `xclconfig: config_sensitive_state_test.go`
+- `xclconfig: static_output_test.go`
+- `xclconfig: types/resource_helpers_test.go`
+- `xclconfig: types/resource_helpers_schema_test.go`
+
+**Discoveries**: `go vet` (run in CI) rejects test structs that repeat a json tag, so json-dominance fixtures must use untagged clashes. `Meta.Properties` is `map[string]any`, so every entity "may hold" a sensitive value and takes wire's reflective walk.
+
+### 2026-10-05 — Task: Show only the marker in event data
+
+**What was done**: `eventData` no longer passes provider-call bytes on as they are when they hold a sensitive value: the pre-call snapshot is read back into the entity's type and re-encoded with `encoding/json`, so sensitive fields show the marker; a snapshot whose redacted and revealed encodings match is returned byte-identical, so plain entities' event data is unchanged. A marshal failure now yields no data rather than the revealing bytes. Doc comments on `events.DataProcessed` and `EncodeSavedEntity` say event data shows the marker.
+
+**Deviations**: Converting processed event data to configuration text needed the configuration-text redaction, so the `gohcl` `ReplaceMarked` option, `xcl.RevealSensitive()` and a `types.RedactedMark` (a second cty mark carried by a value read back from the marker, applied through a new generic `gocty.Wrapper.ExtraMarks`) were implemented here, ahead of the "Redact sensitive values in configuration text" task. `types.RedactedMark` is a public addition not in the plan.
+
+**Files changed**:
+- `xclconfig: internal/parser/events.go`
+- `xclconfig: internal/parser/events_sensitive_test.go`
+- `xclconfig: events/events.go`
+- `xclconfig: encode.go`
+- `xclconfig: internal/xcl/gohcl/encode.go`
+- `xclconfig: internal/xcl/UPSTREAM.md`
+- `xclconfig: internal/cty/gocty/wrapper.go`
+- `xclconfig: internal/cty/UPSTREAM.md`
+- `xclconfig: types/sensitive.go`
+- `xclconfig: config_event_sensitive_test.go`
+
+**Discoveries**: Registered types (no provider) emit no start-phase lifecycle event, so start-phase redaction is only reachable end to end through a plugin type; it is covered by direct `eventData` unit tests.
+
+### 2026-10-05 — Task: Support sensitive fields on plugin types
+
+**What was done**: Added `schema.KnownTypes()`, the host's type map with the seven supported `types.Sensitive` instantiations, used by the registry and by the plugin test helpers (which passed nil before, and now also check the `UnmarshalUntyped` error). The schema writer describes a sensitive field by type name only; the reader parses types with a bracket-depth scanner instead of the greedy regex, and an unknown `types.Sensitive[...]` fails naming the field. The registry checks every plugin type can be rebuilt when its host is added, so an unsupported instantiation fails plugin loading naming the type and field. The in-process test plugin gained a `credential` type with sensitive fields.
+
+**Deviations**: The load-time check sits in `checkHostTypes`, beside the existing name-clash checks, so all problems are joined into one load error. `config_plugin_loading_test.go`'s expected block-type list now includes `credential`.
+
+**Files changed**:
+- `xclconfig: internal/schema/known_types.go`
+- `xclconfig: internal/schema/serialize.go`
+- `xclconfig: internal/schema/deserialize.go`
+- `xclconfig: internal/schema/sensitive_test.go`
+- `xclconfig: plugins/registry/plugin_registry.go`
+- `xclconfig: plugins/registry/sensitive_types_test.go`
+- `xclconfig: plugins/testing/helpers.go`
+- `xclconfig: plugins/testing/sensitive_test.go`
+- `xclconfig: plugins/testing/testdata/credential.xcl`
+- `xclconfig: plugins/example/e2e_test.go`
+- `xclconfig: internal/parser/test_plugin.go`
+- `xclconfig: internal/test_fixtures/plugin/structs/credential.go`
+- `xclconfig: config_plugin_loading_test.go`
+- `xclconfig: config_credential_sensitive_test.go`
+
+**Discoveries**: `parseAttribute` builds map key types with `reflect.TypeOf(t.MapKey)`, so every map key is `string` regardless of the declared key; pre-existing and left alone.
+
+### 2026-10-05 — Task: Prove sensitive fields round-trip through apply and state
+
+**What was done**: End-to-end tests apply a registered type, the in-process test plugin's `credential` type and the example plugin's person (now with a sensitive `Token`), then reload state through a second configuration or `Load`/`DecodeAll` and reveal the real value. They also check the state file holds real values, the provider receives real values (including the saved copy after reload), and events at both levels show only the marker. The external plugin binary is exercised through Create and Read.
+
+**Deviations**: Tests that saved typed entities straight to a `FileStateStore` (parser lifecycle and registered-type harnesses, the example plugin's `applyPeople`) now encode with `parser.EncodeForState` first, the way `Config` does; without it the store wrote the marker and the next apply saw a change. There is no existing pattern for a full apply through the external binary, so the external plugin is covered with host-level Create and Read calls.
+
+**Files changed**:
+- `xclconfig: plugins/example/pkg/person/resource.go`
+- `xclconfig: plugins/example/apply_test.go`
+- `xclconfig: plugins/example/sensitive_test.go`
+- `xclconfig: plugins/example/testdata/people_token.xcl`
+- `xclconfig: internal/parser/lifecycle_test.go`
+- `xclconfig: internal/parser/registered_types_test.go`
+- `xclconfig: config_sensitive_roundtrip_test.go`
+
+**Discoveries**: Any code that saves state itself must go through `parser.EncodeForState`; handing typed entities to a store's `json.Marshal` silently stores the marker, which then shows up as a spurious change on the next apply.
+
+### 2026-10-05 — Task: Reject sensitive values assigned to plain fields during validation
+
+**What was done**: Added validation stage 3, `validateSensitive` (`internal/parser/sensitive_check.go`), between references and properties. Without evaluating, it predicts which parts of each attribute expression are sensitive, following sensitive Go fields, outputs (judged recursively from their own value expressions, memoised and cycle-guarded) and module inputs (judged from the parent module block's `variables` item), and reports each sensitive part landing in a field that is not `Sensitive`, `any` or `cty.Value` as a positioned problem naming the field and entity.
+
+**Deviations**: Module blocks themselves are not checked, since their inputs are judged where the module uses them. `config_sensitive_eval_test.go`'s plain-field test now expects the validation message, because validation catches the case before decoding; the decode-time guard stays covered at the `gocty` level.
+
+**Files changed**:
+- `xclconfig: internal/parser/sensitive_check.go`
+- `xclconfig: internal/parser/sensitive_check_test.go`
+- `xclconfig: internal/parser/validate.go`
+- `xclconfig: internal/test_fixtures/registered/types.go`
+- `xclconfig: internal/test_fixtures/config/sensitive_check/`
+- `xclconfig: config_sensitive_validation_test.go`
+- `xclconfig: config_sensitive_eval_test.go`
+
+**Discoveries**: A module variable's entity has `Meta.Module` set to the module path, and its module block is keyed `module.<that path>`, which is how a module input is traced back to the expression its parent passes in.
+
+### 2026-10-05 — Task: Keep sensitivity in output values
+
+**What was done**: An output's evaluated value is converted by `convertOutputValue`, which unmarks it with paths and wraps exactly the outermost sensitive parts as `types.Sensitive[string|float64|bool|map[string]any|[]any]`, recording them in the new `types.Output.SensitivePaths`. `types.Output.UnmarshalJSON` wraps those paths again on reload, so a reloaded output reads the same; a marker read back from event data gives a redacted value. Module outputs keep their marks for the caller.
+
+**Deviations**: The wrapping logic lives in `types` and is exposed as `(*types.Output).WrapSensitivePaths()`, a small public method not in the plan, so the parser and `UnmarshalJSON` share one implementation.
+
+**Files changed**:
+- `xclconfig: types/output.go`
+- `xclconfig: types/output_test.go`
+- `xclconfig: internal/parser/util.go`
+- `xclconfig: internal/parser/callbacks.go`
+- `xclconfig: internal/test_fixtures/config/sensitive_outputs/`
+- `xclconfig: config_outputs_sensitive_test.go`
+
+**Discoveries**: None beyond the plan.
+
+### 2026-10-05 — Task: Refuse converting a sensitive field into a plain Go field
+
+**What was done**: `asType` now compares the entity's type with the requested one field by field, by JSON name, before copying (`sensitiveFieldBlocked` in `query_sensitive.go`). A sensitive field meeting a plain field fails with `ErrTypeMismatch`, and `errors.TypeMismatchError` gained a `Field` member whose message reads `entity "<id>" field "<field>" is sensitive, <type> declares it as a plain value`. Allowed conversions copy through the revealing encoder, so sensitive-to-sensitive keeps the real value.
+
+**Deviations**: `All` and `Decode` cannot reach a plain-field type: they resolve the requested Go type through the registry, a registered type's entities are always that exact type, and a plugin type cannot also be registered. They share `asType` with `Find`, `FindByType` and `As`, which are tested in both directions; `All` and `Decode` have no dedicated test.
+
+**Files changed**:
+- `xclconfig: query.go`
+- `xclconfig: query_sensitive.go`
+- `xclconfig: query_sensitive_test.go`
+- `xclconfig: errors/query_errors.go`
+- `xclconfig: errors/query_errors_test.go`
+
+**Discoveries**: Only plugin entities (anonymous structs rebuilt from a schema) can be converted into a different named Go type, so the sensitive-field guard matters for plugin types.
+
+### 2026-10-05 — Task: Redact sensitive arguments in function errors
+
+**What was done**: Every function the parser offers, built-in or custom, is wrapped once in `getFunctions` by `redactingFunction` (`internal/parser/function_redaction.go`). The wrapper accepts marked arguments, calls the function with them unmarked, marks the result with every argument mark, and on a type-check or call error replaces the text of each sensitive argument value with the marker, keeping a `function.ArgError`'s index. A plain-argument error is returned unchanged.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xclconfig: internal/parser/function_redaction.go`
+- `xclconfig: internal/parser/function_redaction_test.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/test_fixtures/config/sensitive/function_error/main.xcl`
+- `xclconfig: config_function_redaction_test.go`
+
+**Discoveries**: Secrets are replaced longest first, so a secret that contains another is redacted whole.
+
+### 2026-10-05 — Task: Redact sensitive values in configuration text
+
+**What was done**: The code landed ahead, in the event-data task: `gohcl.EncodeOptions.ReplaceMarked` replaces each marked part before `hclwrite` writes it (or unmarks when nil), and `EncodeEntity`/`EncodeSavedEntity` pass a replacement that writes `"(sensitive)"` unless `xcl.RevealSensitive()` is given; a value read back from the marker carries `types.RedactedMark` and stays the marker. This task added tests for live entities, saved state, a sensitive number, and unchanged text for plain entities.
+
+**Deviations**: Code landed with the event-data task (see that entry). `EncodeIntoBody`/`EncodeAsBlock` keep their signatures and write marked values unmarked.
+
+**Files changed**:
+- `xclconfig: encode_sensitive_test.go`
+- `xclconfig: internal/xcl/gohcl/encode_body_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Redact sensitive values in the resource printer
+
+**What was done**: The printer's `formatValue` recognises `types.SensitiveValue`, including as slice and map elements, and prints the marker, or the real value with the new `logger.WithRevealSensitive(true)` unless the value is redacted. The JSON format uses `encoding/json` by default and the revealing encoder when revealing.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xclconfig: logger/pretty_printer.go`
+- `xclconfig: logger/pretty_printer_sensitive_test.go`
+
+**Discoveries**: The card format prints only "key" fields whose names contain command, image, networks, ports or volumes, so a sensitive field shows there only under such a name.
+
+### 2026-10-05 — Task: Prove no secret leaks from any output path
+
+**What was done**: Added the end-to-end leak suite `sensitive_leak_test.go` with `knownSecret = "s3cr3t-leak-check-7f1d"` held by a registered type, a test-plugin type, an interpolated consumer and two outputs. One test per capture checks the secret is absent and the marker present: events at both data levels, the slog bridge with text and JSON handlers, a custom `%v` slog handler, in-process plugin log details, `%v`/`%+v`/`%#v` of every entity, a function error, a validation error, `EncodeEntity`/`EncodeSavedEntity`, every printer format, `c.Outputs()` and the output entities' JSON. The suite found a real leak: `fmt` of a `*types.Output` reached the real value through `CtyValue` by reflection. `types.Output` now has a `Format` method that shows a marked `CtyValue` as the marker.
+
+**Deviations**: `types.Output.Format` was added to fix the leak (not in the plan). The validation-error capture asserts the field name and no secret but not the marker, since no value is printed. The card printer shows no field values for these types, so only absence of the secret is asserted. The in-process test plugin's log hooks take fixed arguments, so it logs a sensitive value and a struct holding one rather than the applied entity; the external plugin log path is covered by `%v` formatting, which is how details cross the process boundary.
+
+**Files changed**:
+- `xclconfig: types/output.go`
+- `xclconfig: sensitive_leak_test.go`
+- `xclconfig: internal/test_fixtures/config/sensitive_leak/`
+
+**Discoveries**: Any public type that holds a `cty.Value` carrying a sensitive mark leaks through `fmt`'s reflection unless it formats itself; `types.Output` is the only such public type today.
+
+### 2026-10-05 — Task: Declare the examples' secrets sensitive
+
+**What was done**: The application-config example's `Database.Password` and the plugin example's `PostgreSQL.Password` are `types.Sensitive[string]`. The application-config example builds a database URL with `Reveal()` and checks it without printing it; the plugin example's provider calls `Reveal()` only in `connect`, which never logs the address. Tests set known secrets and assert nothing either example prints contains them, that the JSON shows `"password": "(sensitive)"`, and static AST checks require every example field named for a password or secret to be `types.Sensitive` and each such example to call `.Reveal()`.
+
+**Deviations**: The plugin example's configured passwords collided with ordinary words in its output (`password`, `analytics`), so `example/plugin/config/main.xcl`'s `db_password` default is now `"pg-s3cret-example"` and `config/modules/db/db.xcl`'s literal password is `"pg-an4lytics-example"`.
+
+**Files changed**:
+- `xclconfig: example/appconfig/resources/resources.go`
+- `xclconfig: example/appconfig/main.go`
+- `xclconfig: example/appconfig/main_test.go`
+- `xclconfig: example/plugin/resources/resources.go`
+- `xclconfig: example/plugin/internal/plugin.go`
+- `xclconfig: example/plugin/config/main.xcl`
+- `xclconfig: example/plugin/config/modules/db/db.xcl`
+- `xclconfig: example/plugin/main_test.go`
+- `xclconfig: static_examples_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Document sensitive values in the library
+
+**What was done**: The README gained a `## Sensitive values` section (declaring, `NewSensitive`, `Reveal()`, sensitivity following the value, both sensitive-to-plain errors, the marker in the application's own JSON and templates, and the reveal options), and its statements that secrets are shown were replaced; the Modules example now feeds the password from `env`. The plugin developer guide gained `## Sensitive fields` with the supported instantiations, the load error and the warning that a revealed value is no longer protected, cross-linked from its logging section. `docs/plugins.md`, `docs/state.md` and `docs/modules.md` describe log details, state's real values and raw-JSON `Save`, and sensitive module outputs. The changelog has an entry with its breaking changes, and the earlier entry's "secret is shown too" sentence was updated. Content tests guard each part.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xclconfig: README.md`
+- `xclconfig: CHANGELOG.md`
+- `xclconfig: docs/plugin-developer-guide.md`
+- `xclconfig: docs/plugins.md`
+- `xclconfig: docs/state.md`
+- `xclconfig: docs/modules.md`
+- `xclconfig: readme_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-05 — Task: Document sensitive values on the site
+
+**What was done**: Added `src/pages/sensitive-values.mdx`, linked from the Guides navigation, the home page features and the site README, covering declaring, unwrapping, sensitivity following the value, both errors, the marker in the application's own JSON and templates, and what xcl shows and keeps. The home page struct, the application-config page (JSON output now showing the marker, a new "what to notice" point) and the plugins and plugin-logging pages (sensitive password field, `connect` with `Reveal()`, the new `db_password` default) match the examples. `npm ci`, `npm run build` and `astro check` pass.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-website: src/pages/sensitive-values.mdx`
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: README.md`
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: src/pages/examples/application-config.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+- `xcl-website: src/pages/plugin-logging.mdx`
+
+**Discoveries**: None.

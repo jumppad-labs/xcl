@@ -1,0 +1,10 @@
+# An output whose value is an entity with a sensitive and a plain field.
+
+resource "secret" "a" {
+  username = "admin"
+  password = "hunter2"
+}
+
+output "x" {
+  value = resource.secret.a
+}

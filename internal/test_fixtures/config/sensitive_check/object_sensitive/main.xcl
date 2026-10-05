@@ -1,0 +1,10 @@
+resource "secret" "a" {
+  username = "admin"
+  password = "pw"
+}
+
+resource "secret_shape" "c" {
+  secrets = {
+    k = resource.secret.a.password
+  }
+}

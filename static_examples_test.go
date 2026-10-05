@@ -4,8 +4,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -214,4 +216,138 @@ func TestExamplePluginsDoNotLogResourceOrEventDetails(t *testing.T) {
 	}
 
 	require.NotZero(t, logCalls, "no log calls found in the example plugins, the check would prove nothing")
+}
+
+// secretField is a struct field of an example resource whose name says it
+// holds a secret
+type secretField struct {
+	file      string
+	directory string
+	structure string
+	name      string
+	sensitive bool
+}
+
+// isSensitiveType reports whether expression is types.Sensitive[...]
+func isSensitiveType(expression ast.Expr) bool {
+	index, ok := expression.(*ast.IndexExpr)
+	if !ok {
+		return false
+	}
+
+	selector, ok := index.X.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+
+	qualifier, ok := selector.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+
+	return qualifier.Name == "types" && selector.Sel.Name == "Sensitive"
+}
+
+// exampleSecretFields scans every example/*/resources/*.go and returns each
+// struct field whose name contains password or secret, in any case
+func exampleSecretFields(t *testing.T) []secretField {
+	t.Helper()
+
+	files, err := filepath.Glob(filepath.Join("example", "*", "resources", "*.go"))
+	require.NoError(t, err)
+	require.NotEmpty(t, files, "no example resource files found, the scan would prove nothing")
+
+	fields := []secretField{}
+
+	for _, path := range files {
+		file := parseGoFile(t, path)
+
+		ast.Inspect(file, func(n ast.Node) bool {
+			spec, ok := n.(*ast.TypeSpec)
+			if !ok {
+				return true
+			}
+
+			structure, ok := spec.Type.(*ast.StructType)
+			if !ok {
+				return true
+			}
+
+			for _, field := range structure.Fields.List {
+				for _, name := range field.Names {
+					lower := strings.ToLower(name.Name)
+					if !strings.Contains(lower, "password") && !strings.Contains(lower, "secret") {
+						continue
+					}
+
+					fields = append(fields, secretField{
+						file:      path,
+						directory: filepath.Dir(filepath.Dir(path)),
+						structure: spec.Name.Name,
+						name:      name.Name,
+						sensitive: isSensitiveType(field.Type),
+					})
+				}
+			}
+
+			return true
+		})
+	}
+
+	return fields
+}
+
+// TestExampleSecretFieldsAreSensitive asserts every example resource field
+// named for a password or a secret is declared types.Sensitive[...]
+func TestExampleSecretFieldsAreSensitive(t *testing.T) {
+	for _, field := range exampleSecretFields(t) {
+		require.True(t, field.sensitive,
+			"%s: %s.%s holds a secret and must be types.Sensitive[...]", field.file, field.structure, field.name)
+	}
+}
+
+// TestExampleSecretFieldScanFindsTheKnownFields asserts the scan above sees
+// the two fields the examples are known to declare, so it cannot pass by
+// finding nothing
+func TestExampleSecretFieldScanFindsTheKnownFields(t *testing.T) {
+	found := []string{}
+	for _, field := range exampleSecretFields(t) {
+		found = append(found, field.structure+"."+field.name)
+	}
+
+	require.Contains(t, found, "Database.Password")
+	require.Contains(t, found, "PostgreSQL.Password")
+}
+
+// TestExamplesUsingSecretsCallReveal asserts each example declaring a secret
+// field has at least one .Reveal() call in its non-test Go sources, so the
+// secret is used where the program needs it
+func TestExamplesUsingSecretsCallReveal(t *testing.T) {
+	directories := map[string]bool{}
+	for _, field := range exampleSecretFields(t) {
+		directories[field.directory] = true
+	}
+
+	require.NotEmpty(t, directories)
+
+	for directory := range directories {
+		reveals := 0
+
+		err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+
+			reveals += len(callsTo(parseGoFile(t, path), "Reveal"))
+
+			return nil
+		})
+		require.NoError(t, err)
+
+		require.NotZero(t, reveals, "%s declares a secret field but never calls Reveal", directory)
+	}
 }

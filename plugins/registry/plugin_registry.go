@@ -10,7 +10,6 @@ import (
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
-	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -305,7 +304,9 @@ func (r *PluginRegistry) checkType(entityType, subtype string) error {
 
 // checkHostTypes checks every type a new plugin host provides against the
 // types already in the registry, and against the other types the same host
-// provides. It returns every clash joined together. mu must be held.
+// provides, and checks that the host can rebuild each one from its schema,
+// which fails for a field of an unsupported types.Sensitive instantiation.
+// It returns every problem joined together. mu must be held.
 func (r *PluginRegistry) checkHostTypes(host plugins.PluginHost) error {
 	var clashes []error
 	seen := map[string]bool{}
@@ -322,6 +323,10 @@ func (r *PluginRegistry) checkHostTypes(host plugins.PluginHost) error {
 		if err := r.checkType(t.Type, t.SubType); err != nil {
 			clashes = append(clashes, err)
 		}
+
+		if _, err := schema.CreateInstanceFromSchema(t.Schema, schema.KnownTypes()); err != nil {
+			clashes = append(clashes, fmt.Errorf("plugin type %s cannot be rebuilt from its schema: %w", key, err))
+		}
 	}
 
 	return errors.Join(clashes...)
@@ -330,12 +335,8 @@ func (r *PluginRegistry) checkHostTypes(host plugins.PluginHost) error {
 // createEntityFromPlugins attempts to create an entity using registered
 // plugins, mu must be held
 func (r *PluginRegistry) createEntityFromPlugins(entityType, subtype, name string) (any, error) {
-	// Create type mapping for proper type creation
-	typeMapping := map[string]reflect.Type{
-		"types.Meta":         reflect.TypeOf(types.Meta{}),
-		"types.ResourceBase": reflect.TypeOf(types.ResourceBase{}),
-		"cty.Value":          reflect.TypeOf(cty.Value{}), // Treat cty.Value as interface{}
-	}
+	// the Go types the host rebuilds plugin types with
+	typeMapping := schema.KnownTypes()
 
 	key := types.TypeKey(entityType, subtype)
 

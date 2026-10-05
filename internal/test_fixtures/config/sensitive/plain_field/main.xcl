@@ -1,0 +1,9 @@
+# A sensitive value read into a field that is not declared sensitive.
+
+resource "secret" "literal" {
+  password = "from-literal"
+}
+
+resource "secret_consumer" "plain" {
+  note = resource.secret.literal.password
+}

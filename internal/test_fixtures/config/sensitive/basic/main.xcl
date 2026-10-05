@@ -1,0 +1,18 @@
+# A sensitive field set from a literal, a variable and a reference.
+
+variable "db_password" {
+  default = "from-variable"
+}
+
+resource "secret" "literal" {
+  username = "admin"
+  password = "from-literal"
+}
+
+resource "secret" "from_variable" {
+  password = variable.db_password
+}
+
+resource "secret_consumer" "reference" {
+  password = resource.secret.literal.password
+}

@@ -27,6 +27,11 @@ type EncodeOptions struct {
 	// is used only when IncludeComputed is set, and only for a field written
 	// directly into a body, not for one inside an object value.
 	ComputedComment string
+
+	// ReplaceMarked is called with each marked value before it is written,
+	// and returns the value to write in its place. Values with no marks are
+	// not passed to it. When it is nil, a marked value is written unmarked.
+	ReplaceMarked func(cty.Value) cty.Value
 }
 
 // EncodeBody replaces the contents of the given hclwrite Body with attributes
@@ -360,7 +365,69 @@ func (e *bodyEncoder) attributeValue(val reflect.Value, path string) (cty.Value,
 		return cty.NilVal, fmt.Errorf("%s: cannot encode %T as %#v: %w", path, val.Interface(), valTy, err)
 	}
 
-	return out, nil
+	return e.writableValue(out), nil
+}
+
+// writableValue returns a value hclwrite can write: hclwrite cannot write a
+// marked value, so each marked part is replaced through
+// EncodeOptions.ReplaceMarked, or unmarked when there is none.
+func (e *bodyEncoder) writableValue(val cty.Value) cty.Value {
+	if !val.ContainsMarked() {
+		return val
+	}
+
+	if e.options.ReplaceMarked == nil {
+		unmarked, _ := val.UnmarkDeep()
+		return unmarked
+	}
+
+	replaced, _ := replaceMarkedValues(val, e.options.ReplaceMarked).UnmarkDeep()
+
+	return replaced
+}
+
+// replaceMarkedValues replaces each marked part of val with what replace
+// returns for it. A replacement may change a part's type, so a collection
+// holding one is rebuilt as an object or tuple, which write the same way.
+func replaceMarkedValues(val cty.Value, replace func(cty.Value) cty.Value) cty.Value {
+	if val.IsMarked() {
+		return replace(val)
+	}
+
+	if !val.ContainsMarked() || !val.IsKnown() || val.IsNull() {
+		return val
+	}
+
+	ty := val.Type()
+	switch {
+	case ty.IsObjectType() || ty.IsMapType():
+		attrs := map[string]cty.Value{}
+		for it := val.ElementIterator(); it.Next(); {
+			key, elem := it.Element()
+			attrs[key.AsString()] = replaceMarkedValues(elem, replace)
+		}
+
+		if len(attrs) == 0 {
+			return cty.EmptyObjectVal
+		}
+
+		return cty.ObjectVal(attrs)
+
+	case ty.IsListType() || ty.IsSetType() || ty.IsTupleType():
+		elems := []cty.Value{}
+		for it := val.ElementIterator(); it.Next(); {
+			_, elem := it.Element()
+			elems = append(elems, replaceMarkedValues(elem, replace))
+		}
+
+		if len(elems) == 0 {
+			return cty.EmptyTupleVal
+		}
+
+		return cty.TupleVal(elems)
+	}
+
+	return val
 }
 
 // objectValue builds the object written for a struct held as an attribute,

@@ -502,3 +502,42 @@ func TestAppConfigExampleEntityAndStateAgree(t *testing.T) {
 
 	require.Equal(t, 1, compared, "the application was not compared, so the check proves nothing")
 }
+
+// TestAppConfigExamplePrintsNoSecret asserts the database password read from
+// the environment appears nowhere the example writes, neither in the report on
+// stdout, nor on stdout and stderr of the process, nor in the events rendered
+// by the pretty printer
+func TestAppConfigExamplePrintsNoSecret(t *testing.T) {
+	const secret = "app-s3cret-9f8e7d6c"
+	t.Setenv("DB_PASSWORD", secret)
+
+	r := registry.NewPluginRegistry()
+	out := &bytes.Buffer{}
+	rendered := &bytes.Buffer{}
+
+	var runErr error
+	captured := captureStandardStreams(t, func() {
+		_, runErr = run(out, prettylog.Handler(rendered, slog.LevelDebug, r), r, configDir, t.TempDir())
+	})
+
+	require.NoError(t, runErr)
+	require.NotContains(t, captured.stdout, secret)
+	require.NotContains(t, captured.stderr, secret)
+	require.NotContains(t, out.String(), secret)
+	require.NotContains(t, rendered.String(), secret)
+}
+
+// TestAppConfigExampleWritesTheMarkerForThePassword asserts the JSON section
+// holds the sensitive marker in place of the password
+func TestAppConfigExampleWritesTheMarkerForThePassword(t *testing.T) {
+	t.Setenv("DB_PASSWORD", "app-s3cret-9f8e7d6c")
+
+	out := &bytes.Buffer{}
+
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	require.NoError(t, err)
+
+	_, document, found := bytes.Cut(out.Bytes(), []byte("## JSON\n"))
+	require.True(t, found)
+	require.Contains(t, string(document), `"password": "(sensitive)"`)
+}

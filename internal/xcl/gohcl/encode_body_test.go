@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclwrite"
 	"github.com/stretchr/testify/require"
 )
@@ -353,4 +354,96 @@ func TestEncodeBodyWritesNoComputedCommentByDefault(t *testing.T) {
 
 	require.Contains(t, out, "provider_id")
 	require.NotContains(t, out, "#")
+}
+
+// encodeMarkedHolder holds a value that carries cty marks
+type encodeMarkedHolder struct {
+	Name  string    `xcl:"name"`
+	Value cty.Value `xcl:"value"`
+}
+
+func TestEncodeBodyWritesMarkedValueUnmarkedWithoutReplacement(t *testing.T) {
+	holder := encodeMarkedHolder{
+		Name:  "item",
+		Value: cty.StringVal("real-value").Mark("secret"),
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&holder, f.Body(), EncodeOptions{})
+	require.NoError(t, err)
+
+	expected := `name  = "item"
+value = "real-value"
+`
+
+	require.Equal(t, expected, string(f.Bytes()))
+}
+
+func TestEncodeBodyWritesMarkedValueAsWhatTheCallbackReturns(t *testing.T) {
+	holder := encodeMarkedHolder{
+		Name:  "item",
+		Value: cty.StringVal("real-value").Mark("secret"),
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&holder, f.Body(), EncodeOptions{
+		ReplaceMarked: func(cty.Value) cty.Value {
+			return cty.StringVal("hidden")
+		},
+	})
+	require.NoError(t, err)
+
+	expected := `name  = "item"
+value = "hidden"
+`
+
+	require.Equal(t, expected, string(f.Bytes()))
+}
+
+func TestEncodeBodyReplacesOnlyTheMarkedElementOfAnObject(t *testing.T) {
+	holder := encodeMarkedHolder{
+		Name: "item",
+		Value: cty.ObjectVal(map[string]cty.Value{
+			"plain":  cty.StringVal("visible"),
+			"secret": cty.StringVal("real-value").Mark("secret"),
+		}),
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&holder, f.Body(), EncodeOptions{
+		ReplaceMarked: func(cty.Value) cty.Value {
+			return cty.StringVal("hidden")
+		},
+	})
+	require.NoError(t, err)
+
+	text := string(f.Bytes())
+
+	require.Contains(t, text, `plain  = "visible"`)
+	require.Contains(t, text, `secret = "hidden"`)
+	require.NotContains(t, text, "real-value")
+}
+
+func TestEncodeBodyDoesNotPassUnmarkedValuesToTheCallback(t *testing.T) {
+	holder := encodeMarkedHolder{
+		Name: "item",
+		Value: cty.ObjectVal(map[string]cty.Value{
+			"plain": cty.StringVal("visible"),
+			"count": cty.NumberIntVal(3),
+		}),
+	}
+
+	calls := 0
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&holder, f.Body(), EncodeOptions{
+		ReplaceMarked: func(value cty.Value) cty.Value {
+			calls++
+			return value
+		},
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, 0, calls)
+	require.Contains(t, string(f.Bytes()), `plain = "visible"`)
 }

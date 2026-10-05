@@ -1,0 +1,9 @@
+# A sensitive value passed through a function.
+
+resource "secret" "a" {
+  password = "hunter2"
+}
+
+resource "secret_consumer" "c" {
+  password = upper(resource.secret.a.password)
+}

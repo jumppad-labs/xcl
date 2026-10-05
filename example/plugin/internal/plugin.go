@@ -3,6 +3,9 @@ package internal
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
+	"strconv"
 
 	"github.com/jumppad-labs/xcl/example/plugin/resources"
 	"github.com/jumppad-labs/xcl/logger"
@@ -77,6 +80,10 @@ func (p *postgresProvider) Init(state plugins.State, functions plugins.ProviderF
 // Create sets the computed connection string, configured fields are never
 // changed
 func (p *postgresProvider) Create(ctx context.Context, db *resources.PostgreSQL) (*resources.PostgreSQL, error) {
+	if err := connect(db); err != nil {
+		return nil, err
+	}
+
 	db.ConnectionString = connectionString(db)
 	plugins.Logger(ctx).Info("created database", "connection_string", db.ConnectionString)
 
@@ -93,6 +100,10 @@ func (p *postgresProvider) Read(ctx context.Context, old *resources.PostgreSQL, 
 
 // Update sets the computed connection string for the changed configuration
 func (p *postgresProvider) Update(ctx context.Context, db *resources.PostgreSQL) (*resources.PostgreSQL, error) {
+	if err := connect(db); err != nil {
+		return nil, err
+	}
+
 	db.ConnectionString = connectionString(db)
 	plugins.Logger(ctx).Info("updated database", "connection_string", db.ConnectionString)
 
@@ -110,6 +121,27 @@ func (p *postgresProvider) Functions() plugins.ProviderFunctions {
 	return nil
 }
 
+// connect stands in for opening a connection to the database. It is the one
+// place the real password is needed, so it is the one place Reveal is called.
+// A revealed value is no longer protected: the address holding it is checked
+// and never logged or returned.
+func connect(db *resources.PostgreSQL) error {
+	address := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(db.Username, db.Password.Reveal()),
+		Host:   net.JoinHostPort(db.Location, strconv.Itoa(db.Port)),
+		Path:   "/" + db.DBName,
+	}
+
+	if _, err := url.Parse(address.String()); err != nil {
+		return fmt.Errorf("unable to connect to database %s", db.DBName)
+	}
+
+	return nil
+}
+
+// connectionString is the address other blocks use to reach the database. It
+// leaves the password out, so it is safe to log and to keep in state.
 func connectionString(db *resources.PostgreSQL) string {
 	return fmt.Sprintf("postgres://%s@%s:%d/%s", db.Username, db.Location, db.Port, db.DBName)
 }

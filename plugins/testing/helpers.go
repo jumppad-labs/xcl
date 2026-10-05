@@ -2,7 +2,6 @@ package testing
 
 import (
 	"context"
-	"encoding/json"
 	"os/exec"
 	"reflect"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/schema"
+	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclparse"
@@ -109,7 +109,7 @@ func (ops *TestPluginOperations) TestValidate(entityType, entitySubType string, 
 
 	// Test each object from the HCL file
 	for i, obj := range result.Objects {
-		dataJSON, err := json.Marshal(obj)
+		dataJSON, err := wire.Marshal(obj)
 		require.NoError(ops.host.t, err, "Should marshal test data to JSON for object %d", i)
 
 		err = ops.host.Validate(context.Background(), entityType, entitySubType, dataJSON)
@@ -128,7 +128,7 @@ func (ops *TestPluginOperations) TestCreate(entityType, entitySubType string, hc
 
 	// Test creating each object from the HCL file
 	for i, obj := range result.Objects {
-		dataJSON, err := json.Marshal(obj)
+		dataJSON, err := wire.Marshal(obj)
 		require.NoError(ops.host.t, err, "Should marshal test data to JSON for object %d", i)
 
 		_, err = ops.host.Create(context.Background(), entityType, entitySubType, dataJSON)
@@ -147,7 +147,7 @@ func (ops *TestPluginOperations) TestChanged(entityType, entitySubType string, h
 
 	// Test checking changes for each object from the HCL file
 	for i, obj := range result.Objects {
-		dataJSON, err := json.Marshal(obj)
+		dataJSON, err := wire.Marshal(obj)
 		require.NoError(ops.host.t, err, "Should marshal test data to JSON for object %d", i)
 
 		changed, err := ops.host.Changed(context.Background(), entityType, entitySubType, dataJSON, dataJSON)
@@ -176,7 +176,7 @@ func (ops *TestPluginOperations) TestDestroy(entityType, entitySubType string, h
 
 	// Test destroying each object from the HCL file
 	for i, obj := range result.Objects {
-		dataJSON, err := json.Marshal(obj)
+		dataJSON, err := wire.Marshal(obj)
 		require.NoError(ops.host.t, err, "Should marshal test data to JSON for object %d", i)
 
 		err = ops.host.Destroy(context.Background(), entityType, entitySubType, dataJSON)
@@ -187,7 +187,7 @@ func (ops *TestPluginOperations) TestDestroy(entityType, entitySubType string, h
 // TestCRUDOperations tests all CRUD operations with the provided test data (kept for backwards compatibility)
 func (ops *TestPluginOperations) TestCRUDOperations(entityType, entitySubType string, testData interface{}) {
 	// Marshal test data to JSON
-	dataJSON, err := json.Marshal(testData)
+	dataJSON, err := wire.Marshal(testData)
 	require.NoError(ops.host.t, err, "Should marshal test data to JSON")
 
 	// Test Validate with valid data
@@ -219,7 +219,7 @@ func (ops *TestPluginOperations) TestInvalidValidation(entityType, entitySubType
 // TestBasicOperations tests basic create and validate operations (for external plugins with issues)
 func (ops *TestPluginOperations) TestBasicOperations(entityType, entitySubType string, testData interface{}) {
 	// Marshal test data to JSON
-	dataJSON, err := json.Marshal(testData)
+	dataJSON, err := wire.Marshal(testData)
 	require.NoError(ops.host.t, err, "Should marshal test data to JSON")
 
 	// Test Validate
@@ -245,7 +245,9 @@ type HCLParseResult[T any] struct {
 // It returns a slice of the target type with all parsed objects
 func ParseHCLFile[T any](t *testing.T, hclFilePath string, pluginSchema []byte, targetType T) HCLParseResult[T] {
 	// Create wire type from plugin schema
-	wireType, err := schema.CreateInstanceFromSchema(pluginSchema, nil)
+	// rebuild the type the way the host does, so a field such as a
+	// types.Sensitive one decodes the same in tests as in real use
+	wireType, err := schema.CreateInstanceFromSchema(pluginSchema, schema.KnownTypes())
 	require.NoError(t, err, "Should be able to create struct from schema")
 
 	// Parse HCL file
@@ -276,7 +278,8 @@ func ParseHCLFile[T any](t *testing.T, hclFilePath string, pluginSchema []byte, 
 		targetValue := reflect.New(reflect.TypeOf(targetType)).Interface()
 
 		// Unmarshal from wire type to concrete type
-		schema.UnmarshalUntyped(wireType, targetValue)
+		err := schema.UnmarshalUntyped(wireType, targetValue)
+		require.NoError(t, err, "Should convert the decoded block to the target type")
 
 		// Dereference the pointer and append to results
 		results = append(results, reflect.ValueOf(targetValue).Elem().Interface().(T))
@@ -310,7 +313,7 @@ func ParseHCLWithPluginSchemaToEntityData[T any](t *testing.T, host *TestPluginH
 	// Convert each object to JSON bytes
 	var entityData [][]byte
 	for i, obj := range objects {
-		jsonBytes, err := json.Marshal(obj)
+		jsonBytes, err := wire.Marshal(obj)
 		require.NoError(t, err, "Should marshal object %d to JSON", i)
 		entityData = append(entityData, jsonBytes)
 	}

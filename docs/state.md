@@ -129,8 +129,11 @@ text, err := xcl.EncodeSavedEntity(registry, record)
 ```
 
 The same record reaches an event receiver when a configuration asks for
-`xcl.EventDataProcessed`, and it is byte for byte what the state file holds, so
-the same call works on either.
+`xcl.EventDataProcessed`, so the same call works on either. The one difference
+is sensitive values: state holds their real values, while event data shows
+each as `(sensitive)`. Text made from event data therefore shows the marker
+for them, even with `xcl.RevealSensitive()`, since event data has no real
+value to show.
 
 The stored format has one reader. Both the file state store's `Load` and
 `EncodeSavedEntity` go through it, so there is a single place that knows how a
@@ -160,6 +163,15 @@ saved them as; the parser types raw records with its own registry, so a store
 never needs one. Writing one needs no library type — `state/custom_store_test.go` has a
 twenty-line in-memory implementation that round-trips a real apply, written
 against the public API alone.
+
+**State keeps real sensitive values.** `Save` receives each entity already
+encoded, as a `json.RawMessage` holding its record with every
+`types.Sensitive` field written as its real value. A sensitive value marshals
+to `(sensitive)` through `encoding/json`, so encoding the entities first is
+what lets a store that simply marshals what it is given keep the real values,
+and reload them unchanged. A store that inspected the typed entities must
+decode the raw records instead. The state file therefore holds secrets in
+plain text; protect it accordingly.
 
 `Parser.Apply` (and `Parser.Validate`) call `Exists()`/`Load()` at the
 start of every run to get the "previous state", the state saved by the last

@@ -1,0 +1,9 @@
+# A sensitive value interpolated into a string.
+
+resource "secret" "a" {
+  password = "hunter2"
+}
+
+resource "secret_consumer" "c" {
+  password = "x-${resource.secret.a.password}-y"
+}

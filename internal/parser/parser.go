@@ -1339,7 +1339,9 @@ func (p *Parser) getFunctions(file string) map[string]function.Function {
 		funcs[name] = fn
 	}
 
-	return funcs
+	// every function, built-in or custom, keeps sensitive arguments out of
+	// its errors and marks what it derives from them
+	return redactingFunctions(funcs)
 }
 
 // emitValidateError emits a validate error event for a problem found by
