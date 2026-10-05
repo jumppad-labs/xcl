@@ -48,3 +48,29 @@
   references-as-written, user-depends-on, module-boundary-and-output-entities,
   the original spec (now sensitive values; state keeps real values), masking (depends on it).
   User plans to ship all at once.
+
+## Plan-epic run (2026-10-04) — orchestrator notes
+
+- Epic: 20261003134528-327e0657-references-and-secrets. Project root: /home/nicj/code/github.com/jumppad-labs/xcl.
+- Order: references-as-written, user-depends-on, module-boundary-and-output-entities (ready) →
+  references-and-secrets (sensitive values) → masking.
+- An earlier run's notes claimed all 5 DONE, but on re-run status showed no plans in the store,
+  no epic summary and no lanes. Only unsaved working files for module-boundary remained in
+  work/. Restarted the loop from the CLI's status.
+- Run 2 started children: references-as-written, user-depends-on, module-boundary-and-output-entities.
+- DONE: user-depends-on (verified in store). DONE: module-boundary-and-output-entities (verified). Summary sections written. Started child: references-and-secrets. DONE: references-as-written (verified), summary written. DONE: references-and-secrets (verified), summary written. Started child: masking. DONE: masking (verified), summary written. All 5 planned. epic order added 5 deps (chain: module-boundary → refs-and-secrets → refs-as-written → user-depends-on → masking). 3 decisions written (changelog test anchor, site page review, event-data shape). User accepted all 3 decisions (applied to plans and summary), kept the order, and approved 8 knowledge entries (written to xclconfig). Review done.
+- QUESTION (module-boundary, at discovery): spec "outputs found as entities" contradicts knowledge entry architecture/ux-flow.md (Find[string](c,"output.x") returns value). Answer (user): A, wording approved now — plan a task to rewrite ux-flow.md via spek-knowledge with Find[types.Output] + .Value example and Outputs() note. Relayed; child resumed at architecture.
+
+## Plan-epic run 3 (2026-10-05)
+
+- Store again showed no plans / no summary / no lanes despite run 2 notes saying all DONE
+  (plans/ epics/ config.yaml touched 2026-10-05 10:32; cause unknown). User: "ignore all that
+  and just run". Re-planning under the existing epic-order chain (serial):
+  module-boundary → references-and-secrets → references-as-written → user-depends-on → masking.
+- The 3 decisions from run 2 (changelog test anchor, site page review, event-data shape) and the
+  module-boundary ux-flow.md answer (A: rewrite ux-flow.md via spek-knowledge with
+  Find[types.Output] + .Value, Outputs() note) were already settled by the user — reuse, don't re-ask.
+- DONE: module-boundary (verified in store; summary kept for step 6). DONE: references-and-secrets (verified). DONE: references-as-written (verified). DONE: user-depends-on (verified). Started child: masking.
+- Run 3: all 5 DONE (verified). Decisions settled by user: (1) ShowReferences bare ref shown for sensitive field (A); (2) envelope always incl. Redact; (3) CHANGELOG Breaking only vs last release (masking dropped 2 items). Applied to plans; summary + decisions written. epic order added nothing (chain already present). Next: end-of-planning review.
+- Review closed: user approved summary; declined all knowledge saves this run.
+- Review change: user chose destroy graph from Meta.Links (create builder, reverse walk), Meta.Parents removed. user-depends-on plan revised (new tasks b3e94632, 5078beb1); summary section + decisions updated.
