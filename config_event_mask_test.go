@@ -56,7 +56,7 @@ func applySensitiveFixtureWithEventOptions(t *testing.T, level EventDataLevel, o
 	all := []ConfigOption{
 		WithPluginRegistry(reg),
 		WithStateStore(store),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 		WithEventData(level),
 	}
 	all = append(all, options...)
@@ -75,11 +75,8 @@ func applySensitiveFixtureWithEventOptions(t *testing.T, level EventDataLevel, o
 func eventsWithDataFor(t *testing.T, recorder *eventRecorder, id string) []Event {
 	t.Helper()
 
-	recorder.mu.Lock()
-	defer recorder.mu.Unlock()
-
 	found := []Event{}
-	for _, e := range recorder.events {
+	for _, e := range recorder.Events() {
 		if e.ResourceID == id && len(e.Data) > 0 {
 			found = append(found, e)
 		}
@@ -265,7 +262,7 @@ func TestEncodeSavedEntityShowsMarkerForEncryptedState(t *testing.T) {
 // errorEvents returns every recorded event in the error phase
 func errorEvents(recorder *eventRecorder) []Event {
 	found := []Event{}
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		if e.Phase == events.PhaseError {
 			found = append(found, e)
 		}

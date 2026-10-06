@@ -1,20 +1,18 @@
 package xcl
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
@@ -107,14 +105,6 @@ func setupDeliveryConfig(t *testing.T, contents string, opts ...ConfigOption) *d
 	}
 }
 
-// snapshot returns a copy of every event the recorder has received so far
-func (r *eventRecorder) snapshot() []Event {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return append([]Event{}, r.events...)
-}
-
 // withoutBlocked returns the events that are not blocked announcements
 func withoutBlocked(recorded []Event) []Event {
 	kept := []Event{}
@@ -182,23 +172,23 @@ func sortedCreatedResources(p *parser.TestPlugin) []string {
 // for delay
 func slowReceiver(recorder *eventRecorder, delay time.Duration) EventHandler {
 	return func(e Event) {
-		recorder.handle(e)
+		recorder.Record(e)
 		time.Sleep(delay)
 	}
 }
 
 func TestApplyDeliversEveryEventBeforeReturning(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
 
-	atReturn := recorder.snapshot()
+	atReturn := recorder.Events()
 
 	time.Sleep(100 * time.Millisecond)
 
-	afterWait := recorder.snapshot()
+	afterWait := recorder.Events()
 
 	require.Len(t, atReturn, independentNetworksEventCount)
 	require.Len(t, afterWait, len(atReturn))
@@ -210,7 +200,7 @@ func TestApplyDeliversEveryEventBeforeReturning(t *testing.T) {
 
 func TestApplyDeliversErrorEventBeforeReturningError(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.Record))
 
 	injected := errors.New("network-one-refused")
 	f.plugin.SetCreateError("resource.network.one", injected)
@@ -218,7 +208,7 @@ func TestApplyDeliversErrorEventBeforeReturningError(t *testing.T) {
 	err := f.config.Apply(f.configFile)
 	require.ErrorContains(t, err, injected.Error())
 
-	atReturn := recorder.snapshot()
+	atReturn := recorder.Events()
 	require.NotEmpty(t, atReturn)
 
 	last := atReturn[len(atReturn)-1]
@@ -229,16 +219,16 @@ func TestApplyDeliversErrorEventBeforeReturningError(t *testing.T) {
 
 func TestValidateDeliversEveryEventBeforeReturning(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Validate(f.configFile)
 	require.NoError(t, err)
 
-	atReturn := recorder.snapshot()
+	atReturn := recorder.Events()
 
 	time.Sleep(100 * time.Millisecond)
 
-	afterWait := recorder.snapshot()
+	afterWait := recorder.Events()
 
 	// the validate start, the TestPlugin's load start and success, a parse
 	// for each network and the validate success
@@ -252,23 +242,21 @@ func TestValidateDeliversEveryEventBeforeReturning(t *testing.T) {
 
 func TestDestroyDeliversEveryEventBeforeReturning(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
 
-	recorder.mu.Lock()
-	recorder.events = nil
-	recorder.mu.Unlock()
+	recorder.reset()
 
 	err = f.config.Destroy()
 	require.NoError(t, err)
 
-	atReturn := recorder.snapshot()
+	atReturn := recorder.Events()
 
 	time.Sleep(100 * time.Millisecond)
 
-	afterWait := recorder.snapshot()
+	afterWait := recorder.Events()
 
 	// the destroy start, a destroy start and success for each network and
 	// the destroy success
@@ -283,14 +271,14 @@ func TestDestroyDeliversEveryEventBeforeReturning(t *testing.T) {
 
 func TestEveryEventTimeFallsWithinTheCall(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.Record))
 
 	before := time.Now()
 	err := f.config.Apply(f.configFile)
 	after := time.Now()
 	require.NoError(t, err)
 
-	recorded := recorder.snapshot()
+	recorded := recorder.Events()
 	require.Len(t, recorded, independentNetworksEventCount)
 
 	for _, e := range recorded {
@@ -301,14 +289,14 @@ func TestEveryEventTimeFallsWithinTheCall(t *testing.T) {
 
 func TestEveryCoreEventNamesCoreAsSource(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
 
 	// the TestPlugin writes no log messages, so every event is produced by
 	// xcl itself
-	recorded := recorder.snapshot()
+	recorded := recorder.Events()
 	require.Len(t, recorded, independentNetworksEventCount)
 
 	for _, e := range recorded {
@@ -332,7 +320,7 @@ func TestApplyDoesNotWaitForSlowReceiver(t *testing.T) {
 
 	// every event was handled before Apply returned, which takes at least
 	// one delay per event
-	require.Len(t, recorder.snapshot(), independentNetworksEventCount)
+	require.Len(t, recorder.Events(), independentNetworksEventCount)
 	require.GreaterOrEqual(t, returned.Sub(started), independentNetworksEventCount*delay)
 
 	// the provider's calls all finished long before the receiver caught up
@@ -351,7 +339,7 @@ func TestApplyDoesNotWaitForSlowReceiver(t *testing.T) {
 
 func TestApplyWithBufferOfOneDeliversEveryEvent(t *testing.T) {
 	fastRecorder := &eventRecorder{}
-	fast := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(fastRecorder.handle))
+	fast := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(fastRecorder.Record))
 
 	err := fast.config.Apply(fast.configFile)
 	require.NoError(t, err)
@@ -365,8 +353,8 @@ func TestApplyWithBufferOfOneDeliversEveryEvent(t *testing.T) {
 	err = slow.config.Apply(slow.configFile)
 	require.NoError(t, err)
 
-	require.Len(t, withoutBlocked(fastRecorder.snapshot()), independentNetworksEventCount)
-	require.Len(t, withoutBlocked(slowRecorder.snapshot()), len(withoutBlocked(fastRecorder.snapshot())))
+	require.Len(t, withoutBlocked(fastRecorder.Events()), independentNetworksEventCount)
+	require.Len(t, withoutBlocked(slowRecorder.Events()), len(withoutBlocked(fastRecorder.Events())))
 }
 
 func TestApplyWithBufferOfOneAnnouncesBlocking(t *testing.T) {
@@ -379,7 +367,7 @@ func TestApplyWithBufferOfOneAnnouncesBlocking(t *testing.T) {
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
 
-	recorded := recorder.snapshot()
+	recorded := recorder.Events()
 
 	// a run can hold several blocked stretches, each announced once
 	blocked := onlyBlocked(recorded)
@@ -430,7 +418,7 @@ func TestReceiverIsNeverCalledConcurrently(t *testing.T) {
 
 func TestResourceEventsArriveInStartSuccessOrder(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, independentNetworksConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -447,7 +435,7 @@ func TestResourceEventsArriveInStartSuccessOrder(t *testing.T) {
 
 func TestFailedCreateStopsDependantsWithReceiver(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, dependentChainConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, dependentChainConfig, WithEventHandler(recorder.Record))
 
 	injected := errors.New("network-first-refused")
 	f.plugin.SetCreateError("resource.network.first", injected)
@@ -473,7 +461,7 @@ func TestFailedCreateStopsDependantsWithoutReceiver(t *testing.T) {
 
 func TestFailedCreateEmitsErrorEventWithReturnedError(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, dependentChainConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, dependentChainConfig, WithEventHandler(recorder.Record))
 
 	injected := errors.New("network-first-refused")
 	f.plugin.SetCreateError("resource.network.first", injected)
@@ -549,67 +537,15 @@ func TestDefaultEventBufferSizeIsUsedWhenUnset(t *testing.T) {
 	require.Equal(t, 1024, DefaultEventBufferSize)
 }
 
-// captureStandardStreams points os.Stdout and os.Stderr at pipes until the
-// returned function is called, which puts them back and returns everything
-// written to each
-func captureStandardStreams(t *testing.T) func() (string, string) {
-	t.Helper()
-
-	originalStdout := os.Stdout
-	originalStderr := os.Stderr
-
-	stdoutReader, stdoutWriter, err := os.Pipe()
-	require.NoError(t, err)
-
-	stderrReader, stderrWriter, err := os.Pipe()
-	require.NoError(t, err)
-
-	os.Stdout = stdoutWriter
-	os.Stderr = stderrWriter
-
-	restored := false
-	restore := func() {
-		if restored {
-			return
-		}
-
-		restored = true
-		os.Stdout = originalStdout
-		os.Stderr = originalStderr
-	}
-
-	t.Cleanup(restore)
-
-	var wg sync.WaitGroup
-	var stdout, stderr bytes.Buffer
-
-	wg.Go(func() { io.Copy(&stdout, stdoutReader) })
-	wg.Go(func() { io.Copy(&stderr, stderrReader) })
-
-	return func() (string, string) {
-		restore()
-
-		stdoutWriter.Close()
-		stderrWriter.Close()
-		wg.Wait()
-
-		stdoutReader.Close()
-		stderrReader.Close()
-
-		return stdout.String(), stderr.String()
-	}
-}
-
 func TestApplyWithoutReceiverWritesNothingToStdoutOrStderr(t *testing.T) {
 	f := setupDeliveryConfig(t, independentNetworksConfig)
 
-	finish := captureStandardStreams(t)
-
-	err := f.config.Apply(f.configFile)
-
-	stdout, stderr := finish()
+	var err error
+	captured := testutil.CaptureStandardStreams(t, func() {
+		err = f.config.Apply(f.configFile)
+	})
 
 	require.NoError(t, err)
-	require.Empty(t, stdout)
-	require.Empty(t, stderr)
+	require.Empty(t, captured.Stdout)
+	require.Empty(t, captured.Stderr)
 }

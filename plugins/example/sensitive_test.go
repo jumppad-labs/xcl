@@ -35,7 +35,7 @@ func applyTokenPerson(t *testing.T, reg *registry.PluginRegistry, store *state.F
 	options.ModuleCache = filepath.Join(t.TempDir(), parser.ConfigDirectory, "cache")
 	options.PluginRegistry = reg
 	options.StateStore = store
-	options.Emit = collector.collect
+	options.Emit = collector.Record
 	options.EventData = level
 	options.EventMask = mask.Redact()
 
@@ -66,12 +66,9 @@ func newTokenRegistry(t *testing.T) *registry.PluginRegistry {
 func (c *applyEventCollector) eventData(t *testing.T, operation string) []byte {
 	t.Helper()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	var data []byte
 	count := 0
-	for _, event := range c.events {
+	for _, event := range c.Events() {
 		if event.ResourceID == tokenPersonID && event.Operation == operation && event.Phase == events.PhaseSuccess {
 			data = event.Data
 			count++

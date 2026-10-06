@@ -52,6 +52,33 @@ type encodeZeroScalars struct {
 	Name     string `xcl:"name,optional"`
 }
 
+type encodeRequiredZeroScalars struct {
+	Port     int    `xcl:"port"`
+	Disabled bool   `xcl:"disabled"`
+	Name     string `xcl:"name"`
+}
+
+type encodeOptionalPointer struct {
+	Name  string  `xcl:"name"`
+	Value *string `xcl:"value,optional"`
+}
+
+type encodeOptionalBlock struct {
+	Name    string         `xcl:"name"`
+	Network *encodeNetwork `xcl:"network,block"`
+}
+
+// encodeOptionalObject is held as an object valued attribute, with an
+// optional field of its own
+type encodeOptionalObject struct {
+	Subnet string `xcl:"subnet"`
+	Mask   string `xcl:"mask,optional"`
+}
+
+type encodeOptionalObjectHolder struct {
+	Network encodeOptionalObject `xcl:"networkobj"`
+}
+
 type encodeComputedField struct {
 	Name       string `xcl:"name"`
 	ProviderID string `xcl:"provider_id,optional,computed"`
@@ -148,8 +175,25 @@ func TestEncodeBodySkipsNilValues(t *testing.T) {
 	require.NotContains(t, out, "null")
 }
 
-func TestEncodeBodyWritesZeroScalars(t *testing.T) {
+func TestEncodeBodyOmitsOptionalZeroScalars(t *testing.T) {
 	zeros := encodeZeroScalars{
+		Port:     0,
+		Disabled: false,
+		Name:     "",
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&zeros, f.Body(), EncodeOptions{})
+	require.NoError(t, err)
+
+	out := string(f.Bytes())
+	require.NotContains(t, out, "port")
+	require.NotContains(t, out, "disabled")
+	require.NotContains(t, out, "name")
+}
+
+func TestEncodeBodyWritesRequiredZeroScalars(t *testing.T) {
+	zeros := encodeRequiredZeroScalars{
 		Port:     0,
 		Disabled: false,
 		Name:     "",
@@ -163,6 +207,116 @@ func TestEncodeBodyWritesZeroScalars(t *testing.T) {
 	require.Contains(t, out, `port     = 0`)
 	require.Contains(t, out, `disabled = false`)
 	require.Contains(t, out, `name     = ""`)
+}
+
+func TestEncodeBodyWritesOptionalPointerToZero(t *testing.T) {
+	empty := ""
+	holder := encodeOptionalPointer{
+		Name:  "web",
+		Value: &empty,
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&holder, f.Body(), EncodeOptions{})
+	require.NoError(t, err)
+
+	out := string(f.Bytes())
+	require.Contains(t, out, `value = ""`)
+}
+
+func TestEncodeBodyOmitsOptionalZeroInsideObjectAttribute(t *testing.T) {
+	holder := encodeOptionalObjectHolder{
+		Network: encodeOptionalObject{
+			Subnet: "10.0.0.0/16",
+		},
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&holder, f.Body(), EncodeOptions{})
+	require.NoError(t, err)
+
+	out := string(f.Bytes())
+	require.Contains(t, out, "subnet")
+	require.NotContains(t, out, "mask")
+}
+
+func TestEncodeBodyIncludeEmptyWritesOptionalZeroScalars(t *testing.T) {
+	zeros := encodeZeroScalars{
+		Port:     0,
+		Disabled: false,
+		Name:     "",
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&zeros, f.Body(), EncodeOptions{IncludeEmpty: true})
+	require.NoError(t, err)
+
+	out := string(f.Bytes())
+	require.Contains(t, out, `port     = 0`)
+	require.Contains(t, out, `disabled = false`)
+	require.Contains(t, out, `name     = ""`)
+}
+
+func TestEncodeBodyIncludeEmptyWritesNilValuesAsTheirZeroValue(t *testing.T) {
+	nillable := encodeNillable{
+		Name:    "web",
+		Timeout: nil,
+		Tags:    nil,
+		Labels:  nil,
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&nillable, f.Body(), EncodeOptions{IncludeEmpty: true})
+	require.NoError(t, err)
+
+	out := string(f.Bytes())
+	require.Contains(t, out, `timeout = 0`)
+	require.Contains(t, out, `tags    = []`)
+	require.Contains(t, out, `labels  = {}`)
+	require.NotContains(t, out, "null")
+}
+
+func TestEncodeBodyIncludeEmptyWritesNilPointerToStringAsEmpty(t *testing.T) {
+	holder := encodeOptionalPointer{
+		Name:  "web",
+		Value: nil,
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&holder, f.Body(), EncodeOptions{IncludeEmpty: true})
+	require.NoError(t, err)
+
+	out := string(f.Bytes())
+	require.Contains(t, out, `value = ""`)
+}
+
+func TestEncodeBodyIncludeEmptyWritesOptionalZeroInsideObjectAttribute(t *testing.T) {
+	holder := encodeOptionalObjectHolder{
+		Network: encodeOptionalObject{
+			Subnet: "10.0.0.0/16",
+		},
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&holder, f.Body(), EncodeOptions{IncludeEmpty: true})
+	require.NoError(t, err)
+
+	out := string(f.Bytes())
+	require.Contains(t, out, `mask   = ""`)
+}
+
+func TestEncodeBodyIncludeEmptyLeavesNilBlocksOut(t *testing.T) {
+	holder := encodeOptionalBlock{
+		Name:    "web",
+		Network: nil,
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&holder, f.Body(), EncodeOptions{IncludeEmpty: true})
+	require.NoError(t, err)
+
+	out := string(f.Bytes())
+	require.NotContains(t, out, "network")
 }
 
 func TestEncodeBodyOmitsComputedByDefault(t *testing.T) {
@@ -214,6 +368,7 @@ func TestEncodeBodyWritesRepeatedBlocks(t *testing.T) {
 network {
   id = "network.cloud"
 }
+
 network {
   id = "network.onprem"
 }

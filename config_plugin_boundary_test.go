@@ -343,7 +343,7 @@ func TestExternalPluginLogCarriesResourceAndStep(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	recorder := &eventRecorder{}
-	f := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), onePersonConfig, WithEventHandler(recorder.handle))
+	f := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), onePersonConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -377,13 +377,13 @@ func TestInProcessAndExternalPluginLogsMatchExceptSource(t *testing.T) {
 	configFile := writeConfigFile(t, onePersonConfig)
 
 	inProcessRecorder := &eventRecorder{}
-	inProcess := newPersonConfig(t, inProcessPersonRegistry(t), configFile, t.TempDir(), WithEventHandler(inProcessRecorder.handle))
+	inProcess := newPersonConfig(t, inProcessPersonRegistry(t), configFile, t.TempDir(), WithEventHandler(inProcessRecorder.Record))
 
 	err := inProcess.config.Apply(inProcess.configFile)
 	require.NoError(t, err)
 
 	externalRecorder := &eventRecorder{}
-	external := newPersonConfig(t, externalPersonRegistry(t, binary), configFile, t.TempDir(), WithEventHandler(externalRecorder.handle))
+	external := newPersonConfig(t, externalPersonRegistry(t, binary), configFile, t.TempDir(), WithEventHandler(externalRecorder.Record))
 
 	err = external.config.Apply(external.configFile)
 	require.NoError(t, err)
@@ -415,7 +415,7 @@ func TestExternalPluginLogNamesPluginAsSource(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	recorder := &eventRecorder{}
-	f := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), onePersonConfig, WithEventHandler(recorder.handle))
+	f := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), onePersonConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -433,10 +433,10 @@ func TestEachConfigReceivesOnlyItsOwnPluginLogs(t *testing.T) {
 	pr := externalPersonRegistry(t, binary)
 
 	firstRecorder := &eventRecorder{}
-	first := setupPersonConfig(t, pr, t.TempDir(), firstTeamConfig, WithEventHandler(firstRecorder.handle))
+	first := setupPersonConfig(t, pr, t.TempDir(), firstTeamConfig, WithEventHandler(firstRecorder.Record))
 
 	secondRecorder := &eventRecorder{}
-	second := setupPersonConfig(t, pr, t.TempDir(), secondTeamConfig, WithEventHandler(secondRecorder.handle))
+	second := setupPersonConfig(t, pr, t.TempDir(), secondTeamConfig, WithEventHandler(secondRecorder.Record))
 
 	err := first.config.Apply(first.configFile)
 	require.NoError(t, err)
@@ -468,10 +468,10 @@ func TestEachConfigReceivesOnlyItsOwnPluginLogsWhenApplyingConcurrently(t *testi
 	pr := externalPersonRegistry(t, binary)
 
 	firstRecorder := &eventRecorder{}
-	first := setupPersonConfig(t, pr, t.TempDir(), firstTeamConfig, WithEventHandler(firstRecorder.handle))
+	first := setupPersonConfig(t, pr, t.TempDir(), firstTeamConfig, WithEventHandler(firstRecorder.Record))
 
 	secondRecorder := &eventRecorder{}
-	second := setupPersonConfig(t, pr, t.TempDir(), secondTeamConfig, WithEventHandler(secondRecorder.handle))
+	second := setupPersonConfig(t, pr, t.TempDir(), secondTeamConfig, WithEventHandler(secondRecorder.Record))
 
 	var wg sync.WaitGroup
 	var firstErr, secondErr error
@@ -548,7 +548,7 @@ func TestEveryExternalPluginLogReachesReceiver(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	recorder := &eventRecorder{}
-	f := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), threePeopleConfig, WithEventHandler(recorder.handle))
+	f := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), threePeopleConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -585,10 +585,10 @@ func TestReceiverSeesNothingOutsideItWithReceiverSet(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	inProcessRecorder := &eventRecorder{}
-	inProcess := setupPersonConfig(t, inProcessPersonRegistry(t), t.TempDir(), threePeopleConfig, WithEventHandler(inProcessRecorder.handle))
+	inProcess := setupPersonConfig(t, inProcessPersonRegistry(t), t.TempDir(), threePeopleConfig, WithEventHandler(inProcessRecorder.Record))
 
 	externalRecorder := &eventRecorder{}
-	external := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), threePeopleConfig, WithEventHandler(externalRecorder.handle))
+	external := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), threePeopleConfig, WithEventHandler(externalRecorder.Record))
 
 	finish := captureAllOutput(t)
 

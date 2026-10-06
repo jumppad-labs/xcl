@@ -9,6 +9,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclwrite"
@@ -90,7 +91,7 @@ func encodeRegistry(t *testing.T) *registry.PluginRegistry {
 func encodeEntityByID(t *testing.T, c *Config, id string) any {
 	t.Helper()
 
-	entity, err := entityByID(c.Entities(), id)
+	entity, err := testutil.EntityByID(c.Entities(), id)
 	require.NoError(t, err)
 	require.NotNil(t, entity)
 
@@ -309,7 +310,9 @@ func TestEncodeEntityOmitsBookkeepingInsideObjectAttribute(t *testing.T) {
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
-	out, err := EncodeEntity(container)
+	// the fixture leaves networkobj unset, IncludeEmpty writes it as a zero
+	// object so there is an object attribute to look inside
+	out, err := EncodeEntity(container, IncludeEmpty())
 	require.NoError(t, err)
 
 	text := string(out)
@@ -495,4 +498,27 @@ func TestEncodeSavedEntityLoadsUnloadedRegistry(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, strings.HasPrefix(string(out), "resource \"container\" \"web\" {"), "expected the container header, got:\n%s", string(out))
+}
+
+func TestEncodeEntityOmitsOptionalZeroAttributes(t *testing.T) {
+	c, _, _ := applyEncodeFixture(t)
+
+	container := encodeEntityByID(t, c, encodeContainerID)
+
+	out, err := EncodeEntity(container)
+	require.NoError(t, err)
+
+	// each network block leaves its optional id at zero
+	require.NotRegexp(t, `(?m)^\s+id\s+= 0$`, string(out))
+}
+
+func TestEncodeEntityIncludeEmptyWritesOptionalZeroAttributes(t *testing.T) {
+	c, _, _ := applyEncodeFixture(t)
+
+	container := encodeEntityByID(t, c, encodeContainerID)
+
+	out, err := EncodeEntity(container, IncludeEmpty())
+	require.NoError(t, err)
+
+	require.Regexp(t, `(?m)^\s+id\s+= 0$`, string(out))
 }

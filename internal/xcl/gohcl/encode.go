@@ -32,6 +32,13 @@ type EncodeOptions struct {
 	// and returns the value to write in its place. Values with no marks are
 	// not passed to it. When it is nil, a marked value is written unmarked.
 	ReplaceMarked func(cty.Value) cty.Value
+
+	// IncludeEmpty writes the attributes that are otherwise left out because
+	// they hold nothing: an optional attribute at its zero value, and an
+	// unset one, a nil pointer, slice or map, which is written as the zero
+	// value of the type it would hold. Unset blocks and nil interfaces are
+	// still left out, there is no type to write a value of.
+	IncludeEmpty bool
 }
 
 // EncodeBody replaces the contents of the given hclwrite Body with attributes
@@ -42,8 +49,11 @@ type EncodeOptions struct {
 // "remain" tag are written alongside the embedding struct's own fields, in
 // field order, because that is how the decoder fills them. A field held in an
 // interface is written by the type of the value it holds. Fields holding
-// nothing, a nil pointer, slice, map or interface, are left out, while a zero
-// number, false or empty string that is present is written.
+// nothing, a nil pointer, slice, map or interface, are left out, and so is an
+// optional attribute, one tagged optional or of pointer type, at its zero
+// value, since leaving it out reads back to the same value. A required
+// attribute at its zero value is written. EncodeOptions.IncludeEmpty writes
+// the attributes left out this way.
 //
 // Fields that decode attributes into hcl.Expression or hcl.Attribute values,
 // and fields that decode blocks into hcl.Body or hcl.Attributes values, are
@@ -185,9 +195,18 @@ func encodeAsBlock(rv reflect.Value, ty reflect.Type, blockType string, options 
 // bodyEncoder writes struct fields into one destination body. It holds the
 // layout state that decides where blank lines fall, so a struct embedded
 // under a "remain" tag and the struct embedding it lay out as one body.
+//
+// Every block is set apart by a blank line from whatever comes before it, a
+// block of the same type included, and an attribute that follows a block is
+// set apart from it too. Nothing comes before the first item of a body, so no
+// body opens with a blank line.
 type bodyEncoder struct {
 	dst     *hclwrite.Body
 	options EncodeOptions
+
+	// wroteAny records whether anything has been written to the body yet, so
+	// a block that opens the body is not preceded by a blank line
+	wroteAny bool
 
 	// prevWasBlock records whether the last thing written was a block, so an
 	// attribute that follows one is separated from it by a blank line
@@ -231,7 +250,7 @@ func (e *bodyEncoder) encodeStruct(rv reflect.Value, ty reflect.Type, path strin
 		case fieldRemain:
 			err = e.encodeRemain(field, fieldVal, path)
 		case fieldAttribute:
-			err = e.encodeAttribute(field, fieldVal, f.name, joinPath(path, f.name), computed)
+			err = e.encodeAttribute(field, fieldVal, f.name, joinPath(path, f.name), computed, isOptional(tags, f.name, field))
 		case fieldBlock:
 			err = e.encodeBlock(field, fieldVal, f.name, joinPath(path, f.name))
 		}
@@ -295,15 +314,16 @@ func (e *bodyEncoder) encodeRemain(field reflect.StructField, fieldVal reflect.V
 }
 
 // encodeAttribute writes one attribute, taking the value held in an interface
-// field by its dynamic type. A field holding nothing is left out.
-func (e *bodyEncoder) encodeAttribute(field reflect.StructField, fieldVal reflect.Value, name, path string, computed bool) error {
+// field by its dynamic type. A field left out by attributeToWrite is not
+// written.
+func (e *bodyEncoder) encodeAttribute(field reflect.StructField, fieldVal reflect.Value, name, path string, computed, optional bool) error {
 	// these hold an undecoded expression rather than a value, so there is
 	// nothing to write
 	if field.Type == exprType || field.Type == attrType {
 		return nil
 	}
 
-	fieldVal, ok := resolveValue(fieldVal)
+	fieldVal, ok := e.attributeToWrite(fieldVal, optional)
 	if !ok {
 		return nil
 	}
@@ -312,6 +332,8 @@ func (e *bodyEncoder) encodeAttribute(field reflect.StructField, fieldVal reflec
 		e.dst.AppendNewline()
 		e.prevWasBlock = false
 	}
+
+	e.wroteAny = true
 
 	val, err := e.attributeValue(fieldVal, path)
 	if err != nil {
@@ -450,7 +472,7 @@ func (e *bodyEncoder) objectValue(rv reflect.Value, path string) (cty.Value, err
 			continue
 		}
 
-		fieldVal, ok := resolveValue(rv.Field(f.index))
+		fieldVal, ok := e.attributeToWrite(rv.Field(f.index), isOptional(tags, f.name, rv.Type().Field(f.index)))
 		if !ok {
 			continue
 		}
@@ -575,10 +597,6 @@ func (e *bodyEncoder) encodeBlock(field reflect.StructField, fieldVal reflect.Va
 		return nil
 	}
 
-	// each block field opens a group of its own, so the first block written
-	// for it is separated from whatever came before
-	e.prevWasBlock = false
-
 	fieldVal, ok := resolveValue(fieldVal)
 	if !ok {
 		return nil
@@ -614,12 +632,14 @@ func (e *bodyEncoder) appendBlock(rv reflect.Value, name, path string) error {
 		return err
 	}
 
-	if !e.prevWasBlock {
+	if e.wroteAny {
 		e.dst.AppendNewline()
-		e.prevWasBlock = true
 	}
 
 	e.dst.AppendBlock(block)
+
+	e.wroteAny = true
+	e.prevWasBlock = true
 
 	return nil
 }
@@ -648,6 +668,59 @@ func resolveValue(val reflect.Value) (reflect.Value, bool) {
 			return val, true
 		}
 	}
+}
+
+// attributeToWrite returns the value to write for an attribute field, and
+// false when the attribute is left out. A field holding nothing is left out,
+// and so is an optional one at its zero value, unless IncludeEmpty is set: then
+// the zero value is written, and a field holding nothing is written as the
+// zero value of the type it would hold.
+//
+// The zero check is on the field itself, so a pointer is zero only when it is
+// nil: a pointer to an empty string was set on purpose and is written.
+func (e *bodyEncoder) attributeToWrite(fieldVal reflect.Value, optional bool) (reflect.Value, bool) {
+	resolved, ok := resolveValue(fieldVal)
+	if !ok {
+		if !e.options.IncludeEmpty {
+			return resolved, false
+		}
+
+		return emptyValue(fieldVal.Type())
+	}
+
+	if optional && !e.options.IncludeEmpty && fieldVal.IsZero() {
+		return resolved, false
+	}
+
+	return resolved, true
+}
+
+// emptyValue returns the zero value of the type a field of type ty holds,
+// following pointers. A slice or map is made empty rather than nil, so it is
+// written as [] or {} rather than null. An interface holds no type of its own,
+// so there is nothing to write for one and it reports false.
+func emptyValue(ty reflect.Type) (reflect.Value, bool) {
+	for ty.Kind() == reflect.Ptr {
+		ty = ty.Elem()
+	}
+
+	switch ty.Kind() {
+	case reflect.Interface:
+		return reflect.Value{}, false
+	case reflect.Slice:
+		return reflect.MakeSlice(ty, 0, 0), true
+	case reflect.Map:
+		return reflect.MakeMap(ty), true
+	}
+
+	return reflect.Zero(ty), true
+}
+
+// isOptional reports whether the attribute name of a struct is optional: it is
+// tagged optional, or it is a pointer, which the decoder treats as optional
+// without the tag
+func isOptional(tags *fieldTags, name string, field reflect.StructField) bool {
+	return tags.Optional[name] || field.Type.Kind() == reflect.Ptr
 }
 
 // joinPath names a field within the struct at path, for error messages

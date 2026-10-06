@@ -10,6 +10,7 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
@@ -72,7 +73,7 @@ func setupDestroyConfig(t *testing.T, log logger.Logger) *destroyFixture {
 	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithStateStore(store),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 		// the destroy tests assert on what events carry, which is nothing
 		// unless a level asks for it
 		WithEventData(EventDataRaw),
@@ -102,9 +103,7 @@ func applyDestroyFixture(t *testing.T, f *destroyFixture) {
 
 	f.plugin.ResetCalls()
 
-	f.recorder.mu.Lock()
-	f.recorder.events = nil
-	f.recorder.mu.Unlock()
+	f.recorder.reset()
 }
 
 // requireCalledBefore asserts first appears in calls before second
@@ -132,10 +131,7 @@ func requireCalledBefore(t *testing.T, calls []string, first, second string) {
 // eventIndex returns the position of the first event matching id, operation
 // and phase in the order the recorder received them, or -1
 func eventIndex(r *eventRecorder, id, operation, phase string) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	for i, e := range r.events {
+	for i, e := range r.Events() {
 		if e.ResourceID == id && e.Operation == operation && e.Phase == phase {
 			return i
 		}
@@ -147,11 +143,8 @@ func eventIndex(r *eventRecorder, id, operation, phase string) int {
 // logEventsAboveDebug returns every log event the recorder has received at
 // info, warn or error, as "<level>: <message>"
 func logEventsAboveDebug(r *eventRecorder) []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	found := []string{}
-	for _, e := range r.events {
+	for _, e := range r.Events() {
 		if e.Phase != events.PhaseLog || e.Meta[events.KeyLevel] == events.LevelDebug {
 			continue
 		}
@@ -369,20 +362,20 @@ func TestConfigDestroyReturnsErrorNamingFailedResource(t *testing.T) {
 	saved, err := savedentity.DecodeAll(f.registry, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
-	second, err := entityByID(saved, "resource.container.second")
+	second, err := testutil.EntityByID(saved, "resource.container.second")
 	require.NoError(t, err)
 
 	secondMeta, err := types.GetMeta(second)
 	require.NoError(t, err)
 	require.Equal(t, types.StatusDestroyFailed, secondMeta.Status)
 
-	_, err = entityByID(saved, "resource.network.first")
+	_, err = testutil.EntityByID(saved, "resource.network.first")
 	require.NoError(t, err)
 
-	_, err = entityByID(saved, "resource.container.third")
+	_, err = testutil.EntityByID(saved, "resource.container.third")
 	require.Error(t, err)
 
-	_, err = entityByID(saved, "resource.network.independent")
+	_, err = testutil.EntityByID(saved, "resource.network.independent")
 	require.Error(t, err)
 
 	require.Equal(t, 2, f.config.ResourceCount())
@@ -463,7 +456,7 @@ func TestConfigDestroyLogsNothingAboveDebug(t *testing.T) {
 	err := f.config.Destroy()
 	require.NoError(t, err)
 
-	require.NotEmpty(t, f.recorder.snapshot(), "the destroy delivered no events at all")
+	require.NotEmpty(t, f.recorder.Events(), "the destroy delivered no events at all")
 	require.Empty(t, logEventsAboveDebug(f.recorder))
 }
 

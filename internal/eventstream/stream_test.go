@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,31 +16,17 @@ import (
 // any of the operations should take so a slow machine never fails a test
 const generousTimeout = 5 * time.Second
 
-// recorder collects every event delivered to its receive method, it is safe
-// to read while Drain is still running
+// recorder collects every event delivered to its Record method, it is safe
+// to read while Drain is still running. It adds this package's queries to the
+// shared recorder
 type recorder struct {
-	mu     sync.Mutex
-	events []events.Event
-}
-
-func (r *recorder) receive(e events.Event) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.events = append(r.events, e)
-}
-
-func (r *recorder) all() []events.Event {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return append([]events.Event(nil), r.events...)
+	testutil.EventRecorder
 }
 
 // regular returns the delivered events that are not blocked announcements
 func (r *recorder) regular() []events.Event {
 	var regular []events.Event
-	for _, e := range r.all() {
+	for _, e := range r.Events() {
 		if e.Phase != events.PhaseBlocked {
 			regular = append(regular, e)
 		}
@@ -51,7 +38,7 @@ func (r *recorder) regular() []events.Event {
 // blocked returns the delivered blocked announcements
 func (r *recorder) blocked() []events.Event {
 	var blocked []events.Event
-	for _, e := range r.all() {
+	for _, e := range r.Events() {
 		if e.Phase == events.PhaseBlocked {
 			blocked = append(blocked, e)
 		}
@@ -157,7 +144,7 @@ func TestEmitWithALimitOfOneAndASlowReceiverDeliversEveryEvent(t *testing.T) {
 	rec := &recorder{}
 	receiver := func(e events.Event) {
 		time.Sleep(time.Millisecond)
-		rec.receive(e)
+		rec.Record(e)
 	}
 	done := make(chan struct{})
 	returned := startDrain(s, receiver, done)
@@ -193,7 +180,7 @@ func TestASingleBlockedStretchProducesExactlyOneBlockedEvent(t *testing.T) {
 
 	rec := &recorder{}
 	done := make(chan struct{})
-	returned := startDrain(s, rec.receive, done)
+	returned := startDrain(s, rec.Record, done)
 
 	emitters.Wait()
 	close(done)
@@ -226,7 +213,7 @@ func TestTheBlockedEventDoesNotReduceTheDeliveredRegularEvents(t *testing.T) {
 
 	rec := &recorder{}
 	done := make(chan struct{})
-	returned := startDrain(s, rec.receive, done)
+	returned := startDrain(s, rec.Record, done)
 
 	emitters.Wait()
 	close(done)
@@ -234,14 +221,14 @@ func TestTheBlockedEventDoesNotReduceTheDeliveredRegularEvents(t *testing.T) {
 
 	require.Len(t, rec.blocked(), 1)
 	require.Len(t, rec.regular(), 4)
-	require.Len(t, rec.all(), 5)
+	require.Len(t, rec.Events(), 5)
 }
 
 func TestDeliveryOrderMatchesEmitOrderForOneEmitter(t *testing.T) {
 	s := New(1)
 	rec := &recorder{}
 	done := make(chan struct{})
-	returned := startDrain(s, rec.receive, done)
+	returned := startDrain(s, rec.Record, done)
 
 	for i := 0; i < 100; i++ {
 		s.Emit(events.Event{ResourceID: fmt.Sprintf("event-%03d", i)})
@@ -310,10 +297,10 @@ func TestDrainDoesNotReturnBeforeDoneIsClosed(t *testing.T) {
 
 	rec := &recorder{}
 	done := make(chan struct{})
-	returned := startDrain(s, rec.receive, done)
+	returned := startDrain(s, rec.Record, done)
 
 	require.Eventually(t, func() bool {
-		return len(rec.all()) == 5
+		return len(rec.Events()) == 5
 	}, generousTimeout, time.Millisecond)
 
 	// the queue is empty but done is still open
@@ -337,9 +324,9 @@ func TestDrainDeliversEverythingQueuedBeforeReturning(t *testing.T) {
 	close(done)
 
 	rec := &recorder{}
-	s.Drain(rec.receive, done)
+	s.Drain(rec.Record, done)
 
-	all := rec.all()
+	all := rec.Events()
 	require.Len(t, all, 5)
 	require.Equal(t, "event-0", all[0].ResourceID)
 	require.Equal(t, "event-1", all[1].ResourceID)
@@ -374,9 +361,9 @@ func TestEmitAfterDiscardDropsTheEvent(t *testing.T) {
 	done := make(chan struct{})
 	close(done)
 	rec := &recorder{}
-	s.Drain(rec.receive, done)
+	s.Drain(rec.Record, done)
 
-	require.Empty(t, rec.all())
+	require.Empty(t, rec.Events())
 }
 
 func TestDiscardCanBeCalledMoreThanOnce(t *testing.T) {
@@ -398,9 +385,9 @@ func TestEmitStampsTheTimeAndSourceDefaults(t *testing.T) {
 	done := make(chan struct{})
 	close(done)
 	rec := &recorder{}
-	s.Drain(rec.receive, done)
+	s.Drain(rec.Record, done)
 
-	all := rec.all()
+	all := rec.Events()
 	require.Len(t, all, 1)
 	require.Equal(t, events.SourceCore, all[0].Source)
 	require.False(t, all[0].Time.IsZero())
@@ -417,9 +404,9 @@ func TestEmitKeepsATimeAndSourceGivenByTheCaller(t *testing.T) {
 	done := make(chan struct{})
 	close(done)
 	rec := &recorder{}
-	s.Drain(rec.receive, done)
+	s.Drain(rec.Record, done)
 
-	all := rec.all()
+	all := rec.Events()
 	require.Len(t, all, 1)
 	require.Equal(t, "example", all[0].Source)
 	require.Equal(t, given, all[0].Time)

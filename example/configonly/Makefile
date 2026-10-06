@@ -3,6 +3,11 @@
 
 CONFIG_DIR := ./config
 
+# The database password the configuration reads with env("DB_PASSWORD"), a
+# demo value unless one is already set
+DB_PASSWORD ?= example-password
+export DB_PASSWORD
+
 .PHONY: run test
 
 # Run the example against its configuration

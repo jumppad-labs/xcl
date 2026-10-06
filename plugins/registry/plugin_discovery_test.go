@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -451,13 +452,13 @@ func TestPluginDiscoveryReportsWhatItFindsAsDiscoverLogEvents(t *testing.T) {
 	examplePlugin := setup.buildExamplePlugin("test-plugin-base")
 	pluginPath := setup.copyPlugin(examplePlugin, validDir, "xcl-plugin-test")
 
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 
-	pd := NewPluginDiscovery([]string{validDir}, "xcl-plugin-*", recorder.emit)
+	pd := NewPluginDiscovery([]string{validDir}, "xcl-plugin-*", recorder.Record)
 	_, err := pd.DiscoverPlugins()
 	require.NoError(t, err)
 
-	found := logsWithMessage(recorder.recorded(), "Found plugin")
+	found := logsWithMessage(recorder.Events(), "Found plugin")
 	require.Len(t, found, 1)
 	require.Equal(t, events.SourceCore, found[0].Source)
 	require.Equal(t, events.OperationDiscover, found[0].Operation)
@@ -655,16 +656,16 @@ func TestDiscoveryReportsDiscoverLoadAndRejectEvents(t *testing.T) {
 	setup.copyPlugin(examplePlugin, pluginDir, "xcl-plugin-good")
 	badPath := setup.createNonPlugin(pluginDir, "xcl-plugin-bad")
 
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	r := NewPluginRegistry()
 	t.Cleanup(func() { stopHosts(r) })
 
 	r.DiscoverPlugins([]string{pluginDir}, "xcl-plugin-*")
 
-	err := r.Load(recorder.emit)
+	err := r.Load(recorder.Record)
 	require.NoError(t, err)
 
-	discovered := lifecycleEvents(recorder.recorded(), events.OperationDiscover)
+	discovered := lifecycleEvents(recorder.Events(), events.OperationDiscover)
 	require.Len(t, discovered, 2)
 
 	require.Equal(t, events.SourceCore, discovered[0].Source)
@@ -675,14 +676,14 @@ func TestDiscoveryReportsDiscoverLoadAndRejectEvents(t *testing.T) {
 	require.Equal(t, events.PhaseSuccess, discovered[1].Phase)
 	require.Equal(t, map[string]any{"dirs": []string{pluginDir}, "count": 2}, discovered[1].Meta)
 
-	loads := lifecycleEvents(recorder.recorded(), events.OperationLoad)
+	loads := lifecycleEvents(recorder.Events(), events.OperationLoad)
 
-	succeeded := eventsWithPhase(loads, events.PhaseSuccess)
+	succeeded := testutil.EventsWithPhase(loads, events.PhaseSuccess)
 	require.Len(t, succeeded, 1)
 	require.Equal(t, events.SourceCore, succeeded[0].Source)
 	require.Equal(t, map[string]any{"plugin": "xcl-plugin-good", "block_types": "person"}, succeeded[0].Meta)
 
-	rejected := eventsWithPhase(loads, events.PhaseError)
+	rejected := testutil.EventsWithPhase(loads, events.PhaseError)
 	require.Len(t, rejected, 1)
 	require.Equal(t, events.SourceCore, rejected[0].Source)
 	require.Error(t, rejected[0].Error)

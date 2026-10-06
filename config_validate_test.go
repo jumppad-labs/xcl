@@ -9,6 +9,7 @@ import (
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/jumppad-labs/xcl/types"
@@ -285,14 +286,14 @@ func TestApplySavesStateWhenProviderFails(t *testing.T) {
 	saved, err := savedentity.DecodeAll(c.pluginRegistry, savedRecords, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
-	consul, err := entityByID(saved, "resource.container.consul")
+	consul, err := testutil.EntityByID(saved, "resource.container.consul")
 	require.NoError(t, err)
 
 	consulMeta, err := types.GetMeta(consul)
 	require.NoError(t, err)
 	require.Equal(t, types.StatusFailed, consulMeta.Status)
 
-	onprem, err := entityByID(saved, "resource.network.onprem")
+	onprem, err := testutil.EntityByID(saved, "resource.network.onprem")
 	require.NoError(t, err)
 
 	onpremMeta, err := types.GetMeta(onprem)

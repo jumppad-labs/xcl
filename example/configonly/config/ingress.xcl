@@ -1,0 +1,29 @@
+# The service is linked to the deployment by its id. Kubernetes would match
+# the two with a label selector, because a manifest can not point at another
+# object; here the reference does it directly.
+#
+# The port it sends traffic to is read out of the deployment as well. A
+# repeated block is referenced by position, container[0] is the first
+# container block.
+service "api" {
+  deployment  = deployment.api.meta.id
+  port        = 80
+  target_port = deployment.api.container[0].port[0].container_port
+}
+
+# The ingress is linked to the service the same way, by id and port.
+# References order the blocks too, so the service is always parsed before the
+# ingress that reads it.
+ingress "api" {
+  host = "api.example.com"
+
+  rule {
+    path    = "/"
+    service = service.api.meta.id
+    port    = service.api.port
+  }
+}
+
+output "api_url" {
+  value = "https://${ingress.api.host}"
+}

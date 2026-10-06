@@ -15,10 +15,8 @@
 // The Go types are in ./resources and the configuration it applies is in
 // ./config.
 //
-// Set XCL_STATE_KEY to a base64 encoded 32 byte key, for example
-// `XCL_STATE_KEY=$(openssl rand -base64 32) make run`, to encrypt the
-// passwords in state. Without it xcl warns that state holds them in plain
-// text.
+// The passwords are encrypted in state with a key generated at start up,
+// see newStateKey.
 //
 // Build the external plugin and run the example from this directory with
 // `make run`, see the Makefile for the other targets. The configuration
@@ -28,7 +26,7 @@
 package main
 
 import (
-	"encoding/base64"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -43,24 +41,15 @@ import (
 	"github.com/jumppad-labs/xcl/types"
 )
 
-// stateKeyEnv names the environment variable holding the key the example
-// encrypts the sensitive values in its state with: 32 bytes, base64 encoded,
-// for example the output of `openssl rand -base64 32`. In a real application
-// the key comes from a secret store and is never committed. Without it the
-// example still runs, and xcl warns that state holds sensitive values in
-// plain text.
-const stateKeyEnv = "XCL_STATE_KEY"
-
-// stateKeyFromEnv returns the key in stateKeyEnv, or nil when it is not set
-func stateKeyFromEnv() ([]byte, error) {
-	encoded := os.Getenv(stateKeyEnv)
-	if encoded == "" {
-		return nil, nil
-	}
-
-	key, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return nil, fmt.Errorf("%s is not base64: %w", stateKeyEnv, err)
+// newStateKey returns a random 32 byte key to encrypt the sensitive values in
+// state with. The state only lives as long as one run of the example, so a
+// fresh key each run is enough. A real application keeps its state, so it
+// loads a stable key from a secret store instead, a key it loses is state it
+// can no longer read.
+func newStateKey() ([]byte, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("unable to generate the state key: %w", err)
 	}
 
 	return key, nil
@@ -75,7 +64,7 @@ func stateMaskOptions(stateKey []byte) ([]xcl.ConfigOption, error) {
 
 	masker, err := mask.EncryptAES256GCM(stateKey)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", stateKeyEnv, err)
+		return nil, fmt.Errorf("invalid state key: %w", err)
 	}
 
 	return []xcl.ConfigOption{xcl.WithStateMask(masker)}, nil
@@ -92,8 +81,8 @@ func main() {
 		externalPlugin = os.Args[2]
 	}
 
-	// The state is encrypted when a key is given, see stateKeyEnv
-	stateKey, err := stateKeyFromEnv()
+	// Encrypt the sensitive values in state, see newStateKey
+	stateKey, err := newStateKey()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)

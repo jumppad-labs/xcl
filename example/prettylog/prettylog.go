@@ -38,7 +38,8 @@ const LevelEnv = "XCL_LOG_LEVEL"
 //
 // When an entity is created it also writes that entity's configuration
 // beneath the success line, so a reader sees what was actually made,
-// including the values the provider filled in:
+// including the values the provider filled in. On a terminal it is coloured
+// the way the xcl-vscode extension colours it in the editor:
 //
 //	10:04AM INFO create success source=core operation=create resource=resource.postgres.main
 //	  resource "postgres" "main" {
@@ -71,9 +72,13 @@ func Handler(w io.Writer, level slog.Level, reg *registry.PluginRegistry) xcl.Ev
 		return delegate
 	}
 
+	// colour is decided for w itself, as the logger does, so output to a
+	// file or a buffer is plain text
+	h := newHighlighter(lipgloss.NewRenderer(w))
+
 	return func(e xcl.Event) {
 		delegate(e)
-		writeConfiguration(w, logger, reg, e)
+		writeConfiguration(w, logger, reg, h, e)
 	}
 }
 
@@ -81,7 +86,7 @@ func Handler(w io.Writer, level slog.Level, reg *registry.PluginRegistry) xcl.Ev
 // created, beneath the line reporting it. An event carries the entity only
 // when the application asked for xcl.EventDataProcessed, so this does nothing
 // by default.
-func writeConfiguration(w io.Writer, logger *charmlog.Logger, reg *registry.PluginRegistry, e xcl.Event) {
+func writeConfiguration(w io.Writer, logger *charmlog.Logger, reg *registry.PluginRegistry, h highlighter, e xcl.Event) {
 	if e.Operation != events.OperationCreate || e.Phase != events.PhaseSuccess || len(e.Data) == 0 {
 		return
 	}
@@ -103,7 +108,7 @@ func writeConfiguration(w io.Writer, logger *charmlog.Logger, reg *registry.Plug
 		return
 	}
 
-	fmt.Fprintf(w, "%s\n", indent(string(text)))
+	fmt.Fprintf(w, "%s\n", h.highlight(indent(string(text))))
 }
 
 // indent shifts every non-empty line of text right, so the configuration sits

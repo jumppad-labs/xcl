@@ -28,12 +28,14 @@ const computedComment = "set by the provider"
 // unexported so the set of options stays closed to the functions below.
 type encodeOptions struct {
 	includeComputed bool
+	includeEmpty    bool
 	revealSensitive bool
 	showReferences  bool
 }
 
 // EncodeOption configures how an entity is written as configuration text.
-// Construct one with IncludeComputed, RevealSensitive or ShowReferences.
+// Construct one with IncludeComputed, IncludeEmpty, RevealSensitive or
+// ShowReferences.
 type EncodeOption func(*encodeOptions)
 
 // IncludeComputed also writes the fields a provider fills in, such as an
@@ -46,6 +48,24 @@ type EncodeOption func(*encodeOptions)
 func IncludeComputed() EncodeOption {
 	return func(o *encodeOptions) {
 		o.includeComputed = true
+	}
+}
+
+// IncludeEmpty also writes the attributes that hold nothing. Without it an
+// optional attribute at its zero value is left out, and so is one that is not
+// set, a nil pointer, slice or map, since leaving either out reads back to the
+// same value. With it, an optional attribute is written at its zero value, and
+// one that is not set is written as the zero value of the type it would hold:
+// "" for a *string, [] for a slice, {} for a map. Unset blocks are still left
+// out.
+//
+// Text written this way is for reading every field. It does not read back
+// exactly: an unset field is written the same way as one set to its zero
+// value, so a nil *string reads back as a pointer to "", and a nil slice or
+// map as an empty one.
+func IncludeEmpty() EncodeOption {
+	return func(o *encodeOptions) {
+		o.includeEmpty = true
 	}
 }
 
@@ -91,7 +111,9 @@ func ShowReferences() EncodeOption {
 // several entities by calling this once for each.
 //
 // Fields a provider filled in are left out unless IncludeComputed is given, so
-// the text reads back to the same configured values. Values are written as the
+// the text reads back to the same configured values. Optional attributes at
+// their zero value, and attributes that are not set, are left out unless
+// IncludeEmpty is given. Values are written as the
 // literals they resolved to, not as the expressions the original configuration
 // used, unless ShowReferences is given.
 //
@@ -187,6 +209,7 @@ func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 		IncludeComputed: opts.includeComputed,
 		ComputedComment: computedComment,
 		ReplaceMarked:   sensitiveReplacement(opts.revealSensitive),
+		IncludeEmpty:    opts.includeEmpty,
 	})
 	if err != nil {
 		return nil, &xclerrors.NotEncodableError{

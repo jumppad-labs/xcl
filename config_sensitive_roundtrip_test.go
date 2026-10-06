@@ -274,7 +274,7 @@ func applyCredentialWithEventData(t *testing.T, level EventDataLevel) *eventReco
 
 	recorder := &eventRecorder{}
 
-	c, _, _ := newCredentialConfig(t, t.TempDir(), WithEventHandler(recorder.handle), WithEventData(level))
+	c, _, _ := newCredentialConfig(t, t.TempDir(), WithEventHandler(recorder.Record), WithEventData(level))
 	require.NoError(t, c.Apply(writeCredentialConfig(t)))
 
 	return recorder

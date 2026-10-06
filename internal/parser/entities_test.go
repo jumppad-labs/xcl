@@ -56,24 +56,6 @@ func testStateWithContainer(t *testing.T) (*State, *testStateContainer) {
 	return s, r
 }
 
-// entityByID returns the entity the state holds under the given id. Storage
-// answers no questions about addresses, so a test that wants one entity back
-// scans what is held and compares the id each entity already records
-func entityByID(s *State, id string) (any, error) {
-	for _, e := range s.GetResources() {
-		meta, err := types.GetMeta(e)
-		if err != nil {
-			continue
-		}
-
-		if meta.ID == id {
-			return e, nil
-		}
-	}
-
-	return nil, state.ResourceNotFoundError{Resource: id}
-}
-
 func TestAppendResourceStoresTheEntity(t *testing.T) {
 	s, want := testStateWithContainer(t)
 

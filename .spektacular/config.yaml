@@ -6,7 +6,7 @@ command: spektacular
 agent: claude
 spec_trigger_threshold: moderate
 epic_split_threshold: moderate
-auto_commit: "off"
+auto_commit: on
 debug:
     enabled: false
 spec:
@@ -41,3 +41,5 @@ repos:
       location: .
     - name: xcl-website
       location: ../../xcl-website/.spektacular
+    - name: xcl-vscode
+      location: ../../xcl-vscode/.spektacular

@@ -114,12 +114,10 @@ func TestEncodeEntityShowsNestedBlockReferencesAsWritten(t *testing.T) {
 	text := string(out)
 
 	expectedFirst := `  network {
-    id         = 0
     name       = resource.network.main.meta.name
     ip_address = "10.0.0.10"
   }`
 	expectedSecond := `  network {
-    id         = 0
     name       = resource.network.main.meta.name
     ip_address = "10.0.0.11"
   }`
@@ -212,7 +210,6 @@ func TestEncodeEntityShowsReferencesWithComputed(t *testing.T) {
 	expected := `resource "network" "referenced" {
   subnet      = variable.subnet
   provider_id = "id-referenced" # set by the provider
-  observed    = "" # set by the provider
 }
 `
 

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 )
 
@@ -203,14 +204,14 @@ func TestDirectPluginHostReadReturnsErrNotFoundFromProvider(t *testing.T) {
 }
 
 func TestTypedProviderAdapterCreateEmitsNoLogEventsOfItsOwn(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	provider := &readRecordingProvider{}
 	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
 
-	ctx := WithLogger(context.Background(), logger.New(recorder.emit, events.Event{Source: "core", ResourceID: "resource.test.web"}))
+	ctx := WithLogger(context.Background(), logger.New(recorder.Record, events.Event{Source: "core", ResourceID: "resource.test.web"}))
 
 	_, err := adapter.Create(ctx, []byte(`{"name":"web","count":1}`))
 	require.NoError(t, err)
 
-	require.Empty(t, recorder.recorded())
+	require.Empty(t, recorder.Events())
 }

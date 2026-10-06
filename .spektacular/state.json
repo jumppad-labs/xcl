@@ -15,14 +15,15 @@
     "split",
     "finished"
   ],
-  "created_at": "2026-10-03T13:45:28.137239472Z",
-  "updated_at": "2026-10-03T15:34:25.427627307Z",
+  "created_at": "2026-10-06T11:21:08.954541622Z",
+  "updated_at": "2026-10-06T11:29:40.388343796Z",
   "data": {
-    "name": "20261003134528-327e0657-references-and-secrets",
+    "epic": "20261006071139-7b266535-examples-and-output",
+    "name": "20261006112108-17623cda-encoder-syntax-highlighting",
     "sources": [
       {
-        "retrieved_date": "2026-10-03",
-        "uri": "https://github.com/jumppad-labs/xcl/issues/1"
+        "retrieved_date": "2026-10-06",
+        "uri": "https://github.com/jumppad-labs/xcl/issues/6"
       }
     ]
   }

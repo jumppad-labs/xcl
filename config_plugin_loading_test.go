@@ -70,7 +70,7 @@ func setupMissingPluginConfig(t *testing.T) (*Config, *eventRecorder) {
 
 	c, err := NewConfig(
 		WithPluginRegistry(pr),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 	)
 	require.NoError(t, err)
 
@@ -99,7 +99,7 @@ func eventsFor(recorder *eventRecorder, operation, phase string) []Event {
 
 // indexOf returns the position of the first event matching match, or -1
 func indexOf(recorder *eventRecorder, match func(Event) bool) int {
-	for i, e := range recorder.snapshot() {
+	for i, e := range recorder.Events() {
 		if match(e) {
 			return i
 		}
@@ -210,11 +210,11 @@ func TestSharedRegistryStartsExternalPluginOnce(t *testing.T) {
 	require.NoError(t, err)
 
 	firstRecorder := &eventRecorder{}
-	first, err := NewConfig(WithPluginRegistry(pr), WithEventHandler(firstRecorder.handle))
+	first, err := NewConfig(WithPluginRegistry(pr), WithEventHandler(firstRecorder.Record))
 	require.NoError(t, err)
 
 	secondRecorder := &eventRecorder{}
-	second, err := NewConfig(WithPluginRegistry(pr), WithEventHandler(secondRecorder.handle))
+	second, err := NewConfig(WithPluginRegistry(pr), WithEventHandler(secondRecorder.Record))
 	require.NoError(t, err)
 
 	path := writeConfigFile(t, variableOnlyConfig)
@@ -273,7 +273,7 @@ func TestFirstValidateFailsWithClashForPluginType(t *testing.T) {
 
 func TestValidateEmitsLoadEventsForRegisteredPlugin(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Validate(f.configFile)
 	require.NoError(t, err)
@@ -308,7 +308,7 @@ func TestValidateEmitsLoadEventsForRegisteredPlugin(t *testing.T) {
 // operation on a Config uses the plugins the first loaded
 func TestSecondValidateEmitsNoLoadEvents(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Validate(f.configFile)
 	require.NoError(t, err)
@@ -322,7 +322,7 @@ func TestSecondValidateEmitsNoLoadEvents(t *testing.T) {
 
 func TestInProcessPluginInitLogsReachTheLoadingOperation(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 	f.plugin.SetLogOnInit(parser.LogMessage{Level: "info", Message: "plugin ready", Args: []any{"types", 4}})
 
 	err := f.config.Validate(f.configFile)

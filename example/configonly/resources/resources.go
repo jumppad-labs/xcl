@@ -21,11 +21,24 @@ import "github.com/jumppad-labs/xcl/types"
 // ConfigMap defines the block type `config_map`, a bag of values the
 // deployment reads. A map attribute holds values whose names are not known
 // ahead of time, and a single value can be read from it with
-// `resource.config_map.api.data.db_host`.
+// `config_map.api.data.db_host`.
 type ConfigMap struct {
 	types.ResourceBase `xcl:",remain"`
 
 	Data map[string]string `xcl:"data" json:"data"`
+}
+
+// Secret defines the block type `secret`, values that must not be seen. Data
+// is a types.Sensitive, so it is masked in output and events and encrypted in
+// state when the state has a key, and only Reveal returns the real values.
+//
+// As in Kubernetes, nothing else holds a secret's values: a container reads
+// one through a secret_key_ref naming the secret and the key, which are plain
+// strings, so the deployment never becomes sensitive itself.
+type Secret struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Data types.Sensitive[map[string]string] `xcl:"data" json:"data"`
 }
 
 // Deployment defines the block type `deployment`. It holds repeated container
@@ -48,15 +61,13 @@ type Deployment struct {
 // resource of its own, so it does not embed types.ResourceBase and can not be
 // referenced by its own id, its fields are reached through the deployment
 // that holds it, i.e.
-// `resource.deployment.api.container[0].port[0].container_port`.
+// `deployment.api.container[0].port[0].container_port`.
 type Container struct {
 	Name  string `xcl:"name" json:"name"`
 	Image string `xcl:"image" json:"image"`
 
 	Ports []Port   `xcl:"port,block" json:"port,omitempty"`
 	Env   []EnvVar `xcl:"env,block" json:"env,omitempty"`
-
-	Password types.Sensitive[string] `xcl:"password"`
 
 	// Resources appears at most once, so it is a pointer and is nil when the
 	// container does not set it
@@ -75,7 +86,23 @@ type Port struct {
 // from a config map
 type EnvVar struct {
 	Name  string `xcl:"name" json:"name"`
-	Value string `xcl:"value" json:"value"`
+	Value string `xcl:"value,optional" json:"value,omitempty"`
+
+	// ValueFrom is set in place of Value when the value comes from a secret
+	ValueFrom *EnvVarSource `xcl:"value_from,block" json:"value_from,omitempty"`
+}
+
+// EnvVarSource is the nested `value_from` block of an env block, naming where
+// the value is read from when the container starts
+type EnvVarSource struct {
+	SecretKeyRef *SecretKeySelector `xcl:"secret_key_ref,block" json:"secret_key_ref,omitempty"`
+}
+
+// SecretKeySelector is the nested `secret_key_ref` block of a value_from
+// block, it selects one key of a secret by the secret's name
+type SecretKeySelector struct {
+	Name string `xcl:"name" json:"name"`
+	Key  string `xcl:"key" json:"key"`
 }
 
 // ResourceRequirements is the nested `resources` block of a container, it

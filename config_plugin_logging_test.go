@@ -19,7 +19,7 @@ resource "network" "one" {
 // logEvents returns every log event the recorder has received
 func logEvents(recorder *eventRecorder) []Event {
 	found := []Event{}
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		if e.Phase == events.PhaseLog {
 			found = append(found, e)
 		}
@@ -31,7 +31,7 @@ func logEvents(recorder *eventRecorder) []Event {
 // logEventIndex returns the position of the first log event for id written
 // during operation, or -1 when there is none
 func logEventIndex(recorder *eventRecorder, id, operation string) int {
-	for i, e := range recorder.snapshot() {
+	for i, e := range recorder.Events() {
 		if e.Phase == events.PhaseLog && e.ResourceID == id && e.Operation == operation {
 			return i
 		}
@@ -42,7 +42,7 @@ func logEventIndex(recorder *eventRecorder, id, operation string) int {
 
 func TestPluginLogBecomesEventWithSeverityMessageAndDetail(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 	f.plugin.SetLogOnCreate(parser.LogMessage{Level: "info", Message: "something happened", Args: []any{"remote_id", 213}})
 
 	err := f.config.Apply(f.configFile)
@@ -57,7 +57,7 @@ func TestPluginLogBecomesEventWithSeverityMessageAndDetail(t *testing.T) {
 
 func TestPluginLogCarriesResourceTypeFileAndCreateStep(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 	f.plugin.SetLogOnCreate(parser.LogMessage{Level: "info", Message: "something happened", Args: []any{"remote_id", 213}})
 
 	err := f.config.Apply(f.configFile)
@@ -73,7 +73,7 @@ func TestPluginLogCarriesResourceTypeFileAndCreateStep(t *testing.T) {
 
 func TestPluginLogCarriesReadStep(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 
 	// the first apply creates the network, the second finds it in the state
 	// and reads it
@@ -102,7 +102,7 @@ func TestPluginLogCarriesReadStep(t *testing.T) {
 
 func TestPluginLogNamesPluginAsSource(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 	f.plugin.SetLogOnCreate(parser.LogMessage{Level: "info", Message: "something happened"})
 
 	err := f.config.Apply(f.configFile)
@@ -115,7 +115,7 @@ func TestPluginLogNamesPluginAsSource(t *testing.T) {
 
 func TestPluginLogSitsBetweenCreateStartAndSuccess(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 	f.plugin.SetLogOnCreate(parser.LogMessage{Level: "info", Message: "something happened"})
 
 	err := f.config.Apply(f.configFile)
@@ -134,7 +134,7 @@ func TestPluginLogSitsBetweenCreateStartAndSuccess(t *testing.T) {
 
 func TestApplyingOneResourceGivesOneCreateStartAndNoRestatingLog(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestApplyingOneResourceGivesOneCreateStartAndNoRestatingLog(t *testing.T) {
 
 func TestPluginLogsAtEverySeverityReachReceiver(t *testing.T) {
 	recorder := &eventRecorder{}
-	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.handle))
+	f := setupDeliveryConfig(t, singleNetworkConfig, WithEventHandler(recorder.Record))
 	f.plugin.SetLogOnCreate(
 		parser.LogMessage{Level: "debug", Message: "a debug message"},
 		parser.LogMessage{Level: "info", Message: "an info message"},

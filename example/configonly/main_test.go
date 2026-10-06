@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -15,13 +15,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
 	"github.com/jumppad-labs/xcl/example/prettylog"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -31,13 +31,18 @@ import (
 // configDir is the configuration this example parses
 const configDir = "./config"
 
+// testStateKey is the 32 byte key the tests encrypt the sensitive values in
+// state with, fixed so every test run encrypts the same way
+var testStateKey = []byte("0123456789abcdef0123456789abcdef")
+
 // declaredResourceIDs is every resource the configuration declares, sorted
 var declaredResourceIDs = []string{
+	"config_map.api",
+	"deployment.api",
+	"ingress.api",
 	"output.api_url",
-	"resource.config_map.api",
-	"resource.deployment.api",
-	"resource.ingress.api",
-	"resource.service.api",
+	"secret.db",
+	"service.api",
 	"variable.image_tag",
 	"variable.replicas",
 }
@@ -78,10 +83,10 @@ func findResource(t *testing.T, found []any, id string) any {
 func deployment(t *testing.T) *resources.Deployment {
 	t.Helper()
 
-	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
-	d, ok := findResource(t, found, "resource.deployment.api").(*resources.Deployment)
+	d, ok := findResource(t, found, "deployment.api").(*resources.Deployment)
 	require.True(t, ok)
 
 	return d
@@ -90,7 +95,7 @@ func deployment(t *testing.T) *resources.Deployment {
 func TestConfigOnlyExampleFindsDeclaredResources(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	found, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Equal(t, declaredResourceIDs, resourceIDs(t, found))
@@ -100,19 +105,19 @@ func TestConfigOnlyExampleFindsDeclaredResources(t *testing.T) {
 // into the Go type that was registered for it, a registered type is held as
 // itself rather than a type generated from a schema
 func TestConfigOnlyExampleReturnsRegisteredGoTypes(t *testing.T) {
-	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
-	_, ok := findResource(t, found, "resource.config_map.api").(*resources.ConfigMap)
+	_, ok := findResource(t, found, "config_map.api").(*resources.ConfigMap)
 	require.True(t, ok)
 
-	_, ok = findResource(t, found, "resource.deployment.api").(*resources.Deployment)
+	_, ok = findResource(t, found, "deployment.api").(*resources.Deployment)
 	require.True(t, ok)
 
-	_, ok = findResource(t, found, "resource.service.api").(*resources.Service)
+	_, ok = findResource(t, found, "service.api").(*resources.Service)
 	require.True(t, ok)
 
-	_, ok = findResource(t, found, "resource.ingress.api").(*resources.Ingress)
+	_, ok = findResource(t, found, "ingress.api").(*resources.Ingress)
 	require.True(t, ok)
 }
 
@@ -171,13 +176,13 @@ func TestConfigOnlyExampleReadsValuesFromConfigMap(t *testing.T) {
 	d := deployment(t)
 
 	env := d.Containers[0].Env
-	require.Len(t, env, 2)
+	require.Len(t, env, 3)
 	require.Equal(t, "DB_HOST", env[0].Name)
 	require.Equal(t, "postgres.default.svc", env[0].Value)
 	require.Equal(t, "LOG_LEVEL", env[1].Name)
 	require.Equal(t, "info", env[1].Value)
 
-	require.Equal(t, "resource.config_map.api", d.Volumes[0].ConfigMap)
+	require.Equal(t, "config_map.api", d.Volumes[0].ConfigMap)
 }
 
 // TestConfigOnlyExampleReadsVariables asserts a variable is read both as a
@@ -193,13 +198,13 @@ func TestConfigOnlyExampleReadsVariables(t *testing.T) {
 // deployment by id and reads its target port out of it, the port coming from
 // a repeated block referenced by position
 func TestConfigOnlyExampleLinksServiceToDeployment(t *testing.T) {
-	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
-	service, ok := findResource(t, found, "resource.service.api").(*resources.Service)
+	service, ok := findResource(t, found, "service.api").(*resources.Service)
 	require.True(t, ok)
 
-	require.Equal(t, "resource.deployment.api", service.Deployment)
+	require.Equal(t, "deployment.api", service.Deployment)
 	require.Equal(t, 80, service.Port)
 	require.Equal(t, 8080, service.TargetPort)
 }
@@ -207,23 +212,23 @@ func TestConfigOnlyExampleLinksServiceToDeployment(t *testing.T) {
 // TestConfigOnlyExampleLinksIngressToService asserts the ingress rule names
 // the service it routes to by id, and reads its port
 func TestConfigOnlyExampleLinksIngressToService(t *testing.T) {
-	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
-	ingress, ok := findResource(t, found, "resource.ingress.api").(*resources.Ingress)
+	ingress, ok := findResource(t, found, "ingress.api").(*resources.Ingress)
 	require.True(t, ok)
 
 	require.Equal(t, "api.example.com", ingress.Host)
 	require.Len(t, ingress.Rules, 1)
 	require.Equal(t, "/", ingress.Rules[0].Path)
-	require.Equal(t, "resource.service.api", ingress.Rules[0].Service)
+	require.Equal(t, "service.api", ingress.Rules[0].Service)
 	require.Equal(t, 80, ingress.Rules[0].Port)
 }
 
 func TestConfigOnlyExamplePrintsEveryResource(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	for _, id := range declaredResourceIDs {
@@ -236,18 +241,18 @@ func TestConfigOnlyExamplePrintsEveryResource(t *testing.T) {
 func TestConfigOnlyExamplePrintsNestedBlocks(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Deployments\n")
-	require.Contains(t, out.String(), "  resource.deployment.api replicas=3\n")
+	require.Contains(t, out.String(), "  deployment.api replicas=3\n")
 	require.Contains(t, out.String(), "    container api image=ghcr.io/example/api:1.2.0\n")
 	require.Contains(t, out.String(), "      port http container_port=8080\n")
 	require.Contains(t, out.String(), "      env DB_HOST=postgres.default.svc\n")
 	require.Contains(t, out.String(), "      limits cpu=500m memory=512Mi\n")
 	require.Contains(t, out.String(), "      requests cpu=100m memory=128Mi\n")
 	require.Contains(t, out.String(), "      volume_mount config path=/etc/api\n")
-	require.Contains(t, out.String(), "    volume config config_map=resource.config_map.api\n")
+	require.Contains(t, out.String(), "    volume config config_map=config_map.api\n")
 	require.Contains(t, out.String(), "    container proxy image=ghcr.io/example/proxy:0.4.1\n")
 }
 
@@ -256,20 +261,20 @@ func TestConfigOnlyExamplePrintsNestedBlocks(t *testing.T) {
 func TestConfigOnlyExamplePrintsLinkedResources(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Service\n")
-	require.Contains(t, out.String(), "  resource.service.api deployment=resource.deployment.api port=80 target_port=8080\n")
+	require.Contains(t, out.String(), "  service.api deployment=deployment.api port=80 target_port=8080\n")
 	require.Contains(t, out.String(), "## Ingress\n")
-	require.Contains(t, out.String(), "  resource.ingress.api host=api.example.com\n")
-	require.Contains(t, out.String(), "    rule path=/ service=resource.service.api port=80\n")
+	require.Contains(t, out.String(), "  ingress.api host=api.example.com\n")
+	require.Contains(t, out.String(), "    rule path=/ service=service.api port=80\n")
 }
 
 func TestConfigOnlyExampleFailsForMissingConfig(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), "./does-not-exist", t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), "./does-not-exist", t.TempDir(), testStateKey)
 	require.Error(t, err)
 }
 
@@ -303,33 +308,17 @@ func TestConfigOnlyExampleImportsNoPluginCode(t *testing.T) {
 }
 
 // eventRecorder records every event the run reports, it is the handler the
-// tests pass in place of the example's pretty printer. The handler is never
-// called concurrently, the mutex guards the reads the tests make
+// tests pass in place of the example's pretty printer. It adds this
+// package's queries to the shared recorder
 type eventRecorder struct {
-	mu     sync.Mutex
-	events []xcl.Event
-}
-
-func (r *eventRecorder) handle(e xcl.Event) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.events = append(r.events, e)
-}
-
-// snapshot returns a copy of every event recorded so far
-func (r *eventRecorder) snapshot() []xcl.Event {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return append([]xcl.Event{}, r.events...)
+	testutil.EventRecorder
 }
 
 // withOperation returns every event reported for operation, in the order
 // they were reported
 func (r *eventRecorder) withOperation(operation string) []xcl.Event {
 	found := []xcl.Event{}
-	for _, e := range r.snapshot() {
+	for _, e := range r.Events() {
 		if e.Operation == operation {
 			found = append(found, e)
 		}
@@ -345,7 +334,7 @@ func runRecordingEvents(t *testing.T) *eventRecorder {
 
 	recorder := &eventRecorder{}
 
-	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, t.TempDir())
+	_, err := run(&bytes.Buffer{}, recorder.Record, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	return recorder
@@ -364,13 +353,14 @@ func TestConfigOnlyExampleReportsParseEventWithFile(t *testing.T) {
 	}
 
 	require.Equal(t, map[string]string{
-		"variable.image_tag":      "main.xcl",
-		"variable.replicas":       "main.xcl",
-		"resource.config_map.api": "main.xcl",
-		"resource.deployment.api": "main.xcl",
-		"resource.service.api":    "main.xcl",
-		"resource.ingress.api":    "main.xcl",
-		"output.api_url":          "main.xcl",
+		"variable.image_tag": "deployment.xcl",
+		"variable.replicas":  "deployment.xcl",
+		"config_map.api":     "deployment.xcl",
+		"deployment.api":     "deployment.xcl",
+		"secret.db":          "secret.xcl",
+		"service.api":        "ingress.xcl",
+		"ingress.api":        "ingress.xcl",
+		"output.api_url":     "ingress.xcl",
 	}, files)
 }
 
@@ -395,7 +385,7 @@ func TestConfigOnlyExampleReportsCreateSuccessWithoutStart(t *testing.T) {
 func TestConfigOnlyExampleReportsNoLogEvents(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		require.NotEqual(t, events.PhaseLog, e.Phase, "unexpected log event: %+v", e)
 	}
 }
@@ -405,7 +395,7 @@ func TestConfigOnlyExampleReportsNoLogEvents(t *testing.T) {
 func TestConfigOnlyExampleReportsNoErrors(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		require.NotEqual(t, events.PhaseError, e.Phase, "unexpected error event: %+v", e)
 		require.NoError(t, e.Error, "unexpected event with an error: %+v", e)
 	}
@@ -416,7 +406,7 @@ func TestConfigOnlyExampleReportsNoErrors(t *testing.T) {
 func TestConfigOnlyExampleReportsEveryEventFromCore(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
-	recorded := recorder.snapshot()
+	recorded := recorder.Events()
 	require.NotEmpty(t, recorded)
 
 	for _, e := range recorded {
@@ -430,7 +420,7 @@ func TestConfigOnlyExampleReportsEveryEventFromCore(t *testing.T) {
 func TestConfigOnlyExampleReportsOperationAndPhaseOnEveryEvent(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
-	recorded := recorder.snapshot()
+	recorded := recorder.Events()
 	require.NotEmpty(t, recorded)
 
 	for _, e := range recorded {
@@ -449,7 +439,7 @@ func TestConfigOnlyExampleReportsParseErrorWithFile(t *testing.T) {
 
 	recorder := &eventRecorder{}
 
-	_, err = run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), dir, t.TempDir())
+	_, err = run(&bytes.Buffer{}, recorder.Record, registry.NewPluginRegistry(), dir, t.TempDir(), testStateKey)
 	require.Error(t, err)
 
 	failed := []xcl.Event{}
@@ -471,14 +461,14 @@ func TestConfigOnlyExampleReportsParseErrorWithFile(t *testing.T) {
 func TestConfigOnlyExampleDestroysEverythingItApplied(t *testing.T) {
 	stateDir := t.TempDir()
 
-	_, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, stateDir)
+	_, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, stateDir, testStateKey)
 	require.NoError(t, err)
 
 	reg := registry.NewPluginRegistry()
-	require.NoError(t, reg.RegisterType(&resources.ConfigMap{}, "resource", "config_map"))
-	require.NoError(t, reg.RegisterType(&resources.Deployment{}, "resource", "deployment"))
-	require.NoError(t, reg.RegisterType(&resources.Service{}, "resource", "service"))
-	require.NoError(t, reg.RegisterType(&resources.Ingress{}, "resource", "ingress"))
+	require.NoError(t, reg.RegisterType(&resources.ConfigMap{}, "config_map"))
+	require.NoError(t, reg.RegisterType(&resources.Deployment{}, "deployment"))
+	require.NoError(t, reg.RegisterType(&resources.Service{}, "service"))
+	require.NoError(t, reg.RegisterType(&resources.Ingress{}, "ingress"))
 
 	store, err := state.NewFileStateStore(stateDir)
 	require.NoError(t, err)
@@ -491,7 +481,7 @@ func TestConfigOnlyExampleDestroysEverythingItApplied(t *testing.T) {
 func TestConfigOnlyExamplePrintsNoResourcesRemaining(t *testing.T) {
 	out := &bytes.Buffer{}
 
-	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	_, err := run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	require.Contains(t, out.String(), "## Destroyed\n  0 resources remaining\n")
@@ -661,67 +651,6 @@ func TestConfigOnlyExampleMakesNoPerTypeLookups(t *testing.T) {
 	require.Empty(t, lookups, "main.go looks block types up one at a time, assemble the configuration with Decode instead")
 }
 
-// capturedOutput is what was written to the process's standard output and
-// standard error while a function ran
-type capturedOutput struct {
-	stdout string
-	stderr string
-}
-
-// captureStandardStreams runs fn with os.Stdout and os.Stderr redirected to
-// pipes, and returns what was written to each. The streams are restored when
-// fn returns, and again in cleanup should fn fail the test
-func captureStandardStreams(t *testing.T, fn func()) capturedOutput {
-	t.Helper()
-
-	originalStdout := os.Stdout
-	originalStderr := os.Stderr
-
-	restore := func() {
-		os.Stdout = originalStdout
-		os.Stderr = originalStderr
-	}
-	t.Cleanup(restore)
-
-	stdoutReader, stdoutWriter, err := os.Pipe()
-	require.NoError(t, err)
-
-	stderrReader, stderrWriter, err := os.Pipe()
-	require.NoError(t, err)
-
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-
-	var drained sync.WaitGroup
-	drained.Add(2)
-
-	go func() {
-		defer drained.Done()
-		_, _ = io.Copy(stdout, stdoutReader)
-	}()
-
-	go func() {
-		defer drained.Done()
-		_, _ = io.Copy(stderr, stderrReader)
-	}()
-
-	os.Stdout = stdoutWriter
-	os.Stderr = stderrWriter
-
-	fn()
-
-	restore()
-
-	require.NoError(t, stdoutWriter.Close())
-	require.NoError(t, stderrWriter.Close())
-	drained.Wait()
-
-	require.NoError(t, stdoutReader.Close())
-	require.NoError(t, stderrReader.Close())
-
-	return capturedOutput{stdout: stdout.String(), stderr: stderr.String()}
-}
-
 // TestRunWithoutReceiverWritesNothingToStdoutOrStderr asserts xcl writes
 // nothing of its own when no event handler is given, the report the example
 // prints goes to out alone
@@ -729,13 +658,13 @@ func TestRunWithoutReceiverWritesNothingToStdoutOrStderr(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	var runErr error
-	captured := captureStandardStreams(t, func() {
-		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir())
+	captured := testutil.CaptureStandardStreams(t, func() {
+		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
 	})
 
 	require.NoError(t, runErr)
-	require.Empty(t, captured.stdout)
-	require.Empty(t, captured.stderr)
+	require.Empty(t, captured.Stdout)
+	require.Empty(t, captured.Stderr)
 	require.Contains(t, out.String(), "## Resources\n")
 }
 
@@ -749,7 +678,7 @@ func renderEvents(t *testing.T) string {
 	r := registry.NewPluginRegistry()
 	rendered := &bytes.Buffer{}
 
-	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, t.TempDir())
+	_, err := run(&bytes.Buffer{}, prettylog.Handler(rendered, slog.LevelInfo, r), r, configDir, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	return rendered.String()
@@ -765,10 +694,10 @@ func TestConfigOnlyExampleShowsCreatedEntities(t *testing.T) {
 	// as a resource or under its own keyword
 	require.Regexp(t, `(?m)^\s+(resource "|[a-z_]+ ")`, rendered)
 
-	require.Contains(t, rendered, `resource "config_map" "api" {`)
-	require.Contains(t, rendered, `resource "deployment" "api" {`)
-	require.Contains(t, rendered, `resource "service" "api" {`)
-	require.Contains(t, rendered, `resource "ingress" "api" {`)
+	require.Contains(t, rendered, `config_map "api" {`)
+	require.Contains(t, rendered, `deployment "api" {`)
+	require.Contains(t, rendered, `service "api" {`)
+	require.Contains(t, rendered, `ingress "api" {`)
 
 	// the nested blocks of the deployment are written too, and the formatter
 	// aligns the equals signs, so the gap before one is matched rather than
@@ -804,23 +733,6 @@ func (s *stateAtApply) handle(e xcl.Event) {
 	s.err = json.Unmarshal(data, &s.records)
 }
 
-// savedID returns the address a saved record carries, which is how a record
-// is matched to the entity it was written from
-func savedID(t *testing.T, record json.RawMessage) string {
-	t.Helper()
-
-	var envelope struct {
-		Meta struct {
-			ID string `json:"id"`
-		} `json:"meta"`
-	}
-
-	require.NoError(t, json.Unmarshal(record, &envelope))
-	require.NotEmpty(t, envelope.Meta.ID)
-
-	return envelope.Meta.ID
-}
-
 // TestConfigOnlyExampleEntityAndStateAgree asserts the configuration text of a
 // saved record is identical to the text of the entity it was written from,
 // for every record the apply saved. A variable or output is never written as
@@ -831,7 +743,7 @@ func TestConfigOnlyExampleEntityAndStateAgree(t *testing.T) {
 	statePath := filepath.Join(stateDir, state.StateFileName)
 	saved := &stateAtApply{path: statePath}
 
-	applied, err := run(&bytes.Buffer{}, saved.handle, r, configDir, stateDir)
+	applied, err := run(&bytes.Buffer{}, saved.handle, r, configDir, stateDir, testStateKey)
 	require.NoError(t, err)
 
 	require.NoError(t, saved.err)
@@ -846,7 +758,7 @@ func TestConfigOnlyExampleEntityAndStateAgree(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		id := savedID(t, record)
+		id := testutil.SavedID(t, record)
 
 		fromEntity, err := xcl.EncodeEntity(findResource(t, applied, id))
 		require.NoError(t, err)
@@ -870,10 +782,139 @@ const plaintextStateWarning = "sensitive values are stored unencrypted in state;
 func TestConfigOnlyExampleDoesNotWarnAboutPlainState(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
-	recorded := recorder.snapshot()
+	recorded := recorder.Events()
 	require.NotEmpty(t, recorded)
 
 	for _, e := range recorded {
 		require.NotEqual(t, plaintextStateWarning, e.Meta[events.KeyMessage], "unexpected plain text warning: %+v", e)
 	}
+}
+
+// testPassword is the database password the tests set through DB_PASSWORD
+const testPassword = "configonly-s3cret-4b7d2e"
+
+// TestConfigOnlyExampleReadsTheSecretFromTheEnvironment asserts the secret's
+// data is read with env when the configuration is parsed, and that Reveal
+// returns the real value
+func TestConfigOnlyExampleReadsTheSecretFromTheEnvironment(t *testing.T) {
+	t.Setenv("DB_PASSWORD", testPassword)
+
+	found, err := run(&bytes.Buffer{}, nil, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
+	require.NoError(t, err)
+
+	secret, ok := findResource(t, found, "secret.db").(*resources.Secret)
+	require.True(t, ok)
+
+	require.Equal(t, testPassword, secret.Data.Reveal()["password"])
+}
+
+// TestConfigOnlyExampleReferencesTheSecretByNameAndKey asserts the container
+// reads the password through a secret_key_ref, so the deployment holds only
+// the secret's name and the key, never the password
+func TestConfigOnlyExampleReferencesTheSecretByNameAndKey(t *testing.T) {
+	d := deployment(t)
+
+	env := d.Containers[0].Env[2]
+	require.Equal(t, "DB_PASSWORD", env.Name)
+	require.Empty(t, env.Value)
+	require.NotNil(t, env.ValueFrom)
+	require.NotNil(t, env.ValueFrom.SecretKeyRef)
+	require.Equal(t, "db", env.ValueFrom.SecretKeyRef.Name)
+	require.Equal(t, "password", env.ValueFrom.SecretKeyRef.Key)
+}
+
+// TestConfigOnlyExamplePrintsNoSecret asserts the password appears in nothing
+// the run writes: not the report, not the rendered events, and not the
+// process's own standard streams
+func TestConfigOnlyExamplePrintsNoSecret(t *testing.T) {
+	t.Setenv("DB_PASSWORD", testPassword)
+
+	r := registry.NewPluginRegistry()
+	out := &bytes.Buffer{}
+	rendered := &bytes.Buffer{}
+
+	var runErr error
+	captured := testutil.CaptureStandardStreams(t, func() {
+		_, runErr = run(out, prettylog.Handler(rendered, slog.LevelDebug, r), r, configDir, t.TempDir(), testStateKey)
+	})
+
+	require.NoError(t, runErr)
+	require.NotContains(t, captured.Stdout, testPassword)
+	require.NotContains(t, captured.Stderr, testPassword)
+	require.NotContains(t, out.String(), testPassword)
+	require.NotContains(t, rendered.String(), testPassword)
+	require.Contains(t, rendered.String(), types.SensitiveMarker)
+}
+
+// TestConfigOnlyExampleStateHoldsNoSecret asserts that with a state key the
+// password is encrypted in the state as it stood after the apply, the
+// sensitive values written as masked envelopes
+func TestConfigOnlyExampleStateHoldsNoSecret(t *testing.T) {
+	t.Setenv("DB_PASSWORD", testPassword)
+
+	stateDir := t.TempDir()
+	saved := &stateAtApply{path: filepath.Join(stateDir, state.StateFileName)}
+
+	_, err := run(&bytes.Buffer{}, saved.handle, registry.NewPluginRegistry(), configDir, stateDir, testStateKey)
+	require.NoError(t, err)
+
+	require.NoError(t, saved.err)
+	require.NotEmpty(t, saved.records, "the apply saved no state, so the check proves nothing")
+
+	all := ""
+	for _, record := range saved.records {
+		all += string(record)
+	}
+
+	require.NotContains(t, all, testPassword)
+	require.Contains(t, all, "xcl_masked")
+}
+
+// TestConfigOnlyExampleEventDataHoldsNoSecret asserts no event the run reports
+// carries the password, in its data or anywhere else
+func TestConfigOnlyExampleEventDataHoldsNoSecret(t *testing.T) {
+	t.Setenv("DB_PASSWORD", testPassword)
+
+	recorder := &testutil.EventRecorder{}
+
+	_, err := run(&bytes.Buffer{}, recorder.Record, registry.NewPluginRegistry(), configDir, t.TempDir(), testStateKey)
+	require.NoError(t, err)
+
+	recorded := recorder.Events()
+	require.NotEmpty(t, recorded)
+
+	withData := 0
+	for _, e := range recorded {
+		require.NotContains(t, string(e.Data), testPassword, "event data holds the password: %s %s %s", e.Operation, e.Phase, e.ResourceID)
+		require.NotContains(t, fmt.Sprintf("%+v", e), testPassword, "event holds the password: %s %s %s", e.Operation, e.Phase, e.ResourceID)
+
+		if len(e.Data) > 0 {
+			withData++
+		}
+	}
+
+	require.NotZero(t, withData, "no event carried data, so the check proves nothing")
+}
+
+// TestConfigOnlyExampleWithoutKeyWarnsAboutPlainState asserts a run without a
+// state key warns, once, that the secret is stored in plain text
+func TestConfigOnlyExampleWithoutKeyWarnsAboutPlainState(t *testing.T) {
+	t.Setenv("DB_PASSWORD", testPassword)
+
+	recorder := &testutil.EventRecorder{}
+
+	_, err := run(&bytes.Buffer{}, recorder.Record, registry.NewPluginRegistry(), configDir, t.TempDir(), nil)
+	require.NoError(t, err)
+
+	warnings := []xcl.Event{}
+	for _, e := range recorder.Events() {
+		if e.Meta[events.KeyMessage] == plaintextStateWarning && e.Operation == events.OperationApply {
+			warnings = append(warnings, e)
+		}
+	}
+
+	require.Len(t, warnings, 1)
+	require.Equal(t, events.SourceCore, warnings[0].Source)
+	require.Equal(t, events.PhaseLog, warnings[0].Phase)
+	require.Equal(t, events.LevelWarn, warnings[0].Meta[events.KeyLevel])
 }

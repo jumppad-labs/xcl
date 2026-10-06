@@ -8,7 +8,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -16,9 +15,9 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 
@@ -34,7 +33,7 @@ import (
 const configDir = "./config"
 
 // testStateKey is the 32 byte key the tests encrypt the sensitive values in
-// state with, the key main reads from XCL_STATE_KEY
+// state with, fixed so every test run encrypts the same way
 var testStateKey = []byte("0123456789abcdef0123456789abcdef")
 
 // externalPlugin is the external plugin binary, built once for the package's
@@ -83,33 +82,17 @@ var declaredResourceIDs = []string{
 }
 
 // eventRecorder records every event the run reports, it is the handler the
-// tests pass in place of the example's pretty printer. The handler is never
-// called concurrently, the mutex guards the reads the tests make
+// tests pass in place of the example's pretty printer. It adds this
+// package's queries to the shared recorder
 type eventRecorder struct {
-	mu     sync.Mutex
-	events []xcl.Event
-}
-
-func (r *eventRecorder) handle(e xcl.Event) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.events = append(r.events, e)
-}
-
-// snapshot returns a copy of every event recorded so far
-func (r *eventRecorder) snapshot() []xcl.Event {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return append([]xcl.Event{}, r.events...)
+	testutil.EventRecorder
 }
 
 // logEvents returns the log events written during operation by source, in
 // the order they were reported
 func (r *eventRecorder) logEvents(source, operation string) []xcl.Event {
 	found := []xcl.Event{}
-	for _, e := range r.snapshot() {
+	for _, e := range r.Events() {
 		if e.Phase == events.PhaseLog && e.Source == source && e.Operation == operation {
 			found = append(found, e)
 		}
@@ -154,7 +137,7 @@ func runRecordingEvents(t *testing.T) *eventRecorder {
 
 	recorder := &eventRecorder{}
 
-	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
+	_, err := run(&bytes.Buffer{}, recorder.Record, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	require.NoError(t, err)
 
 	return recorder
@@ -453,7 +436,7 @@ func TestPluginExampleFailsWithoutExternalPlugin(t *testing.T) {
 // the log events providers write during the operation
 func allEventPhases(recorder *eventRecorder, operation string) map[string][]string {
 	phases := map[string][]string{}
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		if e.Operation != operation {
 			continue
 		}
@@ -544,7 +527,7 @@ type loadEvent struct {
 // reported, leaving out the log events plugins write while they load
 func loadEvents(recorder *eventRecorder) []loadEvent {
 	found := []loadEvent{}
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		if e.Operation != events.OperationLoad || e.Phase == events.PhaseLog {
 			continue
 		}
@@ -590,7 +573,7 @@ func TestPluginExampleReportsBlockTypesOfLoadedPlugins(t *testing.T) {
 func TestPluginExampleReportsNoErrors(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		require.NotEqual(t, events.PhaseError, e.Phase, "unexpected error event: %+v", e)
 		require.NoError(t, e.Error, "unexpected event with an error: %+v", e)
 		require.NotEqual(t, events.LevelError, e.Meta[events.KeyLevel], "unexpected error log: %+v", e)
@@ -602,7 +585,7 @@ func TestPluginExampleReportsNoErrors(t *testing.T) {
 func TestPluginExampleReportsNoWarnings(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		require.NotEqual(t, events.LevelWarn, e.Meta[events.KeyLevel], "unexpected warn log: %+v", e)
 	}
 }
@@ -630,7 +613,7 @@ func TestPluginExampleReportsProviderCallLogsAtInfo(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
 	calls := []xcl.Event{}
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		if e.Phase == events.PhaseLog && e.Operation != events.OperationLoad {
 			calls = append(calls, e)
 		}
@@ -650,7 +633,7 @@ func TestPluginExampleReportsParseEventWithFile(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
 	files := map[string]string{}
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		if e.Operation != events.OperationParse {
 			continue
 		}
@@ -787,7 +770,7 @@ func TestPluginExampleReportsDestroyOperationStartAndSuccess(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
 	destroy := []xcl.Event{}
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		if e.Operation == events.OperationDestroy {
 			destroy = append(destroy, e)
 		}
@@ -913,67 +896,6 @@ func TestPluginExampleUsesPortableLookupForm(t *testing.T) {
 	require.NotZero(t, lookups, "the guard found no lookups in main.go, so it proves nothing")
 }
 
-// capturedOutput is what was written to the process's standard output and
-// standard error while a function ran
-type capturedOutput struct {
-	stdout string
-	stderr string
-}
-
-// captureStandardStreams runs fn with os.Stdout and os.Stderr redirected to
-// pipes, and returns what was written to each. The streams are restored when
-// fn returns, and again in cleanup should fn fail the test
-func captureStandardStreams(t *testing.T, fn func()) capturedOutput {
-	t.Helper()
-
-	originalStdout := os.Stdout
-	originalStderr := os.Stderr
-
-	restore := func() {
-		os.Stdout = originalStdout
-		os.Stderr = originalStderr
-	}
-	t.Cleanup(restore)
-
-	stdoutReader, stdoutWriter, err := os.Pipe()
-	require.NoError(t, err)
-
-	stderrReader, stderrWriter, err := os.Pipe()
-	require.NoError(t, err)
-
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-
-	var drained sync.WaitGroup
-	drained.Add(2)
-
-	go func() {
-		defer drained.Done()
-		_, _ = io.Copy(stdout, stdoutReader)
-	}()
-
-	go func() {
-		defer drained.Done()
-		_, _ = io.Copy(stderr, stderrReader)
-	}()
-
-	os.Stdout = stdoutWriter
-	os.Stderr = stderrWriter
-
-	fn()
-
-	restore()
-
-	require.NoError(t, stdoutWriter.Close())
-	require.NoError(t, stderrWriter.Close())
-	drained.Wait()
-
-	require.NoError(t, stdoutReader.Close())
-	require.NoError(t, stderrReader.Close())
-
-	return capturedOutput{stdout: stdout.String(), stderr: stderr.String()}
-}
-
 // TestRunWithoutReceiverWritesNothingToStdoutOrStderr asserts xcl, both
 // plugins and the external plugin process write nothing of their own when no
 // event handler is given, the report the example prints goes to out alone
@@ -981,13 +903,13 @@ func TestRunWithoutReceiverWritesNothingToStdoutOrStderr(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	var runErr error
-	captured := captureStandardStreams(t, func() {
+	captured := testutil.CaptureStandardStreams(t, func() {
 		_, runErr = run(out, nil, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), testStateKey)
 	})
 
 	require.NoError(t, runErr)
-	require.Empty(t, captured.stdout)
-	require.Empty(t, captured.stderr)
+	require.Empty(t, captured.Stdout)
+	require.Empty(t, captured.Stderr)
 	require.Contains(t, out.String(), "## Resources\n")
 }
 
@@ -1079,23 +1001,6 @@ func (s *stateAtApply) handle(e xcl.Event) {
 	s.err = json.Unmarshal(data, &s.records)
 }
 
-// savedID returns the address a saved record carries, which is how a record
-// is matched to the entity it was written from
-func savedID(t *testing.T, record json.RawMessage) string {
-	t.Helper()
-
-	var envelope struct {
-		Meta struct {
-			ID string `json:"id"`
-		} `json:"meta"`
-	}
-
-	require.NoError(t, json.Unmarshal(record, &envelope))
-	require.NotEmpty(t, envelope.Meta.ID)
-
-	return envelope.Meta.ID
-}
-
 // entityWithID returns the entity whose address is id
 func entityWithID(t *testing.T, entities []any, id string) any {
 	t.Helper()
@@ -1138,7 +1043,7 @@ func TestPluginExampleEntityAndStateAgree(t *testing.T) {
 		}
 		require.NoError(t, err)
 
-		id := savedID(t, record)
+		id := testutil.SavedID(t, record)
 
 		fromEntity, err := xcl.EncodeEntity(entityWithID(t, applied, id))
 		require.NoError(t, err)
@@ -1190,7 +1095,7 @@ func TestPluginExamplePrintsNoSecret(t *testing.T) {
 	rendered := &bytes.Buffer{}
 
 	var runErr error
-	captured := captureStandardStreams(t, func() {
+	captured := testutil.CaptureStandardStreams(t, func() {
 		runErr = func() error {
 			_, err := run(out, prettylog.Handler(rendered, slog.LevelDebug, r), r, configDir, externalPlugin, t.TempDir(), testStateKey)
 			return err
@@ -1199,7 +1104,7 @@ func TestPluginExamplePrintsNoSecret(t *testing.T) {
 
 	require.NoError(t, runErr)
 
-	for _, written := range []string{captured.stdout, captured.stderr, out.String(), rendered.String()} {
+	for _, written := range []string{captured.Stdout, captured.Stderr, out.String(), rendered.String()} {
 		require.NotContains(t, written, variablePassword)
 		require.NotContains(t, written, modulePassword)
 	}
@@ -1280,7 +1185,7 @@ func TestPluginExampleStateHoldsNoSecret(t *testing.T) {
 func TestPluginExampleEventDataHoldsNoSecret(t *testing.T) {
 	recorder := runRecordingEvents(t)
 
-	recorded := recorder.snapshot()
+	recorded := recorder.Events()
 	require.NotEmpty(t, recorded)
 
 	withData := 0
@@ -1310,12 +1215,12 @@ const plaintextStateWarning = "sensitive values are stored unencrypted in state;
 func TestPluginExampleWithoutKeyWarnsAboutPlainState(t *testing.T) {
 	recorder := &eventRecorder{}
 
-	_, err := run(&bytes.Buffer{}, recorder.handle, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), nil)
+	_, err := run(&bytes.Buffer{}, recorder.Record, registry.NewPluginRegistry(), configDir, externalPlugin, t.TempDir(), nil)
 	require.NoError(t, err)
 
 	applyWarnings := []xcl.Event{}
 	destroyWarnings := []xcl.Event{}
-	for _, e := range recorder.snapshot() {
+	for _, e := range recorder.Events() {
 		if e.Meta[events.KeyMessage] != plaintextStateWarning {
 			continue
 		}

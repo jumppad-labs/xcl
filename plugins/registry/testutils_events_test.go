@@ -4,33 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/events"
 )
-
-// eventRecorder records every event emitted to it. Plugins log from their own
-// goroutines, so recording is guarded by a mutex.
-type eventRecorder struct {
-	mutex  sync.Mutex
-	events []events.Event
-}
-
-func (r *eventRecorder) emit(e events.Event) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	r.events = append(r.events, e)
-}
-
-// recorded returns a copy of the events recorded so far
-func (r *eventRecorder) recorded() []events.Event {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	return append([]events.Event{}, r.events...)
-}
 
 // lifecycleEvents returns the events in recorded for operation that are not
 // log messages, the start, success and error events of the operation
@@ -38,18 +15,6 @@ func lifecycleEvents(recorded []events.Event, operation string) []events.Event {
 	found := []events.Event{}
 	for _, e := range recorded {
 		if e.Operation == operation && e.Phase != events.PhaseLog {
-			found = append(found, e)
-		}
-	}
-
-	return found
-}
-
-// eventsWithPhase returns the events in recorded with the given phase
-func eventsWithPhase(recorded []events.Event, phase string) []events.Event {
-	found := []events.Event{}
-	for _, e := range recorded {
-		if e.Phase == phase {
 			found = append(found, e)
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 )
 
@@ -58,18 +59,6 @@ func (p *LoggingTestPlugin) Init(log logger.Logger, state State) error {
 	return RegisterResourceProvider(&p.PluginBase, log, state, "resource", "other", &testResource{}, &loggingProvider{})
 }
 
-// eventsWithPhase returns the events in recorded with the given phase
-func eventsWithPhase(recorded []events.Event, phase string) []events.Event {
-	found := []events.Event{}
-	for _, e := range recorded {
-		if e.Phase == phase {
-			found = append(found, e)
-		}
-	}
-
-	return found
-}
-
 // adapterFor returns the adapter the host gives for the resource subType
 func adapterFor(t *testing.T, host *DirectPluginHost, subType string) ProviderAdapter {
 	t.Helper()
@@ -98,12 +87,12 @@ func loadEventsIn(recorded []events.Event) []events.Event {
 }
 
 func TestNewDirectPluginHostEmitsNoLoadEvents(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 
-	_, err := NewDirectPluginHost(recorder.emit, emptyState{}, &LoggingTestPlugin{})
+	_, err := NewDirectPluginHost(recorder.Record, emptyState{}, &LoggingTestPlugin{})
 	require.NoError(t, err)
 
-	require.Empty(t, loadEventsIn(recorder.recorded()), "the registry reports loads, not the host")
+	require.Empty(t, loadEventsIn(recorder.Events()), "the registry reports loads, not the host")
 }
 
 func TestNewDirectPluginHostWithANilEmitDoesNotPanic(t *testing.T) {
@@ -114,12 +103,12 @@ func TestNewDirectPluginHostWithANilEmitDoesNotPanic(t *testing.T) {
 }
 
 func TestNewDirectPluginHostInitLoggerNamesThePluginAsSource(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 
-	_, err := NewDirectPluginHost(recorder.emit, emptyState{}, &LoggingTestPlugin{})
+	_, err := NewDirectPluginHost(recorder.Record, emptyState{}, &LoggingTestPlugin{})
 	require.NoError(t, err)
 
-	logs := eventsWithPhase(recorder.recorded(), events.PhaseLog)
+	logs := testutil.EventsWithPhase(recorder.Events(), events.PhaseLog)
 	require.Len(t, logs, 2)
 	require.Equal(t, "LoggingTestPlugin", logs[0].Source)
 	require.Equal(t, events.OperationLoad, logs[0].Operation)
@@ -135,8 +124,8 @@ func TestDirectPluginHostAdapterNamesThePluginAsSourceOfProviderLogs(t *testing.
 	host, err := NewDirectPluginHost(nil, emptyState{}, &LoggingTestPlugin{})
 	require.NoError(t, err)
 
-	recorder := &eventRecorder{}
-	callLogger := logger.New(recorder.emit, events.Event{
+	recorder := &testutil.EventRecorder{}
+	callLogger := logger.New(recorder.Record, events.Event{
 		Source:     events.SourceCore,
 		Operation:  events.OperationCreate,
 		ResourceID: "resource.test.web",
@@ -146,7 +135,7 @@ func TestDirectPluginHostAdapterNamesThePluginAsSourceOfProviderLogs(t *testing.
 	_, err = adapterFor(t, host, "test").Create(ctx, []byte(`{"name":"web","count":1}`))
 	require.NoError(t, err)
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 1)
 	require.Equal(t, "LoggingTestPlugin", recorded[0].Source)
 	require.Equal(t, "resource.test.web", recorded[0].ResourceID)
@@ -163,15 +152,15 @@ func TestDirectPluginHostAdapterDoesNotChangeTheCallersLogger(t *testing.T) {
 	host, err := NewDirectPluginHost(nil, emptyState{}, &LoggingTestPlugin{})
 	require.NoError(t, err)
 
-	recorder := &eventRecorder{}
-	ctx := WithLogger(context.Background(), logger.New(recorder.emit, events.Event{Source: events.SourceCore}))
+	recorder := &testutil.EventRecorder{}
+	ctx := WithLogger(context.Background(), logger.New(recorder.Record, events.Event{Source: events.SourceCore}))
 
 	_, err = adapterFor(t, host, "test").Create(ctx, []byte(`{"name":"web","count":1}`))
 	require.NoError(t, err)
 
 	Logger(ctx).Info("after the call")
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 2)
 	require.Equal(t, events.SourceCore, recorded[1].Source)
 }
@@ -180,27 +169,27 @@ func TestDirectPluginHostCreateNamesThePluginAsSourceOfProviderLogs(t *testing.T
 	host, err := NewDirectPluginHost(nil, emptyState{}, &LoggingTestPlugin{})
 	require.NoError(t, err)
 
-	recorder := &eventRecorder{}
-	callLogger := logger.New(recorder.emit, events.Event{Source: events.SourceCore, ResourceID: "resource.test.web"})
+	recorder := &testutil.EventRecorder{}
+	callLogger := logger.New(recorder.Record, events.Event{Source: events.SourceCore, ResourceID: "resource.test.web"})
 	ctx := WithLogger(context.Background(), callLogger)
 
 	_, err = host.Create(ctx, "resource", "test", []byte(`{"name":"web","count":1}`))
 	require.NoError(t, err)
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 1)
 	require.Equal(t, "LoggingTestPlugin", recorded[0].Source)
 	require.Equal(t, "resource.test.web", recorded[0].ResourceID)
 }
 
 func TestDirectPluginHostAdapterWithoutABoundLoggerEmitsNothing(t *testing.T) {
-	recorder := &eventRecorder{}
-	host, err := NewDirectPluginHost(recorder.emit, emptyState{}, &LoggingTestPlugin{})
+	recorder := &testutil.EventRecorder{}
+	host, err := NewDirectPluginHost(recorder.Record, emptyState{}, &LoggingTestPlugin{})
 	require.NoError(t, err)
-	beforeCall := len(recorder.recorded())
+	beforeCall := len(recorder.Events())
 
 	_, err = adapterFor(t, host, "test").Create(context.Background(), []byte(`{"name":"web","count":1}`))
 	require.NoError(t, err)
 
-	require.Len(t, recorder.recorded(), beforeCall)
+	require.Len(t, recorder.Events(), beforeCall)
 }

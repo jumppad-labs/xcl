@@ -11,6 +11,7 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -110,7 +111,7 @@ func TestCustomStateStoreIsHandedEntitiesWithBothAxes(t *testing.T) {
 	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
-	database, err := entityByID(loaded, "resource.database.main")
+	database, err := testutil.EntityByID(loaded, "resource.database.main")
 	require.NoError(t, err)
 
 	databaseMeta, err := types.GetMeta(database)
@@ -119,7 +120,7 @@ func TestCustomStateStoreIsHandedEntitiesWithBothAxes(t *testing.T) {
 	require.Equal(t, registered.TypeDatabase, databaseMeta.Subtype)
 	require.Equal(t, "main", databaseMeta.Name)
 
-	variable, err := entityByID(loaded, "variable.environment")
+	variable, err := testutil.EntityByID(loaded, "variable.environment")
 	require.NoError(t, err)
 
 	variableMeta, err := types.GetMeta(variable)

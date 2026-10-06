@@ -13,6 +13,7 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -103,25 +104,6 @@ func testLoadSavedState(t *testing.T, path string, reg *registry.PluginRegistry)
 	return s
 }
 
-// entityByID returns the entity the loaded state holds under the given id.
-// Storage answers no questions about addresses, so the entities are scanned
-// and the id each entity already records is compared, an entity's id being its
-// rendered address
-func entityByID(entities []any, id string) (any, error) {
-	for _, e := range entities {
-		meta, err := types.GetMeta(e)
-		if err != nil {
-			continue
-		}
-
-		if meta.ID == id {
-			return e, nil
-		}
-	}
-
-	return nil, state.ResourceNotFoundError{Resource: id}
-}
-
 // testLoadedIDs returns the ID of every entity in entities
 func testLoadedIDs(t *testing.T, entities []any) []string {
 	t.Helper()
@@ -158,7 +140,7 @@ func TestLoadRestoresBothAxesOfAResource(t *testing.T) {
 
 	s := testLoadSavedState(t, statePath, reg)
 
-	r, err := entityByID(s, "resource.database.main")
+	r, err := testutil.EntityByID(s, "resource.database.main")
 	require.NoError(t, err)
 
 	meta, err := types.GetMeta(r)
@@ -177,7 +159,7 @@ func TestLoadRestoresBuiltinsWithoutASubtype(t *testing.T) {
 
 	s := testLoadSavedState(t, statePath, reg)
 
-	variable, err := entityByID(s, "variable.environment")
+	variable, err := testutil.EntityByID(s, "variable.environment")
 	require.NoError(t, err)
 
 	variableMeta, err := types.GetMeta(variable)
@@ -186,7 +168,7 @@ func TestLoadRestoresBuiltinsWithoutASubtype(t *testing.T) {
 	require.Equal(t, "variable", variableMeta.Type)
 	require.Empty(t, variableMeta.Subtype)
 
-	output, err := entityByID(s, "module.shared.output.location")
+	output, err := testutil.EntityByID(s, "module.shared.output.location")
 	require.NoError(t, err)
 
 	outputMeta, err := types.GetMeta(output)
@@ -195,7 +177,7 @@ func TestLoadRestoresBuiltinsWithoutASubtype(t *testing.T) {
 	require.Equal(t, "output", outputMeta.Type)
 	require.Empty(t, outputMeta.Subtype)
 
-	module, err := entityByID(s, "module.shared")
+	module, err := testutil.EntityByID(s, "module.shared")
 	require.NoError(t, err)
 
 	moduleMeta, err := types.GetMeta(module)
@@ -212,7 +194,7 @@ func TestLoadRestoresResourceValues(t *testing.T) {
 
 	s := testLoadSavedState(t, statePath, reg)
 
-	r, err := entityByID(s, "resource.database.main")
+	r, err := testutil.EntityByID(s, "resource.database.main")
 	require.NoError(t, err)
 
 	database, ok := r.(*registered.Database)

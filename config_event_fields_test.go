@@ -11,8 +11,8 @@ import (
 func TestApplyEventsCarryATimeAndTheCoreSource(t *testing.T) {
 	recorder := applyQueryFixtureWithEvents(t)
 
-	require.NotEmpty(t, recorder.events)
-	for _, e := range recorder.events {
+	require.NotEmpty(t, recorder.Events())
+	for _, e := range recorder.Events() {
 		require.False(t, e.Time.IsZero(), "event %s %s %s has no time", e.ResourceID, e.Operation, e.Phase)
 		require.Equal(t, "core", e.Source)
 	}

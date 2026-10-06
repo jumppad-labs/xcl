@@ -88,7 +88,7 @@ func applyLeakFixtureWithOptions(t *testing.T, name string, level EventDataLevel
 		WithPluginRegistry(reg),
 		WithStateStore(store),
 		WithStateMask(stateMasker),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 		WithEventData(level),
 	}
 	all = append(all, options...)
@@ -202,9 +202,9 @@ func leakLogMessage() parser.LogMessage {
 func TestLeakEventsAtRawDataLevel(t *testing.T) {
 	f := applyLeakMain(t, EventDataRaw)
 
-	text := eventText(f.recorder.snapshot())
+	text := eventText(f.recorder.Events())
 
-	require.NotEmpty(t, f.recorder.snapshot())
+	require.NotEmpty(t, f.recorder.Events())
 	require.NotContains(t, text, knownSecret)
 	require.Contains(t, text, types.SensitiveMarker)
 }
@@ -212,9 +212,9 @@ func TestLeakEventsAtRawDataLevel(t *testing.T) {
 func TestLeakEventsAtProcessedDataLevel(t *testing.T) {
 	f := applyLeakMain(t, EventDataProcessed)
 
-	text := eventText(f.recorder.snapshot())
+	text := eventText(f.recorder.Events())
 
-	require.NotEmpty(t, f.recorder.snapshot())
+	require.NotEmpty(t, f.recorder.Events())
 	require.NotContains(t, text, knownSecret)
 	require.Contains(t, text, types.SensitiveMarker)
 }
@@ -224,7 +224,7 @@ func TestLeakSlogBridgeTextHandler(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(out, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	f := applyLeakMain(t, EventDataProcessed, leakLogMessage())
-	for _, e := range f.recorder.snapshot() {
+	for _, e := range f.recorder.Events() {
 		events.SlogHandler(logger)(e)
 	}
 
@@ -238,7 +238,7 @@ func TestLeakSlogBridgeJSONHandler(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	f := applyLeakMain(t, EventDataProcessed, leakLogMessage())
-	for _, e := range f.recorder.snapshot() {
+	for _, e := range f.recorder.Events() {
 		events.SlogHandler(logger)(e)
 	}
 
@@ -252,7 +252,7 @@ func TestLeakSlogBridgeCustomHandlerFormattingWithPercentV(t *testing.T) {
 	logger := slog.New(&valueFormatHandler{out: out})
 
 	f := applyLeakMain(t, EventDataProcessed, leakLogMessage())
-	for _, e := range f.recorder.snapshot() {
+	for _, e := range f.recorder.Events() {
 		events.SlogHandler(logger)(e)
 	}
 

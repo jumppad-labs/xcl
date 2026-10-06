@@ -1,99 +1,41 @@
-# Working context: 20261003134528-327e0657-references-and-secrets
+# Working context: 20261006112108-17623cda-encoder-syntax-highlighting
 
-## How this workflow started
+Epic: `20261006071139-7b266535-examples-and-output` (siblings: e2e suite, configuration-example,
+docker-plugin-example). Source: https://github.com/jumppad-labs/xcl/issues/6 (no comments).
+User instruction: "keep going until the epic is done" — finish specifying this last spec with
+minimal pauses.
 
-- Resumes the earlier `20260923095659-references-and-secrets` spec, whose workflow state was
-  dropped when the config-decode spec was started with `spec new --force`. The old store doc was
-  an empty template; user chose (2026-10-03) to start a new workflow, reuse the saved interview,
-  and delete the old draft (done via `spec file delete`).
-- The earlier interview synthesis was moved to
-  `.spektacular/work/20261003134528-327e0657-references-and-secrets/interview.md` — it is the
-  source of truth for the interview; do not re-ask what it settles.
-- Source recorded: https://github.com/jumppad-labs/xcl/issues/1 (secrets part).
-- No epics exist in the project.
+## Background
 
-## Code facts re-checked 2026-10-03 (after Decode landed)
+- `example/prettylog/highlight.go` colours encoder output per token category matching the
+  xcl-vscode TextMate grammar (block type bold magenta, type label cyan, name label green,
+  attribute blue, strings yellow, numbers/constants bright magenta, reference root cyan,
+  comments dim italic). It uses lipgloss with a renderer bound to the writer, so non-terminals
+  get plain text. Regex line-based, relies on encoder formatting.
+- User: "I think we should add this as a real feature to the encoder but not now" and later
+  "Once we add colorization to encode saved entities then we can remove most of that example code."
+- Library must not depend on charmbracelet (`TestLibraryDoesNotDependOnCharm`).
+- Related: issue #5 (xcl fmt) could share a tokeniser.
 
-- `EncodeEntity` (encode.go:59) and `EncodeSavedEntity` (encode.go:82) still exist.
-- DAG: `buildCreateDAG` (internal/parser/dag.go:63) loops `Meta.Links` through
-  `types.AppendUniqueDependency`, which appends to Links AND mirrors into `DependsOn`
-  ("for backwards compatibility", types/resource_helpers.go:91). `getResourceDependencies`
-  (internal/parser/util.go:507) then reads `DependsOn` back. Interview's description holds.
-- Additional `DependsOn` reader not in the interview: `logger/pretty_printer.go:302,588` uses
-  `types.GetDependencies` — affected by part 2.
-- Tag options live in internal/xcl/tags/tags.go (`OptionComputed = "computed"`); no
-  `sensitive` option exists yet.
+## Decisions after review (2026-10-06)
+- Invalid/unreadable theme -> error at renderer creation; unmatched token -> terminal default
+  colour; theme font styles applied. Added constraint: existing encode output unchanged.
+- Spec written to store.
 
-## Interview decisions (2026-10-03) — detail lives in work/<spec>/interview.md
+# Plan-epic run (2026-10-06)
 
-- Scope widened by user to all of issue #1 (state, events, logs, sensitive), reversing the first
-  interview's exclusions. References + depends_on kept in this spec; split decided at split step.
-- Names chosen by user: `types.Sensitive[T]`; interface `Masker` (Mask/Unmask/Name); options
-  `WithStateMask`, `WithEventMask`, `WithNoEventMask`; built-ins `mask.EncryptAES256GCM`,
-  `mask.HashHMACSHA256`, `mask.Omit`, `mask.Redact`. User asked for AES406/MD5; corrected to
-  AES-256-GCM / HMAC-SHA256 and accepted.
-- Defaults: events Redact; state plaintext + warning without a masker; errors always Redact.
-- Go API returns real values (wrapped in Sensitive). Propagation via cty marks; sensitive
-  outputs stay sensitive. Diagnostics: no change (user: they only print what's in the source).
-- User style this session: thinks out loud and redirects mid-question; when a question dialog is
-  rejected, ask what to clarify and show concrete code/types (they asked to see the Output type).
-- Outputs (Part 4, user-confirmed): `output` stays builtin; only outputs referenceable from
-  outside a module (validation); outputs are public entities returned by Find/All/Decode with the
-  value as a field; Outputs() stays; sensitive values never unwrap into plain Go types.
-- User: "keep adding this to this spec, I think we make it part of an epic in a while" — expect
-  an epic split at the split step (references / depends_on / sensitive+masking+state / outputs).
-- Module boundary applies at every nesting level (user: "a parent should only be able to reach a childs outputs"). Inbound already variables-only (context.go AppendParentModule) — no non-goal needed.
-- Whole-file state encryption: non-goal, "not right now". Design doc for sensitive API offered at technical approach; user's reply ("ok") ambiguous, not written.
-- Split done (2026-10-03): epic 20261003134528-327e0657-references-and-secrets with specs
-  references-as-written, user-depends-on, module-boundary-and-output-entities,
-  the original spec (now sensitive values; state keeps real values), masking (depends on it).
-  User plans to ship all at once.
-
-## Plan-epic run (2026-10-04) — orchestrator notes
-
-- Epic: 20261003134528-327e0657-references-and-secrets. Project root: /home/nicj/code/github.com/jumppad-labs/xcl.
-- Order: references-as-written, user-depends-on, module-boundary-and-output-entities (ready) →
-  references-and-secrets (sensitive values) → masking.
-- An earlier run's notes claimed all 5 DONE, but on re-run status showed no plans in the store,
-  no epic summary and no lanes. Only unsaved working files for module-boundary remained in
-  work/. Restarted the loop from the CLI's status.
-- Run 2 started children: references-as-written, user-depends-on, module-boundary-and-output-entities.
-- DONE: user-depends-on (verified in store). DONE: module-boundary-and-output-entities (verified). Summary sections written. Started child: references-and-secrets. DONE: references-as-written (verified), summary written. DONE: references-and-secrets (verified), summary written. Started child: masking. DONE: masking (verified), summary written. All 5 planned. epic order added 5 deps (chain: module-boundary → refs-and-secrets → refs-as-written → user-depends-on → masking). 3 decisions written (changelog test anchor, site page review, event-data shape). User accepted all 3 decisions (applied to plans and summary), kept the order, and approved 8 knowledge entries (written to xclconfig). Review done.
-- QUESTION (module-boundary, at discovery): spec "outputs found as entities" contradicts knowledge entry architecture/ux-flow.md (Find[string](c,"output.x") returns value). Answer (user): A, wording approved now — plan a task to rewrite ux-flow.md via spek-knowledge with Find[types.Output] + .Value example and Outputs() note. Relayed; child resumed at architecture.
-
-## Plan-epic run 3 (2026-10-05)
-
-- Store again showed no plans / no summary / no lanes despite run 2 notes saying all DONE
-  (plans/ epics/ config.yaml touched 2026-10-05 10:32; cause unknown). User: "ignore all that
-  and just run". Re-planning under the existing epic-order chain (serial):
-  module-boundary → references-and-secrets → references-as-written → user-depends-on → masking.
-- The 3 decisions from run 2 (changelog test anchor, site page review, event-data shape) and the
-  module-boundary ux-flow.md answer (A: rewrite ux-flow.md via spek-knowledge with
-  Find[types.Output] + .Value, Outputs() note) were already settled by the user — reuse, don't re-ask.
-- DONE: module-boundary (verified in store; summary kept for step 6). DONE: references-and-secrets (verified). DONE: references-as-written (verified). DONE: user-depends-on (verified). Started child: masking.
-- Run 3: all 5 DONE (verified). Decisions settled by user: (1) ShowReferences bare ref shown for sensitive field (A); (2) envelope always incl. Redact; (3) CHANGELOG Breaking only vs last release (masking dropped 2 items). Applied to plans; summary + decisions written. epic order added nothing (chain already present). Next: end-of-planning review.
-- Review closed: user approved summary; declined all knowledge saves this run.
-- Review change: user chose destroy graph from Meta.Links (create builder, reverse walk), Meta.Parents removed. user-depends-on plan revised (new tasks b3e94632, 5078beb1); summary section + decisions updated.
-
-## Implement-epic run 1 (2026-10-05) — orchestrator notes
-
-- Epic: 20261003134528-327e0657-references-and-secrets. Repos: xclconfig (this repo), xcl-website.
-- Start: 0/5 implemented; ready: module-boundary; rest blocked in chain order.
-- dirty=true (plans, epic, knowledge untracked in xcl). Asked user to commit: answer "Don't commit" —
-  proceed; uncommitted plans won't be in worktrees. Don't re-ask.
-- Created worktrees + started child: module-boundary-and-output-entities.
-- DONE: module-boundary (8/8 tasks, go test + site build pass, changes uncommitted in worktrees).
-  Merge refused: worktree_failed — xclconfig worktree has uncommitted work; next_action: commit or
-  discard in the worktree, then retry. Not committing (user rule: no commits unless asked). Run stopped
-  awaiting user; worktrees left in place.
-- User (2026-10-05): "ok commit and keep going" — orchestrator commits each spec's worktree (git commit -s + Co-Authored-By) on DONE, then merges. Plans were already committed on main (09a33f3).
-- MERGED: module-boundary (xclconfig 9eccfe1, xcl-website 7ced5b6).
-- Created worktrees + started child: references-and-secrets.
-- DONE + MERGED: references-and-secrets (16/16 tasks; xclconfig 0a51046, xcl-website d28667b). Knowledge candidates kept for final report (EncodeForState, Output.Format, go vet json-tag, registered-type conversion).
-- Created worktrees + started child: references-as-written.
-- DONE + MERGED: references-as-written (4/4 tasks). Knowledge candidates: processExpr link coverage gaps; Meta field → embedded.go schema snapshot.
-- Created worktrees + started child: user-depends-on.
-- DONE + MERGED: user-depends-on (8/8). Knowledge candidates: xcl-tags-gate entry lists removed Parents; call-order tests flaky vs graph parents; Links are attribute paths; one unexplained flaky full-suite failure.
-- Created worktrees + started child: masking.
-- DONE + MERGED: masking (10/10). All 5 specs implemented and merged. Run complete.
-- Knowledge: user approved; wrote 13 entries to repo/xclconfig (2 updates, 11 new). Dropped #7 (processExpr already handles lists/conditionals/unary) and #8 (dup of meta-field-golden-schema).
+Orchestrating `spek-plan-epic` for epic `20261006071139-7b266535-examples-and-output`, root
+`/home/nicj/code/github.com/jumppad-labs/xcl`.
+- Started: 506b8289-e2e-suite-and-real-world-examples, 17623cda-encoder-syntax-highlighting.
+- Blocked on e2e suite: aadf3c10-configuration-example, f7a185dc-docker-plugin-example.
+- DONE: 506b8289 e2e suite (summary kept in orchestrator scratchpad e2e-done.md).
+- Started: aadf3c10-configuration-example, f7a185dc-docker-plugin-example.
+- DONE: 17623cda encoder highlighting (summary in scratchpad highlight-done.md).
+- DONE: aadf3c10 configuration example (summary in scratchpad configonly-done.md).
+- DONE: f7a185dc docker plugin example (summary in scratchpad docker-done.md). All 4 planned.
+- Step 6: 2 cross-plan disagreements put to user (state-masking CTA ownership; highlighting changelog content test).
+- Decisions settled: (1) config plan owns state-masking CTA, docker drops its edit — applied to plans. (2) NO tests that inspect repo files (docs, CI yaml, go.mod, source scans) — user. Deleted readme_test.go, ci_workflow_test.go, static_output_test.go, scan test in query_migration_test.go. Plans e2e/config/docker stripped of changelog content tests. Convention added to conventions/testing-and-mocking.md.
+- Removed also state/dependencies_test, state/public_surface_test, events/imports_test, static_dependencies_test (user). Plans updated. Summary written (4 sections + decisions). epic order added 4 deps. Now: end-of-planning review with user.
+- User: CHANGELOG.md written once at end of epic (not saved as convention — epic decision only). All 4 plans updated with Changelog input notes; summary rewritten; highlight->configonly unordered.
+- Review done: order kept; project-structure convention updated (top-level public pkgs); gotchas saved (example modules/internal, website no redirects). Run complete.
+- Questions/answers: see above

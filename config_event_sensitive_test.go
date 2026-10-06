@@ -36,7 +36,7 @@ func applySensitiveFixtureWithEventData(t *testing.T, level EventDataLevel) (*ev
 	c, err := NewConfig(
 		WithPluginRegistry(reg),
 		WithStateStore(store),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 		WithEventData(level),
 	)
 	require.NoError(t, err)

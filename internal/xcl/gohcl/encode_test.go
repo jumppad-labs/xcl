@@ -62,6 +62,7 @@ func ExampleEncodeIntoBody() {
 	// service "web" {
 	//   executable = ["./web", "--listen=:8080"]
 	// }
+	//
 	// service "worker" {
 	//   executable = ["./worker"]
 	// }

@@ -404,11 +404,8 @@ func TestNewConfigAcceptsEncryptionStateMasker(t *testing.T) {
 // plaintextStateWarnings returns the recorded warn-level log events carrying
 // the plain text state warning for operation
 func plaintextStateWarnings(recorder *eventRecorder, operation string) []Event {
-	recorder.mu.Lock()
-	defer recorder.mu.Unlock()
-
 	found := []Event{}
-	for _, e := range recorder.events {
+	for _, e := range recorder.Events() {
 		if e.Operation != operation || e.Phase != events.PhaseLog {
 			continue
 		}
@@ -430,11 +427,8 @@ func plaintextStateWarnings(recorder *eventRecorder, operation string) []Event {
 // allPlaintextStateWarnings returns every recorded event, of any operation,
 // whose message is the plain text state warning
 func allPlaintextStateWarnings(recorder *eventRecorder) []Event {
-	recorder.mu.Lock()
-	defer recorder.mu.Unlock()
-
 	found := []Event{}
-	for _, e := range recorder.events {
+	for _, e := range recorder.Events() {
 		if e.Meta[events.KeyMessage] == parser.PlaintextStateWarning {
 			found = append(found, e)
 		}
@@ -467,7 +461,7 @@ func TestPlainStateWithSensitiveValueWarnsOnce(t *testing.T) {
 	c, err := NewConfig(
 		WithPluginRegistry(newSecretRegistry(t)),
 		WithStatePath(dir),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 	)
 	require.NoError(t, err)
 
@@ -497,7 +491,7 @@ func TestPlainStateWithoutSensitiveValuesDoesNotWarn(t *testing.T) {
 	c, err := NewConfig(
 		WithPluginRegistry(newNonSensitiveRegistry(t)),
 		WithStatePath(dir),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 	)
 	require.NoError(t, err)
 
@@ -517,13 +511,13 @@ func TestNoStateStoreDoesNotWarn(t *testing.T) {
 
 	c, err := NewConfig(
 		WithPluginRegistry(newSecretRegistry(t)),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 	)
 	require.NoError(t, err)
 
 	require.NoError(t, c.Apply(sensitiveBasicPath(t)))
 
-	require.NotEmpty(t, recorder.events)
+	require.NotEmpty(t, recorder.Events())
 	require.Empty(t, allPlaintextStateWarnings(recorder))
 }
 
@@ -537,7 +531,7 @@ func TestStateMaskerDoesNotWarn(t *testing.T) {
 		WithPluginRegistry(newSecretRegistry(t)),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 	)
 	require.NoError(t, err)
 
@@ -567,7 +561,7 @@ func TestDestroyWithPlainSensitiveStateWarnsOnce(t *testing.T) {
 	destroyer, err := NewConfig(
 		WithPluginRegistry(reg),
 		WithStatePath(dir),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 	)
 	require.NoError(t, err)
 	require.NoError(t, destroyer.Destroy())

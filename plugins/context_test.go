@@ -2,36 +2,14 @@ package plugins
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 )
-
-// eventRecorder records every event emitted to it, it is safe for concurrent
-// use
-type eventRecorder struct {
-	mutex  sync.Mutex
-	events []events.Event
-}
-
-func (r *eventRecorder) emit(e events.Event) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	r.events = append(r.events, e)
-}
-
-// recorded returns a copy of the events recorded so far
-func (r *eventRecorder) recorded() []events.Event {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	return append([]events.Event{}, r.events...)
-}
 
 func TestLoggerWithoutABoundLoggerReturnsALogger(t *testing.T) {
 	l := Logger(context.Background())
@@ -64,13 +42,13 @@ func TestLoggerForABoundNilLoggerIsNop(t *testing.T) {
 }
 
 func TestLoggerReturnsTheBoundLogger(t *testing.T) {
-	recorder := &eventRecorder{}
-	bound := logger.New(recorder.emit, events.Event{Source: "example", ResourceID: "resource.test.web"})
+	recorder := &testutil.EventRecorder{}
+	bound := logger.New(recorder.Record, events.Event{Source: "example", ResourceID: "resource.test.web"})
 	ctx := WithLogger(context.Background(), bound)
 
 	Logger(ctx).Info("creating", "name", "web")
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 1)
 	require.Equal(t, "example", recorded[0].Source)
 	require.Equal(t, "resource.test.web", recorded[0].ResourceID)
@@ -83,11 +61,11 @@ func TestLoggerReturnsTheBoundLogger(t *testing.T) {
 }
 
 func TestWithLoggerDoesNotChangeTheParentContext(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	parent := context.Background()
-	_ = WithLogger(parent, logger.New(recorder.emit, events.Event{}))
+	_ = WithLogger(parent, logger.New(recorder.Record, events.Event{}))
 
 	Logger(parent).Info("creating")
 
-	require.Empty(t, recorder.recorded())
+	require.Empty(t, recorder.Events())
 }

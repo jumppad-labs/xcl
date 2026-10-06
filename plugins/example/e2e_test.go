@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/schema"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
@@ -19,28 +19,17 @@ import (
 )
 
 // eventRecorder records every event emitted to it, so a test can assert what
-// a plugin reported and logged. An external plugin logs from gRPC handler
-// goroutines, so recording is guarded by a mutex.
+// a plugin reported and logged. It adds this package's queries to the shared
+// recorder
 type eventRecorder struct {
-	mu     sync.Mutex
-	events []events.Event
-}
-
-func (r *eventRecorder) emit(e events.Event) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.events = append(r.events, e)
+	testutil.EventRecorder
 }
 
 // logsWithMessage returns every recorded log event with the given level and
 // message
 func (r *eventRecorder) logsWithMessage(level, msg string) []events.Event {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	found := []events.Event{}
-	for _, e := range r.events {
+	for _, e := range r.Events() {
 		if e.Phase == events.PhaseLog && e.Meta[events.KeyLevel] == level && e.Meta[events.KeyMessage] == msg {
 			found = append(found, e)
 		}
@@ -52,11 +41,8 @@ func (r *eventRecorder) logsWithMessage(level, msg string) []events.Event {
 // messages returns the message of every recorded log event, whatever its
 // level
 func (r *eventRecorder) messages() []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	found := []string{}
-	for _, e := range r.events {
+	for _, e := range r.Events() {
 		if e.Phase == events.PhaseLog {
 			found = append(found, fmt.Sprint(e.Meta[events.KeyMessage]))
 		}
@@ -67,11 +53,8 @@ func (r *eventRecorder) messages() []string {
 
 // infoMessages returns the message of every recorded info log event
 func (r *eventRecorder) infoMessages() []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	found := []string{}
-	for _, e := range r.events {
+	for _, e := range r.Events() {
 		if e.Phase == events.PhaseLog && e.Meta[events.KeyLevel] == events.LevelInfo {
 			found = append(found, fmt.Sprint(e.Meta[events.KeyMessage]))
 		}
@@ -82,11 +65,8 @@ func (r *eventRecorder) infoMessages() []string {
 
 // loadEvents returns every recorded load success event
 func (r *eventRecorder) loadEvents() []events.Event {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	found := []events.Event{}
-	for _, e := range r.events {
+	for _, e := range r.Events() {
 		if e.Operation == events.OperationLoad && e.Phase == events.PhaseSuccess {
 			found = append(found, e)
 		}
@@ -98,7 +78,7 @@ func (r *eventRecorder) loadEvents() []events.Event {
 // createContext returns a context carrying the logger xcl binds for the
 // create of resource.person.john, emitting to recorder
 func createContext(recorder *eventRecorder) context.Context {
-	callLogger := logger.New(recorder.emit, events.Event{
+	callLogger := logger.New(recorder.Record, events.Event{
 		Source:       events.SourceCore,
 		Operation:    events.OperationCreate,
 		ResourceType: "person.john",
@@ -111,7 +91,7 @@ func createContext(recorder *eventRecorder) context.Context {
 // destroyContext returns a context carrying the logger xcl binds for the
 // destroy of resource.person.john, emitting to recorder
 func destroyContext(recorder *eventRecorder) context.Context {
-	callLogger := logger.New(recorder.emit, events.Event{
+	callLogger := logger.New(recorder.Record, events.Event{
 		Source:       events.SourceCore,
 		Operation:    events.OperationDestroy,
 		ResourceType: "person.john",
@@ -578,7 +558,7 @@ func TestExternalPluginChangedReportsNoChangeForIdenticalData(t *testing.T) {
 // type as the Source and the call's resource binding kept
 func TestInProcessPluginProviderLogsNameThePluginAsSource(t *testing.T) {
 	recorder := &eventRecorder{}
-	ph := plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.emit)
+	ph := plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.Record)
 
 	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
@@ -599,7 +579,7 @@ func TestInProcessPluginProviderLogsNameThePluginAsSource(t *testing.T) {
 // an in-process plugin emits no load event, the registry reports loads
 func TestInProcessPluginHostEmitsNoLoadEvent(t *testing.T) {
 	recorder := &eventRecorder{}
-	plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.emit)
+	plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.Record)
 
 	require.Empty(t, recorder.loadEvents())
 }
@@ -614,7 +594,7 @@ func TestInProcessPluginLoadedByARegistryEmitsALoadEvent(t *testing.T) {
 	err := r.RegisterPlugin(&PersonPlugin{})
 	require.NoError(t, err)
 
-	err = r.Load(recorder.emit)
+	err = r.Load(recorder.Record)
 	require.NoError(t, err)
 
 	loaded := recorder.loadEvents()
@@ -627,7 +607,7 @@ func TestInProcessPluginLoadedByARegistryEmitsALoadEvent(t *testing.T) {
 // logs a message of its own when it calls an in-process provider
 func TestInProcessPluginLogsNoCallingProviderMessage(t *testing.T) {
 	recorder := &eventRecorder{}
-	ph := plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.emit)
+	ph := plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.Record)
 
 	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
@@ -639,7 +619,7 @@ func TestInProcessPluginLogsNoCallingProviderMessage(t *testing.T) {
 // nothing at info for an in-process plugin, only what its provider logs
 func TestInProcessPluginLogsOnlyProviderMessagesAtInfo(t *testing.T) {
 	recorder := &eventRecorder{}
-	ph := plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.emit)
+	ph := plugintesting.InProcessPluginSetupWithEmit(t, &PersonPlugin{}, recorder.Record)
 
 	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
@@ -656,7 +636,7 @@ func TestExternalPluginProviderLogsReachTheHostsEmit(t *testing.T) {
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
 	recorder := &eventRecorder{}
-	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.Record)
 
 	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
@@ -676,7 +656,7 @@ func TestExternalPluginProviderLogsCarryTheCallsResourceAndStep(t *testing.T) {
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
 	recorder := &eventRecorder{}
-	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.Record)
 
 	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
@@ -702,7 +682,7 @@ func TestExternalPluginDestroyLogCarriesTheDestroyStep(t *testing.T) {
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
 	recorder := &eventRecorder{}
-	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.Record)
 
 	err := ph.Destroy(destroyContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
@@ -729,7 +709,7 @@ func TestExternalPluginProviderLogsWithoutCallLoggerAreDropped(t *testing.T) {
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
 	recorder := &eventRecorder{}
-	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.Record)
 
 	_, err := ph.Create(context.Background(), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
@@ -746,7 +726,7 @@ func TestExternalPluginFrameworkLogsReachTheHostsEmit(t *testing.T) {
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
 	recorder := &eventRecorder{}
-	plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+	plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.Record)
 
 	started := recorder.logsWithMessage(events.LevelDebug, "starting plugin")
 	require.Len(t, started, 1, "go-plugin should log that it started the plugin")
@@ -768,7 +748,7 @@ func TestExternalPluginHostEmitsNoLoadEvent(t *testing.T) {
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
 	recorder := &eventRecorder{}
-	plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+	plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.Record)
 
 	require.Empty(t, recorder.loadEvents())
 }
@@ -792,7 +772,7 @@ func TestExternalPluginLoadedByARegistryEmitsALoadEvent(t *testing.T) {
 	err := r.RegisterPluginWithPath("./build/example")
 	require.NoError(t, err)
 
-	err = r.Load(recorder.emit)
+	err = r.Load(recorder.Record)
 	require.NoError(t, err)
 
 	loaded := recorder.loadEvents()
@@ -809,7 +789,7 @@ func TestExternalPluginLogsNoCallingProviderMessage(t *testing.T) {
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
 	recorder := &eventRecorder{}
-	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.Record)
 
 	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)
@@ -826,7 +806,7 @@ func TestExternalPluginLogsOnlyProviderMessagesAtInfo(t *testing.T) {
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
 	recorder := &eventRecorder{}
-	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.emit)
+	ph := plugintesting.ExternalPluginSetupWithEmit(t, "./build/example", recorder.Record)
 
 	_, err := ph.Create(createContext(recorder), "resource", "person", loggingTestPerson(t))
 	require.NoError(t, err)

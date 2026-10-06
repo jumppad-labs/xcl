@@ -39,7 +39,7 @@ func applyEncodeFixtureWithEventData(t *testing.T, level EventDataLevel) (*event
 	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithStateStore(store),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 		WithEventData(level),
 	)
 	require.NoError(t, err)
@@ -76,7 +76,7 @@ func applyEncodeFixtureWithDefaultEventData(t *testing.T) *eventRecorder {
 	c, err := NewConfig(
 		WithPluginRegistry(pr),
 		WithStateStore(store),
-		WithEventHandler(recorder.handle),
+		WithEventHandler(recorder.Record),
 	)
 	require.NoError(t, err)
 

@@ -5,13 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/schema"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
@@ -25,27 +25,17 @@ const (
 	otherPersonID = "resource.person.other_person"
 )
 
-// applyEventCollector gathers the events the parser emits; the walker fires
-// them in parallel
+// applyEventCollector gathers the events the parser emits, it adds the apply
+// tests' queries to the shared recorder
 type applyEventCollector struct {
-	mu     sync.Mutex
-	events []events.Event
-}
-
-func (c *applyEventCollector) collect(event events.Event) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.events = append(c.events, event)
+	testutil.EventRecorder
 }
 
 // successfulResources returns the IDs of the resources for which the given
 // operation succeeded, leaving out builtin types which are not resources
 func (c *applyEventCollector) successfulResources(operation string) []string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	ids := []string{}
-	for _, event := range c.events {
+	for _, event := range c.Events() {
 		if event.Operation == operation && event.Phase == events.PhaseSuccess && strings.HasPrefix(event.ResourceID, "resource.") {
 			ids = append(ids, event.ResourceID)
 		}
@@ -66,7 +56,7 @@ func applyPeople(t *testing.T, reg *registry.PluginRegistry, store *state.FileSt
 	options.ModuleCache = filepath.Join(t.TempDir(), parser.ConfigDirectory, "cache")
 	options.PluginRegistry = reg
 	options.StateStore = store
-	options.Emit = collector.collect
+	options.Emit = collector.Record
 
 	p := parser.NewParser(options)
 

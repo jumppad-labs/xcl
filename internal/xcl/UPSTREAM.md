@@ -82,8 +82,13 @@ Import paths were rewritten from `github.com/hashicorp/hcl/v2/...` to
     schema were dropped. Only fields whose type is exactly `hcl.Expression` or
     `*hcl.Attribute` are skipped now.
   - a field holding nothing, a nil pointer, interface, slice or map, is left
-    out rather than written as `null`. A zero number, false or empty string
-    that is present is still written.
+    out rather than written as `null`. An optional attribute, tagged optional
+    or of pointer type, at its zero value is left out too, since leaving it
+    out reads back to the same value. A required attribute at its zero value
+    is still written, and so is a non-nil pointer to a zero value.
+    `EncodeOptions.IncludeEmpty` writes both instead, a field holding nothing
+    as the zero value of the type it would hold (`""`, `0`, `[]`, `{}`), never
+    as `null`. Unset blocks and nil interfaces are left out either way.
   - a field whose tag carries XCL's `computed` option is left out unless
     `EncodeOptions.IncludeComputed` asks for it, because it is owned by the
     provider rather than written in configuration.
@@ -94,6 +99,12 @@ Import paths were rewritten from `github.com/hashicorp/hcl/v2/...` to
 - `gohcl/schema.go`: `fieldTags` carries a `Computed` set, so the encoder can
   act on the `computed` option that `tags.Parse` already reads.
 - `gohcl/encode_body_test.go`: new, covering the `EncodeBody` behaviour above.
+- `gohcl/encode.go`: every block is set apart by a blank line from whatever
+  comes before it, a block of the same type included, and no body opens with a
+  blank line. Upstream wrote repeated blocks back to back but put a blank line
+  before the first block of each new block type, even when it was the first
+  thing in the body, so a nested body could open with an empty line.
+  `ExampleEncodeIntoBody` in `gohcl/encode_test.go` shows the new layout.
 - `gohcl/encode.go`: an attribute whose value is a struct carrying `xcl` tags
   is built by the encoder rather than handed whole to `gocty`. Upstream's
   `gocty.ImpliedType` builds an object from every tagged field, so the rules

@@ -15,21 +15,20 @@ variable "replicas" {
 
 # config_map holds values whose names are not known to the Go type, its data
 # is a map. The deployment reads single values out of it below.
-resource "config_map" "api" {
+config_map "api" {
   data = {
     db_host   = "postgres.default.svc"
     log_level = "info"
   }
 }
 
-resource "deployment" "api" {
+deployment "api" {
   replicas = variable.replicas
 
   # container is a repeated block, this deployment has two of them
   container {
     name  = "api"
     image = "ghcr.io/example/api:${variable.image_tag}"
-    password = "my password"
 
     # port is repeated in turn, a block nested inside a block
     port {
@@ -45,12 +44,25 @@ resource "deployment" "api" {
     # env values are read from the config map, so they are declared once
     env {
       name  = "DB_HOST"
-      value = resource.config_map.api.data.db_host
+      value = config_map.api.data.db_host
     }
 
     env {
       name  = "LOG_LEVEL"
-      value = resource.config_map.api.data.log_level
+      value = config_map.api.data.log_level
+    }
+
+    # the password comes from a secret, the deployment holds only the
+    # secret's name and the key to read, never the password itself
+    env {
+      name = "DB_PASSWORD"
+
+      value_from {
+        secret_key_ref {
+          name = secret.db.meta.id
+          key  = "password"
+        }
+      }
     }
 
     # resources nests two more blocks of its own
@@ -75,7 +87,6 @@ resource "deployment" "api" {
   container {
     name  = "proxy"
     image = "ghcr.io/example/proxy:0.4.1"
-    password = "my password"
 
     port {
       name           = "proxy"
@@ -85,36 +96,6 @@ resource "deployment" "api" {
 
   volume {
     name       = "config"
-    config_map = resource.config_map.api.meta.id
+    config_map = config_map.api.meta.id
   }
-}
-
-# The service is linked to the deployment by its id. Kubernetes would match
-# the two with a label selector, because a manifest can not point at another
-# object; here the reference does it directly.
-#
-# The port it sends traffic to is read out of the deployment as well. A
-# repeated block is referenced by position, container[0] is the first
-# container block.
-resource "service" "api" {
-  deployment  = resource.deployment.api.meta.id
-  port        = 80
-  target_port = resource.deployment.api.container[0].port[0].container_port
-}
-
-# The ingress is linked to the service the same way, by id and port.
-# References order the blocks too, so the service is always parsed before the
-# ingress that reads it.
-resource "ingress" "api" {
-  host = "api.example.com"
-
-  rule {
-    path    = "/"
-    service = resource.service.api.meta.id
-    port    = resource.service.api.port
-  }
-}
-
-output "api_url" {
-  value = "https://${resource.ingress.api.host}"
 }

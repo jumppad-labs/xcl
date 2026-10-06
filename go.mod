@@ -19,6 +19,7 @@ require (
 	github.com/hashicorp/go-plugin v1.6.3
 	github.com/infinytum/raymond/v2 v2.0.5
 	github.com/mitchellh/go-wordwrap v1.0.1
+	github.com/muesli/termenv v0.16.0
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/text v0.23.0
 	golang.org/x/tools v0.24.0
@@ -62,7 +63,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
-	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

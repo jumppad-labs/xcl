@@ -7,14 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 )
 
 // newRecordedHCLogAdapter returns an hclog adapter writing to an event logger
 // whose events are recorded by the returned recorder
-func newRecordedHCLogAdapter() (hclog.Logger, *eventRecorder) {
-	recorder := &eventRecorder{}
-	l := newHCLogAdapter(logger.New(recorder.emit, events.Event{Source: "external", Operation: events.OperationLoad}))
+func newRecordedHCLogAdapter() (hclog.Logger, *testutil.EventRecorder) {
+	recorder := &testutil.EventRecorder{}
+	l := newHCLogAdapter(logger.New(recorder.Record, events.Event{Source: "external", Operation: events.OperationLoad}))
 
 	return l, recorder
 }
@@ -27,7 +28,7 @@ func TestHCLogAdapterPassesOnDebugAndInfoAtDebugAndWarnAndErrorAtTheirLevel(t *t
 	l.Warn("plugin slow")
 	l.Error("plugin failed", "error", "boom")
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 4)
 	require.Equal(t, map[string]any{
 		"level":     "debug",
@@ -58,7 +59,7 @@ func TestHCLogAdapterKeepsTheLoggersSourceAndOperation(t *testing.T) {
 
 	l.Warn("plugin slow")
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 1)
 	require.Equal(t, "external", recorded[0].Source)
 	require.Equal(t, events.OperationLoad, recorded[0].Operation)
@@ -71,7 +72,7 @@ func TestHCLogAdapterDropsTrace(t *testing.T) {
 	l.Trace("waiting for stdio data")
 	l.Log(hclog.Trace, "waiting for stdio data")
 
-	require.Empty(t, recorder.recorded())
+	require.Empty(t, recorder.Events())
 	require.False(t, l.IsTrace())
 	require.True(t, l.IsDebug())
 }
@@ -84,7 +85,7 @@ func TestHCLogAdapterLogPassesOnAtTheGivenLevel(t *testing.T) {
 	l.Log(hclog.Warn, "plugin slow")
 	l.Log(hclog.Error, "plugin failed")
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 4)
 	require.Equal(t, map[string]any{"level": "debug", "message": "plugin address", "component": "go-plugin"}, recorded[0].Meta)
 	require.Equal(t, map[string]any{"level": "debug", "message": "using plugin", "component": "go-plugin"}, recorded[1].Meta)
@@ -100,7 +101,7 @@ func TestHCLogAdapterWithAddsImpliedArgs(t *testing.T) {
 
 	require.Equal(t, []interface{}{"pid", 123}, l.ImpliedArgs())
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 1)
 	require.Equal(t, map[string]any{
 		"level":     "debug",
@@ -124,7 +125,7 @@ func TestHCLogAdapterStandardWriterWritesEachLineAtDebug(t *testing.T) {
 	_, err := l.StandardWriter(nil).Write([]byte("first line\nsecond line\n"))
 	require.NoError(t, err)
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 2)
 	require.Equal(t, map[string]any{"level": "debug", "message": "first line", "component": "go-plugin"}, recorded[0].Meta)
 	require.Equal(t, map[string]any{"level": "debug", "message": "second line", "component": "go-plugin"}, recorded[1].Meta)
@@ -135,7 +136,7 @@ func TestHCLogAdapterGivesEveryLogTheGoPluginComponent(t *testing.T) {
 
 	l.Warn("plugin slow", "pid", 123)
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 1)
 	require.Equal(t, "go-plugin", recorded[0].Meta["component"])
 	require.Equal(t, 123, recorded[0].Meta["pid"])
@@ -146,19 +147,19 @@ func TestHCLogAdapterDoesNotWriteAnEventDetail(t *testing.T) {
 
 	l.Warn("plugin slow")
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 1)
 	require.NotContains(t, recorded[0].Meta, "event")
 }
 
 func TestHCLogAdapterGivesTheGoPluginComponentToAPluginTaggedLog(t *testing.T) {
-	recorder := &eventRecorder{}
-	tagged := logger.WithTag(logger.New(recorder.emit, events.Event{}), "plugin", "external")
+	recorder := &testutil.EventRecorder{}
+	tagged := logger.WithTag(logger.New(recorder.Record, events.Event{}), "plugin", "external")
 	l := newHCLogAdapter(tagged)
 
 	l.Debug("starting plugin", "path", "build/external")
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 1)
 	require.Equal(t, map[string]any{
 		"level":     "debug",
@@ -182,7 +183,7 @@ func TestHCLogAdapterBuriesEndOfStdioStream(t *testing.T) {
 
 	l.Debug("received EOF, stopping recv loop", "err", "rpc error: code = Unavailable desc = error reading from server: EOF")
 
-	require.Empty(t, recorder.recorded())
+	require.Empty(t, recorder.Events())
 }
 
 func TestHCLogAdapterPassesOnEndOfStdioStreamAboveDebug(t *testing.T) {
@@ -190,7 +191,7 @@ func TestHCLogAdapterPassesOnEndOfStdioStreamAboveDebug(t *testing.T) {
 
 	l.Error("received EOF, stopping recv loop")
 
-	recorded := recorder.recorded()
+	recorded := recorder.Events()
 	require.Len(t, recorded, 1)
 	require.Equal(t, map[string]any{
 		"level":     "error",

@@ -10,6 +10,7 @@ import (
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -853,16 +854,16 @@ func TestLoadWithFailingInProcessPluginFailsNamingIt(t *testing.T) {
 }
 
 func TestLoadEmitsLoadStartAndErrorForFailingInProcessPlugin(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	r := NewPluginRegistry()
 
 	err := r.RegisterPlugin(&failingPlugin{})
 	require.NoError(t, err)
 
-	loadErr := r.Load(recorder.emit)
+	loadErr := r.Load(recorder.Record)
 	require.Error(t, loadErr)
 
-	loads := lifecycleEvents(recorder.recorded(), events.OperationLoad)
+	loads := lifecycleEvents(recorder.Events(), events.OperationLoad)
 	require.Len(t, loads, 2)
 
 	require.Equal(t, events.SourceCore, loads[0].Source)
@@ -942,12 +943,12 @@ func TestLoadRunsOnce(t *testing.T) {
 	err = r.Load(nil)
 	require.NoError(t, err)
 
-	second := &eventRecorder{}
-	err = r.Load(second.emit)
+	second := &testutil.EventRecorder{}
+	err = r.Load(second.Record)
 	require.NoError(t, err)
 
 	require.Len(t, r.GetPluginHosts(), 1)
-	require.Empty(t, second.recorded())
+	require.Empty(t, second.Events())
 }
 
 func TestLoadCachesFailure(t *testing.T) {
@@ -959,11 +960,11 @@ func TestLoadCachesFailure(t *testing.T) {
 	firstErr := r.Load(nil)
 	require.Error(t, firstErr)
 
-	second := &eventRecorder{}
-	secondErr := r.Load(second.emit)
+	second := &testutil.EventRecorder{}
+	secondErr := r.Load(second.Record)
 
 	require.Equal(t, firstErr, secondErr)
-	require.Empty(t, second.recorded())
+	require.Empty(t, second.Events())
 }
 
 func TestRegisterTypeClashingWithBuiltinFailsImmediately(t *testing.T) {
@@ -1045,16 +1046,16 @@ func TestLoadFailsWithClashForRegisteredTypeMatchingPluginType(t *testing.T) {
 }
 
 func TestLoadEmitsLoadStartAndSuccessForInProcessPlugin(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	r := NewPluginRegistry()
 
 	err := r.RegisterPlugin(&thingPlugin{})
 	require.NoError(t, err)
 
-	err = r.Load(recorder.emit)
+	err = r.Load(recorder.Record)
 	require.NoError(t, err)
 
-	loads := lifecycleEvents(recorder.recorded(), events.OperationLoad)
+	loads := lifecycleEvents(recorder.Events(), events.OperationLoad)
 	require.Len(t, loads, 2)
 
 	require.Equal(t, events.SourceCore, loads[0].Source)
@@ -1070,17 +1071,17 @@ func TestLoadEmitsLoadStartAndSuccessForExternalPlugin(t *testing.T) {
 	setup := newTestPluginSetup(t)
 	examplePlugin := setup.buildExamplePlugin("test-plugin")
 
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	r := NewPluginRegistry()
 	t.Cleanup(func() { stopHosts(r) })
 
 	err := r.RegisterPluginWithPath(examplePlugin)
 	require.NoError(t, err)
 
-	err = r.Load(recorder.emit)
+	err = r.Load(recorder.Record)
 	require.NoError(t, err)
 
-	loads := lifecycleEvents(recorder.recorded(), events.OperationLoad)
+	loads := lifecycleEvents(recorder.Events(), events.OperationLoad)
 	require.Len(t, loads, 2)
 
 	require.Equal(t, events.SourceCore, loads[0].Source)
@@ -1093,29 +1094,29 @@ func TestLoadEmitsLoadStartAndSuccessForExternalPlugin(t *testing.T) {
 }
 
 func TestLoadWithoutDiscoveryDirectoriesEmitsNoDiscoverEvents(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	r := NewPluginRegistry()
 
 	err := r.RegisterPlugin(&thingPlugin{})
 	require.NoError(t, err)
 
-	err = r.Load(recorder.emit)
+	err = r.Load(recorder.Record)
 	require.NoError(t, err)
 
-	require.Empty(t, lifecycleEvents(recorder.recorded(), events.OperationDiscover))
+	require.Empty(t, lifecycleEvents(recorder.Events(), events.OperationDiscover))
 }
 
 func TestLoadRoutesPluginInitLogsToLoadsEmitter(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	r := NewPluginRegistry()
 
 	err := r.RegisterPlugin(&chattyPlugin{})
 	require.NoError(t, err)
 
-	err = r.Load(recorder.emit)
+	err = r.Load(recorder.Record)
 	require.NoError(t, err)
 
-	initialised := logsWithMessage(recorder.recorded(), "chatty provider initialised")
+	initialised := logsWithMessage(recorder.Events(), "chatty provider initialised")
 	require.Len(t, initialised, 1)
 	require.Equal(t, "chattyPlugin", initialised[0].Source)
 }
@@ -1164,13 +1165,13 @@ func TestActivateRoutesPluginLogsToTheActiveEmitter(t *testing.T) {
 	err = r.Load(nil)
 	require.NoError(t, err)
 
-	recorder := &eventRecorder{}
-	deactivate := r.Activate(recorder.emit)
+	recorder := &testutil.EventRecorder{}
+	deactivate := r.Activate(recorder.Record)
 	t.Cleanup(deactivate)
 
 	createThing(t, r)
 
-	created := logsWithMessage(recorder.recorded(), "creating a thing")
+	created := logsWithMessage(recorder.Events(), "creating a thing")
 	require.Len(t, created, 1)
 	require.Equal(t, "chattyPlugin", created[0].Source)
 }
@@ -1184,13 +1185,13 @@ func TestDeactivateStopsRouting(t *testing.T) {
 	err = r.Load(nil)
 	require.NoError(t, err)
 
-	recorder := &eventRecorder{}
-	deactivate := r.Activate(recorder.emit)
+	recorder := &testutil.EventRecorder{}
+	deactivate := r.Activate(recorder.Record)
 	deactivate()
 
 	createThing(t, r)
 
-	require.Empty(t, recorder.recorded())
+	require.Empty(t, recorder.Events())
 }
 
 func TestDeactivateOfAnOlderActivationKeepsTheNewer(t *testing.T) {
@@ -1202,19 +1203,19 @@ func TestDeactivateOfAnOlderActivationKeepsTheNewer(t *testing.T) {
 	err = r.Load(nil)
 	require.NoError(t, err)
 
-	older := &eventRecorder{}
-	deactivateOlder := r.Activate(older.emit)
+	older := &testutil.EventRecorder{}
+	deactivateOlder := r.Activate(older.Record)
 
-	newer := &eventRecorder{}
-	deactivateNewer := r.Activate(newer.emit)
+	newer := &testutil.EventRecorder{}
+	deactivateNewer := r.Activate(newer.Record)
 	t.Cleanup(deactivateNewer)
 
 	deactivateOlder()
 
 	createThing(t, r)
 
-	require.Empty(t, older.recorded())
-	require.Len(t, logsWithMessage(newer.recorded(), "creating a thing"), 1)
+	require.Empty(t, older.Events())
+	require.Len(t, logsWithMessage(newer.Events(), "creating a thing"), 1)
 }
 
 // A plugin provides types the same way RegisterType does, by a type and an

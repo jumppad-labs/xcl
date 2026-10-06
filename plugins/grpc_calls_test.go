@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/proto"
 )
@@ -54,8 +55,8 @@ func (c *fakeHostCallbackClient) Info(ctx context.Context, in *proto.LogRequest,
 
 // createCallLogger returns a logger bound the way xcl binds the create of
 // resource.person.john, emitting to recorder
-func createCallLogger(recorder *eventRecorder) logger.Logger {
-	return logger.New(recorder.emit, events.Event{
+func createCallLogger(recorder *testutil.EventRecorder) logger.Logger {
+	return logger.New(recorder.Record, events.Event{
 		Source:       events.SourceCore,
 		Operation:    events.OperationCreate,
 		ResourceType: "person.john",
@@ -119,7 +120,7 @@ func TestGRPCPluginWrapperWithoutCallLoggersSendsNoCallID(t *testing.T) {
 // a call is in progress its ID resolves to the ctx logger, keeping the call's
 // resource and step, with the plugin's name as its Source
 func TestGRPCPluginWrapperRegistersCallLoggerSourcedToPlugin(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	calls := newCallLoggers()
 
 	client := &fakeCreateServiceClient{}
@@ -136,7 +137,7 @@ func TestGRPCPluginWrapperRegistersCallLoggerSourcedToPlugin(t *testing.T) {
 	_, err := wrapper.Create(ctx, "resource", "person", []byte(`{}`))
 	require.NoError(t, err)
 
-	logged := recorder.recorded()
+	logged := recorder.Events()
 	require.Len(t, logged, 1)
 	require.Equal(t, testPluginName, logged[0].Source)
 	require.Equal(t, events.OperationCreate, logged[0].Operation)
@@ -152,7 +153,7 @@ func TestGRPCPluginWrapperRegistersCallLoggerSourcedToPlugin(t *testing.T) {
 }
 
 func TestGRPCPluginWrapperForgetsCallLoggerAfterCallReturns(t *testing.T) {
-	recorder := &eventRecorder{}
+	recorder := &testutil.EventRecorder{}
 	calls := newCallLoggers()
 	client := &fakeCreateServiceClient{}
 	wrapper := &grpcPluginWrapper{client: client, name: testPluginName, calls: calls}
@@ -182,8 +183,8 @@ func TestGRPCLoggerSendsItsCallIDWithEveryMessage(t *testing.T) {
 // setupCallbackServer returns a host callback server whose plugin scoped
 // logger emits to pluginRecorder, with one call in progress whose logger
 // emits to callRecorder, and the ID of that call
-func setupCallbackServer(pluginRecorder, callRecorder *eventRecorder) (*GRPCHostCallbackServer, string) {
-	pluginLogger := logger.New(pluginRecorder.emit, events.Event{Source: testPluginName, Operation: events.OperationLoad})
+func setupCallbackServer(pluginRecorder, callRecorder *testutil.EventRecorder) (*GRPCHostCallbackServer, string) {
+	pluginLogger := logger.New(pluginRecorder.Record, events.Event{Source: testPluginName, Operation: events.OperationLoad})
 
 	server := NewGRPCHostCallbackServer(pluginLogger, nil)
 	server.calls = newCallLoggers()
@@ -194,8 +195,8 @@ func setupCallbackServer(pluginRecorder, callRecorder *eventRecorder) (*GRPCHost
 }
 
 func TestGRPCHostCallbackServerWritesKnownCallIDToTheCallsLogger(t *testing.T) {
-	pluginRecorder := &eventRecorder{}
-	callRecorder := &eventRecorder{}
+	pluginRecorder := &testutil.EventRecorder{}
+	callRecorder := &testutil.EventRecorder{}
 	server, callID := setupCallbackServer(pluginRecorder, callRecorder)
 
 	_, err := server.Info(context.Background(), &proto.LogRequest{
@@ -205,9 +206,9 @@ func TestGRPCHostCallbackServerWritesKnownCallIDToTheCallsLogger(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Empty(t, pluginRecorder.recorded())
+	require.Empty(t, pluginRecorder.Events())
 
-	logged := callRecorder.recorded()
+	logged := callRecorder.Events()
 	require.Len(t, logged, 1)
 	require.Equal(t, testPluginName, logged[0].Source)
 	require.Equal(t, events.OperationCreate, logged[0].Operation)
@@ -220,8 +221,8 @@ func TestGRPCHostCallbackServerWritesKnownCallIDToTheCallsLogger(t *testing.T) {
 }
 
 func TestGRPCHostCallbackServerWritesUnknownCallIDToThePluginLogger(t *testing.T) {
-	pluginRecorder := &eventRecorder{}
-	callRecorder := &eventRecorder{}
+	pluginRecorder := &testutil.EventRecorder{}
+	callRecorder := &testutil.EventRecorder{}
 	server, _ := setupCallbackServer(pluginRecorder, callRecorder)
 
 	_, err := server.Warn(context.Background(), &proto.LogRequest{
@@ -230,9 +231,9 @@ func TestGRPCHostCallbackServerWritesUnknownCallIDToThePluginLogger(t *testing.T
 	})
 	require.NoError(t, err)
 
-	require.Empty(t, callRecorder.recorded())
+	require.Empty(t, callRecorder.Events())
 
-	logged := pluginRecorder.recorded()
+	logged := pluginRecorder.Events()
 	require.Len(t, logged, 1)
 	require.Equal(t, testPluginName, logged[0].Source)
 	require.Equal(t, events.OperationLoad, logged[0].Operation)
@@ -242,8 +243,8 @@ func TestGRPCHostCallbackServerWritesUnknownCallIDToThePluginLogger(t *testing.T
 }
 
 func TestGRPCHostCallbackServerWritesEmptyCallIDToThePluginLogger(t *testing.T) {
-	pluginRecorder := &eventRecorder{}
-	callRecorder := &eventRecorder{}
+	pluginRecorder := &testutil.EventRecorder{}
+	callRecorder := &testutil.EventRecorder{}
 	server, _ := setupCallbackServer(pluginRecorder, callRecorder)
 
 	_, err := server.Debug(context.Background(), &proto.LogRequest{
@@ -252,9 +253,9 @@ func TestGRPCHostCallbackServerWritesEmptyCallIDToThePluginLogger(t *testing.T) 
 	})
 	require.NoError(t, err)
 
-	require.Empty(t, callRecorder.recorded())
+	require.Empty(t, callRecorder.Events())
 
-	logged := pluginRecorder.recorded()
+	logged := pluginRecorder.Events()
 	require.Len(t, logged, 1)
 	require.Equal(t, testPluginName, logged[0].Source)
 	require.Equal(t, events.OperationLoad, logged[0].Operation)
@@ -269,10 +270,10 @@ func TestGRPCHostCallbackServerWritesEmptyCallIDToThePluginLogger(t *testing.T) 
 // message arriving after its call has returned falls back to the plugin
 // scoped logger
 func TestGRPCHostCallbackServerWritesReturnedCallIDToThePluginLogger(t *testing.T) {
-	pluginRecorder := &eventRecorder{}
-	callRecorder := &eventRecorder{}
+	pluginRecorder := &testutil.EventRecorder{}
+	callRecorder := &testutil.EventRecorder{}
 
-	pluginLogger := logger.New(pluginRecorder.emit, events.Event{Source: testPluginName, Operation: events.OperationLoad})
+	pluginLogger := logger.New(pluginRecorder.Record, events.Event{Source: testPluginName, Operation: events.OperationLoad})
 	server := NewGRPCHostCallbackServer(pluginLogger, nil)
 	server.calls = newCallLoggers()
 
@@ -282,8 +283,8 @@ func TestGRPCHostCallbackServerWritesReturnedCallIDToThePluginLogger(t *testing.
 	_, err := server.Error(context.Background(), &proto.LogRequest{Message: "after return", CallId: callID})
 	require.NoError(t, err)
 
-	require.Empty(t, callRecorder.recorded())
-	require.Len(t, pluginRecorder.recorded(), 1)
+	require.Empty(t, callRecorder.Events())
+	require.Len(t, pluginRecorder.Events(), 1)
 }
 
 func TestCallIDFromContextReadsIncomingMetadata(t *testing.T) {

@@ -13,50 +13,46 @@
     "register",
     "finished"
   ],
-  "created_at": "2026-09-20T07:23:12.818676914Z",
-  "updated_at": "2026-09-20T07:31:23.529300854Z",
+  "created_at": "2026-10-06T06:50:30.107682099Z",
+  "updated_at": "2026-10-06T06:52:06.043534296Z",
   "data": {
-    "description": "The documentation site for xcl, served at xcl.dev, built with Astro 5 (MDX) and Tailwind CSS v4.",
+    "description": "The VS Code extension for XCL, providing syntax highlighting for `.xcl` configuration files.",
     "evidence": {
-      "identity": "xclconf-website",
+      "identity": "xcl-vscode",
       "languages": [
         "JavaScript"
       ],
       "languages_line": "JavaScript",
       "manifest": "package.json",
       "readable": true,
-      "readme": "The documentation site for [xcl](https://github.com/jumppad-labs/xcl), served at [xcl.dev](https://xcl.dev). Built with [Astro 5](https://astro.build/) (MDX) and [Tailwind CSS v4](https://tailwindcss.com/), on the same layout and components as the Spektacular site.",
-      "summary": "xcl.dev documentation site",
+      "readme": "Syntax highlighting for [XCL](https://github.com/jumppad-labs/xcl) (`.xcl`) configuration files.",
+      "summary": "Syntax highlighting for XCL configuration files.",
       "top_level": [
-        "dist/",
-        "node_modules/",
-        "public/",
-        "src/",
-        "Makefile",
+        "syntaxes/",
+        "test/",
+        "CHANGELOG.md",
+        "LICENSE",
         "README.md",
-        "astro.config.mjs",
-        "ec.config.mjs",
+        "language-configuration.json",
         "package-lock.json",
-        "package.json",
-        "tsconfig.json"
+        "package.json"
       ],
-      "top_level_line": "dist/, node_modules/, public/, src/, Makefile, README.md, astro.config.mjs, ec.config.mjs, package-lock.json, package.json, tsconfig.json"
+      "top_level_line": "syntaxes/, test/, CHANGELOG.md, LICENSE, README.md, language-configuration.json, package-lock.json, package.json"
     },
-    "location": "/home/nicj/code/github.com/jumppad-labs/xcl-website",
-    "name": "xcl-website",
+    "location": "/home/nicj/code/github.com/jumppad-labs/xcl-vscode",
+    "name": "xcl-vscode",
     "placement": "inside",
     "registration": {
       "footprint": "created",
       "metadata_note": "",
       "registered": true
     },
-    "role": "documentation",
+    "role": "editor extension",
     "tags": [
-      "astro",
-      "mdx",
-      "tailwind",
-      "documentation",
-      "static-site",
+      "vscode",
+      "textmate-grammar",
+      "syntax-highlighting",
+      "javascript",
       "xcl"
     ]
   }
