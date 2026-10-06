@@ -176,9 +176,12 @@ plugin are told apart in what they log outside a call. (It is added with
 `logger.WithTag`, which only tags xcl's own event logger, so it applies to
 in-process plugins; inside an external plugin process the plugin scoped logger
 sends to the host over gRPC and is passed on unchanged.) During a call the
-event names the resource and its type instead. Both plugins in
-[`example/plugin`](../example/plugin) provide two types this way, the
-in-process one `postgres` and `redis`, the external one `app` and `ingress`.
+event names the resource and its type instead. The external Docker plugin in
+[`example/plugin`](../example/plugin) provides two types this way,
+`docker.network` and `docker.container`. Its in-process template plugin
+provides one, `template`, registered with an empty subtype, so a block is
+written `template "welcome" {}` and its provider's `Init` logs carry
+`provider=template`, the type.
 
 `PluginBase.GetTypes()` just returns that slice — it's what both
 `DirectPluginHost.GetTypes()` (directly) and `GRPCPluginHost.GetTypes()`
@@ -266,10 +269,11 @@ a copy of `base` with the message in `Meta`. `logger.Nop()` emits nothing.
 A provider logs through the logger in the call's context:
 
 ```go
-func (p *postgresProvider) Create(ctx context.Context, db *resources.PostgreSQL) (*resources.PostgreSQL, error) {
-    db.ConnectionString = connectionString(db)
-    plugins.Logger(ctx).Info("created database", "connection_string", db.ConnectionString)
-    return db, nil
+func (p *networkProvider) Create(ctx context.Context, n *Network) (*Network, error) {
+    // ... NetworkCreate through the Docker client
+    n.DockerID = resp.ID
+    plugins.Logger(ctx).Info("created network", "name", n.Meta.Name, "id", n.DockerID)
+    return n, nil
 }
 ```
 
@@ -286,7 +290,8 @@ The event's `Source` is the plugin's name: `core` is xcl itself. The host
 sets it with `logger.WithSource` before the call reaches the plugin:
 
 - in-process, `DirectPluginHost` re-sources the call's logger with the Go
-  type name of the plugin, `plugins.PluginName` (`ExamplePlugin`);
+  type name of the plugin, `plugins.PluginName` (`TemplatePlugin` for the
+  plugin example's template plugin);
 - external, `GRPCPluginHost` uses the binary's file name,
   `plugins.PluginBinaryName` (`xcl-plugin-person`, without `.exe`).
 
@@ -405,8 +410,10 @@ is found depends on when the type arrives:
 
 [`example/configonly`](../example/configonly) parses a Kubernetes-like
 configuration into registered types this way, with no plugin at all.
-[`example/plugin`](../example/plugin) is the other half of the picture, four
-block types provided by two plugins instead.
+[`example/plugin`](../example/plugin) is the other half of the picture, three
+block types provided by two plugins instead: `docker.network` and
+`docker.container` from an external Docker plugin, and `template`, a type with
+no subtype, from an in-process template plugin.
 
 ## Mocks
 

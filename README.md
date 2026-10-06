@@ -147,27 +147,39 @@ its state, with the secret encrypted, in a temporary directory.
 ### Plugins
 
 [`example/plugin`](./example/plugin) applies its configuration
-([`plugin/config`](./example/plugin/config)) through two plugins, each
-providing two block types with a provider of its own. `ExamplePlugin`
-(`internal/`) is an in-process plugin that provides `postgres` and `redis`,
-filling in a computed `connection_string` on both. `external` (`external/`)
-is an external plugin, compiled to its own binary and called over gRPC, that
-provides `app` and `ingress`. A plugin registers each block type with its own
-call to `plugins.RegisterResourceProvider` in `Init`.
+([`plugin/config`](./example/plugin/config)) through two plugins that do real
+work, each laid out the way a plugin author would lay out their own project:
 
-Computed values cross both ways: `app` reads the `connection_string` the
-in-process `redis` provider computed, and `ingress` reads the `url` the
-external `app` provider computed, so a value moves between two plugins and
-between two types of the same plugin. The configuration also uses a module,
-[`plugin/config/modules/db`](./example/plugin/config/modules/db).
+- The Docker plugin ([`plugin/docker`](./example/plugin/docker)) is an
+  external plugin, served by its own binary
+  ([`plugin/cmd/docker-plugin`](./example/plugin/cmd/docker-plugin)) that xcl
+  starts and calls over gRPC. It provides `docker "network"` and
+  `docker "container"`, and creates real Docker networks and containers. Its
+  providers hold a narrow `Client` interface over the Docker SDK, which the
+  real SDK client satisfies and a Mockery mock stands in for in their unit
+  tests.
+- The template plugin ([`plugin/template`](./example/plugin/template)) is an
+  in-process plugin, compiled into the program. It provides `template`, a
+  block type with no subtype written `template "welcome" {}`, and renders a
+  Handlebars template to a file.
+
+A plugin registers each block type with its own call to
+`plugins.RegisterResourceProvider` in `Init`, passing an empty subtype for a
+type like `template`. The container's `ip_address` is computed by the Docker
+plugin when it creates the container, and the template's `variables` read it,
+so a value moves from the external plugin to the in-process one.
 
 Their providers log from each lifecycle method with
-`plugins.Logger(ctx).Info("created database", "connection_string", ...)`,
+`plugins.Logger(ctx).Info("created network", "name", n.Meta.Name, "id", n.DockerID)`,
 passing no resource details. xcl binds that logger to the resource, its type,
 the file it was declared in and the step, and names the plugin as the
 message's source, so the in-process and the external plugin read the same in
 the output:
-`INFO created database source=ExamplePlugin operation=create phase=log resource=resource.postgres.main ...`.
+`INFO created network source=docker-plugin operation=create phase=log resource=docker.network.app ...`.
+
+Running it needs a Docker engine, reached through `DOCKER_HOST` or the default
+socket. Its tests do not: the provider unit tests use the mock or a temporary
+directory, and the tests that need a real engine skip when none answers.
 
 ### Running them
 
@@ -181,9 +193,9 @@ set `XCL_LOG_LEVEL=debug` to see plugin loading and `Init` messages too. The
 program's own report goes to standard output.
 
 Run any of them from its directory with `make run`. For `plugin` this builds
-the external plugin into `build/` first, and it has the extra Makefile targets
-`build` and `clean`; every example has `run` and `test`. The plugin tests build
-the external plugin themselves.
+the Docker plugin into `build/` first, and it has the extra Makefile targets
+`build`, `generate` and `clean`; every example has `run` and `test`. The plugin
+tests build the Docker plugin themselves.
 
 Each example is a Go module of its own, pointed at this checkout with a
 `replace` directive, so it can be copied out of the repository: drop the
@@ -1313,8 +1325,9 @@ functionality into modules.
 
 A module is a default type, however you still need to create the go structs that 
 define the resources included in your module. The following example shows how you can
-use the module that is defined in
-[./example/plugin/config/modules/db/db.xcl](./example/plugin/config/modules/db/db.xcl)
+use a module in the directory `../example/modules/db`, a `db` module that
+declares a database from the variables `db_username` and `db_password` and
+publishes its `connection_string` as an output.
 
 Any sub folder can be a module, to create a module all that is needed is one or more `.hcl` files
 that contain your custom resources.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -9,57 +10,86 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// smokeRun is what one run of the built example produced
-type smokeRun struct {
-	stdout string
-	stderr string
-	err    error
-}
-
-// buildExample compiles this example into a temporary directory and returns
-// the path of the binary, so a smoke test exercises main exactly as a user
-// running the example would
+// buildExample builds the example program into a temporary directory and
+// returns the path of the binary
 func buildExample(t *testing.T) string {
 	t.Helper()
 
 	binary := filepath.Join(t.TempDir(), "plugin")
 
-	output, err := exec.Command("go", "build", "-o", binary, ".").CombinedOutput()
-	require.NoError(t, err, "unable to build the example: %s", output)
+	build := exec.Command("go", "build", "-o", binary, ".")
+	build.Dir = "."
+
+	output, err := build.CombinedOutput()
+	require.NoError(t, err, string(output))
 
 	return binary
 }
 
-// runExample runs binary with args and returns what it wrote and how it exited
-func runExample(binary string, args ...string) smokeRun {
-	var stdout, stderr bytes.Buffer
+// runExample runs the example binary with args from this directory, adding
+// env to the environment, and returns its stdout, stderr and error
+func runExample(t *testing.T, binary string, env []string, args ...string) (string, string, error) {
+	t.Helper()
 
-	command := exec.Command(binary, args...)
-	command.Stdout = &stdout
-	command.Stderr = &stderr
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
 
-	err := command.Run()
+	run := exec.Command(binary, args...)
+	run.Dir = "."
+	run.Env = append(os.Environ(), env...)
+	run.Stdout = stdout
+	run.Stderr = stderr
 
-	return smokeRun{stdout: stdout.String(), stderr: stderr.String(), err: err}
+	err := run.Run()
+
+	return stdout.String(), stderr.String(), err
 }
 
-// TestPluginExampleSmokeRunsAgainstItsConfig builds the example and runs it
-// the way `make run` does, against the external plugin TestMain built,
-// exercising main rather than run
-func TestPluginExampleSmokeRunsAgainstItsConfig(t *testing.T) {
-	run := runExample(buildExample(t), configDir, externalPlugin)
+func TestPluginExampleSmokeRunsWithDefaultArguments(t *testing.T) {
+	requireDocker(t)
 
-	require.NoError(t, run.err, "stderr: %s", run.stderr)
-	require.Contains(t, run.stdout, "## Resources")
-	require.Contains(t, run.stdout, "## Databases")
-	require.Contains(t, run.stdout, "## Caches")
-	require.Contains(t, run.stdout, "resource.postgres.main")
-	require.NotContains(t, run.stderr, "error:")
+	// the example's default Docker plugin path is ./build/docker-plugin
+	buildPlugin := exec.Command("go", "build", "-o", "build/docker-plugin", "./cmd/docker-plugin")
+	buildPlugin.Dir = "."
+
+	output, err := buildPlugin.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	binary := buildExample(t)
+	outputDir := t.TempDir()
+
+	stdout, stderr, err := runExample(t, binary, []string{"HCL_VAR_output_dir=" + outputDir})
+	require.NoError(t, err, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
+
+	require.Contains(t, stdout, "## Networks")
+	require.Contains(t, stdout, "docker.network.app")
+	require.Contains(t, stdout, "## Containers")
+	require.Contains(t, stdout, "docker.container.web")
+	require.Contains(t, stdout, "## Templates")
+	require.Contains(t, stdout, "template.welcome")
+	require.Contains(t, stdout, "## Destroyed")
+	require.Contains(t, stdout, "0 resources remaining")
+	require.NotContains(t, stderr, "error:")
 }
 
-func TestPluginExampleSmokeFailsForMissingExternalPlugin(t *testing.T) {
-	run := runExample(buildExample(t), configDir, filepath.Join(t.TempDir(), "missing"))
+func TestPluginExampleSmokeFailsForMissingPlugin(t *testing.T) {
+	// the example checks for a Docker engine before it loads any plugin
+	requireDocker(t)
 
-	require.Error(t, run.err)
-	require.Contains(t, run.stderr, "error:")
+	binary := buildExample(t)
+	outputDir := t.TempDir()
+
+	_, stderr, err := runExample(t, binary, []string{"HCL_VAR_output_dir=" + outputDir}, "./config", "/nonexistent/docker-plugin")
+	require.Error(t, err)
+	require.Contains(t, stderr, "error:")
+	require.Contains(t, stderr, "make build")
+}
+
+func TestPluginExampleSmokeFailsWithoutDocker(t *testing.T) {
+	binary := buildExample(t)
+	socket := "unix://" + filepath.Join(t.TempDir(), "none.sock")
+
+	_, stderr, err := runExample(t, binary, []string{"DOCKER_HOST=" + socket})
+	require.Error(t, err)
+	require.Contains(t, stderr, "no Docker engine reachable")
 }

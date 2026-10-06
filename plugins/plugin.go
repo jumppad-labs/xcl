@@ -3,9 +3,10 @@ package plugins
 import (
 	"context"
 	"errors"
-	"github.com/jumppad-labs/xcl/logger"
 
 	"github.com/jumppad-labs/xcl/internal/schema"
+	"github.com/jumppad-labs/xcl/logger"
+	"github.com/jumppad-labs/xcl/types"
 )
 
 /*
@@ -59,14 +60,22 @@ type PluginEntityProvider interface {
 // RegisterResourceProvider registers a typed resource provider with the plugin.
 // This creates a typed adapter and registers it with the plugin.
 //
+// subTypeName may be empty, in which case the block type has no subtype and
+// is written <type> "<name>" {} and addressed <type>.<name>. A keyword cannot
+// be registered both with and without a subtype.
+//
 // logger is plugin scoped, it is for messages the provider writes outside a
 // provider call, such as in Init. During a call use Logger(ctx), which is
 // bound to the resource and step being worked on.
 func RegisterResourceProvider[T any](p *PluginBase, logger logger.Logger, state State, typeName, subTypeName string, resourceInstance T, provider ResourceProvider[T]) error {
 	// Create a typed adapter for the provider, named after the block type so
-	// the provider's logs are tagged with it
+	// the provider's logs are tagged with it. A type registered without a
+	// subtype, written <type> "<name>" {}, is named after its type.
 	adapter := NewTypedProviderAdapter(provider, resourceInstance)
 	adapter.name = subTypeName
+	if subTypeName == "" {
+		adapter.name = typeName
+	}
 
 	// Initialize the adapter with state, functions (can be nil), and logger
 	err := adapter.Init(state, nil, logger)
@@ -144,7 +153,7 @@ func (p *PluginBase) Validate(ctx context.Context, entityType, entitySubType str
 
 	rt := p.getRegisteredType(entityType, entitySubType)
 	if rt == nil {
-		return errors.New("no registered type found for " + entityType + "." + entitySubType)
+		return errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
 	}
 
 	return rt.Adapter.Validate(ctx, entityData)
@@ -154,7 +163,7 @@ func (p *PluginBase) Validate(ctx context.Context, entityType, entitySubType str
 func (p *PluginBase) Create(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
 	rt := p.getRegisteredType(entityType, entitySubType)
 	if rt == nil {
-		return nil, errors.New("no registered type found for " + entityType + "." + entitySubType)
+		return nil, errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
 	}
 
 	return rt.Adapter.Create(ctx, entityData)
@@ -164,7 +173,7 @@ func (p *PluginBase) Create(ctx context.Context, entityType, entitySubType strin
 func (p *PluginBase) Destroy(ctx context.Context, entityType, entitySubType string, entityData []byte) error {
 	rt := p.getRegisteredType(entityType, entitySubType)
 	if rt == nil {
-		return errors.New("no registered type found for " + entityType + "." + entitySubType)
+		return errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
 	}
 
 	return rt.Adapter.Destroy(ctx, entityData, false)
@@ -174,7 +183,7 @@ func (p *PluginBase) Destroy(ctx context.Context, entityType, entitySubType stri
 func (p *PluginBase) Read(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) ([]byte, error) {
 	rt := p.getRegisteredType(entityType, entitySubType)
 	if rt == nil {
-		return nil, errors.New("no registered type found for " + entityType + "." + entitySubType)
+		return nil, errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
 	}
 
 	return rt.Adapter.Read(ctx, oldEntityData, newEntityData)
@@ -184,7 +193,7 @@ func (p *PluginBase) Read(ctx context.Context, entityType, entitySubType string,
 func (p *PluginBase) Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
 	rt := p.getRegisteredType(entityType, entitySubType)
 	if rt == nil {
-		return nil, errors.New("no registered type found for " + entityType + "." + entitySubType)
+		return nil, errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
 	}
 
 	return rt.Adapter.Update(ctx, entityData)
@@ -194,7 +203,7 @@ func (p *PluginBase) Update(ctx context.Context, entityType, entitySubType strin
 func (p *PluginBase) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error) {
 	rt := p.getRegisteredType(entityType, entitySubType)
 	if rt == nil {
-		return false, errors.New("no registered type found for " + entityType + "." + entitySubType)
+		return false, errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
 	}
 
 	return rt.Adapter.Changed(ctx, oldEntityData, newEntityData)

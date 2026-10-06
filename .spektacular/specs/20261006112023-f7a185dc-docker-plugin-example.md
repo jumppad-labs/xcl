@@ -31,23 +31,23 @@ The plugin example is rewritten as a real project modelled on Jumppad: an extern
 -->
 ## Requirements
 
-- [ ] **The plugin example stands alone**
+- [x] **The plugin example stands alone**
   The plugin example builds, runs and tests on its own as if it were a separate project.
-- [ ] **The plugin example reads as real code**
+- [x] **The plugin example reads as real code**
   The plugin example contains no code that exists only so tests can reach inside it.
-- [ ] **The plugin example has a smoke test**
+- [x] **The plugin example has a smoke test**
   The plugin example has a test that builds and runs its program the way a user would, and checks it succeeds.
-- [ ] **A Docker plugin creates networks and containers**
+- [x] **A Docker plugin creates networks and containers**
   The plugin example includes a plugin that creates and destroys Docker networks and containers, with a container able to join a network declared in the same configuration.
-- [ ] **A template plugin renders files**
+- [x] **A template plugin renders files**
   The plugin example includes a plugin that renders a template with variables to a file, and removes the file on destroy.
-- [ ] **Plugin providers are unit tested without Docker**
+- [x] **Plugin providers are unit tested without Docker**
   Each plugin's providers have unit tests that run without a Docker engine, the way a plugin author would test their own plugin.
-- [ ] **Real-Docker tests skip cleanly**
+- [x] **Real-Docker tests skip cleanly**
   Tests that need a real Docker engine are skipped, not failed, when no Docker engine is available.
-- [ ] **The application wiring is tested**
+- [x] **The application wiring is tested**
   The plugin example tests that the application loads both plugins and applies a configuration that uses them.
-- [ ] **The website matches the plugin example**
+- [x] **The website matches the plugin example**
   The documentation website's plugin example page, and any page quoting the plugin example, match the rewritten example.
 
 <!--
@@ -83,25 +83,25 @@ The plugin example is rewritten as a real project modelled on Jumppad: an extern
 
 - [ ] **The plugin example stands alone**
   Copying the plugin example's directory out of the repository, and pointing it at a published xcl version, leaves it buildable and its tests passing, or skipped where they need Docker and none is available.
-- [ ] **No test-only seams**
+- [x] **No test-only seams**
   The plugin example's program exposes no function, parameter or return value that only its tests use. A function the program itself also calls does not count.
-- [ ] **Smoke test passes**
+- [x] **Smoke test passes**
   With Docker running, the plugin example's smoke test builds the program, runs it with its default arguments, and passes.
-- [ ] **Real Docker resources appear and disappear**
+- [x] **Real Docker resources appear and disappear**
   With Docker running, applying the plugin example creates a Docker network and a container attached to it, both visible in Docker, and destroying it removes both.
-- [ ] **The template is rendered and removed**
+- [x] **The template is rendered and removed**
   With Docker running, applying the plugin example writes the template's destination file with the variables substituted, and destroying it removes the file.
-- [ ] **Typed block forms parse**
+- [x] **Typed block forms parse**
   With Docker running, the plugin example's configuration, written in the fixed block forms, applies without error.
-- [ ] **Provider tests need no Docker**
+- [x] **Provider tests need no Docker**
   With no Docker engine available, every provider unit test in the plugin example runs and passes.
-- [ ] **Docker tests skip**
+- [x] **Docker tests skip**
   With no Docker engine available, the tests that need one report as skipped, and the test run passes.
-- [ ] **Wiring test passes**
+- [x] **Wiring test passes**
   With Docker running, the plugin example's wiring test applies a configuration that uses both plugins, and finds the resources of both. Without Docker it is skipped.
-- [ ] **Existing plugins are unaffected**
+- [x] **Existing plugins are unaffected**
   Any library change made for the example leaves existing configurations and plugins that register types with a subtype loading and applying unchanged, and the library's existing tests pass.
-- [ ] **The website matches**
+- [x] **The website matches**
   Every code snippet on the website taken from the plugin example matches its current source.
 
 <!--

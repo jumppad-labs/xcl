@@ -1,76 +1,47 @@
-# The example configuration, shared by the configonly and plugin examples.
+# The configuration the plugin example applies. The docker blocks come from
+# the external Docker plugin, the template block from the in-process template
+# plugin.
 #
 # Variables can be overridden with environment variables prefixed HCL_VAR_,
-# i.e. HCL_VAR_db_username.
-variable "db_username" {
-  default = "admin"
+# i.e. HCL_VAR_output_dir.
+
+# output_dir is where the rendered template is written
+variable "output_dir" {
+  default = "./build/rendered"
 }
 
-variable "db_password" {
-  default = "pg-s3cret-example"
+# A Docker bridge network named app. The Docker plugin sets the computed
+# docker_id when it creates it.
+docker "network" "app" {
+  subnet = "10.42.0.0/24"
 }
 
-resource "postgres" "main" {
-  location = "localhost"
-  port     = 5432
-  db_name  = "main"
-  username = variable.db_username
-  password = variable.db_password
+# An nginx container named web on the app network. Referring to the network
+# orders the blocks, web is always created after app and destroyed before it.
+docker "container" "web" {
+  image = "nginx:1.27-alpine"
 
-  timeouts {
-    connection = 10
-    keep_alive = 60
+  # a nested block, repeated once per network the container joins
+  network {
+    name    = docker.network.app.meta.name
+    aliases = ["web"]
   }
 }
 
-resource "postgres" "replica" {
-  # depends_on orders blocks that do not reference each other
-  depends_on = ["resource.postgres.main"]
+# template has no subtype, so it takes just a name. Its variables read the
+# container's ip_address, which the Docker plugin computes when it creates the
+# container, so a value crosses from the external plugin to the in-process
+# one.
+template "welcome" {
+  source = <<-EOF
+  Welcome to the {{network}} network.
+  The web container answers at http://{{address}}/
+  EOF
 
-  location = "replica.localhost"
-  port     = 5433
-  db_name  = "main"
-  username = variable.db_username
-  password = variable.db_password
-}
+  destination = "${variable.output_dir}/welcome.txt"
 
-# redis is the second block type the in-process plugin provides, postgres is
-# the first
-resource "redis" "cache" {
-  location = "localhost"
-  port     = 6379
-}
-
-# Modules group configuration in a directory, their outputs can be read by the
-# configuration that uses them
-module "analytics" {
-  source = "./modules/db"
-}
-
-resource "app" "web" {
-  # References order blocks, app.web is always processed after postgres.main
-  # and the analytics module
-  database_location  = resource.postgres.main.location
-  database_user      = variable.db_username
-  analytics_location = module.analytics.output.location
-
-  # connection_string is computed on postgres, it only has a value when a
-  # provider fills it in
-  connection_string = resource.postgres.main.connection_string
-
-  # The cache is provided by a different plugin than the app, computed values
-  # cross from one plugin to the other
-  cache_connection_string = resource.redis.cache.connection_string
-}
-
-# ingress is the second block type the external plugin provides, app is the
-# first. It reads the computed url of the app, so both values come from the
-# same plugin.
-resource "ingress" "web" {
-  hostname = "example.com"
-  app_url  = resource.app.web.url
-}
-
-output "web_database" {
-  value = resource.app.web.database_location
+  variables = {
+    network = docker.network.app.meta.name
+    address = docker.container.web.ip_address
+  }
 }

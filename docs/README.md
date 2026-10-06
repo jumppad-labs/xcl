@@ -45,6 +45,6 @@ not at end users writing `.xcl` config.
 | `state/` | `StateStore` interface (exchanges plain entities), `FileStateStore`, state error types |
 | `errors/` | Structured error types (`ParserError`, `ConfigError`, `PluginLoadError`) |
 | `logger/` | The `Logger` interface providers log through; its one implementation, `logger.New`, turns every log call into a log event |
-| `example/` | Two runnable, tested examples, each its own Go module with its own `config/` and `resources/`: `configonly` (a Kubernetes-like configuration decoded into registered types and reported as ingress routes, no plugin) and `plugin` (an in-process and an external plugin, each providing two block types), sharing the `prettylog/` event receiver |
+| `example/` | Two runnable, tested examples, each its own Go module with its own `config/`: `configonly` (a Kubernetes-like configuration decoded into registered types in `resources/` and reported as ingress routes, no plugin) and `plugin` (an external Docker plugin providing `docker "network"` and `docker "container"`, and an in-process template plugin providing `template`, a type with no subtype), sharing the `prettylog/` event receiver |
 
 See individual pages for details on how these pieces connect.

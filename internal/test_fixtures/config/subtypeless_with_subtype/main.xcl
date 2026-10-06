@@ -1,0 +1,5 @@
+# widget is registered with no subtype, so giving it a subtype label as well
+# as a name is an error
+widget "small" "main" {
+  size = 1
+}
