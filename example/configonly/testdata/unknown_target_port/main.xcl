@@ -1,0 +1,28 @@
+# The service sends traffic to a port no container of its deployment exposes.
+deployment "web" {
+  container {
+    name  = "web"
+    image = "ghcr.io/example/web:2.0.0"
+
+    port {
+      name           = "http"
+      container_port = 3000
+    }
+  }
+}
+
+service "web" {
+  deployment  = deployment.web.meta.id
+  port        = 80
+  target_port = 1234
+}
+
+ingress "shop" {
+  host = "shop.test"
+
+  rule {
+    path    = "/"
+    service = service.web.meta.id
+    port    = service.web.port
+  }
+}

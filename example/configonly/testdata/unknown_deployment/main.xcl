@@ -1,0 +1,17 @@
+# The service names a deployment that is not declared, written as a string
+# rather than a reference for the same reason.
+service "web" {
+  deployment  = "deployment.missing"
+  port        = 80
+  target_port = 3000
+}
+
+ingress "shop" {
+  host = "shop.test"
+
+  rule {
+    path    = "/"
+    service = service.web.meta.id
+    port    = service.web.port
+  }
+}

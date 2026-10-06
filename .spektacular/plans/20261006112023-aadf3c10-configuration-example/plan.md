@@ -152,7 +152,7 @@ No library types or public interfaces change; xcl's API is untouched. The new co
 
 **Validation point**: The example's tests pass from its own directory and through xcl's test run; running the example prints one route line per ingress path; the example's configuration files are unchanged; nothing in the program exists only for its tests.
 
-#### - [ ] Task: Rewrite the configuration example as load, derive and print
+#### - [x] Task: Rewrite the configuration example as load, derive and print
 **Id:** 0ecb8e2f-60ba-4282-8fc0-16345eef7cdd
 **Repo:** xclconfig
 **Depends on:** none
@@ -163,13 +163,13 @@ Replace the example's test-facing `run` with the shape a real application has: a
 *Technical detail:* [context.md#task-rewrite-the-configuration-example-as-load-derive-and-print](./context.md#task-rewrite-the-configuration-example-as-load-derive-and-print)
 
 **Acceptance criteria**:
-- [ ] Running the example prints, for each ingress path, the host, path, service, deployment, container and port the traffic reaches.
-- [ ] A configuration whose ingress, service or target port cannot be followed makes the program fail with an error naming the ingress and path.
-- [ ] Every function, parameter and return value in the program is used by the program itself.
-- [ ] The example's configuration files are unchanged and the example no longer depends on the pretty-printing library.
-- [ ] The smoke test builds and runs the program with its default arguments and passes.
+- [x] Running the example prints, for each ingress path, the host, path, service, deployment, container and port the traffic reaches.
+- [x] A configuration whose ingress, service or target port cannot be followed makes the program fail with an error naming the ingress and path.
+- [x] Every function, parameter and return value in the program is used by the program itself.
+- [x] The example's configuration files are unchanged and the example no longer depends on the pretty-printing library.
+- [x] The smoke test builds and runs the program with its default arguments and passes.
 
-#### - [ ] Task: Test the route logic against a test configuration
+#### - [x] Task: Test the route logic against a test configuration
 **Id:** 7fd38e4b-7f34-480a-9336-88843b4dcc5d
 **Repo:** xclconfig
 **Depends on:**
@@ -181,10 +181,10 @@ Give the example the tests an application developer would write: a test configur
 *Technical detail:* [context.md#task-test-the-route-logic-against-a-test-configuration](./context.md#task-test-the-route-logic-against-a-test-configuration)
 
 **Acceptance criteria**:
-- [ ] The example's tests load a test configuration separate from the example's own and check every reported route.
-- [ ] An unknown service, an unknown deployment and a target port no container exposes each have their own test that expects a clear error.
-- [ ] No test is table-driven and no test mixes a success case with a failure case.
-- [ ] The example's tests pass from its own directory and through xcl's normal test run.
+- [x] The example's tests load a test configuration separate from the example's own and check every reported route.
+- [x] An unknown service, an unknown deployment and a target port no container exposes each have their own test that expects a clear error.
+- [x] No test is table-driven and no test mixes a success case with a failure case.
+- [x] The example's tests pass from its own directory and through xcl's normal test run.
 
 ### Milestone 2: The repository has one configuration example and documents it
 
@@ -192,7 +192,7 @@ Give the example the tests an application developer would write: a test configur
 
 **Validation point**: No application config example remains in the repository outside historical changelog entries and planning records; the README's configuration-example snippets match the source (manual review).
 
-#### - [ ] Task: Remove the application config example and update the repository docs
+#### - [x] Task: Remove the application config example and update the repository docs
 **Id:** cf5c5e2f-4a80-4094-9bc3-24d39ecf4d68
 **Repo:** xclconfig
 **Depends on:**
@@ -204,9 +204,9 @@ Make sure the application config example's directory is gone, then bring the rep
 *Technical detail:* [context.md#task-remove-the-application-config-example-and-update-the-repository-docs](./context.md#task-remove-the-application-config-example-and-update-the-repository-docs)
 
 **Acceptance criteria**:
-- [ ] The repository contains no application config example.
-- [ ] The README describes the configuration example as it now is, and every snippet it quotes from the example matches the source.
-- [ ] No current documentation in the repository refers to the application config example.
+- [x] The repository contains no application config example.
+- [x] The README describes the configuration example as it now is, and every snippet it quotes from the example matches the source.
+- [x] No current documentation in the repository refers to the application config example.
 
 ### Milestone 3: The website matches the configuration example
 
@@ -214,7 +214,7 @@ Make sure the application config example's directory is gone, then bring the rep
 
 **Validation point**: The site builds and type-checks; no page refers to the application config example or links to its page; every snippet titled with a configuration-example file matches the current source (manual review).
 
-#### - [ ] Task: Rewrite the website's configuration example page
+#### - [x] Task: Rewrite the website's configuration example page
 **Id:** 47233c2a-8e54-4529-983f-2c8360994f65
 **Repo:** xcl-website
 **Depends on:**
@@ -226,12 +226,12 @@ Rewrite the configuration-only page from the current example: its Go types inclu
 *Technical detail:* [context.md#task-rewrite-the-websites-configuration-example-page](./context.md#task-rewrite-the-websites-configuration-example-page)
 
 **Acceptance criteria**:
-- [ ] Every code snippet on the page titled with a configuration-example file matches that file's current source.
-- [ ] The output shown is what the example prints when run.
-- [ ] The page explains the route report and how the example's tests check it.
-- [ ] The page does not refer to the application config example.
+- [x] Every code snippet on the page titled with a configuration-example file matches that file's current source.
+- [x] The output shown is what the example prints when run.
+- [x] The page explains the route report and how the example's tests check it.
+- [x] The page does not refer to the application config example.
 
-#### - [ ] Task: Remove the application config page and repoint its links
+#### - [x] Task: Remove the application config page and repoint its links
 **Id:** 911b4433-9869-4be4-9d6d-14b967cd3a4f
 **Repo:** xcl-website
 **Depends on:**
@@ -243,12 +243,12 @@ Delete the application config example's page and its navigation entry, and point
 *Technical detail:* [context.md#task-remove-the-application-config-page-and-repoint-its-links](./context.md#task-remove-the-application-config-page-and-repoint-its-links)
 
 **Acceptance criteria**:
-- [ ] The site has no application config example page and no navigation entry for it.
-- [ ] No page links to the removed page, and the home page lists the examples that exist.
-- [ ] The state-masking page's call to action names the configuration example as the example that encrypts its state.
-- [ ] The site builds without errors.
+- [x] The site has no application config example page and no navigation entry for it.
+- [x] No page links to the removed page, and the home page lists the examples that exist.
+- [x] The state-masking page's call to action names the configuration example as the example that encrypts its state.
+- [x] The site builds without errors.
 
-#### - [ ] Task: Illustrate sensitive values with the configuration example
+#### - [x] Task: Illustrate sensitive values with the configuration example
 **Id:** 6a85a693-bd97-435b-ad7f-84fe152337f9
 **Repo:** xcl-website
 **Depends on:**
@@ -260,10 +260,10 @@ The sensitive-values page quotes the removed application config example's databa
 *Technical detail:* [context.md#task-illustrate-sensitive-values-with-the-configuration-example](./context.md#task-illustrate-sensitive-values-with-the-configuration-example)
 
 **Acceptance criteria**:
-- [ ] Every snippet on the page titled with an example file matches that file's current source.
-- [ ] The page still explains declaring, revealing and printing a sensitive value.
-- [ ] The page does not refer to the application config example.
-- [ ] The site builds without errors.
+- [x] Every snippet on the page titled with an example file matches that file's current source.
+- [x] The page still explains declaring, revealing and printing a sensitive value.
+- [x] The page does not refer to the application config example.
+- [x] The site builds without errors.
 
 ## Open Questions
 
@@ -291,3 +291,86 @@ Notes for the epic's single changelog entry, written once after all its specs ar
 - The example shows how to test configuration-driven code: unit tests of the route logic against a separate test configuration, plus a smoke test that runs the built program.
 - The application config example (`example/appconfig`) and its website page are removed; the configuration example covers what it showed, and website links now point there.
 - Breaking changes: none (no library or public API change).
+
+## Changelog
+
+
+### 2026-10-06 — Task: Rewrite the configuration example as load, derive and print
+
+**What was done**: `example/configonly` now loads its configuration with `loadConfig(dir, registry, options...)` into an `appConfig` of slices (one `Decode`), derives one `Route` per ingress path with `ingressRoutes` (new `routes.go`), and `main` prints one route line per path. The old harness `run(out, handler, …)` with its `## Resources`/`## Deployments` printing and `Destroy` is gone, `main_test.go` (old-output tests) is deleted, and the smoke test asserts the route line `api.example.com/ -> service.api:80 -> deployment.api container api port http (8080)` with `DB_PASSWORD` set as the Makefile does.
+
+**Deviations**: Starting point differed from the plan's description: the program was the 8271816 restore (`run(out, handler, r, dir, stateDir, stateKey)` printing sections and destroying), and `kr/pretty` was already absent from main.go and go.mod, so there was nothing to drop. Kept a small `run(dir string) error` called only by `main`, so the temporary state directory is removed with `defer` before `os.Exit`; the plan had `main` remove it before every exit. Added a `findContainerPort` helper inside routes.go. `go mod tidy` changed nothing. `configDir` moved from main_test.go into smoke_test.go.
+
+**Files changed**:
+- `xclconfig: example/configonly/main.go`
+- `xclconfig: example/configonly/routes.go`
+- `xclconfig: example/configonly/main_test.go` (deleted)
+- `xclconfig: example/configonly/smoke_test.go`
+- `xclconfig: example/configonly/Makefile`
+
+**Discoveries**: An unreadable configuration directory surfaces from `Apply` as an "error finding .vars files" error; the smoke test only asserts `error:` on stderr. The `secret.xcl` `env("DB_PASSWORD")` parses even when the variable is unset.
+
+### 2026-10-06 — Task: Test the route logic against a test configuration
+
+**What was done**: Added `routes_test.go` with a positive test that loads `testdata/routes` (two deployments, two services, one ingress with two paths, the api target port on the second container) through `loadConfig` with no options and asserts the full `[]Route`; one test each for an unknown service, an unknown deployment and an unreachable target port, each with its own small `testdata/` configuration; and a `Route.String` format test.
+
+**Deviations**: None. The broken-link configurations write the missing ids and port as literals, as planned. main_test.go had already been deleted in the previous task.
+
+**Files changed**:
+- `xclconfig: example/configonly/routes_test.go`
+- `xclconfig: example/configonly/testdata/routes/deployment.xcl`
+- `xclconfig: example/configonly/testdata/routes/ingress.xcl`
+- `xclconfig: example/configonly/testdata/unknown_service/main.xcl`
+- `xclconfig: example/configonly/testdata/unknown_deployment/main.xcl`
+- `xclconfig: example/configonly/testdata/unknown_target_port/main.xcl`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Remove the application config example and update the repository docs
+
+**What was done**: Confirmed `example/appconfig` is gone (not on disk, not tracked). The README's examples introduction now counts two programs, each its own module; the "Configuration only" section is rewritten around the three config files, unprefixed reference syntax, a trimmed `deployment "api"` snippet copied from `deployment.xcl`, the current `appConfig` and `Decode` lines from `main.go`, `ingressRoutes` and the route output line, and the test approach; the "Application configuration" section is deleted. `docs/README.md`'s layout row lists two examples.
+
+**Deviations**: In the e2e-owned "Running them" paragraph, only "prints the resources it parsed" became "prints what it read", as the plan's context allowed. No tests: documentation is checked by human review.
+
+**Files changed**:
+- `xclconfig: README.md`
+- `xclconfig: docs/README.md`
+
+**Discoveries**: The README's "Plugins" section still quotes a `resource.postgres.main` resource id; that section belongs to the docker-plugin spec.
+
+### 2026-10-06 — Task: Rewrite the website's configuration example page
+
+**What was done**: Rewrote `configuration-only.mdx` from the current example: the Go types (ConfigMap, Secret, Deployment, Container, then Service, Ingress, Rule) and the three configuration files are quoted whole, `appConfig`/`loadConfig`, the `loadConfig` call with its options, `ingressRoutes`/`findContainerPort` and the printing loop are quoted from `main.go` and `routes.go`, a new "Testing it" section quotes `testdata/routes/ingress.xcl` and two tests from `routes_test.go`, and "Run it" shows trimmed real event lines plus the real route line. The closing call to action offers only the plugins example.
+
+**Deviations**: Snippets were generated by a script that copies contiguous source ranges, so they match byte for byte; the two snippets from inside `run` are dedented by one tab. `npm ci` was run in the website worktree to build (node_modules is gitignored). No tests: the site is checked by `npm run build` (9 pages) and `astro check` (0 errors).
+
+**Files changed**:
+- `xcl-website: src/pages/examples/configuration-only.mdx`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Remove the application config page and repoint its links
+
+**What was done**: Deleted `src/pages/examples/application-config.mdx` and its nav entry. The home page hero button and closing call to action now lead to the configuration example, and its examples list is "Two examples" with the configuration-only bullet mentioning route reporting. The state-masking call to action now reads "The configuration example encrypts its state with a fresh key each run." and links to the configuration example. The plugins page loses its application-config button.
+
+**Deviations**: On the plugins page the call to action's body also changed, from "The other two examples parse configuration…" to "The configuration example reads its configuration into Go types with no plugin at all.", because it counted the removed example; the rest of that page is untouched and stays with the docker-plugin spec.
+
+**Files changed**:
+- `xcl-website: src/pages/examples/application-config.mdx` (deleted)
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: src/pages/state-masking.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Illustrate sensitive values with the configuration example
+
+**What was done**: The sensitive-values page now declares a sensitive field with the configuration example's `Secret` type (`types.Sensitive[map[string]string]`) and the `secret "db"` block, both copied verbatim from source. The Reveal illustration is an untitled snippet that builds a connection string from `secret.Data.Reveal()["password"]`, the JSON passage no longer cites a removed example (marshalling the secret writes `"data": "(sensitive)"`, as `Sensitive.MarshalJSON` does), and the call to action names and links the configuration example.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-website: src/pages/sensitive-values.mdx`
+
+**Discoveries**: None.

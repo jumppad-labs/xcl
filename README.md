@@ -62,19 +62,22 @@ node in graph.
 
 ## Example
 
-The [`example`](./example) directory holds three self-contained programs, each
-with its own configuration and Go types.
+The [`example`](./example) directory holds two self-contained programs, each
+a Go module of its own with its own configuration and Go types.
 
 ### Configuration only
 
 [`example/configonly`](./example/configonly) uses XCL for what it is most
-often needed for: parsing a configuration into Go objects. The block types
+often needed for: an application reading its configuration into its own Go
+types and acting on it. The block types
 ([`configonly/resources`](./example/configonly/resources)) are plain Go types
 registered on the plugin registry, with no plugin and no provider.
 
 Its configuration ([`configonly/config`](./example/configonly/config)) is a
-small Kubernetes-like deployment, chosen because that shape needs everything
-a configuration language is asked for:
+small Kubernetes-like deployment split across three files, `deployment.xcl`,
+`ingress.xcl` and `secret.xcl`, declaring a config map, a secret, a
+deployment, a service and an ingress. That shape needs everything a
+configuration language is asked for:
 
 - **blocks nested inside blocks** — `resources` inside `container`, holding
   `limits` and `requests` of its own
@@ -83,56 +86,63 @@ a configuration language is asked for:
   a pointer, and is `nil` when it is left out
 - **links between resources** — the `service` names the `deployment` by id
   and reads its target port out of it
-  (`resource.deployment.api.container[0].port[0].container_port`), the
-  `ingress` names the `service` the same way, and the container's environment
-  is read out of a `config_map`'s map attribute
-  (`resource.config_map.api.data.db_host`). Kubernetes matches a service to
-  its pods with a label selector because a manifest can not point at another
-  object; a reference does it directly.
+  (`deployment.api.container[0].port[0].container_port`), the `ingress` names
+  the `service` the same way, and the container's environment is read out of
+  a `config_map`'s map attribute (`config_map.api.data.db_host`). Kubernetes
+  matches a service to its pods with a label selector because a manifest can
+  not point at another object; a reference does it directly.
 
 ```hcl
-resource "deployment" "api" {
+deployment "api" {
   replicas = variable.replicas
 
+  # container is a repeated block, this deployment has two of them
   container {
     name  = "api"
     image = "ghcr.io/example/api:${variable.image_tag}"
 
+    # port is repeated in turn, a block nested inside a block
     port {
       name           = "http"
       container_port = 8080
     }
-
-    env {
-      name  = "DB_HOST"
-      value = resource.config_map.api.data.db_host
-    }
-
-    resources {
-      limits {
-        cpu    = "500m"
-        memory = "512Mi"
-      }
-    }
-  }
-}
 ```
 
-After `Apply`, the program gathers every block it reads into one struct of its
-own with a single call, rather than looking each type up separately (see
-[Filling a struct of your own](#filling-a-struct-of-your-own)):
+The program loads the configuration with `loadConfig`, which registers the
+block types, applies the configuration and gathers every block it reads into
+one struct of its own with a single call, rather than looking each type up
+separately (see [Filling a struct of your own](#filling-a-struct-of-your-own)):
 
 ```go
 type appConfig struct {
-	ConfigMaps  []*resources.ConfigMap
 	Deployments []*resources.Deployment
-	Service     *resources.Service
-	Ingress     *resources.Ingress
+	Services    []*resources.Service
+	Ingresses   []*resources.Ingress
 }
-
-var cfg appConfig
-err := c.Decode(&cfg)
 ```
+
+```go
+	var cfg appConfig
+	if err := c.Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("reading configuration from %s: %w", dir, err)
+	}
+```
+
+Then `ingressRoutes` follows the links: for every path of every ingress it
+looks up the service the rule names, the deployment that service names, and
+the container port that listens on the service's target port. It prints one
+line per route, and a link that can not be followed is an error naming the
+ingress and path:
+
+```
+api.example.com/ -> service.api:80 -> deployment.api container api port http (8080)
+```
+
+Its tests are the ones an application author writes for configuration-driven
+code: `ingressRoutes` is checked against test configurations under
+[`configonly/testdata`](./example/configonly/testdata), loaded through the same
+`loadConfig`, and a smoke test builds and runs the program. The program keeps
+its state, with the secret encrypted, in a temporary directory.
 
 ### Plugins
 
@@ -159,67 +169,10 @@ message's source, so the in-process and the external plugin read the same in
 the output:
 `INFO created database source=ExamplePlugin operation=create phase=log resource=resource.postgres.main ...`.
 
-### Application configuration
-
-[`example/appconfig`](./example/appconfig) is the shape configuration most
-often takes outside infrastructure: one application configuration file, of the
-kind usually written as JSON, read into a tree of Go structs. Its
-configuration is a single file,
-[`appconfig/config/app.xcl`](./example/appconfig/config/app.xcl), and one
-block type ([`appconfig/resources`](./example/appconfig/resources)) is
-registered for it, with no plugin and no provider.
-
-Every shape a JSON document is built from has an equivalent: an object is a
-nested block held in a pointer (`server`, and `tls` and `client_auth` nested
-below it), an array of objects is a repeated block held in a slice (`service`,
-each holding repeated `route` blocks of its own), an array of values is a list
-attribute (`ciphers`), and an object whose keys the Go type does not know is a
-map attribute (`labels`, `options`, `headers`). Nesting goes four blocks deep
-on two different paths.
-
-```hcl
-resource "application" "api" {
-  name        = "checkout-api"
-  environment = variable.environment
-
-  server {
-    host = "0.0.0.0"
-    port = 8443
-
-    tls {
-      enabled   = true
-      cert_file = "/etc/certs/api.pem"
-
-      client_auth {
-        mode    = "require_and_verify"
-        ca_file = "/etc/certs/ca.pem"
-      }
-    }
-  }
-
-  service {
-    name = "payments"
-    url  = "https://payments.internal"
-
-    route {
-      path    = "/v1/charges"
-      methods = ["POST"]
-
-      rate_limit {
-        requests_per_second = 50
-      }
-    }
-  }
-}
-```
-
-The program prints the parsed configuration as a tree, then prints the same
-resource as JSON, which is the document this configuration replaces.
-
 ### Running them
 
 Every example keeps its state in a file, applies the configuration and prints
-the resources it parsed. The plugin example then `Destroy`s everything through
+what it read. The plugin example then `Destroy`s everything through
 the providers and prints what is left under `## Destroyed`. Each sends
 everything xcl reports, lifecycle events, plugin log messages and errors, to
 the shared [`example/prettylog`](./example/prettylog) receiver, set up in one

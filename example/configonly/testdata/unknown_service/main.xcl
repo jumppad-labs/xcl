@@ -1,0 +1,12 @@
+# The ingress names a service that is not declared. The id is written as a
+# string rather than a reference, a reference to a missing block would fail
+# when the configuration is parsed.
+ingress "shop" {
+  host = "shop.test"
+
+  rule {
+    path    = "/"
+    service = "service.missing"
+    port    = 80
+  }
+}

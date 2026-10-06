@@ -31,21 +31,21 @@ The configuration example is rewritten as a real application: it loads its confi
 -->
 ## Requirements
 
-- [ ] **The configuration example stands alone**
+- [x] **The configuration example stands alone**
   The configuration example builds, runs and tests on its own as if it were a separate project.
-- [ ] **The configuration example reads as real code**
+- [x] **The configuration example reads as real code**
   The configuration example contains no code that exists only so tests can reach inside it.
-- [ ] **The configuration example has a smoke test**
+- [x] **The configuration example has a smoke test**
   The configuration example has a test that builds and runs its program the way a user would, and checks it succeeds.
-- [ ] **The configuration example uses its configuration**
+- [x] **The configuration example uses its configuration**
   The configuration example decodes its configuration into the application's own types and uses it. It reports, for each ingress path, the host, the path, and the service, deployment, container and port the traffic reaches.
-- [ ] **The configuration example shows testing config-driven code**
+- [x] **The configuration example shows testing config-driven code**
   The configuration example's tests check the code that consumes the configuration against a test configuration, the way a developer would test their own application.
-- [ ] **The configuration example's config is unchanged**
+- [x] **The configuration example's config is unchanged**
   The configuration example keeps its current configuration: a config map, a secret, a deployment, a service and an ingress, split across several files.
-- [ ] **The application config example is removed**
+- [x] **The application config example is removed**
   The separate application config example, which repeated the configuration example, is removed from the repository.
-- [ ] **The website matches the configuration example**
+- [x] **The website matches the configuration example**
   The documentation website's configuration example page, and any page quoting the configuration example, match the rewritten example. The application config example's page is removed or merged into the configuration example's.
 
 <!--
@@ -77,19 +77,19 @@ The configuration example is rewritten as a real application: it loads its confi
 
 - [ ] **The configuration example stands alone**
   Copying the configuration example's directory out of the repository, and pointing it at a published xcl version, leaves it buildable and its tests passing.
-- [ ] **No test-only seams**
+- [x] **No test-only seams**
   The configuration example's program exposes no function, parameter or return value that only its tests use. A function the program itself also calls does not count.
-- [ ] **Smoke test passes**
+- [x] **Smoke test passes**
   The configuration example's smoke test builds the program, runs it with its default arguments, and passes.
-- [ ] **Routes are reported**
+- [x] **Routes are reported**
   Running the configuration example prints, for each ingress path, the host, the path, and the service, deployment, container and port the traffic reaches.
-- [ ] **Consuming code is tested against a test config**
+- [x] **Consuming code is tested against a test config**
   The configuration example's tests load a test configuration separate from the example's own, and check the reported routes.
-- [ ] **The config is unchanged**
+- [x] **The config is unchanged**
   The configuration example's configuration declares the same config map, secret, deployment, service and ingress as before this work.
-- [ ] **The application config example is gone**
+- [x] **The application config example is gone**
   The repository contains no application config example.
-- [ ] **The website matches**
+- [x] **The website matches**
   Every code snippet on the website taken from the configuration example matches its current source. No page refers to the application config example.
 
 <!--
