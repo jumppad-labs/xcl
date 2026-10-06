@@ -134,7 +134,7 @@ No library types or public interfaces are added or changed: xcl's API is untouch
 
 **Validation point**: The e2e suite passes as part of xcl's normal test run, imports no internal package except the shared test helpers, and the coverage map lists every library-behaviour test in the examples (current files and `HEAD` 8271816) beside an existing covering test.
 
-#### - [ ] Task: Build the e2e fixtures
+#### - [x] Task: Build the e2e fixtures
 **Id:** eba0ed7e-2060-4a6c-995d-491b4240b481
 **Repo:** xclconfig
 **Depends on:** none
@@ -145,12 +145,12 @@ Create the end-to-end suite's home and the fixtures it owns: configurations repr
 *Technical detail:* [context.md#task-build-the-e2e-fixtures](./context.md#task-build-the-e2e-fixtures)
 
 **Acceptance criteria**:
-- [ ] The suite has its own configurations, block types, in-process plugin and external plugin, none borrowed from an example or from the library's internal fixtures.
-- [ ] The fixtures use no xcl package under `internal/`.
-- [ ] The external plugin is built automatically when the suite runs, and the build is cleaned up afterwards.
-- [ ] Applying each fixture configuration through the public API succeeds.
+- [x] The suite has its own configurations, block types, in-process plugin and external plugin, none borrowed from an example or from the library's internal fixtures.
+- [x] The fixtures use no xcl package under `internal/`.
+- [x] The external plugin is built automatically when the suite runs, and the build is cleaned up afterwards.
+- [x] Applying each fixture configuration through the public API succeeds.
 
-#### - [ ] Task: Carry the configuration-only behaviours into the e2e suite
+#### - [x] Task: Carry the configuration-only behaviours into the e2e suite
 **Id:** a2c04319-7e73-4baf-9994-5f5b558d593e
 **Repo:** xclconfig
 **Depends on:**
@@ -162,11 +162,11 @@ Reproduce in the e2e suite every library behaviour the configuration-only exampl
 *Technical detail:* [context.md#task-carry-the-configuration-only-behaviours-into-the-e2e-suite](./context.md#task-carry-the-configuration-only-behaviours-into-the-e2e-suite)
 
 **Acceptance criteria**:
-- [ ] Every library-behaviour test in the configuration-only example (current file and `HEAD` 8271816) has a covering test in the e2e suite or an identified existing library test.
-- [ ] Each new test checks one behaviour, positive and negative cases are in separate tests, and no test is table-driven.
-- [ ] The new tests pass, and each fails if the behaviour it covers is broken.
+- [x] Every library-behaviour test in the configuration-only example (current file and `HEAD` 8271816) has a covering test in the e2e suite or an identified existing library test.
+- [x] Each new test checks one behaviour, positive and negative cases are in separate tests, and no test is table-driven.
+- [x] The new tests pass, and each fails if the behaviour it covers is broken.
 
-#### - [ ] Task: Carry the plugin behaviours into the e2e suite
+#### - [x] Task: Carry the plugin behaviours into the e2e suite
 **Id:** b77459e0-d663-45ec-9f56-78939930fd8b
 **Repo:** xclconfig
 **Depends on:**
@@ -178,11 +178,11 @@ Reproduce in the e2e suite every library behaviour the plugin example's tests ch
 *Technical detail:* [context.md#task-carry-the-plugin-behaviours-into-the-e2e-suite](./context.md#task-carry-the-plugin-behaviours-into-the-e2e-suite)
 
 **Acceptance criteria**:
-- [ ] Every library-behaviour test in the plugin example (current file and `HEAD` 8271816) has a covering test in the e2e suite or an identified existing library test.
-- [ ] Ordering assertions between unlinked resources are made on the dependency graph, not on provider call order.
-- [ ] The new tests pass, and each fails if the behaviour it covers is broken.
+- [x] Every library-behaviour test in the plugin example (current file and `HEAD` 8271816) has a covering test in the e2e suite or an identified existing library test.
+- [x] Ordering assertions between unlinked resources are made on the dependency graph, not on provider call order.
+- [x] The new tests pass, and each fails if the behaviour it covers is broken.
 
-#### - [ ] Task: Write the coverage map
+#### - [x] Task: Write the coverage map
 **Id:** 8169f01b-09b3-4431-99d2-105774a51a58
 **Repo:** xclconfig
 **Depends on:**
@@ -195,9 +195,9 @@ Write the coverage map beside the e2e suite. It lists every library-behaviour te
 *Technical detail:* [context.md#task-write-the-coverage-map](./context.md#task-write-the-coverage-map)
 
 **Acceptance criteria**:
-- [ ] Every library-behaviour test in the configuration-only and plugin examples appears exactly once, beside a covering test that exists.
-- [ ] Every source-inspection test being deleted is listed with the reason it has no replacement.
-- [ ] The map explains how the suite runs the examples and that a new example adds its own runner test.
+- [x] Every library-behaviour test in the configuration-only and plugin examples appears exactly once, beside a covering test that exists.
+- [x] Every source-inspection test being deleted is listed with the reason it has no replacement.
+- [x] The map explains how the suite runs the examples and that a new example adds its own runner test.
 
 ### Milestone 2: Examples test only what they do
 
@@ -205,7 +205,7 @@ Write the coverage map beside the e2e suite. It lists every library-behaviour te
 
 **Validation point**: xcl's full test run passes; no test in the repository parses or inspects an example's source; every test removed in this milestone appears in the coverage map.
 
-#### - [ ] Task: Strip library and source tests from the configuration-only example
+#### - [x] Task: Strip library and source tests from the configuration-only example
 **Id:** 1a368904-38d9-4516-8788-59179654b98b
 **Repo:** xclconfig
 **Depends on:**
@@ -217,11 +217,11 @@ Remove from the configuration-only example every test the coverage map says is n
 *Technical detail:* [context.md#task-strip-library-and-source-tests-from-the-configuration-only-example](./context.md#task-strip-library-and-source-tests-from-the-configuration-only-example)
 
 **Acceptance criteria**:
-- [ ] The configuration-only example's tests check only its own output, exit behaviour and smoke run.
-- [ ] No test in the example or at the repository root parses or inspects an example's source.
-- [ ] Every removed test is listed in the coverage map, and the example's remaining tests pass.
+- [x] The configuration-only example's tests check only its own output, exit behaviour and smoke run.
+- [x] No test in the example or at the repository root parses or inspects an example's source.
+- [x] Every removed test is listed in the coverage map, and the example's remaining tests pass.
 
-#### - [ ] Task: Strip library and source tests from the plugin example
+#### - [x] Task: Strip library and source tests from the plugin example
 **Id:** 613cdd65-9037-4936-bc39-e60c2b1dad9e
 **Repo:** xclconfig
 **Depends on:**
@@ -233,9 +233,9 @@ Remove from the plugin example every test the coverage map says is now covered e
 *Technical detail:* [context.md#task-strip-library-and-source-tests-from-the-plugin-example](./context.md#task-strip-library-and-source-tests-from-the-plugin-example)
 
 **Acceptance criteria**:
-- [ ] The plugin example's tests check only its own output, exit behaviour and smoke run.
-- [ ] No test in the plugin example parses or inspects its source.
-- [ ] Every removed test is listed in the coverage map, and the example's remaining tests pass.
+- [x] The plugin example's tests check only its own output, exit behaviour and smoke run.
+- [x] No test in the plugin example parses or inspects its source.
+- [x] Every removed test is listed in the coverage map, and the example's remaining tests pass.
 
 ### Milestone 3: Each example is a standalone project the suite runs
 
@@ -243,7 +243,7 @@ Remove from the plugin example every test the coverage map says is now covered e
 
 **Validation point**: xcl's full test run passes and runs every example's tests; a deliberately failing fixture module makes the runner fail with its name; a root `go mod tidy` leaves xcl's module without the charmbracelet libraries (review); each example builds on Go 1.25.0; prettylog builds and tests outside the repository against a published xcl (manual).
 
-#### - [ ] Task: Give prettylog fixtures of its own
+#### - [x] Task: Give prettylog fixtures of its own
 **Id:** 53083707-d518-4a1a-b592-29fb29bdfb39
 **Repo:** xclconfig
 **Depends on:** none
@@ -254,11 +254,11 @@ prettylog's tests currently borrow the library's internal test plugin, internal 
 *Technical detail:* [context.md#task-give-prettylog-fixtures-of-its-own](./context.md#task-give-prettylog-fixtures-of-its-own)
 
 **Acceptance criteria**:
-- [ ] prettylog's tests import no xcl package under `internal/` and refer to no file outside prettylog's directory.
-- [ ] Every prettylog test that existed before still exists and checks the same behaviour.
-- [ ] prettylog's tests pass.
+- [x] prettylog's tests import no xcl package under `internal/` and refer to no file outside prettylog's directory.
+- [x] Every prettylog test that existed before still exists and checks the same behaviour.
+- [x] prettylog's tests pass.
 
-#### - [ ] Task: Make each example its own module
+#### - [x] Task: Make each example its own module
 **Id:** 8c17e6e6-7531-4b52-8751-2e93ea32dd80
 **Repo:** xclconfig
 **Depends on:**
@@ -272,11 +272,11 @@ Give configonly, plugin and prettylog each a module definition pointed at the lo
 *Technical detail:* [context.md#task-make-each-example-its-own-module](./context.md#task-make-each-example-its-own-module)
 
 **Acceptance criteria**:
-- [ ] Each example builds and its tests pass when run from its own directory.
-- [ ] No example imports an xcl package under `internal/`.
-- [ ] After a root `go mod tidy`, xcl's module no longer lists the dependencies only the examples use (the charmbracelet libraries, `muesli/termenv`, `kr/pretty`), confirmed in review.
+- [x] Each example builds and its tests pass when run from its own directory.
+- [x] No example imports an xcl package under `internal/`.
+- [x] After a root `go mod tidy`, xcl's module no longer lists the dependencies only the examples use (the charmbracelet libraries, `muesli/termenv`, `kr/pretty`), confirmed in review.
 
-#### - [ ] Task: Run the example tests from the e2e suite
+#### - [x] Task: Run the example tests from the e2e suite
 **Id:** 892c2dd1-5469-4d48-8ba3-fda73b13a6d1
 **Repo:** xclconfig
 **Depends on:**
@@ -288,11 +288,11 @@ Add the example runner to the e2e suite: one named test per example that runs th
 *Technical detail:* [context.md#task-run-the-example-tests-from-the-e2e-suite](./context.md#task-run-the-example-tests-from-the-e2e-suite)
 
 **Acceptance criteria**:
-- [ ] xcl's normal test run runs the configuration-only, plugin and prettylog examples' tests, smoke tests included.
-- [ ] A failing example makes the suite fail with a message naming that example.
-- [ ] The runner's own tests pass for the passing fixture module and report the failing one by name.
+- [x] xcl's normal test run runs the configuration-only, plugin and prettylog examples' tests, smoke tests included.
+- [x] A failing example makes the suite fail with a message naming that example.
+- [x] The runner's own tests pass for the passing fixture module and report the failing one by name.
 
-#### - [ ] Task: Build the examples on the minimum supported Go in CI
+#### - [x] Task: Build the examples on the minimum supported Go in CI
 **Id:** bc7c14a9-94c1-42e0-bce2-321798ffab49
 **Repo:** xclconfig
 **Depends on:**
@@ -304,9 +304,9 @@ The deleted portable-lookup source checks stood for one real guarantee: what a r
 *Technical detail:* [context.md#task-build-the-examples-on-the-minimum-supported-go-in-ci](./context.md#task-build-the-examples-on-the-minimum-supported-go-in-ci)
 
 **Acceptance criteria**:
-- [ ] The minimum-Go CI job builds and vets every example module on Go 1.25.0; the workflow change is reviewed by hand.
+- [x] The minimum-Go CI job builds and vets every example module on Go 1.25.0; the workflow change is reviewed by hand.
 
-#### - [ ] Task: Document the new layout
+#### - [x] Task: Document the new layout
 **Id:** 0ed63f13-d9c0-4b13-8684-006388cd401a
 **Repo:** xclconfig
 **Depends on:**
@@ -318,7 +318,7 @@ Update the README's passage on running the examples to say each is its own modul
 *Technical detail:* [context.md#task-document-the-new-layout](./context.md#task-document-the-new-layout)
 
 **Acceptance criteria**:
-- [ ] The README describes the examples as standalone modules and says how their tests are run.
+- [x] The README describes the examples as standalone modules and says how their tests are run.
 
 ### Changelog input
 
@@ -344,3 +344,191 @@ No other open questions remain.
 - **Publishing a public test-helper package** for application and plugin authors. Examples use standard-library process handling in their smoke tests instead; whether xcl should publish helpers is left to the sibling specs if they need one.
 - **New library behaviour or public API changes.** The e2e suite covers existing behaviour only.
 - **A guard that detects examples without a runner test.** Each new example adds its own named runner test as part of its spec.
+
+## Changelog
+
+### 2026-10-06 — Baseline decision: configuration-only example restored
+
+**What was done**: The working tree's configonly test file did not compile against its rewritten `main.go` (plan Open Question 1). The user chose to restore `example/configonly/main.go` from 8271816, the version the tests were written for, and follow the plan as written. The 8271816 program needed small adaptations to match the committed tests, config and types: `run` gained a trailing `stateKey []byte` (nil means no state mask, so xcl warns about plain state), `main` generates the key with `newStateKey`, types are registered under a single block name (`config_map`, not `resource`/`config_map`), and the `secret` type is registered. In `config/deployment.xcl`, the `secret_key_ref` name now reads `secret.db.meta.name`, which the test expects, instead of `meta.id`. Nothing used `kr/pretty` any more, so a root `go mod tidy` removed it.
+
+**Deviations**: The restored `main.go` is the 8271816 program with the adaptations above, not a byte-for-byte copy, because that copy did not compile against the current tests.
+
+**Files changed**:
+- `example/configonly/main.go`
+- `example/configonly/config/deployment.xcl`
+- `go.mod`
+- `go.sum`
+
+**Discoveries**: A tracked ELF binary named `configonly` sits at the repository root. `go build ./example/configonly/` run from the root overwrites it. Build to a temporary path with `-o`, or restore it with `git checkout -- configonly`.
+
+### 2026-10-06 — Task: Build the e2e fixtures
+
+**What was done**: Added the e2e suite's home and its own fixtures. There are block types in `e2e/fixtures/kube` (Kubernetes-like) and `e2e/fixtures/services` (postgres, redis, app, ingress), an in-process plugin in `e2e/fixtures/inprocess`, and an external plugin binary in `e2e/fixtures/externalplugin`. All of them are written against public packages only. The configurations are in `e2e/testdata/kube` and `e2e/testdata/plugin`. `TestMain` builds the external plugin once into a temporary directory and removes it afterwards. Shared helpers (`registerKubeTypes`, `registerPlugins`, `newKubeConfig`, `newPluginConfig`, `newConfig`) and two smoke tests confirm each configuration applies.
+
+**Deviations**: The types are split across the `kube` and `services` packages rather than a single `resources` package, because both sets define an `Ingress` type, which the context allowed for. `newConfig` adds the event handler and state mask only when they are non-nil, and does not set `WithEventData`. Tests that need entity data on events add that option themselves.
+
+**Files changed**:
+- `e2e/doc_test.go`
+- `e2e/main_test.go`
+- `e2e/helpers_test.go`
+- `e2e/fixtures_test.go`
+- `e2e/fixtures/kube/kube.go`
+- `e2e/fixtures/services/services.go`
+- `e2e/fixtures/inprocess/plugin.go`
+- `e2e/fixtures/externalplugin/main.go`
+- `e2e/testdata/kube/deployment.xcl`
+- `e2e/testdata/kube/ingress.xcl`
+- `e2e/testdata/kube/secret.xcl`
+- `e2e/testdata/plugin/main.xcl`
+- `e2e/testdata/plugin/modules/db/db.xcl`
+
+**Discoveries**: The kube configuration uses unlabelled block types (ids such as `config_map.api`). The plugin configuration uses `resource "postgres" "main"` (ids such as `resource.postgres.main`). `e2e` holds only external test files, so its imports are listed under `go list`'s `.XTestImports`, not `.TestImports`.
+
+### 2026-10-06 — Task: Carry the configuration-only behaviours into the e2e suite
+
+**What was done**: Each library-behaviour test of the configuration-only example (28 of them, all present in the current file, which is a superset of the one at 8271816) now has a named e2e test. Each runs against the suite's kube fixtures through the public API. The tests cover decoding, references and variables, parse, create and destroy events, destroy emptying the saved state, silence without an event handler, sensitive values (the env secret, masked state and events, the plain-state warning with and without a key), and encoding of saved entities. Old→new pairs are staged in `.spektacular/tmp/coverage-configonly-{a,b}.md` for the coverage map.
+
+**Deviations**:
+- `newConfig` in `e2e/helpers_test.go` now always sets `WithEventData(xcl.EventDataProcessed)`, mirroring the examples.
+- Two example tests were split along library and rendering lines. `ShowsCreatedEntities` has a library half (`TestEncodeSavedEntityWritesCreatedConfiguration`) and a prettylog rendering half that stays with prettylog. `PrintsNoSecret` has library halves (`TestStandardStreamsHoldNoSecret`, `TestEncodeSavedEntityMasksSecret`), while its report and rendering checks stay with the example.
+- The silence test drops the example's `## Resources` output assertion.
+- State tests read the state file directly after `Apply` instead of the example's event-handler trick.
+- No existing library test was cited in place of a new e2e test.
+
+**Files changed**:
+- `e2e/helpers_test.go`
+- `e2e/kube_helpers_test.go`
+- `e2e/decode_test.go`
+- `e2e/events_test.go`
+- `e2e/destroy_test.go`
+- `e2e/silence_test.go`
+- `e2e/sensitive_test.go`
+- `e2e/encode_test.go`
+
+**Discoveries**: Apply of the kube configuration succeeds without `DB_PASSWORD` set, because `env()` yields an empty value. The e2e tests set it anyway so the secret checks are meaningful. `state.NewFileStateStore(dir).Load()` errors on a missing file, which lets the destroy test tell "emptied" from "deleted".
+
+### 2026-10-06 — Task: Carry the plugin behaviours into the e2e suite
+
+**What was done**: Each library-behaviour test of the plugin example now has a named e2e test, 41 in all. They run against the suite's in-process and external plugin fixtures through the public API. They cover values filled by providers and passed between blocks and plugins, generated types, published values and module outputs, in-process and external plugin logging (levels, sources, between start and success), create, destroy and plugin-load events, destroy emptying state, entity encoding and agreement with state, masking, the plain-state warning, silence without a handler, and the missing-external-plugin error. Old→new pairs are staged in `.spektacular/tmp/coverage-plugin-{a,b}.md`.
+
+**Deviations**:
+- Expected event sources follow the fixtures' names: `Plugin` and `externalplugin`, rather than the example's `ExamplePlugin` and `external`.
+- Example-only halves stay with the example or prettylog: the `make build` hint in the missing-plugin error, the `## Resources` report, and rendered-text checks.
+- No ordering is asserted between different resources. Only per-resource phase sequences are checked, and destroy was seen to interleave across resources.
+- No existing library test was cited in place of a new e2e test.
+
+**Files changed**:
+- `e2e/plugin_helpers_test.go`
+- `e2e/plugin_values_test.go`
+- `e2e/plugin_logging_test.go`
+- `e2e/plugin_errors_test.go`
+- `e2e/plugin_events_test.go`
+- `e2e/plugin_state_test.go`
+- `e2e/plugin_encode_test.go`
+- `e2e/plugin_silence_test.go`
+
+**Discoveries**: xcl names an in-process plugin's event source after its Go type name (`Plugin`) and an external plugin's after its binary's base name (`externalplugin`). The plugin tests were stable across repeated `-race -count=3` runs.
+
+### 2026-10-06 — Task: Write the coverage map
+
+**What was done**: Wrote `e2e/COVERAGE.md`. Its preamble covers what the suite is, how it runs each example module through one named runner test, and that a new example adds its own runner test. It has one table per example (29 configonly rows, 38 plugin rows), each pairing a removed test with its behaviour and the covering e2e test. It lists the tests and test halves that stay with the example or prettylog, and gives a table of the 14 source-inspection tests (4 configonly, 2 plugin, 8 from the root `static_examples_test.go` at 8271816) deleted without replacement, each with its reason.
+
+**Deviations**: Six example tests are split. Their library half is mapped in the tables, and their printing or rendering half is named under "Stayed with the example or prettylog". `TestPluginExamplePrintsPublishedTotal` stays with the example (it checks a printed line); the count behind it is also covered by `TestOutputsHoldsModuleOutputs`. The preamble names `TestPluginExampleTestsPass`, a runner test that the "Run the example tests from the e2e suite" task adds later. The staged `.spektacular/tmp/coverage-*.md` scratch files were folded in and removed.
+
+**Files changed**:
+- `e2e/COVERAGE.md`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Strip library and source tests from the configuration-only example
+
+**What was done**: Removed from `example/configonly/main_test.go` the 28 library-behaviour tests the coverage map now covers elsewhere, the four source-inspection tests and `TestConfigOnlyExampleShowsCreatedEntities`, whose rendering half is prettylog's. Also removed the helpers left with no caller. The file no longer imports `go/ast`, `go/parser`, `go/token`, `internal/testutil`, `events` or `state`. What remains is six tests of the example's own report and failure behaviour, plus its two smoke tests. The root `static_examples_test.go` stays deleted.
+
+**Deviations**: `TestConfigOnlyExamplePrintsNoSecret` keeps its checks on the example's report and rendered events. Its standard-stream capture, which needed `internal/testutil`, was dropped, because `e2e.TestStandardStreamsHoldNoSecret` covers that half.
+
+**Files changed**:
+- `example/configonly/main_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Strip library and source tests from the plugin example
+
+**What was done**: Removed from `example/plugin/main_test.go` the 36 library-behaviour tests the coverage map covers elsewhere and the two source-inspection tests, along with the helpers left with no caller. The file no longer imports `go/ast`, `go/parser`, `go/token`, `internal/testutil`, `events`, `state` or `encoding/json`. What remains is `TestMain`, which builds the external plugin, and six tests of the example's own report and failure behaviour. The two smoke tests are unchanged.
+
+**Deviations**: `TestPluginExampleFailsWithoutExternalPlugin` was kept but trimmed to the example's own "build it with `make build`" hint. Its library half (`ErrPluginLoad`, the path in the error) is covered by `e2e.TestMissingExternalPluginFailsApply`. `TestPluginExamplePrintsNoSecret` lost its standard-stream capture, which `e2e.TestPluginStandardStreamsHoldNoSecret` covers. The "Stayed with the example" list in `e2e/COVERAGE.md` was corrected to name the hint half of `TestPluginExampleFailsWithoutExternalPlugin`.
+
+**Files changed**:
+- `example/plugin/main_test.go`
+- `e2e/COVERAGE.md`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Give prettylog fixtures of its own
+
+**What was done**: prettylog's tests now use fixtures prettylog owns. `example/prettylog/fixtures_test.go` holds `Database`, `Cache`, `Network` and `Container` block types and a small in-process plugin (`fixturePlugin`) whose providers fill the computed `provider_id` and `assigned_address`, all written against the public `types`, `plugins` and `logger` packages. The configuration is a copy at `example/prettylog/testdata/encode/main.xcl`. `prettylog_test.go` no longer imports `internal/parser` or `internal/test_fixtures/registered`, and no longer reads a path outside its directory. `HOME` is set with `t.Setenv`. All 30 prettylog tests remain, with unchanged assertions.
+
+**Deviations**: The local `NetworkAttachment` leaves out the internal fixture's optional `id` key field, which the configuration never sets. This task's verification was run inline (prettylog tests with `-race`, a grep for internal or out-of-directory paths, the test-name list compared against HEAD, and `go vet ./...`) rather than in a separate sub-agent, because the test-writing sub-agent had already run the same checks.
+
+**Files changed**:
+- `example/prettylog/prettylog_test.go`
+- `example/prettylog/fixtures_test.go`
+- `example/prettylog/testdata/encode/main.xcl`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Make each example its own module
+
+**What was done**: configonly, plugin and prettylog each now have a `go.mod` (module path unchanged, `go 1.25.0`) and a `go.sum`, with `replace github.com/jumppad-labs/xcl => ../..`. configonly and plugin also replace prettylog with `../prettylog`. The example modules were seeded with the root's requirement versions and then tidied offline, so their third-party versions match what the root used. The configonly and plugin smoke tests now build and run the real binary with `os/exec` through a small local helper (`buildExample`, `runExample`) in place of `internal/testutil`, keeping the same assertions. A root `go mod tidy` removed `charmbracelet/*`, `muesli/termenv` and their indirect dependencies from xcl's module; `kr/pretty` had already gone.
+
+**Deviations**: The first verification sub-agent ran its checks in the main checkout rather than the worktree, so it reported missing `go.mod` files. The checks were re-run directly in the worktree: each example vets, tests and is tidy; no example imports `internal/`; the root is tidy and lists no charmbracelet, termenv or kr/pretty dependency; `go list ./...` from the root reaches no example package (only `plugins/example`, which is library code).
+
+**Files changed**:
+- `example/prettylog/go.mod`
+- `example/prettylog/go.sum`
+- `example/configonly/go.mod`
+- `example/configonly/go.sum`
+- `example/configonly/smoke_test.go`
+- `example/plugin/go.mod`
+- `example/plugin/go.sum`
+- `example/plugin/smoke_test.go`
+- `go.mod`
+- `go.sum`
+
+**Discoveries**: `go mod tidy` in an example module succeeds even while its tests import another module's `internal/` package; only build or vet catches that. Running tidy with `GOPROXY=off` works from the module cache once the examples are seeded with the root's requirements.
+
+### 2026-10-06 — Task: Run the example tests from the e2e suite
+
+**What was done**: Added `e2e/examples_test.go`. `exampleTestsError(dir)` runs `go test ./...` in a module directory and returns `example <name>: tests failed: …` with the combined output. `runExampleTests(t, name)` checks that `go` is on `PATH` (a missing `go` fails the test rather than skipping it) and runs `example/<name>`. There are three named runner tests, `TestConfigOnlyExampleTestsPass`, `TestPluginExampleTestsPass` and `TestPrettylogExampleTestsPass`, each run with `t.Parallel()`. The runner is itself tested against two stdlib-only fixture modules under `e2e/testdata`, one passing and one failing: `TestExampleRunnerPassesForAPassingModule` and `TestExampleRunnerNamesAFailingModule`.
+
+**Deviations**: The tests were written and verified inline rather than in a separate sub-agent, given how small the task is. Verification was gofmt, `go vet ./...`, and `go test -race -count=1 ./...` from the root, all green.
+
+**Files changed**:
+- `e2e/examples_test.go`
+- `e2e/testdata/passingexample/go.mod`
+- `e2e/testdata/passingexample/pass_test.go`
+- `e2e/testdata/failingexample/go.mod`
+- `e2e/testdata/failingexample/fail_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Build the examples on the minimum supported Go in CI
+
+**What was done**: The `build-minimum-go` job in `.github/workflows/go.yml` has a new final step, "Build and vet the examples". It runs `go build -v ./...` and `go vet ./...` in each of `example/configonly`, `example/plugin` and `example/prettylog` under the job's pinned `GOTOOLCHAIN=go1.25.0`, and fails on the first error. The job's comment now explains that the examples are built there because they are separate modules, and that what a reader copies out of an example must compile on the minimum Go.
+
+**Deviations**: None. As planned, no test reads the workflow file. The change was checked by parsing the YAML and building each example locally on the current toolchain. The Go 1.25.0 build itself is proved when CI runs.
+
+**Files changed**:
+- `.github/workflows/go.yml`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Document the new layout
+
+**What was done**: In the README's "Running them" passage, the sentence saying the examples' tests run as part of `go test ./...` is replaced. The passage now says each example is its own Go module pointed at the checkout with a `replace`, and that dropping the `replace` and requiring a published xcl lets it build on its own. It says how to run an example's tests and that xcl's `go test ./...` runs them through the `e2e/` suite, which also holds the library's end-to-end tests and links to `e2e/COVERAGE.md`. The rest of the examples section is left to the sibling specs.
+
+**Deviations**: The README says to run an example's tests with `go test ./...` (or `make test`), because prettylog has no Makefile. The minimum-Go guarantee from the previous task was also confirmed locally: all three examples build and vet on the cached go1.25.0 toolchain.
+
+**Files changed**:
+- `README.md`
+
+**Discoveries**: None.

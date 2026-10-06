@@ -40,6 +40,10 @@ jobs:
   # binary that a fresh checkout does not produce, so a suite run here would be
   # red for a reason unrelated to the toolchain and would teach contributors to
   # ignore the job.
+  #
+  # Each example is a Go module of its own, so the root build does not reach
+  # it. The examples are built and vetted here as well: what a reader copies
+  # out of an example has to compile on the minimum supported Go too.
   build-minimum-go:
     name: Build on minimum supported Go
     runs-on: ubuntu-latest
@@ -63,3 +67,10 @@ jobs:
 
     - name: Vet
       run: go vet ./...
+
+    - name: Build and vet the examples
+      run: |
+        for example in example/configonly example/plugin example/prettylog; do
+          echo "== $example"
+          (cd "$example" && go build -v ./... && go vet ./...) || exit 1
+        done

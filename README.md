@@ -229,9 +229,16 @@ program's own report goes to standard output.
 
 Run any of them from its directory with `make run`. For `plugin` this builds
 the external plugin into `build/` first, and it has the extra Makefile targets
-`build` and `clean`; every example has `run` and `test`. The tests for all
-three run as part of `go test ./...`, and the plugin tests build the external
-plugin themselves.
+`build` and `clean`; every example has `run` and `test`. The plugin tests build
+the external plugin themselves.
+
+Each example is a Go module of its own, pointed at this checkout with a
+`replace` directive, so it can be copied out of the repository: drop the
+`replace`, require a published xcl version and it builds on its own. Run an
+example's tests with `go test ./...` (or `make test`) in its directory. xcl's
+own `go test ./...` runs every example's tests too, through the end-to-end
+suite in [`e2e/`](./e2e), which also holds xcl's end-to-end tests of the
+library itself and a [coverage map](./e2e/COVERAGE.md) of what they cover.
 
 Block types are defined as Go structs that embed `types.ResourceBase` and map
 configuration to fields with `xcl` tags.

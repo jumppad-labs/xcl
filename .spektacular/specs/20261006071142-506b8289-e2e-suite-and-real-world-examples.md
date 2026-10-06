@@ -31,15 +31,15 @@ xcl's examples currently double as its end-to-end test suite, so they are writte
 -->
 ## Requirements
 
-- [ ] **xcl has its own end-to-end suite**
+- [x] **xcl has its own end-to-end suite**
   xcl's behaviour is covered by an end-to-end test suite that exercises the library only as an application would, through its public interface.
-- [ ] **No coverage lost**
+- [x] **No coverage lost**
   This spec removes the library-behaviour tests from the examples. Every library behaviour they check today is covered by the end-to-end suite or by the library's own tests before they are removed.
-- [ ] **The suite runs the examples**
+- [x] **The suite runs the examples**
   The end-to-end suite runs each example's own tests, including any smoke test, and fails if any of them fail.
-- [ ] **No tests of how examples are written**
+- [x] **No tests of how examples are written**
   No test anywhere checks how an example's source is written. Tests only check what the examples do.
-- [ ] **prettylog is self-contained**
+- [x] **prettylog is self-contained**
   prettylog builds and tests on its own as if it were a separate project. It is a reusable handler rather than a runnable application, so it has no smoke test.
 
 <!--
@@ -71,13 +71,13 @@ xcl's examples currently double as its end-to-end test suite, so they are writte
 -->
 ## Acceptance Criteria
 
-- [ ] **The e2e suite runs and passes**
+- [x] **The e2e suite runs and passes**
   Running the end-to-end suite from a fresh checkout passes, and it uses xcl only through its public interface.
 - [ ] **Coverage carried over**
   A coverage map kept with the end-to-end suite lists every library-behaviour test removed from the examples alongside the test that now covers it, and each listed test fails if that behaviour breaks.
-- [ ] **A broken example fails the suite**
+- [x] **A broken example fails the suite**
   If an example's tests are made to fail, the end-to-end suite fails and names that example.
-- [ ] **No source-inspection tests**
+- [x] **No source-inspection tests**
   No test in the repository parses or inspects an example's source code.
 - [ ] **prettylog builds alone**
   Copying prettylog's directory out of the repository, and pointing it at a published xcl version, leaves it buildable and its tests passing.

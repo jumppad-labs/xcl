@@ -1,7 +1,6 @@
-# The configuration only example: a small Kubernetes-like deployment, parsed
-# into the Go types in ../resources. Nothing here is applied to a cluster, the
-# blocks are decoded into Go structs and the references between them are
-# resolved.
+# The end-to-end suite's Kubernetes-like configuration, decoded into the Go
+# types in e2e/fixtures/kube. No plugin and no provider is involved: the blocks
+# are decoded into Go structs and the references between them are resolved.
 #
 # Variables can be overridden with environment variables prefixed HCL_VAR_,
 # i.e. HCL_VAR_image_tag.
