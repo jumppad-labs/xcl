@@ -1,0 +1,51 @@
+# A test configuration in the example's shape with different values: two
+# deployments, two services and one ingress with two paths. The api service's
+# target port is on the deployment's second container, so the routes can only
+# be right if every link is followed.
+deployment "web" {
+  replicas = 2
+
+  container {
+    name  = "web"
+    image = "ghcr.io/example/web:2.0.0"
+
+    port {
+      name           = "http"
+      container_port = 3000
+    }
+  }
+
+  container {
+    name  = "sidecar"
+    image = "ghcr.io/example/sidecar:1.0.0"
+
+    port {
+      name           = "admin"
+      container_port = 9000
+    }
+  }
+}
+
+deployment "api" {
+  replicas = 1
+
+  container {
+    name  = "proxy"
+    image = "ghcr.io/example/proxy:0.4.1"
+
+    port {
+      name           = "proxy"
+      container_port = 8081
+    }
+  }
+
+  container {
+    name  = "api"
+    image = "ghcr.io/example/api:1.2.0"
+
+    port {
+      name           = "grpc"
+      container_port = 7000
+    }
+  }
+}

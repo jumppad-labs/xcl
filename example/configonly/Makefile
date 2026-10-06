@@ -1,5 +1,5 @@
-# Builds and runs the configuration only example. It uses no plugins, the
-# block types are plain Go types registered with the plugin registry.
+# Builds and runs the configuration example, which reads its configuration
+# into its own Go types and reports where each ingress path sends traffic.
 
 CONFIG_DIR := ./config
 

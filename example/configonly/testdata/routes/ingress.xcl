@@ -1,0 +1,27 @@
+service "web" {
+  deployment  = deployment.web.meta.id
+  port        = 80
+  target_port = deployment.web.container[0].port[0].container_port
+}
+
+service "api" {
+  deployment  = deployment.api.meta.id
+  port        = 9090
+  target_port = deployment.api.container[1].port[0].container_port
+}
+
+ingress "shop" {
+  host = "shop.test"
+
+  rule {
+    path    = "/"
+    service = service.web.meta.id
+    port    = service.web.port
+  }
+
+  rule {
+    path    = "/api"
+    service = service.api.meta.id
+    port    = service.api.port
+  }
+}
