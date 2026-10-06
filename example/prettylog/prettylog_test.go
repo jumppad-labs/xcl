@@ -3,20 +3,17 @@ package prettylog_test
 import (
 	"bytes"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/example/prettylog"
-	"github.com/jumppad-labs/xcl/internal/parser"
-	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/plugins/registry"
-	"github.com/stretchr/testify/require"
 )
 
 // ansiCodes matches the escape sequences a terminal styles text with, the
@@ -219,13 +216,13 @@ func encodeFixtureRegistry(t *testing.T) *registry.PluginRegistry {
 
 	pr := registry.NewPluginRegistry()
 
-	err := pr.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	err := pr.RegisterType(&Database{}, "resource", typeDatabase)
 	require.NoError(t, err)
 
-	err = pr.RegisterType(&registered.Cache{}, registered.TypeCache)
+	err = pr.RegisterType(&Cache{}, typeCache)
 	require.NoError(t, err)
 
-	err = pr.RegisterPlugin(&parser.TestPlugin{})
+	err = pr.RegisterPlugin(&fixturePlugin{})
 	require.NoError(t, err)
 
 	return pr
@@ -237,12 +234,7 @@ func encodeFixtureRegistry(t *testing.T) *registry.PluginRegistry {
 func applyEncodeFixture(t *testing.T, out *bytes.Buffer, level slog.Level) {
 	t.Helper()
 
-	home := os.Getenv("HOME")
-	os.Setenv("HOME", t.TempDir())
-
-	t.Cleanup(func() {
-		os.Setenv("HOME", home)
-	})
+	t.Setenv("HOME", t.TempDir())
 
 	pr := encodeFixtureRegistry(t)
 
@@ -253,10 +245,7 @@ func applyEncodeFixture(t *testing.T, out *bytes.Buffer, level slog.Level) {
 	)
 	require.NoError(t, err)
 
-	path, err := filepath.Abs("../../internal/test_fixtures/config/encode/main.xcl")
-	require.NoError(t, err)
-
-	err = c.Apply(path)
+	err = c.Apply("testdata/encode/main.xcl")
 	require.NoError(t, err)
 }
 

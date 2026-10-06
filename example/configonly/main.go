@@ -24,6 +24,7 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/jumppad-labs/xcl"
@@ -31,7 +32,7 @@ import (
 	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
-	"github.com/kr/pretty"
+	"github.com/jumppad-labs/xcl/types"
 )
 
 // newStateKey returns a random 32 byte key to encrypt the sensitive values in
@@ -72,21 +73,14 @@ func main() {
 	// is what types the entity an event carries, which is how the receiver
 	// shows each resource's configuration as it is created
 	r := registry.NewPluginRegistry()
-	eh := prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), r)
 
-	// parse the config
-	entities, err := run(eh, r, dir, stateDir, stateKey)
-
-	pretty.Print(entities)
-
-	// cleanup
+	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), r), r, dir, stateDir, stateKey)
 	os.RemoveAll(stateDir)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
 	}
-
 }
 
 // appConfig is the application's view of the configuration. Decode fills it
@@ -106,7 +100,7 @@ type appConfig struct {
 // applied. Every event xcl produces goes to handler, a nil handler leaves xcl
 // silent. The sensitive values in state are encrypted with stateKey, or
 // written in plain text, with a warning, when it is nil.
-func run(handler xcl.EventHandler, r *registry.PluginRegistry, dir string, stateDir string, stateKey []byte) ([]any, error) {
+func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, dir string, stateDir string, stateKey []byte) ([]any, error) {
 
 	// Register each Go type under the block type name used in configuration.
 	// A registered type needs nothing else: no plugin, no provider, no schema
@@ -131,35 +125,29 @@ func run(handler xcl.EventHandler, r *registry.PluginRegistry, dir string, state
 		return nil, err
 	}
 
-	// a masker allows sensitive values in the state and events to be
-	// encrypted
-	masker, err := mask.EncryptAES256GCM(stateKey)
-	if err != nil {
-		return nil, fmt.Errorf("invalid state key: %w", err)
-	}
-
 	options := []xcl.ConfigOption{
 		xcl.WithPluginRegistry(r),
-
 		// Keep the state in a file, Destroy works from it alone
 		xcl.WithStatePath(stateDir),
-
-		// Using an optional state mask ensures that all types.Sensitive values are stored
-		// in the state as encrypted values
-		xcl.WithStateMask(masker),
-
-		// Every action for a resources lifecycle is broadcast as an event
-		// rather than injecting a logger you inject an event handler
-		// which can log values or push them to Prometheus,etc
 		xcl.WithEventHandler(handler),
-
 		// events carry nothing by default, this asks for each resource as
 		// state records it, which is what the receiver turns back into
-		// configuration text. Passwords are redacted in it.
+		// configuration text
+		// By default sensitive fields are redacted in the output
 		xcl.WithEventData(xcl.EventDataProcessed),
 	}
 
-	// with a key, the passwords are encrypted in the state file
+	// Encrypt sensitive values in the state when there is a key, without one
+	// they are written in plain text and xcl warns about it
+	if stateKey != nil {
+		masker, err := mask.EncryptAES256GCM(stateKey)
+		if err != nil {
+			return nil, fmt.Errorf("invalid state key: %w", err)
+		}
+
+		options = append(options, xcl.WithStateMask(masker))
+	}
+
 	c, err := xcl.NewConfig(options...)
 	if err != nil {
 		return nil, err
@@ -169,7 +157,106 @@ func run(handler xcl.EventHandler, r *registry.PluginRegistry, dir string, state
 		return nil, err
 	}
 
-	applied := c.Entities()
+	fmt.Fprintln(out, "## Resources")
+	for _, res := range c.Entities() {
+		meta, err := types.GetMeta(res)
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Fprintf(out, "  %s\n", meta.ID)
+	}
+
+	// gather the configuration into the application's own struct, Decode is
+	// an ordinary method so this works on every supported Go version
+	var cfg appConfig
+	if err := c.Decode(&cfg); err != nil {
+		return nil, err
+	}
+
+	printDeployments(out, cfg.Deployments)
+
+	if err := printRouting(out, cfg.Service, cfg.Ingress); err != nil {
+		return nil, err
+	}
+
+	applied := append([]any{}, c.Entities()...)
+
+	// Destroy everything that was applied, dependents before what they depend
+	// on, working only from the saved state. For these types that means
+	// clearing them from state, since none of them has a provider
+	if err := c.Destroy(); err != nil {
+		return nil, err
+	}
+
+	fmt.Fprintln(out, "## Destroyed")
+	fmt.Fprintf(out, "  %d resources remaining\n", c.EntityCount())
 
 	return applied, nil
+}
+
+// printDeployments writes each deployment and walks the blocks nested inside
+// it, the containers and, for each of those, its ports, environment and
+// resource limits. Registered types come back as the Go type that was
+// registered, so the nested blocks are ordinary Go structs and slices.
+func printDeployments(out io.Writer, deployments []*resources.Deployment) {
+	fmt.Fprintln(out, "## Deployments")
+	for _, d := range deployments {
+		fmt.Fprintf(out, "  %s replicas=%d\n", d.Meta.ID, d.Replicas)
+
+		for _, container := range d.Containers {
+			fmt.Fprintf(out, "    container %s image=%s\n", container.Name, container.Image)
+
+			for _, port := range container.Ports {
+				fmt.Fprintf(out, "      port %s container_port=%d\n", port.Name, port.ContainerPort)
+			}
+
+			// env values were read from the config map, the reference is
+			// resolved by the time the resource is returned
+			for _, env := range container.Env {
+				fmt.Fprintf(out, "      env %s=%s\n", env.Name, env.Value)
+			}
+
+			// A block that appears once is a pointer, nil when the
+			// configuration leaves it out
+			if container.Resources != nil {
+				fmt.Fprintf(out, "      limits cpu=%s memory=%s\n", container.Resources.Limits.CPU, container.Resources.Limits.Memory)
+				fmt.Fprintf(out, "      requests cpu=%s memory=%s\n", container.Resources.Requests.CPU, container.Resources.Requests.Memory)
+			}
+
+			for _, mount := range container.VolumeMounts {
+				fmt.Fprintf(out, "      volume_mount %s path=%s\n", mount.Name, mount.Path)
+			}
+		}
+
+		for _, volume := range d.Volumes {
+			fmt.Fprintf(out, "    volume %s config_map=%s\n", volume.Name, volume.ConfigMap)
+		}
+	}
+}
+
+// printRouting writes the two resources that are linked to the deployment,
+// their values were read from the blocks they reference rather than repeated
+// in the configuration. The configuration declares one of each, a missing one
+// is reported rather than printed
+func printRouting(out io.Writer, service *resources.Service, ingress *resources.Ingress) error {
+	if service == nil {
+		return fmt.Errorf("the configuration declares no service")
+	}
+
+	if ingress == nil {
+		return fmt.Errorf("the configuration declares no ingress")
+	}
+
+	fmt.Fprintln(out, "## Service")
+	fmt.Fprintf(out, "  %s deployment=%s port=%d target_port=%d\n", service.Meta.ID, service.Deployment, service.Port, service.TargetPort)
+
+	fmt.Fprintln(out, "## Ingress")
+	fmt.Fprintf(out, "  %s host=%s\n", ingress.Meta.ID, ingress.Host)
+
+	for _, rule := range ingress.Rules {
+		fmt.Fprintf(out, "    rule path=%s service=%s port=%d\n", rule.Path, rule.Service, rule.Port)
+	}
+
+	return nil
 }
