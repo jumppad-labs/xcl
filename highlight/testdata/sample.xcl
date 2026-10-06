@@ -1,0 +1,70 @@
+// Comment forms
+# hash comment
+/* block
+   comment */
+
+variable "cpu_resources" {
+  default = 2048
+}
+
+resource "network" "onprem" {
+  subnet = "10.6.0.0/16"
+}
+
+resource "template" "consul_config" {
+  disabled = false
+
+  source = <<-EOF
+    data_dir = "#{{ .Vars.data_dir }}"
+    server = true
+  EOF
+
+  plain = <<EOT
+raw ${interpolated} text
+EOT
+
+  append_file = resource.template.other.append_file
+  count       = len(variable.cpu_resources)
+  path        = env("HOME")
+  msg         = "hello ${variable.cpu_resources} world"
+
+  vars = {
+    data_dir = "/tmp"
+  }
+
+  items = [1, 2.5, -3, true, null]
+}
+
+module "mod" {
+  source = "./sub"
+}
+
+output "out" {
+  value = resource.network.onprem.subnet
+}
+
+// Block types registered by the application, written without "resource"
+deployment "api" {
+  replicas = 3
+
+  container {
+    name = "api"
+  }
+}
+
+service "api" {
+  target = deployment.api.meta.id
+}
+
+server "big" "web" {
+  location = server.big.web.location
+}
+
+// Added for the highlight package: escapes, a one-line block comment,
+// operators and a call to a function xcl does not provide
+locals_example "ops" {
+  escaped = "a\tb\"cé"
+  /* inline */ enabled = !false && (1 + 2 * 3 >= 4 || 5 % 2 != 0)
+  label = 10 == 10 ? "yes" : "no"
+  custom = my_function(1)
+}

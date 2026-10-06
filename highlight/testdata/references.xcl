@@ -1,0 +1,4 @@
+resource "config" "a" {
+  x   = resource.b.one.y
+  msg = "hello ${variable.cpu} world"
+}

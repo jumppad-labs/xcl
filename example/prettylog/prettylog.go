@@ -1,6 +1,7 @@
 // Package prettylog is the event receiver the examples share. It renders
 // everything xcl reports, lifecycle events, plugin log messages and errors,
-// as styled terminal lines.
+// as styled terminal lines, with the configuration of each entity it creates
+// coloured by xcl's own highlight package.
 //
 // It is an example, not part of xcl's API. It shows how little an application
 // needs: xcl ships events.SlogHandler, which turns the event stream into
@@ -21,8 +22,11 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	charmlog "github.com/charmbracelet/log"
+	"github.com/muesli/termenv"
+
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
@@ -33,18 +37,20 @@ const LevelEnv = "XCL_LOG_LEVEL"
 // above to w as a styled line, showing its severity, source, and the resource
 // and step where there is one:
 //
-//	10:04AM INFO create start source=core operation=create phase=start resource=resource.postgres.main ...
-//	10:04AM INFO created database source=ExamplePlugin operation=create phase=log resource=resource.postgres.main ...
+//	10:04AM INFO create start source=core operation=create phase=start resource=template.welcome ...
+//	10:04AM INFO rendered template source=TemplatePlugin operation=create phase=log resource=template.welcome ...
 //
 // When an entity is created it also writes that entity's configuration
 // beneath the success line, so a reader sees what was actually made,
-// including the values the provider filled in. On a terminal it is coloured
-// the way the xcl-vscode extension colours it in the editor:
+// including the values the provider filled in. When w shows colour, the
+// configuration is coloured by xcl itself, through xcl.Highlight and the
+// highlight package's terminal renderer, the way the xcl-vscode extension
+// colours it in the editor. The example has no highlighting code of its own:
 //
-//	10:04AM INFO create success source=core operation=create resource=resource.postgres.main
-//	  resource "postgres" "main" {
-//	    port              = 5432
-//	    connection_string = "postgres://..." # set by the provider
+//	10:04AM INFO create success source=core operation=create resource=template.welcome
+//	  template "welcome" {
+//	    source      = "Hello {{name}}"
+//	    destination = "/tmp/welcome.txt"
 //	  }
 //
 // That needs two things from the application: the registry, which is what
@@ -72,13 +78,25 @@ func Handler(w io.Writer, level slog.Level, reg *registry.PluginRegistry) xcl.Ev
 		return delegate
 	}
 
+	// the example output is for a person to read, so it shows the values the
+	// provider filled in as well as the ones that were configured
+	options := []xcl.EncodeOption{xcl.IncludeComputed()}
+
 	// colour is decided for w itself, as the logger does, so output to a
-	// file or a buffer is plain text
-	h := newHighlighter(lipgloss.NewRenderer(w))
+	// file or a buffer is plain text. xcl never checks for a terminal, asking
+	// it for colour is the application's decision.
+	if lipgloss.NewRenderer(w).ColorProfile() != termenv.Ascii {
+		// the default theme is built in, so creating the renderer cannot
+		// fail. Were it ever to, the configuration is simply written plain.
+		renderer, err := highlight.NewANSIRenderer()
+		if err == nil {
+			options = append(options, xcl.Highlight(renderer))
+		}
+	}
 
 	return func(e xcl.Event) {
 		delegate(e)
-		writeConfiguration(w, logger, reg, h, e)
+		writeConfiguration(w, logger, reg, options, e)
 	}
 }
 
@@ -86,14 +104,12 @@ func Handler(w io.Writer, level slog.Level, reg *registry.PluginRegistry) xcl.Ev
 // created, beneath the line reporting it. An event carries the entity only
 // when the application asked for xcl.EventDataProcessed, so this does nothing
 // by default.
-func writeConfiguration(w io.Writer, logger *charmlog.Logger, reg *registry.PluginRegistry, h highlighter, e xcl.Event) {
+func writeConfiguration(w io.Writer, logger *charmlog.Logger, reg *registry.PluginRegistry, options []xcl.EncodeOption, e xcl.Event) {
 	if e.Operation != events.OperationCreate || e.Phase != events.PhaseSuccess || len(e.Data) == 0 {
 		return
 	}
 
-	// the example output is for a person to read, so it shows the values the
-	// provider filled in as well as the ones that were configured
-	text, err := xcl.EncodeSavedEntity(reg, e.Data, xcl.IncludeComputed())
+	text, err := xcl.EncodeSavedEntity(reg, e.Data, options...)
 	if err != nil {
 		// a variable, output or module is never written as configuration, so
 		// there is simply nothing to show and nothing to report
@@ -108,7 +124,9 @@ func writeConfiguration(w io.Writer, logger *charmlog.Logger, reg *registry.Plug
 		return
 	}
 
-	fmt.Fprintf(w, "%s\n", h.highlight(indent(string(text))))
+	// indenting after highlighting is safe, the renderer leaves every newline
+	// outside its colour codes
+	fmt.Fprintf(w, "%s\n", indent(string(text)))
 }
 
 // indent shifts every non-empty line of text right, so the configuration sits

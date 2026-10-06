@@ -434,3 +434,81 @@ func TestHandlerKeepsWritingAfterAFailure(t *testing.T) {
 
 	require.Greater(t, later, warning, "the event after the failure should still be written")
 }
+
+// configurationLines returns the raw lines written to out after the first,
+// which is the create success line, leaving any styling in place
+func configurationLines(t *testing.T, out *bytes.Buffer) []string {
+	t.Helper()
+
+	raw := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	require.Greater(t, len(raw), 1, "the configuration should follow the create success line")
+
+	return raw[1:]
+}
+
+// TestHandlerColoursConfigurationWhenColourIsForced asserts that when the
+// writer is to show colour the configuration is coloured by xcl's renderer,
+// and that removing the colour leaves exactly the plain configuration
+func TestHandlerColoursConfigurationWhenColourIsForced(t *testing.T) {
+	t.Setenv("CLICOLOR_FORCE", "1")
+	t.Setenv("CLICOLOR", "")
+	t.Setenv("NO_COLOR", "")
+
+	out := &bytes.Buffer{}
+	pr := encodeFixtureRegistry(t)
+	handler := prettylog.Handler(out, slog.LevelInfo, pr)
+
+	handler(cacheCreateSuccess())
+
+	configuration := configurationLines(t, out)
+
+	require.True(t, strings.HasPrefix(configuration[0], "  \x1b[1;35mcache\x1b[0m"),
+		"the block type should be coloured by the default theme, got %q", configuration[0])
+	require.Contains(t, strings.Join(configuration, "\n"), "\x1b[34mlocation\x1b[0m")
+	require.Contains(t, strings.Join(configuration, "\n"), "\x1b[33m")
+
+	plain, err := xcl.EncodeSavedEntity(pr, savedCacheRecord(), xcl.IncludeComputed())
+	require.NoError(t, err)
+
+	expected := []string{}
+	for _, line := range strings.Split(strings.TrimRight(string(plain), "\n"), "\n") {
+		if line != "" {
+			line = "  " + line
+		}
+		expected = append(expected, line)
+	}
+
+	stripped := []string{}
+	for _, line := range configuration {
+		stripped = append(stripped, ansiCodes.ReplaceAllString(line, ""))
+	}
+
+	require.Equal(t, expected, stripped)
+	require.Equal(t, []string{
+		`  cache "main" {`,
+		`    location = "us-east"`,
+		`  }`,
+	}, stripped)
+}
+
+// TestHandlerWritesPlainConfigurationToNonTerminal asserts that a writer
+// which is not a terminal, such as a buffer, gets the configuration with no
+// colour at all
+func TestHandlerWritesPlainConfigurationToNonTerminal(t *testing.T) {
+	t.Setenv("CLICOLOR_FORCE", "")
+
+	out := &bytes.Buffer{}
+	pr := encodeFixtureRegistry(t)
+	handler := prettylog.Handler(out, slog.LevelInfo, pr)
+
+	handler(cacheCreateSuccess())
+
+	configuration := configurationLines(t, out)
+
+	require.Equal(t, []string{
+		`  cache "main" {`,
+		`    location = "us-east"`,
+		`  }`,
+	}, configuration)
+	require.NotContains(t, strings.Join(configuration, "\n"), "\x1b")
+}
