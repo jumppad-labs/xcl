@@ -34,29 +34,29 @@ Applications built on xcl can turn configuration back into text, but only as pla
 -->
 ## Requirements
 
-- [ ] **Highlighting is opt-in**
+- [x] **Highlighting is opt-in**
   Encoded configuration text is uncoloured unless the caller asks for highlighting.
-- [ ] **Tokens use editor-standard names**
+- [x] **Tokens use editor-standard names**
   Every token of highlighted text is labelled with the same standard token names the xcl editor extension uses.
-- [ ] **Output formats are pluggable**
+- [x] **Output formats are pluggable**
   Developers can supply their own renderer to turn labelled tokens into any output format.
-- [ ] **Terminal colour ships built in**
+- [x] **Terminal colour ships built in**
   xcl ships a terminal-colour renderer.
-- [ ] **Default theme follows the terminal**
+- [x] **Default theme follows the terminal**
   With no theme given, the terminal renderer uses only the terminal's standard 16 palette colours, so the result follows the user's terminal palette.
-- [ ] **Editor themes work in the terminal**
+- [x] **Editor themes work in the terminal**
   The terminal renderer accepts an editor colour theme and colours tokens as the editor would with that theme, including the bold, italic and underline styles the theme sets.
-- [ ] **Unmatched tokens keep the default colour**
+- [x] **Unmatched tokens keep the default colour**
   A token that no rule in the theme matches is written in the terminal's default colour.
-- [ ] **Bad themes are reported**
+- [x] **Bad themes are reported**
   A theme that cannot be read or is invalid is reported as an error when the renderer is created, rather than silently replaced with defaults.
-- [ ] **All encoder output can be highlighted**
+- [x] **All encoder output can be highlighted**
   Highlighting works on any text the encoder produces, including output that keeps references to other configuration as expressions rather than resolving them to values.
-- [ ] **Highlighting never changes the text**
+- [x] **Highlighting never changes the text**
   Removing the colour from highlighted output gives exactly the uncoloured text.
-- [ ] **The logging example uses it**
+- [x] **The logging example uses it**
   The logging example uses the library's highlighting and no longer has its own highlighter.
-- [ ] **Highlighting is documented**
+- [x] **Highlighting is documented**
   The documentation website explains how to turn on highlighting, use a theme and write a renderer.
 
 <!--
@@ -89,27 +89,27 @@ Applications built on xcl can turn configuration back into text, but only as pla
 -->
 ## Acceptance Criteria
 
-- [ ] **Plain by default**
+- [x] **Plain by default**
   Encoding an entity without asking for highlighting gives text with no colour codes, identical to today's output.
-- [ ] **Standard token names**
+- [x] **Standard token names**
   For a configuration containing a token of each scope the xcl editor extension's grammar assigns, each token is labelled with the name that grammar gives the same text.
-- [ ] **Custom renderer**
+- [x] **Custom renderer**
   A renderer written by a test, which wraps each token in markers naming its label, produces output in which every token is wrapped with the expected label.
-- [ ] **Default colours**
+- [x] **Default colours**
   Highlighting with the built-in terminal renderer and no theme produces output that uses only the standard 16-colour foreground codes, and no 256-colour or 24-bit codes.
-- [ ] **Theme colours**
+- [x] **Theme colours**
   Highlighting with a reference editor theme colours every kind of token with the colour and font style that theme gives it, and a more specific rule in the theme overrides a general one.
-- [ ] **Unmatched tokens**
+- [x] **Unmatched tokens**
   With a theme that has no rule for some kind of token, those tokens are written with no colour codes.
-- [ ] **Invalid theme**
+- [x] **Invalid theme**
   Creating the terminal renderer from an unreadable or invalid theme returns an error.
-- [ ] **References highlighted**
+- [x] **References highlighted**
   Highlighting output that keeps references as expressions colours the first segment of each reference, as the editor grammar does.
-- [ ] **Text unchanged**
+- [x] **Text unchanged**
   For every configuration in the repository's examples and test fixtures, stripping colour codes from the highlighted output gives the uncoloured output byte for byte.
-- [ ] **Logging example migrated**
+- [x] **Logging example migrated**
   The logging example's coloured output is produced by the library, and the example contains no highlighting code of its own.
-- [ ] **Docs section**
+- [x] **Docs section**
   The documentation website's encoding page has a section showing how to enable highlighting, pass a theme, and write a renderer.
 
 <!--

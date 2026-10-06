@@ -90,6 +90,11 @@ var (
 	// because it is not an entity, it is a builtin such as a variable, output
 	// or module, or it holds a value that has no configuration form.
 	ErrNotEncodable = xclerrors.ErrNotEncodable
+
+	// ErrInvalidTheme means a colour theme given to highlight.NewANSIRenderer
+	// cannot be read or is not a valid VS Code colour theme. The
+	// InvalidThemeError detail names the theme and what was wrong with it.
+	ErrInvalidTheme = xclerrors.ErrInvalidTheme
 )
 
 // The errors below name the ways masking a sensitive value can fail. Check
@@ -125,6 +130,7 @@ type (
 	UnregisteredTypeError = xclerrors.UnregisteredTypeError
 	InvalidSavedDataError = xclerrors.InvalidSavedDataError
 	NotEncodableError     = xclerrors.NotEncodableError
+	InvalidThemeError     = xclerrors.InvalidThemeError
 
 	UnrecoverableError     = xclerrors.UnrecoverableError
 	MaskNotReversibleError = xclerrors.MaskNotReversibleError

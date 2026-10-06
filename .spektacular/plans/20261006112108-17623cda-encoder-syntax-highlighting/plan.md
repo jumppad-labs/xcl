@@ -227,7 +227,7 @@ Each scope decision is a small, named function, documented with the grammar rule
 
 **Validation point**: Tests show that a fixture holding every scope the grammar assigns is labelled exactly as the grammar labels it. A marker-wrapping custom renderer wraps every token with its label. The fuzz test confirms that joining the pieces always gives back the input.
 
-#### - [ ] Task: Add the highlight package with the tokeniser and renderer interface
+#### - [x] Task: Add the highlight package with the tokeniser and renderer interface
 **Id:** 90d79027-5621-4838-873c-331c3f9a6268
 **Repo:** xclconfig
 **Depends on:** none
@@ -238,18 +238,18 @@ Create the public `highlight` package. Its tokeniser lexes configuration text wi
 *Technical detail:* [context.md#task-add-the-highlight-package-with-the-tokeniser-and-renderer-interface](./context.md#task-add-the-highlight-package-with-the-tokeniser-and-renderer-interface)
 
 **Acceptance criteria**:
-- [ ] Every scope the xcl-vscode grammar assigns has a test showing the tokeniser gives the same text the same scope name, `.xcl` suffix included.
-- [ ] In text that shows references as written, the first segment of each reference is labelled as a reference root.
-- [ ] A test renderer that wraps each token in markers naming its label gets every token wrapped with the expected label, and unlabelled text arrives with an empty label.
-- [ ] Joining the pieces with an identity renderer gives back the input byte for byte, for the fixtures and under fuzzing, including input that does not lex cleanly.
-- [ ] Review confirms the package pulls in no charmbracelet library and no new module.
+- [x] Every scope the xcl-vscode grammar assigns has a test showing the tokeniser gives the same text the same scope name, `.xcl` suffix included.
+- [x] In text that shows references as written, the first segment of each reference is labelled as a reference root.
+- [x] A test renderer that wraps each token in markers naming its label gets every token wrapped with the expected label, and unlabelled text arrives with an empty label.
+- [x] Joining the pieces with an identity renderer gives back the input byte for byte, for the fixtures and under fuzzing, including input that does not lex cleanly.
+- [x] Review confirms the package pulls in no charmbracelet library and no new module.
 
 ### Milestone 2: Configuration can be coloured for the terminal, by default or with an editor theme
 **What changes**: Developers can create a built-in terminal renderer. With no theme it uses only the terminal's 16 standard colours, so it follows the user's own palette. Given a VS Code colour theme, it colours tokens exactly as the editor would, with bold, italic and underline, and leaves tokens the theme does not cover in the terminal's default colour. A theme that cannot be read or is invalid fails when the renderer is created, with an `xcl.ErrInvalidTheme` error explaining what is wrong.
 
 **Validation point**: Tests show that default output uses only 16-colour codes and that each token gets the reference theme's colour and style, with a more specific rule overriding a general one. Unmatched tokens carry no codes. Each kind of bad theme returns `xcl.ErrInvalidTheme`.
 
-#### - [ ] Task: Add the invalid-theme error
+#### - [x] Task: Add the invalid-theme error
 **Id:** c63cf7d1-d229-412d-b2a8-76c6a76a0502
 **Repo:** xclconfig
 **Depends on:** none
@@ -260,11 +260,11 @@ Add the sentinel error and its detail type for a theme that cannot be read or is
 *Technical detail:* [context.md#task-add-the-invalid-theme-error](./context.md#task-add-the-invalid-theme-error)
 
 **Acceptance criteria**:
-- [ ] A theme error matches `xcl.ErrInvalidTheme`, and also matches the underlying read or parse error when there is one.
-- [ ] The error message names the theme's source and the reason it is invalid.
-- [ ] Review confirms the `errors` package imports nothing new.
+- [x] A theme error matches `xcl.ErrInvalidTheme`, and also matches the underlying read or parse error when there is one.
+- [x] The error message names the theme's source and the reason it is invalid.
+- [x] Review confirms the `errors` package imports nothing new.
 
-#### - [ ] Task: Read VS Code colour themes and match scopes against them
+#### - [x] Task: Read VS Code colour themes and match scopes against them
 **Id:** 5fded1d4-fd87-4b6c-8681-9310847a9b79
 **Repo:** xclconfig
 **Depends on:**
@@ -276,13 +276,13 @@ Teach the `highlight` package to read a VS Code colour theme, comments and trail
 *Technical detail:* [context.md#task-read-vs-code-colour-themes-and-match-scopes-against-them](./context.md#task-read-vs-code-colour-themes-and-match-scopes-against-them)
 
 **Acceptance criteria**:
-- [ ] A theme selector colours every scope it is a dot-segment prefix of, and a more specific selector overrides a general one.
-- [ ] Colour and font style are each taken from the most specific rule that sets them, and the later rule wins a tie.
-- [ ] Scopes written as a string, a comma-separated string or an array all work, and a theme with comments and trailing commas loads.
-- [ ] A scope no rule matches gets no style.
-- [ ] An unreadable file, malformed JSON, a malformed colour, an unknown font style, a malformed `tokenColors` and an `include` each fail with `xcl.ErrInvalidTheme`.
+- [x] A theme selector colours every scope it is a dot-segment prefix of, and a more specific selector overrides a general one.
+- [x] Colour and font style are each taken from the most specific rule that sets them, and the later rule wins a tie.
+- [x] Scopes written as a string, a comma-separated string or an array all work, and a theme with comments and trailing commas loads.
+- [x] A scope no rule matches gets no style.
+- [x] An unreadable file, malformed JSON, a malformed colour, an unknown font style, a malformed `tokenColors` and an `include` each fail with `xcl.ErrInvalidTheme`.
 
-#### - [ ] Task: Add the ANSI terminal renderer
+#### - [x] Task: Add the ANSI terminal renderer
 **Id:** 60e83712-3914-47f9-b90c-ef7ffc1f6c95
 **Repo:** xclconfig
 **Depends on:**
@@ -295,18 +295,18 @@ Add the built-in terminal renderer, created with an optional theme from a reader
 *Technical detail:* [context.md#task-add-the-ansi-terminal-renderer](./context.md#task-add-the-ansi-terminal-renderer)
 
 **Acceptance criteria**:
-- [ ] With no theme, output uses only the standard 16 foreground colours, with no 256-colour or 24-bit codes.
-- [ ] With the reference theme, every kind of token gets the theme's colour and font style.
-- [ ] Tokens a theme has no rule for, and text between tokens, are written with no colour codes.
-- [ ] Creating the renderer from an unreadable or invalid theme returns an error, and never a renderer with default colours.
-- [ ] Stripping the colour codes from rendered output gives back the original text.
+- [x] With no theme, output uses only the standard 16 foreground colours, with no 256-colour or 24-bit codes.
+- [x] With the reference theme, every kind of token gets the theme's colour and font style.
+- [x] Tokens a theme has no rule for, and text between tokens, are written with no colour codes.
+- [x] Creating the renderer from an unreadable or invalid theme returns an error, and never a renderer with default colours.
+- [x] Stripping the colour codes from rendered output gives back the original text.
 
 ### Milestone 3: The encoder highlights on request, and the logging example uses it
 **What changes**: `EncodeEntity` and `EncodeSavedEntity` accept a new `xcl.Highlight(renderer)` option and return highlighted text, including text that shows references as written. Without the option the output is exactly as before. The logging example drops its own highlighter and colours the configuration it prints through the library. The documentation website's encoding page explains how to turn highlighting on, use a theme and write a renderer.
 
 **Validation point**: Encoder tests show that highlighted output from both entry points strips back to the plain output, that references are coloured, and that output without the option is unchanged. prettylog's tests pass with no highlighting code left in the example. Review confirms the library gained no charmbracelet or other new module dependency, and the website page builds with the new section.
 
-#### - [ ] Task: Add the Highlight encode option
+#### - [x] Task: Add the Highlight encode option
 **Id:** d0a8df74-2634-4a2a-aaf8-4ae3e7b36d03
 **Repo:** xclconfig
 **Depends on:**
@@ -318,12 +318,12 @@ Add `xcl.Highlight(renderer)` to the encoder's options. When it is given, the sh
 *Technical detail:* [context.md#task-add-the-highlight-encode-option](./context.md#task-add-the-highlight-encode-option)
 
 **Acceptance criteria**:
-- [ ] Encoding without the option gives exactly today's text, with no colour codes.
-- [ ] Both encode functions return highlighted text when given a renderer, and removing the highlighting gives exactly the plain text.
-- [ ] With references shown as written, the first segment of each reference is highlighted as a reference.
-- [ ] A nil renderer behaves as if the option were not given.
+- [x] Encoding without the option gives exactly today's text, with no colour codes.
+- [x] Both encode functions return highlighted text when given a renderer, and removing the highlighting gives exactly the plain text.
+- [x] With references shown as written, the first segment of each reference is highlighted as a reference.
+- [x] A nil renderer behaves as if the option were not given.
 
-#### - [ ] Task: Switch the logging example to library highlighting
+#### - [x] Task: Switch the logging example to library highlighting
 **Id:** 6302ae6c-f533-4fe8-8ee9-4026893c7eda
 **Repo:** xclconfig
 **Depends on:**
@@ -336,12 +336,12 @@ Remove prettylog's own regex highlighter and its tests, and have the handler ask
 *Technical detail:* [context.md#task-switch-the-logging-example-to-library-highlighting](./context.md#task-switch-the-logging-example-to-library-highlighting)
 
 **Acceptance criteria**:
-- [ ] The logging example contains no highlighting code of its own.
-- [ ] When colour is on, the configuration it prints is coloured by the library, and stripping the colour gives the plain configuration.
-- [ ] When the writer does not show colour, the configuration is printed plain.
-- [ ] Review confirms the library still depends on no charmbracelet package.
+- [x] The logging example contains no highlighting code of its own.
+- [x] When colour is on, the configuration it prints is coloured by the library, and stripping the colour gives the plain configuration.
+- [x] When the writer does not show colour, the configuration is printed plain.
+- [x] Review confirms the library still depends on no charmbracelet package.
 
-#### - [ ] Task: Document highlighting on the website encoding page
+#### - [x] Task: Document highlighting on the website encoding page
 **Id:** d16236dc-043f-4404-9852-132f325ca8db
 **Repo:** xcl-website
 **Depends on:**
@@ -354,9 +354,9 @@ Add a "Highlighting" section to the configuration-text page. It shows how to tur
 *Technical detail:* [context.md#task-document-highlighting-on-the-website-encoding-page](./context.md#task-document-highlighting-on-the-website-encoding-page)
 
 **Acceptance criteria**:
-- [ ] The encoding page has a section showing how to enable highlighting, pass a theme and write a renderer.
-- [ ] The examples on the page match the library's real API names and signatures.
-- [ ] The site builds with the new section.
+- [x] The encoding page has a section showing how to enable highlighting, pass a theme and write a renderer.
+- [x] The examples on the page match the library's real API names and signatures.
+- [x] The site builds with the new section.
 
 ## Open Questions
 
@@ -383,3 +383,110 @@ Notes for the epic-level changelog entry, written once after every spec in the e
 - New `highlight.NewANSIRenderer` with `WithTheme` and `WithThemeFile` (16-colour default theme, 24-bit VS Code theme colours, font styles), plus `xcl.ErrInvalidTheme` / `InvalidThemeError` for unreadable or invalid themes.
 - The prettylog example now uses the library's highlighting instead of its own regex highlighter.
 - Breaking changes: none.
+
+## Changelog
+
+### 2026-10-06 — Task: Add the highlight package with the tokeniser and renderer interface
+
+**What was done**: Added the public `highlight` package: `Renderer`, `RendererFunc`, `Text` and the 24 `Scope*` constants, plus an unexported tokeniser that lexes with `hclsyntax.LexConfig` and labels tokens with the xcl-vscode grammar's scopes using a frame stack (quote, heredoc, interpolation, directive) and byte spans for block labels and `%{ }` directives. Gaps between tokens are emitted from a byte cursor, so the text is unchanged by construction. Added parity fixtures, per-scope tests, identity/nil tests, a fuzz test, and `internal/testutil.StripANSI` for later tasks.
+
+**Deviations**:
+- Grammar reference is the xcl-vscode working-tree grammar (uncommitted edits: any identifier can be a labelled block type or a reference root), as the plan specified.
+- Adjacent pieces with the same scope are merged into one renderer call (a label and its quotes arrive as one piece).
+- Identifiers and whitespace inside `${ }` that no expression rule matches are passed with scope "" rather than `meta.interpolation.xcl` (the plan defines no constant for it).
+- The keyword rule is applied as the grammar writes it: `resource|module|variable|output|local` not followed by `.` is `storage.type.xcl` anywhere outside strings, and a single label after a keyword with no `{` on the line is `entity.name.type.xcl` (the grammar's capture 2).
+- `$${` in a quoted string is treated as text; the grammar would start an interpolation there. Not replicated.
+
+**Files changed**:
+- `xclconfig: highlight/doc.go`
+- `xclconfig: highlight/highlight.go`
+- `xclconfig: highlight/tokenize.go`
+- `xclconfig: highlight/highlight_test.go`
+- `xclconfig: highlight/tokenize_test.go`
+- `xclconfig: highlight/testdata/sample.xcl`
+- `xclconfig: highlight/testdata/references.xcl`
+- `xclconfig: internal/testutil/ansi.go`
+
+**Discoveries**: The HCL scanner includes a line comment's trailing newline in the comment token, and emits a heredoc's opener including its newline (`<<-EOF\n`) and its closer including leading indentation (`  EOF`), so these are split by hand. Tokens are never separated by newlines (newlines are tokens), so "next token" lookahead equals the grammar's `(?=\s*x)`.
+
+### 2026-10-06 — Task: Add the invalid-theme error
+
+**What was done**: Added `ErrInvalidTheme` and the `InvalidThemeError{Source, Reason, Err}` detail type (pointer receivers, `Unwrap() []error` returning the sentinel and the cause) to the `errors` package, and re-exported `xcl.ErrInvalidTheme` and the `xcl.InvalidThemeError` alias from `config.go` beside the encode errors.
+
+**Deviations**: The plan named only the sentinel re-export; the detail type is also aliased from `xcl`, following the existing pattern for every other detail type, so callers can `errors.As` without importing the `errors` package.
+
+**Files changed**:
+- `xclconfig: errors/highlight_errors.go`
+- `xclconfig: errors/highlight_errors_test.go`
+- `xclconfig: config.go`
+- `xclconfig: highlight_errors_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Read VS Code colour themes and match scopes against them
+
+**What was done**: Added `stripJSONC` (comments and trailing commas removed outside strings) and the unexported theme: `parseTheme` reads a VS Code colour theme's `tokenColors` into rules (one per selector), and `theme.style` resolves a scope's colour and font style independently by dot-segment prefix matching, most segments winning and the later rule winning a tie, cached per scope behind a mutex. `defaultTheme` carries over prettylog's 16-colour palette as basic rules. Every failure is an `*InvalidThemeError` naming the path into the theme. Added `testdata/reference-theme.json` and the theme and JSONC tests.
+
+**Deviations**:
+- `#RGBA` colours are accepted as well as `#RGB`, `#RRGGBB` and `#RRGGBBAA` (VS Code accepts all four); alpha is ignored.
+- A theme with no `tokenColors` (or `null`) loads and styles nothing, rather than failing.
+- An entry that is not an object, or whose scope is neither a string nor a list of strings, is rejected as invalid.
+
+**Files changed**:
+- `xclconfig: highlight/jsonc.go`
+- `xclconfig: highlight/theme.go`
+- `xclconfig: highlight/testdata/reference-theme.json`
+- `xclconfig: highlight/theme_test.go`
+- `xclconfig: highlight/jsonc_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Add the ANSI terminal renderer
+
+**What was done**: Added the public `ANSIRenderer` with `NewANSIRenderer`, `WithTheme(io.Reader)` and `WithThemeFile(path)`. With no theme it uses the 16-colour default theme; with a theme it writes `38;2;r;g;b` colours. Font styles are written as SGR 1/3/4/9 before the colour. Unlabelled and unmatched pieces are returned unchanged, and every non-empty line of a piece is wrapped separately so newlines stay outside escape codes. A file that cannot be opened, or any theme error, fails the constructor with `*InvalidThemeError` and a nil renderer.
+
+**Deviations**: `ansi.go` also imports `io`, `os` and the `errors` package (the plan said only `strconv` and `strings`), needed for the options and the file-open error. The default theme leaves heredoc operators and markers, functions, members and operators in the terminal's default colour, as the palette carried over from prettylog has no rule for them.
+
+**Files changed**:
+- `xclconfig: highlight/ansi.go`
+- `xclconfig: highlight/ansi_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Add the Highlight encode option
+
+**What was done**: Added `xcl.Highlight(renderer highlight.Renderer)` to the closed `encodeOptions` set. `encodeEntity`, the single path behind `EncodeEntity` and `EncodeSavedEntity`, now passes the formatted `file.Bytes()` through `highlight.Text` as its last step when a renderer is set; a nil renderer, or no option, leaves the output exactly as before. Option and `EncodeEntity` doc comments name the new option. Added encoder integration tests.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xclconfig: encode.go`
+- `xclconfig: encode_highlight_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-06 — Task: Switch the logging example to library highlighting
+
+**What was done**: Deleted prettylog's regex highlighter (`highlight.go`, `highlight_test.go`). `Handler` now decides colour for its writer with `lipgloss.NewRenderer(w).ColorProfile() != termenv.Ascii` and, when colour is on, adds `xcl.Highlight` with the default `highlight.NewANSIRenderer()` to the `EncodeSavedEntity` options; `writeConfiguration` takes the options and indents the (possibly coloured) text. Updated the package and `Handler` doc comments, replacing the stale `ExamplePlugin` log line with the template plugin's. Added forced-colour and plain-writer handler tests.
+
+**Deviations**: prettylog had already become its own module (sibling e2e spec) with a development `replace` to the local xcl, so the migration was made there and needed no release; the plan's open question resolved without a stop.
+
+**Files changed**:
+- `xclconfig: example/prettylog/highlight.go` (deleted)
+- `xclconfig: example/prettylog/highlight_test.go` (deleted)
+- `xclconfig: example/prettylog/prettylog.go`
+- `xclconfig: example/prettylog/prettylog_test.go`
+
+**Discoveries**: lipgloss's renderer resolves colour through termenv's `EnvColorProfile`, which turns colour on for any writer when `CLICOLOR_FORCE` is set (and not `0`), and treats an empty `NO_COLOR` as unset; tests force colour with `t.Setenv("CLICOLOR_FORCE", "1")`.
+
+### 2026-10-06 — Task: Document highlighting on the website encoding page
+
+**What was done**: Added a "Highlighting" section to `src/pages/configuration-text.mdx`, before "For reading, not reprocessing", covering turning highlighting on with `highlight.NewANSIRenderer` and `xcl.Highlight`, the caller's own terminal decision, using a VS Code theme with `WithThemeFile`/`WithTheme` and handling `xcl.ErrInvalidTheme`, and writing a renderer with `highlight.RendererFunc`, the scope names and the `highlight.Scope*` constants. The page intro mentions colouring. Also fixed the stale `prettylog.Handler` snippet on `src/pages/events.mdx` (it showed a two-argument signature) and noted that the example colours configuration through `xcl.Highlight`.
+
+**Deviations**: The `events.mdx` fix is outside this task's listed files; it was reported by an earlier spec as stale and falls to this spec because this spec changes prettylog's `Handler`.
+
+**Files changed**:
+- `xcl-website: src/pages/configuration-text.mdx`
+- `xcl-website: src/pages/events.mdx`
+
+**Discoveries**: The website worktree has no `node_modules`; the build was run against the main checkout's installed modules through a temporary symlink, removed afterwards.

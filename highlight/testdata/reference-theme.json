@@ -1,0 +1,55 @@
+// A small VS Code colour theme used by the highlight tests. It is JSON with
+// comments and trailing commas, as published themes often are.
+{
+  "name": "xcl reference",
+  "type": "dark",
+  "colors": {
+    // editor colours are not used for tokens
+    "editor.foreground": "#ffffff",
+  },
+  "tokenColors": [
+    {
+      "name": "Block types",
+      "scope": "storage.type",
+      "settings": { "foreground": "#c586c0", "fontStyle": "bold" },
+    },
+    {
+      // deliberately general: every entity.name scope gets this colour
+      "name": "Names",
+      "scope": "entity.name",
+      "settings": { "foreground": "#4ec9b0" },
+    },
+    {
+      // a more specific rule overriding the general one for name labels
+      "name": "Name labels",
+      "scope": "entity.name.tag",
+      "settings": { "foreground": "#569cd6", "fontStyle": "underline" },
+    },
+    {
+      "name": "Attributes",
+      "scope": "variable.other.property",
+      "settings": { "foreground": "#9cdcfe" },
+    },
+    {
+      "name": "Strings",
+      "scope": ["string.quoted", "string.unquoted.heredoc"],
+      "settings": { "foreground": "#ce9178" },
+    },
+    {
+      "name": "Constants",
+      "scope": "constant.numeric, constant.language, constant.character.escape",
+      "settings": { "foreground": "#b5cea8" },
+    },
+    {
+      "name": "References",
+      "scope": "support.class.reference",
+      "settings": { "foreground": "#4fc1ff" },
+    },
+    {
+      "name": "Comments",
+      "scope": "comment",
+      "settings": { "foreground": "#6a9955", "fontStyle": "italic" },
+    },
+    /* no rule for keyword.operator: operators keep the default colour */
+  ],
+}
