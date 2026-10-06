@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/proto"
+	"github.com/jumppad-labs/xcl/types"
 )
 
 // GRPCServer wraps PluginBase and implements the gRPC PluginService
@@ -78,7 +79,7 @@ func (s *GRPCServer) Create(ctx context.Context, req *proto.CreateRequest) (*pro
 	// Get the registered type to access its adapter
 	rt := s.getRegisteredType(req.EntityType, req.EntitySubType)
 	if rt == nil {
-		return &proto.CreateResponse{Error: "no registered type found for " + req.EntityType + "." + req.EntitySubType}, nil
+		return &proto.CreateResponse{Error: "no registered type found for " + types.TypeKey(req.EntityType, req.EntitySubType)}, nil
 	}
 
 	// Call the adapter's Create method which returns mutated data
@@ -108,7 +109,7 @@ func (s *GRPCServer) Read(ctx context.Context, req *proto.ReadRequest) (*proto.R
 	// Get the registered type to access its adapter
 	rt := s.getRegisteredType(req.EntityType, req.EntitySubType)
 	if rt == nil {
-		return &proto.ReadResponse{Error: "no registered type found for " + req.EntityType + "." + req.EntitySubType}, nil
+		return &proto.ReadResponse{Error: "no registered type found for " + types.TypeKey(req.EntityType, req.EntitySubType)}, nil
 	}
 
 	// Call the adapter's Read method which returns the read data
@@ -129,7 +130,7 @@ func (s *GRPCServer) Update(ctx context.Context, req *proto.UpdateRequest) (*pro
 	// Get the registered type to access its adapter
 	rt := s.getRegisteredType(req.EntityType, req.EntitySubType)
 	if rt == nil {
-		return &proto.UpdateResponse{Error: "no registered type found for " + req.EntityType + "." + req.EntitySubType}, nil
+		return &proto.UpdateResponse{Error: "no registered type found for " + types.TypeKey(req.EntityType, req.EntitySubType)}, nil
 	}
 
 	// Call the adapter's Update method which returns mutated data

@@ -1,98 +1,62 @@
-// Command plugin shows XCL used with plugins. The block types are provided
-// by two plugins whose providers take part in the lifecycle, creating the
-// resources on apply and destroying them at the end. Each plugin provides two
-// block types, registered with a provider of their own:
+// Command plugin shows xcl used with two plugins that do real work. Their
+// providers take part in the lifecycle, creating real things on apply and
+// removing them on destroy:
 //
-//   - ExamplePlugin (./internal) is an in-process plugin, compiled into this
-//     program. It provides postgres and redis, filling in the computed
-//     connection_string on both that the configuration only example leaves
-//     empty.
-//   - external (./external) is an external plugin, compiled to its own binary
-//     that xcl starts as a separate process and calls over gRPC. It provides
-//     app and ingress, and fills in the computed url on app that ingress
-//     reads.
+//   - The Docker plugin (./docker) is an external plugin, served by its own
+//     binary (./cmd/docker-plugin) that xcl starts as a separate process and
+//     calls over gRPC. It provides docker "network" and docker "container",
+//     and creates real Docker networks and containers.
+//   - The template plugin (./template) is an in-process plugin, compiled into
+//     this program. It provides template, a block type with no subtype, and
+//     renders a Handlebars template to a file.
 //
-// The Go types are in ./resources and the configuration it applies is in
-// ./config.
+// The configuration it applies is in ./config. The template reads the
+// container's address, which the Docker plugin computes when it creates the
+// container, so a value crosses from one plugin to the other.
 //
-// The passwords are encrypted in state with a key generated at start up,
-// see newStateKey.
-//
-// Build the external plugin and run the example from this directory with
+// It needs a Docker engine, reached through DOCKER_HOST or the default socket.
+// Build the Docker plugin and run the example from this directory with
 // `make run`, see the Makefile for the other targets. The configuration
-// directory and the external plugin binary can be passed as arguments:
-// `go run . <config dir> <external plugin binary>`, they default to ./config
-// and ./build/external.
+// directory and the Docker plugin binary can be passed as arguments:
+// `go run . <config dir> <docker plugin binary>`, they default to ./config
+// and ./build/docker-plugin.
 package main
 
 import (
-	"crypto/rand"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/example/plugin/internal"
-	"github.com/jumppad-labs/xcl/example/plugin/resources"
+	"github.com/jumppad-labs/xcl/example/plugin/docker"
+	"github.com/jumppad-labs/xcl/example/plugin/template"
 	"github.com/jumppad-labs/xcl/example/prettylog"
-	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
-	"github.com/jumppad-labs/xcl/types"
 )
 
-// newStateKey returns a random 32 byte key to encrypt the sensitive values in
-// state with. The state only lives as long as one run of the example, so a
-// fresh key each run is enough. A real application keeps its state, so it
-// loads a stable key from a secret store instead, a key it loses is state it
-// can no longer read.
-func newStateKey() ([]byte, error) {
-	key := make([]byte, 32)
-	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("unable to generate the state key: %w", err)
-	}
-
-	return key, nil
-}
-
-// stateMaskOptions returns the option that encrypts state with stateKey, or
-// none when there is no key
-func stateMaskOptions(stateKey []byte) ([]xcl.ConfigOption, error) {
-	if stateKey == nil {
-		return nil, nil
-	}
-
-	masker, err := mask.EncryptAES256GCM(stateKey)
-	if err != nil {
-		return nil, fmt.Errorf("invalid state key: %w", err)
-	}
-
-	return []xcl.ConfigOption{xcl.WithStateMask(masker)}, nil
-}
-
 func main() {
-	dir := "./config"
+	configDir := "./config"
 	if len(os.Args) > 1 {
-		dir = os.Args[1]
+		configDir = os.Args[1]
 	}
 
-	externalPlugin := "./build/external"
+	dockerPlugin := "./build/docker-plugin"
 	if len(os.Args) > 2 {
-		externalPlugin = os.Args[2]
+		dockerPlugin = os.Args[2]
 	}
 
-	// Encrypt the sensitive values in state, see newStateKey
-	stateKey, err := newStateKey()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		os.Exit(1)
+	// The Docker plugin creates real containers, check an engine answers
+	// before applying anything
+	if err := docker.Ping(context.Background()); err != nil {
+		exit(err)
 	}
 
 	// Keep the state in a temporary directory, removed when the example ends
-	stateDir, err := os.MkdirTemp("", "xcl-example")
+	stateDir, err := os.MkdirTemp("", "xcl-example-plugin")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		os.Exit(1)
+		exit(err)
 	}
 
 	// the registry is built here so that the event receiver can share it: it
@@ -100,153 +64,136 @@ func main() {
 	// shows each resource's configuration as it is created
 	r := registry.NewPluginRegistry()
 
-	_, err = run(os.Stdout, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), r), r, dir, externalPlugin, stateDir, stateKey)
+	c, err := apply(r, prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), r), configDir, dockerPlugin, stateDir)
+	if err == nil {
+		err = report(os.Stdout, c)
+	}
+
+	// Destroy whatever was applied, even when applying or reporting failed
+	// part way, so the example never leaves containers behind
+	if c != nil && c.EntityCount() > 0 {
+		err = errors.Join(err, destroy(os.Stdout, c))
+	}
+
+	// The Docker plugin runs as a separate process, stop it when done
+	for _, host := range r.GetPluginHosts() {
+		host.Stop()
+	}
+
 	os.RemoveAll(stateDir)
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		os.Exit(1)
+		exit(err)
 	}
 }
 
-// run applies the configuration in dir with the in-process ExamplePlugin and
-// the external plugin binary at externalPlugin registered, keeping the state
-// in a file in stateDir. It writes the resources and query results to out,
-// then destroys everything through the providers and returns the resources
-// that were applied. Every event xcl produces, including the plugins' log
-// messages, goes to handler, a nil handler leaves xcl silent. The sensitive
-// values in state are encrypted with stateKey, or written in plain text, with
-// a warning, when it is nil.
-func run(out io.Writer, handler xcl.EventHandler, r *registry.PluginRegistry, dir string, externalPlugin string, stateDir string, stateKey []byte) ([]any, error) {
-	// The external plugin runs as a separate process, stop it when done
-	defer func() {
-		for _, host := range r.GetPluginHosts() {
-			host.Stop()
-		}
-	}()
+// exit reports err and ends the program with a failure
+func exit(err error) {
+	fmt.Fprintf(os.Stderr, "error: %s\n", err)
+	os.Exit(1)
+}
 
+// apply registers the in-process template plugin and the Docker plugin binary
+// at dockerPlugin with r, then applies the configuration in configDir,
+// keeping the state in a file in stateDir. Every event xcl produces, including
+// the plugins' log messages, goes to handler, a nil handler leaves xcl silent.
+//
+// It returns the Config whenever one was created, even when applying failed,
+// so the caller can destroy what was applied.
+func apply(r *registry.PluginRegistry, handler xcl.EventHandler, configDir, dockerPlugin, stateDir string) (*xcl.Config, error) {
 	// Register the in-process plugin, which provides every block type it
 	// registers in Init. Registering only records the plugin, it is loaded
 	// by the first Apply.
-	if err := r.RegisterPlugin(&internal.ExamplePlugin{}); err != nil {
+	if err := r.RegisterPlugin(&template.TemplatePlugin{}); err != nil {
 		return nil, err
 	}
 
 	// Register the external plugin binary, it is started by the first Apply
-	if err := r.RegisterPluginWithPath(externalPlugin); err != nil {
+	if err := r.RegisterPluginWithPath(dockerPlugin); err != nil {
 		return nil, err
 	}
 
-	masking, err := stateMaskOptions(stateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	options := []xcl.ConfigOption{
+	c, err := xcl.NewConfig(
 		xcl.WithPluginRegistry(r),
 		// Keep the state in a file, Destroy works from it alone
 		xcl.WithStatePath(stateDir),
 		xcl.WithEventHandler(handler),
 		// events carry nothing by default, this asks for each resource as
 		// state records it, which is what the receiver turns back into
-		// configuration text. Passwords are redacted in it.
+		// configuration text
 		xcl.WithEventData(xcl.EventDataProcessed),
-	}
-
-	// with a key, the passwords are encrypted in the state file
-	c, err := xcl.NewConfig(append(options, masking...)...)
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := c.Apply(dir); err != nil {
+	if err := c.Apply(configDir); err != nil {
 		// a plugin that fails to load is reported by the first operation,
-		// the likeliest cause is an external plugin that was not built
+		// the likeliest cause is a Docker plugin that was not built
 		if errors.Is(err, xcl.ErrPluginLoad) {
-			return nil, fmt.Errorf("%w, build it with `make build` in example/plugin", err)
+			return c, fmt.Errorf("%w, build it with `make build` in example/plugin", err)
 		}
 
-		return nil, err
+		return c, err
 	}
 
-	fmt.Fprintln(out, "## Resources")
-	for _, res := range c.Entities() {
-		meta, err := types.GetMeta(res)
-		if err != nil {
-			return nil, err
-		}
+	return c, nil
+}
 
-		fmt.Fprintf(out, "  %s\n", meta.ID)
-	}
-
+// report writes the networks, containers and rendered templates c applied to
+// out
+func report(out io.Writer, c *xcl.Config) error {
 	// Plugin types are held as types generated from the plugin's schema, the
-	// lookup copies them into the Go type
-	databases, err := xcl.FindByType[resources.PostgreSQL](c, "resource", "postgres")
+	// lookup copies them into the plugin's Go type
+	networks, err := xcl.FindByType[docker.Network](c, "docker", "network")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	fmt.Fprintln(out, "## Databases")
-	for _, db := range databases {
-		fmt.Fprintf(out, "  %s location=%s port=%d connection_string=%q\n", db.Meta.ID, db.Location, db.Port, db.ConnectionString)
+	fmt.Fprintln(out, "## Networks")
+	for _, n := range networks {
+		fmt.Fprintf(out, "  %s name=%s subnet=%s docker_id=%s\n", n.Meta.ID, n.Meta.Name, n.Subnet, n.DockerID)
 	}
 
-	caches, err := xcl.FindByType[resources.Redis](c, "resource", "redis")
+	containers, err := xcl.FindByType[docker.Container](c, "docker", "container")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	fmt.Fprintln(out, "## Caches")
-	for _, cache := range caches {
-		fmt.Fprintf(out, "  %s location=%s port=%d connection_string=%q\n", cache.Meta.ID, cache.Location, cache.Port, cache.ConnectionString)
+	fmt.Fprintln(out, "## Containers")
+	for _, ctr := range containers {
+		fmt.Fprintf(out, "  %s image=%s ip_address=%s docker_id=%s\n", ctr.Meta.ID, ctr.Image, ctr.IPAddress, ctr.DockerID)
 	}
 
-	app, err := xcl.Find[resources.App](c, "resource.app.web")
+	// template has no subtype, so its address has one segment before the name
+	templates, err := xcl.FindByType[template.Template](c, "template")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	fmt.Fprintln(out, "## App")
-	fmt.Fprintf(out, "  %s database_location=%s database_user=%s analytics_location=%s connection_string=%q cache_connection_string=%q url=%q\n",
-		app.Meta.ID, app.DatabaseLocation, app.DatabaseUser, app.AnalyticsLocation, app.ConnectionString, app.CacheConnectionString, app.URL)
+	fmt.Fprintln(out, "## Templates")
+	for _, t := range templates {
+		rendered, err := os.ReadFile(t.Destination)
+		if err != nil {
+			return err
+		}
 
-	ingress, err := xcl.Find[resources.Ingress](c, "resource.ingress.web")
-	if err != nil {
-		return nil, err
+		fmt.Fprintf(out, "  %s destination=%s\n", t.Meta.ID, t.Destination)
+		fmt.Fprintf(out, "%s", rendered)
 	}
 
-	fmt.Fprintln(out, "## Ingress")
-	fmt.Fprintf(out, "  %s hostname=%s app_url=%q\n", ingress.Meta.ID, ingress.Hostname, ingress.AppURL)
+	return nil
+}
 
-	// An output is an entity like everything else: it is found by its address
-	// as a types.Output, and the value it publishes is on its Value field
-	webDatabase, err := xcl.Find[types.Output](c, "output.web_database")
-	if err != nil {
-		return nil, err
-	}
-
-	moduleLocation, err := xcl.Find[types.Output](c, "module.analytics.output.location")
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Fprintln(out, "## Published")
-	fmt.Fprintf(out, "  output.web_database=%q\n", webDatabase.Value)
-	fmt.Fprintf(out, "  module.analytics.output.location=%q\n", moduleLocation.Value)
-
-	// or every published value at once, keyed by address
-	fmt.Fprintf(out, "  %d published in total\n", len(c.Outputs()))
-
-	applied := append([]any{}, c.Entities()...)
-
-	// Destroy everything that was applied, dependents before what they depend
-	// on, working only from the saved state
+// destroy removes everything c applied, dependents before what they depend
+// on, working only from the saved state, and writes what remains to out
+func destroy(out io.Writer, c *xcl.Config) error {
 	if err := c.Destroy(); err != nil {
-		return nil, err
+		return err
 	}
 
 	fmt.Fprintln(out, "## Destroyed")
 	fmt.Fprintf(out, "  %d resources remaining\n", c.EntityCount())
 
-	return applied, nil
+	return nil
 }

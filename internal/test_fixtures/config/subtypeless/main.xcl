@@ -1,0 +1,13 @@
+# widget is provided by a plugin that registers it with no subtype, so a
+# widget block takes a single name label
+widget "main" {
+  size = 3
+
+  part {
+    name = "wheel"
+  }
+
+  part {
+    name = "axle"
+  }
+}
