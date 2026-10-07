@@ -1,0 +1,15 @@
+# base with the web container removed.
+
+resource "network" "app" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "container" "api" {
+  network {
+    name = resource.network.app.meta.name
+  }
+
+  env = {
+    PORT = "8080"
+  }
+}

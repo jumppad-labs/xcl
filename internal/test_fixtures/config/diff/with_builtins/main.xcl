@@ -1,0 +1,30 @@
+# One provider resource, the app network, alongside blocks no provider
+# handles: a variable, an output, a module, a disabled network and a
+# registered config-only database.
+
+variable "subnet" {
+  default = "10.0.0.0/16"
+}
+
+resource "network" "app" {
+  subnet = variable.subnet
+}
+
+resource "network" "off" {
+  disabled = true
+
+  subnet = "10.9.0.0/16"
+}
+
+resource "database" "main" {
+  location = "us-east"
+  port     = 5432
+}
+
+module "shared" {
+  source = "./module"
+}
+
+output "app_name" {
+  value = resource.network.app.meta.name
+}

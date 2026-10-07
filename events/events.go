@@ -47,10 +47,12 @@ const (
 
 // Operations are the core operation names an event can carry.
 const (
-	OperationParse     = "parse"
-	OperationValidate  = "validate"
-	OperationApply     = "apply"
-	OperationDestroy   = "destroy"
+	OperationParse    = "parse"
+	OperationValidate = "validate"
+	OperationApply    = "apply"
+	OperationDestroy  = "destroy"
+	// OperationDiff reports what an apply would do without doing any of it
+	OperationDiff      = "diff"
 	OperationLoadState = "load_state"
 	OperationCreate    = "create"
 	OperationRead      = "read"

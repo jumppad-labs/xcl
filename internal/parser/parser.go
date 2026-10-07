@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/errwrap"
+	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/cty/function"
@@ -341,6 +342,75 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
 	}
 
 	return currentState, nil
+}
+
+// Diff reports what an apply of the configuration discovered from paths would
+// do, without doing any of it. It parses and validates exactly as Apply does,
+// against the same previous state, and fails in the same cases.
+//
+// Resources in the previous state that are no longer configured would be
+// deleted. The rest of the configuration is walked in dependency order as
+// Apply walks it: a resource not in the previous state would be created, one
+// saved as failed or destroy_failed would be replaced, and one saved as
+// created or updated is read and compared through its provider, exactly as
+// Apply does, and would be updated when it changed or created again when its
+// provider no longer finds it. Only resources an apply hands to a provider
+// take part.
+//
+// Diff never calls a provider's Create, Update or Destroy and never writes to
+// the state store. A provider error while reading or comparing a resource
+// fails the diff with an error naming the resource, there is no partial
+// result. Once ctx is cancelled no new provider call starts and Diff returns
+// ctx's error.
+func (p *Parser) Diff(ctx context.Context, options diff.Options, paths ...string) (*diff.Diff, error) {
+	currentState, previousState, err := p.parseAndValidate(paths...)
+	if err != nil {
+		return nil, err
+	}
+
+	// an empty configuration fails as it does for Apply
+	if currentState.ResourceCount() == 0 {
+		return nil, ErrEmptyConfiguration
+	}
+
+	recorder := newDiffRecorder()
+
+	// the resources Apply's removal phase would destroy through a provider
+	for _, r := range removedResources(currentState, previousState) {
+		meta, err := types.GetMeta(r)
+		if err != nil {
+			continue
+		}
+
+		if disabled, _ := types.GetDisabled(r); disabled || handledWithoutProvider(p.typeRegistry, meta) {
+			continue
+		}
+
+		recorder.record(diff.Resource{Address: meta.ID, Action: diff.ActionDelete})
+	}
+
+	lifecycle := &resourceLifecycle{
+		mode:        walkDiff,
+		recorder:    recorder,
+		diffOptions: options,
+	}
+
+	_, errs := p.walkWith(ctx, currentState, previousState, p.getFunctions, lifecycle)
+
+	if len(errs) == 0 && ctx.Err() != nil {
+		errs = append(errs, fmt.Errorf("diff stopped before every resource was reached: %w", ctx.Err()))
+	}
+
+	if len(errs) > 0 {
+		ce := errors.NewConfigError()
+		for _, e := range errs {
+			ce.AppendError(e)
+		}
+
+		return nil, ce
+	}
+
+	return recorder.result(), nil
 }
 
 // Destroy destroys every resource in saved, working only from the saved state:
@@ -1318,10 +1388,17 @@ func processDisabled(bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (b
 //
 // It returns the progress of the walk, which is nil when the walk did not start.
 func (p *Parser) walk(ctx context.Context, currentState, previousState *State, functions functionsForFile) (*applyProgress, []error) {
+	return p.walkWith(ctx, currentState, previousState, functions, &resourceLifecycle{mode: walkApply})
+}
+
+// walkWith walks the configuration with a lifecycle prepared for the walk's
+// mode: the walk fills in what every walk shares, the context, the previous
+// state, the provider resolver and the bodies
+func (p *Parser) walkWith(ctx context.Context, currentState, previousState *State, functions functionsForFile, lifecycle *resourceLifecycle) (*applyProgress, []error) {
 	// Build the DAG using currentState (implements ResourceProvider)
 	d, err := DoYouLikeDags(currentState, p.addressParser(), false)
 	if err != nil {
-		p.emitOperationError(events.OperationApply, err)
+		p.emitOperationError(lifecycle.operation(), err)
 		return nil, []error{err}
 	}
 
@@ -1332,7 +1409,7 @@ func (p *Parser) walk(ctx context.Context, currentState, previousState *State, f
 	err = d.Validate()
 	if err != nil {
 		err = fmt.Errorf("unable to validate dependency graph: %w", err)
-		p.emitOperationError(events.OperationApply, err)
+		p.emitOperationError(lifecycle.operation(), err)
 		return nil, []error{err}
 	}
 
@@ -1341,15 +1418,13 @@ func (p *Parser) walk(ctx context.Context, currentState, previousState *State, f
 
 	// The lifecycle decides the provider calls for each resource from the
 	// state saved by the last apply
-	lifecycle := &resourceLifecycle{
-		ctx:      ctx,
-		previous: previousState,
-		resolver: p.providerResolver,
-		options:  &p.options,
-		types:    p.typeRegistry,
-		bodies:   p.parsedResources.bodies,
-		progress: newApplyProgress(),
-	}
+	lifecycle.ctx = ctx
+	lifecycle.previous = previousState
+	lifecycle.resolver = p.providerResolver
+	lifecycle.options = &p.options
+	lifecycle.types = p.typeRegistry
+	lifecycle.bodies = p.parsedResources.bodies
+	lifecycle.progress = newApplyProgress()
 
 	w.Callback = walkCallback(p.parsedResources, currentState, p.addressParser(), lifecycle, &p.options, functions)
 	w.Reverse = false

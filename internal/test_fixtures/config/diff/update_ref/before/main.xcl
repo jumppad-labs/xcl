@@ -1,0 +1,33 @@
+# Network app is referenced three ways: user names its network block after
+# app's provider id, a computed value; plain names its network block after
+# app's subnet, a configured value; named names its network block after app's
+# name. chained names its network block after user's assigned address, a
+# computed value of user.
+
+resource "network" "app" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "container" "user" {
+  network {
+    name = resource.network.app.provider_id
+  }
+}
+
+resource "container" "plain" {
+  network {
+    name = resource.network.app.subnet
+  }
+}
+
+resource "container" "named" {
+  network {
+    name = resource.network.app.meta.name
+  }
+}
+
+resource "container" "chained" {
+  network {
+    name = resource.container.user.network[0].assigned_address
+  }
+}

@@ -1,0 +1,25 @@
+# base with the api container's PORT changed from 8080 to 9090.
+
+resource "network" "app" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "container" "api" {
+  network {
+    name = resource.network.app.meta.name
+  }
+
+  env = {
+    PORT = "9090"
+  }
+}
+
+resource "container" "web" {
+  network {
+    name = resource.network.app.meta.name
+  }
+
+  env = {
+    PORT = "80"
+  }
+}

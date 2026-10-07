@@ -1,0 +1,38 @@
+# The configuration the mixed replace scenario is applied from first: an app
+# network with two containers on it, a legacy network whose create a test
+# makes fail so it is saved as failed, and an old container that the next
+# configuration removes.
+
+resource "network" "app" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "network" "legacy" {
+  subnet = "10.8.0.0/16"
+}
+
+resource "container" "api" {
+  network {
+    name = resource.network.app.meta.name
+  }
+
+  env = {
+    PORT = "8080"
+  }
+}
+
+resource "container" "web" {
+  network {
+    name = resource.network.app.meta.name
+  }
+
+  env = {
+    PORT = "80"
+  }
+}
+
+resource "container" "old" {
+  network {
+    name = resource.network.app.meta.name
+  }
+}
