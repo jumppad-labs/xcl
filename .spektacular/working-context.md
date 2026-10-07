@@ -33,3 +33,18 @@ User wants to "do a diff between state and config". The diff "should show the re
 - User switched auto_commit off (config.yaml set to 'off'). Resuming diff child to finish without commit.
 - diff plan DONE (no commit). Starting child for 20261007111826-cf3b66d8-diff-rendering-and-docs.
 - Both plans DONE; epic summary written (2 spec sections, no decisions); epic order added none. Next: end-of-planning review.
+
+# Orchestrator — spek-implement-epic 20261007105731-2388b579-diff (2026-10-07)
+- Epic: 20261007105731-2388b579-diff. Order: diff -> diff-rendering-and-docs.
+- Dirty check: user chose "commit first"; tree was already clean (user committed cc065ec on branch f-diff).
+- Created worktree for 20261007105731-2388b579-diff at .spektacular/worktrees/20261007105731-2388b579-diff/xclconfig; started child.
+- diff child QUESTION at Task 8 verify: redis port edit -> apply also updates app.web (computed connection_string recomputed on Update), diff reports only redis. Conflicts design (unknown only for create/replace) vs success metric (diff == apply for all e2e). Options: 1 keep design + document limitation in test/metric (default), 2 treat updated resources' computed fields unknown, 3 drop redis scenario. Tasks 1-7 done. Put to user.
+- User decision (diff Task 8 question): conservative default — every computed field of a resource reported as update is unknown; dependents show update with (known after apply). Contract: diff never under-reports; apply may skip dependents (lifecycle re-reads + Changed). Override = optional provider method ComputedChanges(ctx, old, new T) ([]string, error) + gRPC RPC; example: docker network DNS add keeps docker_id. Override goes in a NEW separate spec in this epic (with example + docs); user accepted.
+- config-diff.md revised via spek-design (user approved). Written into the diff spec's WORKTREE (so it merges with the branch); main checkout's copy restored to HEAD content.
+- Resumed diff child with the decision.
+- User: create the ComputedChanges override spec AFTER this run (then add to this epic, plan, implement). Reminder for final report.
+- Merge refused (uncommitted worktree). User authorised committing each finished spec's worktree on its spek/ branch for THIS run (both specs).
+- diff spec DONE. Merge needed: (a) commit (user-authorised), (b) store files must NOT be on the branch (epic_merge_touches_spektacular) — copied spec/plan/context/test-plan/changelogs/design into the project via CLI (verified byte-identical), dropped them from the branch, committed code only (1e247a9). Merged into f-diff (316bb5f); worktree removed. Project store records left uncommitted in main checkout.
+- Started rendering-and-docs (worktree created). Same merge procedure applies when it finishes.
+- rendering child QUESTION: implement new refused dependencies_unmet (diff spec's records uncommitted in project, worktree store stale). User chose: override_dependencies. repo list fails in worktree (no xcl-vscode worktree) — child uses given roots.
+- rendering-and-docs DONE; records copied to project via CLI (verified identical), code committed (xclconfig 9a4a22f, xcl-website 30c69e9), merged. Epic implement complete. Next (user): create ComputedChanges override spec in this epic.

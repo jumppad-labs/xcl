@@ -125,6 +125,20 @@ Requirements carried: Unknown values are marked; Existing resources are refreshe
 **Token estimate**: ~60k tokens
 **Agent strategy**: Parallel analysis, sequential integration: one agent on the context hook and propagation, one on the decoder; integrate into the walk callback sequentially, then run the full test suite.
 
+### Task: Treat computed values of updated resources as unknown
+
+Requirements carried: Unknown values are marked; Existing resources are refreshed (except those depending on unknowns). Design: `config-diff.md` § Computed values of updated resources (conservative default only; the provider override is a separate spec). Repo: xclconfig.
+
+**File changes**:
+- `internal/parser/lifecycle.go` (`diffResource`) — mark the resource pending (`recorder.markPending`) whenever it is recorded as `update`: after a refresh that reports changed, and when it is reported as update because it depends on unknown values. `diffRecorder.contextValue` (`internal/parser/diff_unknown.go`) already makes every computed field of a pending entity unknown to its dependents, so dependents are reported as update with the value unknown and get no provider call.
+- `internal/parser/diff_recorder.go` — doc comments: pending now means create, replace or update.
+- `internal/parser/diff_unknown_test.go` / `diff_test.go` — tests: drift/config-change update makes a saved dependent referencing its computed field an update with that path unknown and no Read; a dependent referencing only configured fields is unaffected; an update caused by unknowns propagates further; existing expectations adjusted where an updated parent now makes dependents unknown.
+- `e2e/diff_test.go` — `TestDiffOfEditedRedisPortPredictsApply` expects `resource.redis.cache` and `resource.app.web` (with `cache_connection_string` unknown) as updates and asserts the new parity contract.
+
+**Complexity**: Low
+**Token estimate**: ~15k tokens
+**Agent strategy**: Single agent, sequential execution.
+
 ### Task: Prove diff matches apply end to end
 
 Requirements carried: success metrics (diff matches apply; diff changes nothing; no sensitive value without reveal). Repo: xclconfig.

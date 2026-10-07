@@ -209,7 +209,7 @@ Deliberate gaps: no rendering tests (sibling spec); no tests of the `example/` p
 
 **Validation point**: The `diff` package's tests pass: path strings and JSON for every step kind, the changed-count method, option resolution, and the design's example result marshals to the design's JSON byte for byte.
 
-#### - [ ] Task: Add the diff result types package
+#### - [x] Task: Add the diff result types package
 **Id:** 620e6cd3-2fe8-4861-997d-0d2a9054d1bf
 **Repo:** xclconfig
 **Depends on:** none
@@ -220,12 +220,12 @@ Creates the public `diff` package holding the result a diff returns: the summary
 *Technical detail:* [context.md#task-add-the-diff-result-types-package](./context.md#task-add-the-diff-result-types-package)
 
 **Acceptance criteria**:
-- [ ] Applications can import the `diff` package and read a result's summary, resources, actions and changes without importing any xcl internals.
-- [ ] A path prints in the design's forms (`image`, `ports[0].host`, `env["LOG_LEVEL"]`) and encodes to JSON as that string.
-- [ ] Encoding the design's example result to JSON produces the design's JSON, with absent before, after and changes omitted.
-- [ ] The number of changed resources is offered as a method that always equals the sum of the four action counts.
-- [ ] The only option is the one that reveals sensitive values, and it can be resolved by code outside the package.
-- [ ] The package and its documentation use the name "diff" and never "plan".
+- [x] Applications can import the `diff` package and read a result's summary, resources, actions and changes without importing any xcl internals.
+- [x] A path prints in the design's forms (`image`, `ports[0].host`, `env["LOG_LEVEL"]`) and encodes to JSON as that string.
+- [x] Encoding the design's example result to JSON produces the design's JSON, with absent before, after and changes omitted.
+- [x] The number of changed resources is offered as a method that always equals the sum of the four action counts.
+- [x] The only option is the one that reveals sensitive values, and it can be resolved by code outside the package.
+- [x] The package and its documentation use the name "diff" and never "plan".
 
 ### Milestone 2: A diff reports which resources an apply would create, update, replace or delete
 
@@ -233,7 +233,7 @@ Creates the public `diff` package holding the result a diff returns: the summary
 
 **Validation point**: Every existing test still passes, and new parser and `Config.Diff` tests show the right action for each scenario, no Create/Update/Destroy calls, reads for exactly the expected resources, byte-identical state after a diff, the summary counts, the error naming the resource, and the events and log.
 
-#### - [ ] Task: Share the read-and-compare step between apply and diff
+#### - [x] Task: Share the read-and-compare step between apply and diff
 **Id:** 717823ca-0a37-4d65-9f51-3582ea79e6ee
 **Repo:** xclconfig
 **Depends on:** none
@@ -244,11 +244,11 @@ Reorganises apply's handling of an existing resource so that reading it through 
 *Technical detail:* [context.md#task-share-the-read-and-compare-step-between-apply-and-diff](./context.md#task-share-the-read-and-compare-step-between-apply-and-diff)
 
 **Acceptance criteria**:
-- [ ] Apply makes the same provider calls, in the same order per resource, with the same events and the same saved state as before the change.
-- [ ] Every existing lifecycle, event and state test passes without modification.
-- [ ] The read-and-compare step can be run on its own and reports not found, changed or unchanged without ever creating or updating anything.
+- [x] Apply makes the same provider calls, in the same order per resource, with the same events and the same saved state as before the change.
+- [x] Every existing lifecycle, event and state test passes without modification.
+- [x] The read-and-compare step can be run on its own and reports not found, changed or unchanged without ever creating or updating anything.
 
-#### - [ ] Task: Add the diff walk to the parser
+#### - [x] Task: Add the diff walk to the parser
 **Id:** 3ea446ce-e0a9-4399-8ee4-69e225c8dae7
 **Repo:** xclconfig
 **Depends on:**
@@ -261,15 +261,15 @@ Adds a diff operation to the parser that parses and validates exactly as apply d
 *Technical detail:* [context.md#task-add-the-diff-walk-to-the-parser](./context.md#task-add-the-diff-walk-to-the-parser)
 
 **Acceptance criteria**:
-- [ ] A diff never calls a provider's create, update or destroy, and never writes to the state store.
-- [ ] Every resource in state that is still configured and not failed is read and compared through its provider, and no other resource is read.
-- [ ] New resources are reported as create, removed ones as delete, failed and failed-to-destroy ones as replace, changed or drifted ones as update, and vanished ones as create.
-- [ ] Variables, outputs, modules, disabled blocks and registered config-only types are neither listed nor counted; other unchanged resources are counted but not listed.
-- [ ] A provider error during a read or compare fails the diff with an error that names the resource and still matches the provider's error.
-- [ ] A diff emits read and changed lifecycle events, and never a create, update or destroy event.
-- [ ] Apply's behaviour is unchanged.
+- [x] A diff never calls a provider's create, update or destroy, and never writes to the state store.
+- [x] Every resource in state that is still configured and not failed is read and compared through its provider, and no other resource is read.
+- [x] New resources are reported as create, removed ones as delete, failed and failed-to-destroy ones as replace, changed or drifted ones as update, and vanished ones as create.
+- [x] Variables, outputs, modules, disabled blocks and registered config-only types are neither listed nor counted; other unchanged resources are counted but not listed.
+- [x] A provider error during a read or compare fails the diff with an error that names the resource and still matches the provider's error.
+- [x] A diff emits read and changed lifecycle events, and never a create, update or destroy event.
+- [x] Apply's behaviour is unchanged.
 
-#### - [ ] Task: Add Config.Diff as a public operation
+#### - [x] Task: Add Config.Diff as a public operation
 **Id:** 610d5a71-a42e-4264-918f-14086db077ba
 **Repo:** xclconfig
 **Depends on:**
@@ -281,12 +281,12 @@ Adds `Config.Diff`, which takes the same paths as `Apply` plus diff options and 
 *Technical detail:* [context.md#task-add-configdiff-as-a-public-operation](./context.md#task-add-configdiff-as-a-public-operation)
 
 **Acceptance criteria**:
-- [ ] A diff of a configuration identical to the one applied, with unchanged real resources, returns no changed resources and zero to create, update, replace and delete.
-- [ ] The saved state is byte-for-byte identical before and after a diff that reports changes, and the Config's entities are unchanged.
-- [ ] A mixed configuration reports the right number to create, update, replace, delete and leave unchanged.
-- [ ] A resource altered outside xcl is reported as updated against an unchanged configuration.
-- [ ] A subscribed caller receives start and finish events for the `diff` operation and the per-resource read and changed events, and log entries arrive through the configured logger.
-- [ ] A diff fails in the same cases as apply: no paths, a configuration that does not parse or validate, an empty configuration, or a state that cannot be loaded.
+- [x] A diff of a configuration identical to the one applied, with unchanged real resources, returns no changed resources and zero to create, update, replace and delete.
+- [x] The saved state is byte-for-byte identical before and after a diff that reports changes, and the Config's entities are unchanged.
+- [x] A mixed configuration reports the right number to create, update, replace, delete and leave unchanged.
+- [x] A resource altered outside xcl is reported as updated against an unchanged configuration.
+- [x] A subscribed caller receives start and finish events for the `diff` operation and the per-resource read and changed events, and log entries arrive through the configured logger.
+- [x] A diff fails in the same cases as apply: no paths, a configuration that does not parse or validate, an empty configuration, or a state that cannot be loaded.
 
 ### Milestone 3: A diff shows exactly which values would change, with secrets hidden
 
@@ -294,7 +294,7 @@ Adds `Config.Diff`, which takes the same paths as `Apply` plus diff options and 
 
 **Validation point**: Comparator unit tests cover every change rule; `Config.Diff` tests show a single changed attribute listed alone, a created resource's values listed, and a changed sensitive value hidden in the result and its JSON, then revealed with the option; the sensitive-leak suite's diff cases pass.
 
-#### - [ ] Task: Compute field-level changes between saved and configured resources
+#### - [x] Task: Compute field-level changes between saved and configured resources
 **Id:** bc6cdfea-0b40-4bd1-aba6-67103977585f
 **Repo:** xclconfig
 **Depends on:**
@@ -306,15 +306,15 @@ Adds the comparator that turns a resource's saved copy and configured copy into 
 *Technical detail:* [context.md#task-compute-field-level-changes-between-saved-and-configured-resources](./context.md#task-compute-field-level-changes-between-saved-and-configured-resources)
 
 **Acceptance criteria**:
-- [ ] Changing one attribute yields exactly one change for that attribute, with its old and new values.
-- [ ] Values a provider computes never appear as changes.
-- [ ] Lists are compared by position, maps by key, and an added or removed element appears once with only its new or old value.
-- [ ] A created resource lists each configured top-level field with only its new value; a deleted resource lists nothing.
-- [ ] A changed sensitive value is listed as changed with neither value present; with revealing asked for, both values are present and it is still marked sensitive.
-- [ ] No sensitive value is reachable from a change unless revealing was asked for, including inside an added or created whole value.
-- [ ] Values in changes are plain values keyed by configuration names, so their JSON reads like the configuration.
+- [x] Changing one attribute yields exactly one change for that attribute, with its old and new values.
+- [x] Values a provider computes never appear as changes.
+- [x] Lists are compared by position, maps by key, and an added or removed element appears once with only its new or old value.
+- [x] A created resource lists each configured top-level field with only its new value; a deleted resource lists nothing.
+- [x] A changed sensitive value is listed as changed with neither value present; with revealing asked for, both values are present and it is still marked sensitive.
+- [x] No sensitive value is reachable from a change unless revealing was asked for, including inside an added or created whole value.
+- [x] Values in changes are plain values keyed by configuration names, so their JSON reads like the configuration.
 
-#### - [ ] Task: Report value changes in diff results
+#### - [x] Task: Report value changes in diff results
 **Id:** 541a9fbb-3a8e-4eea-835f-099b6fcb338f
 **Repo:** xclconfig
 **Depends on:**
@@ -327,12 +327,12 @@ Connects the comparator to the diff walk so every created, updated and replaced 
 *Technical detail:* [context.md#task-report-value-changes-in-diff-results](./context.md#task-report-value-changes-in-diff-results)
 
 **Acceptance criteria**:
-- [ ] Adding a resource reports it as created with its configured values listed.
-- [ ] Changing one attribute of an applied resource reports that resource as updated, listing exactly that attribute with its old and new values.
-- [ ] A resource that drifted with no configuration change is reported as updated with no changes listed.
-- [ ] A changed sensitive value appears in the result and its JSON as changed, with neither value, unless the diff asked to reveal sensitive values, in which case both appear.
-- [ ] No secret appears in a diff result, its JSON, its formatted output or any event a diff emits, unless revealing was asked for.
-- [ ] Callers can enumerate every changed resource's address and action and every change's path, before and after values from the Go result alone.
+- [x] Adding a resource reports it as created with its configured values listed.
+- [x] Changing one attribute of an applied resource reports that resource as updated, listing exactly that attribute with its old and new values.
+- [x] A resource that drifted with no configuration change is reported as updated with no changes listed.
+- [x] A changed sensitive value appears in the result and its JSON as changed, with neither value, unless the diff asked to reveal sensitive values, in which case both appear.
+- [x] No secret appears in a diff result, its JSON, its formatted output or any event a diff emits, unless revealing was asked for.
+- [x] Callers can enumerate every changed resource's address and action and every change's path, before and after values from the Go result alone.
 
 ### Milestone 4: A diff marks values known only after apply, and matches what apply does
 
@@ -340,7 +340,7 @@ Connects the comparator to the diff walk so every created, updated and replaced 
 
 **Validation point**: The unknown-reference tests pass (the referencing value is marked unknown, the referencing resource gets no read, dependents through outputs and modules also see the unknown), and the end-to-end diff tests pass for both fixtures in every scenario.
 
-#### - [ ] Task: Mark values known only after apply
+#### - [x] Task: Mark values known only after apply
 **Id:** 335e1ee4-6896-4057-8cc9-6bf5e67aa2a0
 **Repo:** xclconfig
 **Depends on:**
@@ -352,17 +352,34 @@ Makes the diff treat values that a resource being created or replaced will compu
 *Technical detail:* [context.md#task-mark-values-known-only-after-apply](./context.md#task-mark-values-known-only-after-apply)
 
 **Acceptance criteria**:
-- [ ] When an existing resource is changed to reference a new resource's computed value, the diff reports the referencing value as known only after apply and the provider records no read for the referencing resource.
-- [ ] A created resource whose value depends on another created resource's computed value lists that value as known only after apply, with every other value concrete.
-- [ ] An unknown inside a larger value is reported on its own, with the rest of the value concrete.
-- [ ] Unknowns pass through outputs and module variables to the resources that use them.
-- [ ] Apply's behaviour is unchanged, and no unknown value ever reaches a provider or the result's values.
+- [x] When an existing resource is changed to reference a new resource's computed value, the diff reports the referencing value as known only after apply and the provider records no read for the referencing resource.
+- [x] A created resource whose value depends on another created resource's computed value lists that value as known only after apply, with every other value concrete.
+- [x] An unknown inside a larger value is reported on its own, with the rest of the value concrete.
+- [x] Unknowns pass through outputs and module variables to the resources that use them.
+- [x] Apply's behaviour is unchanged, and no unknown value ever reaches a provider or the result's values.
 
-#### - [ ] Task: Prove diff matches apply end to end
-**Id:** 56175414-e2c4-43ba-9e91-cea244dad16a
+#### - [x] Task: Treat computed values of updated resources as unknown
+**Id:** 25298ac3-b8c3-4cc7-a632-671bf831d97a
 **Repo:** xclconfig
 **Depends on:**
 - 335e1ee4-6896-4057-8cc9-6bf5e67aa2a0 — Mark values known only after apply
+**Execution:** agent
+
+Applies the revised design's conservative default: when a resource is reported as update, every computed field on it is unknown, so every resource that references one is reported as update with that value known only after apply and gets no provider call, exactly as dependents of created and replaced resources already are. The diff never under-reports and may over-report. Added after the end-to-end suite found an apply updating a resource the diff had not listed (the user chose to change the design).
+
+*Technical detail:* [context.md#task-treat-computed-values-of-updated-resources-as-unknown](./context.md#task-treat-computed-values-of-updated-resources-as-unknown)
+
+**Acceptance criteria**:
+- [x] A resource reported as update, whether its provider reported a change or it depends on an unknown value, has every computed field unknown to the resources that reference it.
+- [x] A saved resource that references a computed field of an updated resource is reported as update with that value unknown, and its provider records no read for it.
+- [x] A resource that references only configured fields of an updated resource is unaffected.
+- [x] Apply's behaviour is unchanged.
+
+#### - [x] Task: Prove diff matches apply end to end
+**Id:** 56175414-e2c4-43ba-9e91-cea244dad16a
+**Repo:** xclconfig
+**Depends on:**
+- 25298ac3-b8c3-4cc7-a632-671bf831d97a — Treat computed values of updated resources as unknown
 **Execution:** agent
 
 Adds end-to-end tests that run a diff before each apply against the suite's plugin and registered-type configurations, across a first apply, an unchanged re-apply, an edited configuration, a removed block and a failed resource. They confirm the diff predicted exactly what the following apply did, left state and resources untouched, and never exposed a secret, using only xcl's public packages.
@@ -370,10 +387,10 @@ Adds end-to-end tests that run a diff before each apply against the suite's plug
 *Technical detail:* [context.md#task-prove-diff-matches-apply-end-to-end](./context.md#task-prove-diff-matches-apply-end-to-end)
 
 **Acceptance criteria**:
-- [ ] For every end-to-end configuration and scenario, the resources a diff reports as created, updated, replaced and deleted are exactly those the following apply creates, updates, replaces and deletes.
-- [ ] For every end-to-end configuration and scenario, saved state is byte-for-byte unchanged by the diff and no resource is created, updated or destroyed during it.
-- [ ] No database password from the plugin configuration appears in any diff result, its JSON or the events it emits without an explicit reveal.
-- [ ] The end-to-end tests use only xcl's public packages and the shared test helpers.
+- [x] For every end-to-end configuration and scenario, an apply never changes a resource the diff did not list (every resource the following apply creates, updates, replaces or deletes is in the diff with that action), and every listed resource the apply leaves alone was listed with at least one unknown value.
+- [x] For every end-to-end configuration and scenario, saved state is byte-for-byte unchanged by the diff and no resource is created, updated or destroyed during it.
+- [x] No database password from the plugin configuration appears in any diff result, its JSON or the events it emits without an explicit reveal.
+- [x] The end-to-end tests use only xcl's public packages and the shared test helpers.
 
 ## Open Questions
 
@@ -390,5 +407,165 @@ Adds end-to-end tests that run a diff before each apply against the suite's plug
 - Matching list elements by identity rather than by position; lists are compared strictly by index.
 - Showing the saved values of a resource that would be deleted; a delete lists no changes.
 - Changes to the VS Code extension.
-- Predicting values an `Update` would compute: computed values of a resource reported as update are taken from its provider's read, not marked unknown, as the design only treats values from resources being created or replaced as unknown.
+- The provider override for computed values of updated resources (an optional `ComputedChanges(ctx, old, new T) ([]string, error)` provider method, its gRPC RPC, and the docker network DNS example) — a separate spec in this epic. This spec implements only the conservative default: every computed field of a resource reported as update is unknown to its dependents.
 - Reading a diff's JSON back into Go types (`Path` marshals only).
+
+## Changelog
+
+### 2026-10-07 — Task: Add the diff result types package
+
+**What was done**: Added the public `diff` package with the result types (`Diff`, `Summary`, `Resource`, `Change`, `Action` and its constants, `Path`, `Step`, `StepKind`), `Path.String`/`MarshalJSON`, nil-safe `Diff.Changed()`, the `Path.Attribute`/`Index`/`Key` copy-on-extend constructors, and the `Options`/`Option`/`RevealSensitive`/`NewOptions` option plumbing, with external-package tests including the design's JSON example.
+
+**Deviations**: None.
+
+**Files changed**:
+- `diff/diff.go`
+- `diff/path.go`
+- `diff/options.go`
+- `diff/diff_test.go`
+- `diff/path_test.go`
+- `diff/options_test.go`
+
+**Discoveries**: A path whose first step is an index prints without a leading dot (`[2].host`); an empty path prints as the empty string.
+
+### 2026-10-07 — Task: Share the read-and-compare step between apply and diff
+
+**What was done**: Split `resourceLifecycle.read` into a shared `refresh` step (carry saved computed values, provider Read with its events, restore configured values on not found, provider Changed with its events) that reports `refreshNotFound`, `refreshChanged` or `refreshUnchanged` along with the serialized saved, configured (pre-read) and read copies; `read` now refreshes and then creates, keeps the previous status, or updates. Added focused tests of `refresh` on its own.
+
+**Deviations**: None.
+
+**Files changed**:
+- `internal/parser/lifecycle.go`
+- `internal/parser/lifecycle_test.go`
+
+**Discoveries**: Saved entities loaded from state are schema-generated types, not `*structs.Network`; tests convert through `findResource` to inspect fixture fields. The `example/plugin` tests (and the e2e test that runs them) fail on this host because a Docker network named `app` already exists — environmental, unrelated to this change.
+
+### 2026-10-07 — Task: Add the diff walk to the parser
+
+**What was done**: Added `events.OperationDiff`, a concurrency-safe `diffRecorder` (pending set, unknown paths, resources, unchanged count, sorted result with summary), a `walkMode` and `diff` step on `resourceLifecycle` that chooses create / refresh / replace as `run` does without calling Create, Update or Destroy, and `Parser.Diff`, which parses and validates like Apply, records provider-backed removed resources as delete and walks in diff mode via a new `walkWith` that takes a prepared lifecycle. Walk-level error events now carry the walk's operation (apply or diff).
+
+**Deviations**: `walk` keeps its signature for Apply and delegates to a new `walkWith(ctx, current, previous, functions, lifecycle)`; the lifecycle carries the mode, recorder and diff options rather than `walk` taking extra arguments. Behaviourally equivalent to the plan.
+
+**Files changed**:
+- `events/events.go`
+- `internal/parser/diff_recorder.go`
+- `internal/parser/lifecycle.go`
+- `internal/parser/callbacks.go`
+- `internal/parser/parser.go`
+- `internal/parser/diff_test.go`
+- `internal/test_fixtures/config/diff/base/main.xcl`
+- `internal/test_fixtures/config/diff/changed_attribute/main.xcl`
+- `internal/test_fixtures/config/diff/added/main.xcl`
+- `internal/test_fixtures/config/diff/removed/main.xcl`
+- `internal/test_fixtures/config/diff/mixed/main.xcl`
+- `internal/test_fixtures/config/diff/with_builtins/main.xcl`
+- `internal/test_fixtures/config/diff/with_builtins/module/outputs.xcl`
+
+**Discoveries**: Removed resources are recorded before the walk starts, so the recorder's sort is what puts deletes in address order. Value-level changes are not yet filled (next milestone).
+
+### 2026-10-07 — Task: Add Config.Diff as a public operation
+
+**What was done**: Added `Config.Diff(paths, options...)`, which runs `Parser.Diff` as the `diff` operation through `Config.run` with the same parser options as Apply, emits a core debug log "diff complete" with the action counts, and never saves state or touches the Config's entities. Mentioned Diff in the `Config` and `run` doc comments. Added `Config.Diff` tests and two fixtures for the mixed create/update/replace/delete scenario.
+
+**Deviations**: The "state cannot be loaded" negative test uses a corrupt state file written over a real apply's state rather than an `UnknownTypesError`; it exercises the same load failure path.
+
+**Files changed**:
+- `config_diff.go`
+- `config.go`
+- `config_diff_test.go`
+- `internal/test_fixtures/config/diff/replace_base/main.xcl`
+- `internal/test_fixtures/config/diff/replace_mixed/main.xcl`
+
+**Discoveries**: A drifted parent (network) reported as update does not make its dependent containers updates: they are read and compared on their own and count as unchanged.
+
+### 2026-10-07 — Task: Compute field-level changes between saved and configured resources
+
+**What was done**: Added `resourceChanges` in the parser: a pure comparator that walks the saved and configured copies by xcl field name in declaration order, skips computed fields, compares leaves by value, descends into blocks, compares lists by index and maps by sorted key, reports added/removed elements whole, lists a create's configured top-level fields (set in the body or non-zero), masks sensitive values unless revealed, honours unknown paths, and splits added/created whole values holding a sensitive or unknown value until it stands alone. Values are converted to plain Go values keyed by xcl names; `cty.Value` fields are leaves converted through their JSON form.
+
+**Deviations**: None.
+
+**Files changed**:
+- `internal/parser/diff_changes.go`
+- `internal/parser/diff_changes_test.go`
+
+**Discoveries**: A whole added/removed element that is not split carries all its non-computed fields, including zero values (e.g. `{"id":0,"name":"app","ip_address":"","aliases":null}`); only split values leave zero parts out. Unknown entries on update/replace carry the saved value as `before`.
+
+### 2026-10-07 — Task: Report value changes in diff results
+
+**What was done**: The diff step now fills each resource's `Changes` through `resourceChanges`: create from the decoded (or, when the provider no longer finds it, restored) configured resource, replace from the saved copy against the configured resource, and update from the saved copy against the configured snapshot taken before the provider Read, so drift alone is an update with no changes. Reveal comes from the diff options. Tests cover create values, a single changed attribute, drift without changes, enumerating the Go result, sensitive masking and reveal, and diff cases in the sensitive-leak suite (JSON, `%v`, `%+v`, events).
+
+**Deviations**: The credential fixture's password is sensitive because it flows into a `types.Sensitive` field (the repo has no `sensitive = true` variable syntax). Four earlier diff-walk tests that compared whole `diff.Resource` values were narrowed to address and action now that changes are filled.
+
+**Files changed**:
+- `internal/parser/lifecycle.go`
+- `internal/parser/diff_test.go`
+- `config_diff_test.go`
+- `sensitive_leak_test.go`
+- `internal/test_fixtures/config/diff/credential/before/main.xcl`
+- `internal/test_fixtures/config/diff/credential/after/main.xcl`
+
+**Discoveries**: A created resource lists defaults applied by `defaults.Set` (e.g. container `default = "hello world"`) because the field is non-zero after decoding, as the plan intended.
+
+### 2026-10-07 — Task: Mark values known only after apply
+
+**What was done**: Added the unknown-value hook: `buildContextForResource` takes an optional `unknownValues` (the diff recorder; nil in apply) that makes a pending entity's computed fields, and every recorded unknown path of an entity, unknown in its dependents' context. Added `decodeForDiff`, which evaluates each attribute, records the path of every unknown (split until each stands alone), and decodes a copied body with type-appropriate placeholders, never mutating the parsed body. The walk callback decodes provider-backed and registered entities through it in diff mode, outputs skip Go conversion when not wholly known, and a saved resource with unknown values is reported as update without a provider call, keeping its saved computed values for dependents.
+
+**Deviations**: Output unknown paths are not recorded separately: outputs and module variables hold `cty.Value`s that carry unknowns natively, which is enough for dependents (verified through module outputs and module variables). A saved resource reported as update because of unknowns has its saved computed values carried onto it so its dependents see them.
+
+**Files changed**:
+- `internal/parser/diff_unknown.go`
+- `internal/parser/diff_decode.go`
+- `internal/parser/context.go`
+- `internal/parser/callbacks.go`
+- `internal/parser/lifecycle.go`
+- `internal/parser/diff_unknown_test.go`
+- `internal/parser/diff_decode_test.go`
+- `config_diff_test.go`
+- `internal/test_fixtures/config/diff/unknown_ref/before/main.xcl`
+- `internal/test_fixtures/config/diff/unknown_ref/after/main.xcl`
+- `internal/test_fixtures/config/diff/unknown_chain/main.xcl`
+- `internal/test_fixtures/config/diff/unknown_collection/main.xcl`
+- `internal/test_fixtures/config/diff/unknown_output/main.xcl`
+- `internal/test_fixtures/config/diff/unknown_output/net/main.xcl`
+- `internal/test_fixtures/config/diff/unknown_output/app/main.xcl`
+
+**Discoveries**: The placeholder open question resolved without touching the HCL fork: empty string, zero, false and empty collections decode into every field kind exercised. A root-level output cannot be referenced as `output.x`; outputs reach other blocks only as `module.<name>.output.<x>`. In a create, a block split because it holds an unknown omits its zero-valued siblings, while a fully known block is listed whole with its zero fields.
+
+### 2026-10-07 — Plan change: computed values of updated resources are unknown
+
+**What was done**: The end-to-end diff test for an edited redis port found an apply updating `resource.app.web` that the diff had not listed: redis's Update recomputes `connection_string`, which `app.web` references, and the plan took an updated resource's computed values from its provider's read. The user chose to change the design (`config-diff.md`, new section "Computed values of updated resources"). The plan now applies its conservative default: every computed field of a resource reported as update is unknown, so its dependents are reported as update with that value unknown and get no provider call. A new task "Treat computed values of updated resources as unknown" was added before the end-to-end task. The Out of Scope line that kept updated resources' computed values known was replaced by an entry putting the provider override (`ComputedChanges`, its gRPC RPC, the docker network DNS example) in a separate spec in this epic.
+
+**Deviations**: The end-to-end task's parity criterion is restated as the new contract: an apply never changes a resource the diff did not list, and any listed resource the apply leaves alone was listed with at least one unknown value. This supersedes the spec's success metric "diff matches apply for every scenario"; the spec itself is not edited.
+
+**Files changed**:
+- none (plan and context only)
+
+**Discoveries**: Apply needs no change for the new contract: it re-reads a dependent after its parent updates and skips Update when Changed reports nothing.
+
+### 2026-10-07 — Task: Treat computed values of updated resources as unknown
+
+**What was done**: A resource the diff reports as update — because its provider's refresh reported a change, or because it depends on unknown values — is now marked pending like a create or replace, so every computed field on it is unknown to its dependents. A saved dependent that references one is reported as update with that value unknown and gets no provider call; dependents that reference only configured fields or `meta` are read normally. The earlier carry of saved computed values onto an unknown-dependent update was removed, since those values are now unknown to dependents anyway. Tests cover drift and config-edit updates, configured and meta references, propagation through a chain, the unchanged regression, and that the following apply leaves an over-reported dependent alone.
+
+**Deviations**: None from the revised plan. Verification: `internal/parser`, root and `diff` packages pass. The e2e diff tests `TestDiffOfEditedRedisPortPredictsApply` and `TestDiffOfChangedPasswordPredictsApply` now see the expected over-reporting (`app.web`/`ingress.web` listed with unknowns) and are updated to the new contract in the next task. `TestPluginExampleTestsPass` / `example/plugin` still fail on this host because a Docker network named `app` already exists — environmental, left alone.
+
+**Files changed**:
+- `internal/parser/lifecycle.go`
+- `internal/parser/diff_recorder.go`
+- `internal/parser/diff_unknown.go`
+- `internal/parser/diff_update_unknown_test.go`
+- `internal/test_fixtures/config/diff/update_ref/before/main.xcl`
+- `internal/test_fixtures/config/diff/update_ref/edited/main.xcl`
+
+**Discoveries**: A drift-only update lists the drifted resource with no changes; its dependents that use its computed values are listed as updates with unknown values even though the following apply leaves them alone (Changed reports nothing) — this is the accepted over-report.
+
+### 2026-10-07 — Task: Prove diff matches apply end to end
+
+**What was done**: Added `e2e/diff_test.go`, which drives `Config.Diff` and `Config.Apply` through public packages only against copies of the plugin and kube fixtures. Scenarios: first apply (all creates; app and ingress computed values reported unknown), unchanged re-apply (nothing listed), edited redis port, edited replica location, removed ingress, changed database password (sensitive change), and a failed replica that is replaced. For each one the tests check that the state file bytes are unchanged and that no create, update or destroy event fires during the diff. They then derive the apply's per-action sets from its lifecycle events and assert the parity contract with `requireDiffPredictsApply`. The kube (registered types) diff reports nothing. Leak tests check the JSON, `%v`, `%+v` and event channels before and after a password change. `e2e/COVERAGE.md` gains a diff section.
+
+**Deviations**: The parity criterion is the new contract from the user's design decision, not exact equality. The contract: every resource the apply changes is in the diff with the same action, and any listed resource the apply leaves alone has at least one unknown value. In the redis-port and changed-password scenarios the diff lists `app.web` and `ingress.web` as updates with unknown values: `cache_connection_string` or `connection_string`, and `app_url`. This is the accepted over-report. The spec's success metric "diff matches apply for every scenario" is superseded by this contract; the spec is not edited. Verification: every package passes except `TestPluginExampleTestsPass` (e2e) and the `example/plugin` tests. They fail because a Docker network named `app` already exists on this host, which is environmental and unrelated, and the network was left alone.
+
+**Files changed**:
+- `e2e/diff_test.go`
+- `e2e/COVERAGE.md`
+
+**Discoveries**: A failed resource can be produced end to end without changing fixtures: setting the postgres replica location to `"bad host"` in a temp copy makes the in-process plugin's `connect` fail.

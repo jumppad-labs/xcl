@@ -155,7 +155,7 @@ Deliberate gaps: no tests of the `example/` programs (non-goal); no performance 
 
 **Validation point**: The renderer's tests pass for every action, value marker, placeholder and summary form; rendering the design's example result produces the design's text (with alignment by its stated rule); the runnable example's checked output matches; and a real `Config.Diff` with a changed secret renders without the secret unless revealed.
 
-#### - [ ] Task: Render a diff as plain text
+#### - [x] Task: Render a diff as plain text
 **Id:** d0553186-6e90-437e-bd57-0e7ebdbf205b
 **Repo:** xclconfig
 **Depends on:** none
@@ -166,17 +166,17 @@ Adds `Render` to the public `diff` package, turning a diff result into the git-d
 *Technical detail:* [context.md#task-render-a-diff-as-plain-text](./context.md#task-render-a-diff-as-plain-text)
 
 **Acceptance criteria**:
-- [ ] Created resources and values are marked as added, deleted ones as removed, replaced ones as replaced, and updated ones as changed with the old and new values shown together.
-- [ ] Each resource has a comment line saying what will happen, including a resource that changed outside xcl, and resources appear in the result's order.
-- [ ] A value known only after apply is shown as known after apply rather than as a concrete value.
-- [ ] A changed sensitive value is shown as changed with neither its old nor its new value, unless the result carries the values because the diff revealed them, in which case both appear.
-- [ ] The `=` signs line up within each resource's block.
-- [ ] The output ends with a summary line giving the numbers to create, update, replace and delete and the number unchanged; when nothing changes, the summary line is the only output.
-- [ ] The output contains no colour codes.
-- [ ] The design's example result renders as the design's example text, and the runnable example shows that text.
-- [ ] Public names and doc comments say "diff", never "plan".
+- [x] Created resources and values are marked as added, deleted ones as removed, replaced ones as replaced, and updated ones as changed with the old and new values shown together.
+- [x] Each resource has a comment line saying what will happen, including a resource that changed outside xcl, and resources appear in the result's order.
+- [x] A value known only after apply is shown as known after apply rather than as a concrete value.
+- [x] A changed sensitive value is shown as changed with neither its old nor its new value, unless the result carries the values because the diff revealed them, in which case both appear.
+- [x] The `=` signs line up within each resource's block.
+- [x] The output ends with a summary line giving the numbers to create, update, replace and delete and the number unchanged; when nothing changes, the summary line is the only output.
+- [x] The output contains no colour codes.
+- [x] The design's example result renders as the design's example text, and the runnable example shows that text.
+- [x] Public names and doc comments say "diff", never "plan".
 
-#### - [ ] Task: Prove renderings of a real diff keep secrets hidden
+#### - [x] Task: Prove renderings of a real diff keep secrets hidden
 **Id:** 1cf90c27-512d-4b35-bd61-56d393331a2f
 **Repo:** xclconfig
 **Depends on:**
@@ -188,8 +188,8 @@ Extends the sensitive-leak checks to rendered diffs: a real configuration whose 
 *Technical detail:* [context.md#task-prove-renderings-of-a-real-diff-keep-secrets-hidden](./context.md#task-prove-renderings-of-a-real-diff-keep-secrets-hidden)
 
 **Acceptance criteria**:
-- [ ] Rendering a real diff with a changed sensitive value contains neither the old nor the new secret, and shows that a sensitive value changed.
-- [ ] Rendering the same diff run with sensitive values revealed contains both values.
+- [x] Rendering a real diff with a changed sensitive value contains neither the old nor the new secret, and shows that a sensitive value changed.
+- [x] Rendering the same diff run with sensitive values revealed contains both values.
 
 ### Milestone 2: The diff can be shown in colour
 
@@ -197,7 +197,7 @@ Extends the sensitive-leak checks to rendered diffs: a real configuration whose 
 
 **Validation point**: Plain output has no escape codes; highlighted output gives each piece the expected scope, contains escape codes with the terminal renderer, and equals the plain output once the codes are removed; the default theme's diff colours resolve and it still uses only the 16 basic colours.
 
-#### - [ ] Task: Add diff colours to the highlight package
+#### - [x] Task: Add diff colours to the highlight package
 **Id:** f04d43d7-13ce-4e5d-a9ba-97e3662c8b91
 **Repo:** xclconfig
 **Depends on:** none
@@ -208,12 +208,12 @@ Gives the highlight package names for the three kinds of diff line — inserted,
 *Technical detail:* [context.md#task-add-diff-colours-to-the-highlight-package](./context.md#task-add-diff-colours-to-the-highlight-package)
 
 **Acceptance criteria**:
-- [ ] The inserted, deleted and changed scopes are exported and documented as the scopes diff output uses.
-- [ ] The built-in terminal theme colours inserted text green, deleted text red and changed text yellow, and still uses only the terminal's 16 standard colours.
-- [ ] A VS Code theme's diff colours apply to the new scopes.
-- [ ] Highlighted configuration text is unchanged.
+- [x] The inserted, deleted and changed scopes are exported and documented as the scopes diff output uses.
+- [x] The built-in terminal theme colours inserted text green, deleted text red and changed text yellow, and still uses only the terminal's 16 standard colours.
+- [x] A VS Code theme's diff colours apply to the new scopes.
+- [x] Highlighted configuration text is unchanged.
 
-#### - [ ] Task: Colour the rendered diff on request
+#### - [x] Task: Colour the rendered diff on request
 **Id:** c49e9113-5be2-4515-bc6f-98ff2345b56d
 **Repo:** xclconfig
 **Depends on:**
@@ -226,11 +226,11 @@ Adds the `Highlight` render option, so a caller can pass the same highlight rend
 *Technical detail:* [context.md#task-colour-the-rendered-diff-on-request](./context.md#task-colour-the-rendered-diff-on-request)
 
 **Acceptance criteria**:
-- [ ] Without the option, rendered output contains no colour codes; with the built-in terminal renderer, it contains colour codes.
-- [ ] Added, removed and changed lines receive the inserted, deleted and changed colours; replaced resources use the changed colour; values and headers are coloured as configuration.
-- [ ] Removing the colour codes from coloured output gives back exactly the plain output.
-- [ ] A theme with no diff colours leaves markers and paths in the terminal's default colour.
-- [ ] Sensitive values stay hidden in coloured output exactly as in plain output.
+- [x] Without the option, rendered output contains no colour codes; with the built-in terminal renderer, it contains colour codes.
+- [x] Added, removed and changed lines receive the inserted, deleted and changed colours; replaced resources use the changed colour; values and headers are coloured as configuration.
+- [x] Removing the colour codes from coloured output gives back exactly the plain output.
+- [x] A theme with no diff colours leaves markers and paths in the terminal's default colour.
+- [x] Sensitive values stay hidden in coloured output exactly as in plain output.
 
 ### Milestone 3: The documentation explains how to run and read a diff
 
@@ -238,7 +238,7 @@ Adds the `Highlight` render option, so a caller can pass the same highlight rend
 
 **Validation point**: The site builds and type-checks with the new page and nav entry, and the page's rendered example is identical to the renderer's checked example output.
 
-#### - [ ] Task: Write the diff guide on the documentation site
+#### - [x] Task: Write the diff guide on the documentation site
 **Id:** 3aa01462-ab79-47ae-ae96-4100636fe75d
 **Repo:** xcl-website
 **Depends on:**
@@ -251,12 +251,12 @@ Adds a guide page to the xcl site that shows how to run a diff and render it, ex
 *Technical detail:* [context.md#task-write-the-diff-guide-on-the-documentation-site](./context.md#task-write-the-diff-guide-on-the-documentation-site)
 
 **Acceptance criteria**:
-- [ ] The site has a diff page that explains running a diff, the meaning of create, update, replace, delete and known after apply, and shows an example of the rendered output.
-- [ ] The page's rendered example is identical, line for line, to the renderer's example output.
-- [ ] The page explains how sensitive values appear and how to reveal them, and how to colour the output.
-- [ ] The page is reachable from the Guides navigation, and the sensitive values guide mentions diffs.
-- [ ] The page uses the word "diff" throughout and never "plan" for this feature.
-- [ ] The site builds with the new page.
+- [x] The site has a diff page that explains running a diff, the meaning of create, update, replace, delete and known after apply, and shows an example of the rendered output.
+- [x] The page's rendered example is identical, line for line, to the renderer's example output.
+- [x] The page explains how sensitive values appear and how to reveal them, and how to colour the output.
+- [x] The page is reachable from the Guides navigation, and the sensitive values guide mentions diffs.
+- [x] The page uses the word "diff" throughout and never "plan" for this feature.
+- [x] The site builds with the new page.
 
 ## Open Questions
 
@@ -275,3 +275,74 @@ Adds a guide page to the xcl site that shows how to run a diff and render it, ex
 - Rendering formats other than text (HTML, Markdown); a custom `highlight.Renderer` can style the text, but there is no separate format.
 - Correcting the alignment in the design document's first example block — noted for the user's review, not changed by this plan.
 - CHANGELOG.md entries — left to the implement workflow's changelog step.
+
+## Changelog
+
+### 2026-10-07 — Task: Render a diff as plain text
+
+**What was done**: Added `diff.Render` and the `RenderOption` type. Render writes a `Diff` as git-diff-style text: a comment line, a marked header, aligned change lines and a closing brace for each resource, then the summary line. Every piece goes through an internal styler, which is the identity for now. Added two unexported helpers, the one-line HCL value formatter `formatValue` and the address-to-header reader `blockHeader`. Added unit tests, a golden test of the design example, and `ExampleRender`, whose checked output is the text the website copies.
+
+**Deviations**: Implementation started before the dependency `20261007105731-2388b579-diff` was recorded as implemented: the store reported it as "planned, not started". The user approved overriding it through the orchestrator because the record was stale. That spec is implemented and its code is merged into this branch (316bb5f), but its finished plan and changelog are not committed yet. Otherwise: the design example's `api` block is aligned at longest+1, as the plan decided, not with the design's two extra spaces. gofmt strips leading spaces inside doc-comment code blocks, so the example in Render's doc comment is not indented like the real output.
+
+**Files changed**:
+- `xclconfig: diff/render.go`
+- `xclconfig: diff/render_value.go`
+- `xclconfig: diff/render_header.go`
+- `xclconfig: diff/render_test.go`
+- `xclconfig: diff/render_value_test.go`
+- `xclconfig: diff/render_header_test.go`
+- `xclconfig: diff/example_test.go`
+
+**Discoveries**: The upstream comparator turns values into plain Go values through ctyjson, so every number arrives as a float64. `strconv.FormatFloat(v, 'f', -1, 64)` writes them in their shortest form (8080, not 8080.0). Per the revised design, dependents of an updated resource arrive as `update` changes with `Before` set and `Unknown: true`, and they render as `~ path = <before> -> (known after apply)`.
+
+### 2026-10-07 — Task: Prove renderings of a real diff keep secrets hidden
+
+**What was done**: Added two root-package leak tests. Each one diffs a real configuration whose sensitive password changed, through `Config.Diff`, and renders the result. The rendering without reveal contains neither password and shows `~ password = (sensitive value)`. The rendering of the diff run with `diff.RevealSensitive()` shows `"<before>" -> "<after>"`.
+
+**Deviations**: The tests reuse the upstream `diffChangedCredential` helper and its `credential/before` and `credential/after` fixtures from `config_diff_test.go`, which the plan's context pointed to only loosely. The highlighted assertion is added by the colour task, as planned.
+
+**Files changed**:
+- `xclconfig: sensitive_leak_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-07 — Task: Add diff colours to the highlight package
+
+**What was done**: Exported the TextMate diff scopes `ScopeInserted` (`markup.inserted.diff`), `ScopeDeleted` and `ScopeChanged` from `highlight` as a separate, documented constant group. Added basic green, red and yellow rules for `markup.inserted`, `markup.deleted` and `markup.changed` to the default theme. Updated the package doc. Tests cover the default-theme colours, a VS Code theme's `markup.inserted` rule applying to `ScopeInserted`, and a theme without markup rules leaving `ScopeDeleted` plain.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xclconfig: highlight/highlight.go`
+- `xclconfig: highlight/theme.go`
+- `xclconfig: highlight/doc.go`
+- `xclconfig: highlight/theme_test.go`
+- `xclconfig: highlight/ansi_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-07 — Task: Colour the rendered diff on request
+
+**What was done**: Added `diff.Highlight(renderer)`. The styler now passes markers and paths to the renderer with `ScopeInserted`, `ScopeDeleted` or `ScopeChanged` (replace uses changed), comment lines with `ScopeHashComment`, headers and values through `highlight.Text`, and every other piece with the empty scope. Indentation and newlines stay outside every styled piece. Tests assert the scope of each piece with a marker renderer. They also check that ANSI output contains codes and equals the plain output once the codes are stripped, that a theme without markup rules leaves markers plain, and that `Highlight(nil)` gives plain output. Two new leak tests cover the highlighted rendering of a real changed credential, with and without reveal.
+
+**Deviations**: The header markers and the closing brace now carry their indentation outside the styled piece: `headerMarker` returns `+`, `-`, `~` or `-/+`, and the padding is written separately. The plain output is unchanged.
+
+**Files changed**:
+- `xclconfig: diff/render.go`
+- `xclconfig: diff/render_test.go`
+- `xclconfig: sensitive_leak_test.go`
+
+**Discoveries**: `highlight.Text` labels an object key named `local` as `storage.type.xcl`, the block-type keyword scope, while `host` gets `variable.other.property.xcl`. So `{ host = 443, local = 8443 }` colours `local` as a keyword. This is pre-existing tokenizer behaviour, probably shared with the encoder's highlighting, and was not changed here.
+
+### 2026-10-07 — Task: Write the diff guide on the documentation site
+
+**What was done**: Added the `/diff/` guide page. It covers what a diff is, running `Config.Diff` and reading the result, the four actions, known-after-apply, sensitive values and `diff.RevealSensitive()`, reading the rendered output with the example and a marker table, the summary forms, colour with `diff.Highlight` and the three scopes, and the JSON form. Also added a "Diffs" entry to the Guides nav and a "Diffs" bullet to the sensitive-values page's list of outputs. The page's example block was compared mechanically with `ExampleRender`'s `// Output:` and is identical. `npm run build` and `astro check` pass, with 0 errors and 0 warnings.
+
+**Deviations**: Following the revised design, the page explains that a diff assumes updating a resource can change the values its provider fills in, so resources that refer to them are reported as updates with those values known after apply. It does not mention a provider method for narrowing this, since none exists yet. The JSON example on the page lists a single created resource, with a matching summary, instead of reproducing the design's full example.
+
+**Files changed**:
+- `xcl-website: src/pages/diff.mdx`
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: src/pages/sensitive-values.mdx`
+
+**Discoveries**: None.

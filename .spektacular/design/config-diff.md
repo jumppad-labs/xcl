@@ -53,8 +53,10 @@ Resources that get no provider call:
 
 - one being created, deleted or replaced;
 - one whose configuration depends on a value that is unknown until apply (see
-  Unknown values). Calling `Read` with a half-resolved resource would ask the
-  provider about something that does not exist yet.
+  Unknown values). That includes a computed value of a resource being
+  updated, unless its provider says the update leaves that value alone (see
+  Computed values of updated resources). Calling `Read` with a half-resolved
+  resource would ask the provider about something that does not exist yet.
 
 When `Read` returns `plugins.ErrNotFound`, the real resource is gone and an
 apply would create it again, so the resource is reported as `create`.
@@ -115,8 +117,9 @@ provider fills in never show up as noise.
 
 ## Unknown values
 
-A value that depends on a computed field of a resource being created or
-replaced is reported with `unknown: true` and no `after`. When an entry's value
+A value is unknown when it depends on a computed field of a resource being
+created or replaced, or of a resource being updated whose provider does not say
+that field keeps its value. It is reported with `unknown: true` and no `after`. When an entry's value
 would *contain* an unknown — an added block with one unknown field, say — it is
 split into its children until the unknown stands alone, so every other value
 stays concrete.
@@ -129,6 +132,72 @@ One constraint for the plan to solve: the apply walk decodes a body straight
 into a Go struct, which cannot hold an unknown value. For a field that depends
 on one, `Diff` has to evaluate the expression itself and record the path as
 unknown rather than decoding it.
+
+## Computed values of updated resources
+
+A computed field is owned by the provider, and nothing in its `computed` tag
+says which configured fields it depends on. When a resource is reported as
+`update`, `Diff` cannot know whether the update will change its computed
+values, so by default it assumes every one of them will: each computed field of
+an updated resource is unknown, and every resource that references one is
+reported as `update` with that value `(known after apply)`.
+
+This keeps one promise: **the diff never under-reports.** An apply never
+changes a resource the diff did not list. The diff may over-report: an apply
+re-reads each dependent once its parent has been updated, and calls the
+dependent's `Changed` with the real values (`internal/parser/lifecycle.go`). If
+nothing differs, the dependent is left alone, even though the diff listed it.
+Every resource an apply leaves alone in this way was listed with at least one
+unknown value, which is why it was listed.
+
+### The provider override
+
+A provider that knows which computed fields an update changes can say so, by
+implementing an optional method alongside `Changed`:
+
+```go
+// ComputedChanges returns the computed fields that updating old to new will
+// change. A computed field it does not name keeps its saved value.
+ComputedChanges(ctx context.Context, old T, new T) ([]string, error)
+```
+
+- `Diff` calls it only for a resource reported as `update`, after `Changed`,
+  with the same saved and read copies `Changed` received.
+- It returns paths in the form of `diff.Path.String()`, such as
+  `connection_string` or `status.address`. Naming a block makes every computed
+  field inside it unknown.
+- Only the computed fields it names are unknown. Every other computed field
+  keeps its saved value, so a resource that depends only on those fields is not
+  listed because of this update.
+- An error is handled like an error from `Changed`: `Diff` stops and returns it,
+  wrapped with the resource's address.
+- A provider that does not implement it gets the default: every computed field
+  is unknown. Over gRPC it is a new `ComputedChanges` RPC, and a plugin that
+  does not implement it falls back to the same default, so existing plugins
+  keep working unchanged.
+
+Apply does not use `ComputedChanges`. Whatever the provider returns, an apply
+still re-reads and compares each dependent. A wrong answer from the provider
+can make the diff miss a change, but it can never make an apply skip one.
+
+### Example
+
+Adding a DNS entry to a Docker network updates the network in place, and
+Docker keeps its ID. So the network provider in `example/plugin` returns no
+computed changes when only its DNS settings change:
+
+```go
+// ComputedChanges reports that no update changes the network's ID, Docker
+// updates a network in place
+func (p *networkProvider) ComputedChanges(ctx context.Context, old, new *Network) ([]string, error) {
+	return nil, nil
+}
+```
+
+Without the override, a container that references
+`resource.network.app.docker_id` would be listed as `update` with
+`(known after apply)` every time the network's DNS changed. With it, the diff
+lists only the network.
 
 ## Sensitive values
 
@@ -294,4 +363,6 @@ Diff: no changes, 9 unchanged.
 - Matching list elements by identity rather than by index.
 - Showing the saved values of a deleted resource.
 - Saving a diff and applying exactly that diff later.
+- Computing the after-apply value of a computed field during a diff. A
+  provider can say *which* computed fields change, not what they change to.
 - Any CLI.

@@ -34,13 +34,13 @@ People reviewing a change want to see what an apply would do at a glance, not re
 -->
 ## Requirements
 
-- [ ] **Readable rendering**
+- [x] **Readable rendering**
   Users can render a diff result as text in a git-diff-like style, where each resource and each changed value is marked by whether it is added, changed, replaced or removed, values known only after apply are shown as such, and a summary line ends the output giving the number of resources to create, update, replace and delete, and the number unchanged.
-- [ ] **Optional colour**
+- [x] **Optional colour**
   Users can choose to render the diff with colour; without that choice the rendering is plain text.
-- [ ] **Sensitive values stay hidden in the rendering**
+- [x] **Sensitive values stay hidden in the rendering**
   The rendering shows that a sensitive value changed without showing its values, and shows the values only when the diff was run with sensitive values revealed.
-- [ ] **Documentation**
+- [x] **Documentation**
   The xcl documentation site explains how to run a diff, what each kind of change means, and how to read the rendered output.
 
 <!--
@@ -69,17 +69,17 @@ People reviewing a change want to see what an apply would do at a glance, not re
 -->
 ## Acceptance Criteria
 
-- [ ] **Rendering marks changes**
+- [x] **Rendering marks changes**
   Rendered output marks created resources and values as added, deleted ones as removed, replaced ones as replaced, and updated ones as changed with the old and new values shown together, and ends with the summary line.
-- [ ] **Unknown values are shown**
+- [x] **Unknown values are shown**
   Rendering a result that holds a value known only after apply shows that value as known after apply rather than as a concrete value.
-- [ ] **Rendered summary matches the result**
+- [x] **Rendered summary matches the result**
   For a result reporting 2 to create, 1 to update, 1 to replace, 1 to delete and 3 unchanged, the rendered summary line shows all five numbers; for a result with no changes, the summary line is the only output.
-- [ ] **Plain by default, colour on request**
+- [x] **Plain by default, colour on request**
   Rendered output contains no colour codes unless colour is requested; when it is requested, the output contains colour codes.
-- [ ] **Sensitive values are masked in the rendering**
+- [x] **Sensitive values are masked in the rendering**
   When a sensitive value changes, the rendered output contains neither the old nor the new value and shows that a sensitive value changed; when the diff was run with sensitive values revealed, both values appear.
-- [ ] **Documentation published**
+- [x] **Documentation published**
   The xcl documentation site has a page that explains running a diff, the meaning of create, update, replace, delete and known-after-apply, and shows an example of the rendered output.
 
 <!--
