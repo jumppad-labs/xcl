@@ -1,4 +1,4 @@
-package docker
+package resources
 
 import (
 	"testing"

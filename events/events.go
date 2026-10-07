@@ -47,17 +47,18 @@ const (
 
 // Operations are the core operation names an event can carry.
 const (
-	OperationParse    = "parse"
-	OperationValidate = "validate"
-	OperationApply    = "apply"
-	OperationDestroy  = "destroy"
-	OperationCreate   = "create"
-	OperationRead     = "read"
-	OperationChanged  = "changed"
-	OperationUpdate   = "update"
-	OperationDiscover = "discover"
-	OperationLoad     = "load"
-	OperationEvents   = "events"
+	OperationParse     = "parse"
+	OperationValidate  = "validate"
+	OperationApply     = "apply"
+	OperationDestroy   = "destroy"
+	OperationLoadState = "load_state"
+	OperationCreate    = "create"
+	OperationRead      = "read"
+	OperationChanged   = "changed"
+	OperationUpdate    = "update"
+	OperationDiscover  = "discover"
+	OperationLoad      = "load"
+	OperationEvents    = "events"
 )
 
 // Event is one thing xcl or a plugin reports. Every kind of event shares this

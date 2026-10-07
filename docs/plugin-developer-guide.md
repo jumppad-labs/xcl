@@ -28,9 +28,12 @@ type ResourceProvider[T any] interface {
 }
 ```
 
-`Init` is called once when the provider is registered, which happens when
-xcl loads the plugin at the start of the first `Validate`, `Apply` or
-`Destroy`. Use it to keep the state and functions it is given and to set up
+`Init` is called when the provider is registered, which happens when xcl
+loads the plugin at the start of the first `Validate`, `Apply`, `Destroy` or
+`Load`. For an in-process plugin that is once. An external plugin's process
+runs only while an operation is using it, xcl starts it for each operation
+and stops it when the operation is done, so its `Init` runs again for every
+operation and the provider keeps nothing in memory between them. Use it to keep the state and functions it is given and to set up
 any clients. The logger it is given is plugin scoped: it is for messages
 written outside a provider call, such as in `Init` itself. Don't keep it for
 the lifecycle methods; log from those through the call's context (see

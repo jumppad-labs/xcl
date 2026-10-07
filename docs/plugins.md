@@ -129,7 +129,9 @@ Two implementations:
 - **`GRPCPluginHost`** ([`plugins/grpc_plugin_host.go`](../plugins/grpc_plugin_host.go)) —
   created with `NewGRPCPluginHost(emit, state)`, `Start(path)` starts a
   plugin binary as a subprocess and talks to it over gRPC
-  (`plugins/grpc_server.go` is what runs *inside* the plugin process).
+  (`plugins/grpc_server.go` is what runs *inside* the plugin process, started
+  by the plugin binary's `main` calling `plugins.Serve(plugin)`, which owns the
+  handshake and the name the host dispenses the plugin by).
   `GetTypes()` calls the remote `GetTypes` RPC once, then builds and caches
   one `GRPCResourceProviderAdapter` per returned type (`h.cachedTypes`,
   `h.typesCached`) — so the gRPC round-trip for type discovery happens
@@ -204,8 +206,10 @@ plugin binary, and `DiscoverPlugins(dirs, pattern)` for directories to search
 for binaries named like `pattern` (`xcl-plugin-*` when empty).
 
 Nothing is started until `Load(emit)`, which `Config` calls at the start of
-the first `Validate`, `Apply` or `Destroy` (and the parser calls again, which
-is free). `Load` runs once per registry however many `Config`s share it, and
+the first `Validate`, `Apply`, `Destroy` or `Load` (and the parser calls
+again, which is free). An external plugin's process then runs only while an
+operation is using it: `Config` starts it for each operation and stops it
+when the operation is done, so nothing is left running between operations. `Load` runs once per registry however many `Config`s share it, and
 later calls return the first call's result, failure included. It reports what
 it does to `emit`:
 

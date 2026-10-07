@@ -1,4 +1,4 @@
-package docker
+package resources
 
 import (
 	"context"
@@ -11,8 +11,9 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
+	dockerclient "github.com/docker/docker/client"
 
+	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -59,10 +60,16 @@ type NetworkAttachment struct {
 type containerProvider struct {
 	plugins.DefaultChanged[*Container]
 
-	client Client
+	client client.Docker
 }
 
 var _ plugins.ResourceProvider[*Container] = (*containerProvider)(nil)
+
+// NewContainerProvider returns the provider for docker "container" blocks,
+// which creates and removes containers through dockerClient
+func NewContainerProvider(dockerClient client.Docker) plugins.ResourceProvider[*Container] {
+	return &containerProvider{client: dockerClient}
+}
 
 // Init logs that the provider is ready, it needs nothing else
 func (p *containerProvider) Init(state plugins.State, functions plugins.ProviderFunctions, log logger.Logger) error {
@@ -205,7 +212,7 @@ func environment(variables map[string]string) []string {
 // counts as removed
 func (p *containerProvider) Destroy(ctx context.Context, c *Container, force bool) error {
 	err := p.client.ContainerStop(ctx, c.DockerID, container.StopOptions{})
-	if client.IsErrNotFound(err) {
+	if dockerclient.IsErrNotFound(err) {
 		plugins.Logger(ctx).Info("destroyed container", "name", c.Meta.Name)
 		return nil
 	}
@@ -215,7 +222,7 @@ func (p *containerProvider) Destroy(ctx context.Context, c *Container, force boo
 	}
 
 	err = p.client.ContainerRemove(ctx, c.DockerID, container.RemoveOptions{Force: true})
-	if err != nil && !client.IsErrNotFound(err) {
+	if err != nil && !dockerclient.IsErrNotFound(err) {
 		return fmt.Errorf("unable to remove container %s: %w", c.Meta.Name, err)
 	}
 

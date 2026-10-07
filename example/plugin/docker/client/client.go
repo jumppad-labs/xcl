@@ -1,12 +1,11 @@
-// Package docker is an external xcl plugin that creates real Docker networks
-// and containers. It provides the block types docker "network" and
-// docker "container", and is served as its own binary by ../cmd/docker-plugin.
+// Package client is the Docker Engine client the Docker plugin's providers
+// use to create real networks and containers.
 //
-// The providers never use the Docker SDK client directly. They hold a Client,
+// The providers never use the Docker SDK client directly. They hold a Docker,
 // a narrow interface that mirrors only the SDK methods they call. The real SDK
 // client satisfies it unchanged, and the provider unit tests use a mock
 // generated from it by Mockery, so they run without a Docker engine.
-package docker
+package client
 
 import (
 	"context"
@@ -18,16 +17,16 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
+	dockerclient "github.com/docker/docker/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // pingTimeout is how long Ping waits for a Docker engine to answer
 const pingTimeout = 5 * time.Second
 
-// Client is the part of the Docker Engine SDK client the providers use. Each
+// Docker is the part of the Docker Engine SDK client the providers use. Each
 // method has the same signature as the SDK's, so *client.Client satisfies it.
-type Client interface {
+type Docker interface {
 	Ping(ctx context.Context) (types.Ping, error)
 
 	NetworkCreate(ctx context.Context, name string, options network.CreateOptions) (network.CreateResponse, error)
@@ -45,18 +44,18 @@ type Client interface {
 	ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error)
 }
 
-// the real SDK client satisfies Client without an adapter
-var _ Client = (*client.Client)(nil)
+// the real SDK client satisfies Docker without an adapter
+var _ Docker = (*dockerclient.Client)(nil)
 
-// NewClient returns a Docker Engine SDK client configured from the
-// environment: DOCKER_HOST, or the default socket when it is not set. The API
-// version is negotiated with the engine, so older engines work too.
-func NewClient() (Client, error) {
+// New returns a Docker Engine SDK client configured from the environment:
+// DOCKER_HOST, or the default socket when it is not set. The API version is
+// negotiated with the engine, so older engines work too.
+func New() (Docker, error) {
 	return newSDKClient()
 }
 
-func newSDKClient() (*client.Client, error) {
-	c, err := client.NewClientWithOpts(client.WithHostFromEnv(), client.WithAPIVersionNegotiation())
+func newSDKClient() (*dockerclient.Client, error) {
+	c, err := dockerclient.NewClientWithOpts(dockerclient.WithHostFromEnv(), dockerclient.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("unable to create Docker client: %w", err)
 	}

@@ -39,3 +39,20 @@ Orchestrating `spek-plan-epic` for epic `20261006071139-7b266535-examples-and-ou
 - User: CHANGELOG.md written once at end of epic (not saved as convention — epic decision only). All 4 plans updated with Changelog input notes; summary rewritten; highlight->configonly unordered.
 - Review done: order kept; project-structure convention updated (top-level public pkgs); gotchas saved (example modules/internal, website no redirects). Run complete.
 - Questions/answers: see above
+
+# Implement-epic run (2026-10-06)
+
+Orchestrating `spek-implement-epic` for epic `20261006071139-7b266535-examples-and-output`.
+- Start-up: config auto_commit "on" was invalid -> user chose "workflow" (committed). go.mod/go.sum
+  kr/pretty change committed (user). xcl-website gotcha entry committed. Remaining dirty = xcl-vscode
+  only (no spec touches it) — not asked again.
+- Order: e2e (506b8289) -> configonly (aadf3c10) -> docker (f7a185dc) -> highlight (17623cda); strictly serial.
+- Started child: 506b8289 e2e (worktree .spektacular/worktrees/20261006071142-506b8289-e2e-suite-and-real-world-examples/xclconfig).
+- Q (e2e, read_plan drift): configonly main.go rewritten (kr/pretty) vs tests from 8271816 -> user: RESTORE main.go from 8271816 and follow plan as written. Answer sent to child; child resumed.
+- DONE+MERGED: 506b8289 e2e (bcb917d). Discoveries to offer at end: tracked ELF 'configonly' at repo root; plugin event source naming (Go type name / binary base name); go mod tidy doesn't flag internal/ imports across modules; sub-agents need worktree root.
+- Started child: aadf3c10 configuration example (worktrees under .spektacular/worktrees/20261006112023-aadf3c10-configuration-example/).
+- DONE+MERGED: aadf3c10 configuration example (xclconfig 3cc3703, xcl-website 18a7dfb). Discovery: references to nonexistent blocks fail at parse time -> broken-link tests use literal string ids.
+- Started child: f7a185dc docker plugin example.
+- DONE+MERGED: f7a185dc docker plugin (xclconfig 49c009f, xcl-website 86a89a3). Discoveries: example/plugin go mod tidy -> go get go@1.25.0; provider= tag in-process only; raymond HTML-escapes (xcl template quote likely emits &quot; - separate look); stale docs/state.md links; events.mdx prettylog Handler sig + prettylog doc comment stale (for highlight spec).
+- Started child: 17623cda encoder highlighting (last spec).
+- DONE+MERGED: 17623cda highlighting (xclconfig 66efe1c, xcl-website 129f942). Epic implement complete 4/4. Note: highlight scopes follow xcl-vscode UNCOMMITTED grammar.

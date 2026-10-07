@@ -4,7 +4,6 @@ go 1.25.0
 
 require (
 	github.com/docker/docker v28.5.2+incompatible
-	github.com/hashicorp/go-plugin v1.6.3
 	github.com/infinytum/raymond/v2 v2.0.5
 	github.com/jumppad-labs/xcl v0.0.0-00010101000000-000000000000
 	github.com/jumppad-labs/xcl/example/prettylog v0.0.0-00010101000000-000000000000
@@ -40,6 +39,7 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-hclog v0.14.1 // indirect
+	github.com/hashicorp/go-plugin v1.6.3 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.4 // indirect

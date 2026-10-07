@@ -24,6 +24,9 @@ type GRPCPluginHost struct {
 	cachedTypes []RegisteredType // cached types with adapters
 	typesCached bool             // flag to track if types have been cached
 
+	// path is the plugin binary Start was given, Restart starts it again
+	path string
+
 	// calls maps the ID of each provider call in progress to its logger,
 	// so the plugin's log messages reach the right resource and receiver
 	calls *callLoggers
@@ -46,11 +49,43 @@ func NewGRPCPluginHost(emit events.Emit, state State) *GRPCPluginHost {
 // call carries that call's resource and step, one written outside a call,
 // and go-plugin's own messages, go to emit.
 func (h *GRPCPluginHost) Start(pluginPath string) error {
+	h.path = pluginPath
+
+	return h.connect()
+}
+
+// Restart starts the plugin process again when it is not running, after Stop
+// or because it exited, and does nothing while it runs. The types the plugin
+// provides and their adapters are kept, the adapters reach the new process.
+// It must not be called while a provider call is in progress.
+func (h *GRPCPluginHost) Restart() error {
+	if h.Running() {
+		return nil
+	}
+
+	return h.connect()
+}
+
+// Running reports whether the plugin process is running
+func (h *GRPCPluginHost) Running() bool {
+	return h.client != nil && !h.client.Exited()
+}
+
+// Path returns the path of the plugin binary the host starts
+func (h *GRPCPluginHost) Path() string {
+	return h.path
+}
+
+// connect starts the plugin binary at h.path and connects to it. A host that
+// was connected before keeps its wrapper, which the cached adapters hold, and
+// points it at the new process.
+func (h *GRPCPluginHost) connect() error {
+	pluginPath := h.path
 	name := PluginBinaryName(pluginPath)
 	pluginLogger := logger.New(h.emit, events.Event{Source: name, Operation: events.OperationLoad})
 
 	var PluginMap = map[string]plugin.Plugin{
-		"plugin": &GRPCPlugin{logger: pluginLogger, calls: h.calls},
+		pluginName: &GRPCPlugin{logger: pluginLogger, calls: h.calls},
 	}
 
 	// Create the plugin client
@@ -73,13 +108,19 @@ func (h *GRPCPluginHost) Start(pluginPath string) error {
 	}
 
 	// Get the plugin interface
-	raw, err := rpcClient.Dispense("plugin")
+	raw, err := rpcClient.Dispense(pluginName)
 	if err != nil {
 		return fmt.Errorf("failed to dispense plugin: %w", err)
 	}
 
 	// Cast to gRPC client and wrap it
 	grpcClient := raw.(proto.PluginServiceClient)
+
+	if wrapper, ok := h.plugin.(*grpcPluginWrapper); ok {
+		wrapper.client = grpcClient
+		return nil
+	}
+
 	h.plugin = &grpcPluginWrapper{client: grpcClient, name: name, calls: h.calls}
 
 	return nil
@@ -92,7 +133,7 @@ func PluginBinaryName(pluginPath string) string {
 	return strings.TrimSuffix(filepath.Base(pluginPath), ".exe")
 }
 
-// Stop shuts down the plugin host and cleans up resources
+// Stop stops the plugin process, Restart starts it again
 func (h *GRPCPluginHost) Stop() {
 	if h.client != nil {
 		h.client.Kill()

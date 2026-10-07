@@ -11,6 +11,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/eventstream"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/resources"
+	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
@@ -426,6 +427,43 @@ func (c *Config) Destroy() error {
 	})
 }
 
+// Load reads the saved state into the Config without applying or destroying
+// anything, so Entities, Find, FindByType and the other lookups answer from
+// what was last saved. It needs no configuration and calls no provider. A
+// program that applies in one run and reports in another, i.e. a status
+// command, calls it before looking anything up.
+//
+// Plugins are loaded first, a saved plugin type is read back into its Go type
+// through its plugin's schema. When nothing has been saved Load succeeds and
+// the Config holds nothing. Without a state store there is nothing to read,
+// Load succeeds and keeps what the Config already holds.
+func (c *Config) Load() error {
+	return c.run(events.OperationLoadState, func(ctx context.Context, emit events.Emit) error {
+		if c.stateStore == nil {
+			return nil
+		}
+
+		if !c.stateStore.Exists() {
+			c.entities = []any{}
+			return nil
+		}
+
+		loaded, err := c.stateStore.Load()
+		if err != nil {
+			return fmt.Errorf("failed to load state: %w", err)
+		}
+
+		saved, err := savedentity.DecodeAll(c.pluginRegistry, loaded, savedentity.ReadOptions{Mask: c.stateMask})
+		if err != nil {
+			return fmt.Errorf("failed to load state: %w", err)
+		}
+
+		c.entities = saved
+
+		return nil
+	})
+}
+
 // convertVariablesToStringMap converts map[string]any to map[string]string
 // This is needed for parser compatibility
 func convertVariablesToStringMap(vars map[string]any) map[string]string {
@@ -512,18 +550,24 @@ func (c *Config) run(operation string, work func(ctx context.Context, emit event
 	return err
 }
 
-// withPlugins returns work preceded by loading the registry's plugins, so a
-// plugin is started on the first operation that needs it and a plugin that
-// fails to load fails that operation. While work runs, the messages plugins
-// write outside a provider call go to emit.
+// withPlugins returns work preceded by making the registry's plugins ready,
+// so a plugin is loaded by the first operation that needs it and a plugin that
+// fails to load fails that operation. External plugin processes run while work
+// does and are stopped after it, unless another operation still uses them.
+// While work runs, the messages plugins write outside a provider call go to
+// emit.
 func (c *Config) withPlugins(work func(ctx context.Context, emit events.Emit) error) func(ctx context.Context, emit events.Emit) error {
 	return func(ctx context.Context, emit events.Emit) error {
 		deactivate := c.pluginRegistry.Activate(emit)
 		defer deactivate()
 
-		if err := c.pluginRegistry.Load(emit); err != nil {
+		// the external plugins run only while the operation uses them, done
+		// stops them once no operation is using the registry
+		done, err := c.pluginRegistry.Use(emit)
+		if err != nil {
 			return err
 		}
+		defer done()
 
 		return work(ctx, emit)
 	}

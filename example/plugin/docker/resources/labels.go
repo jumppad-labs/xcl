@@ -1,4 +1,8 @@
-package docker
+// Package resources holds the Docker plugin's block types, docker "network"
+// and docker "container", and the providers that create them as real Docker
+// networks and containers. A program using the plugin imports it to read the
+// blocks it applied, i.e. xcl.FindByType[resources.Container].
+package resources
 
 import "github.com/jumppad-labs/xcl/types"
 

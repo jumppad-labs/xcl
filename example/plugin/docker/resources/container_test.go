@@ -1,4 +1,4 @@
-package docker
+package resources
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jumppad-labs/xcl/example/plugin/docker/mocks"
+	"github.com/jumppad-labs/xcl/example/plugin/docker/client/mocks"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -42,7 +42,7 @@ func emptyPullProgress() io.ReadCloser {
 }
 
 // expectImagePresent makes Docker report that it already has the image
-func expectImagePresent(client *mocks.MockClient) {
+func expectImagePresent(client *mocks.MockDocker) {
 	client.EXPECT().
 		ImageList(mock.Anything, mock.Anything).
 		Return([]image.Summary{{ID: "sha256:abc"}}, nil).
@@ -50,7 +50,7 @@ func expectImagePresent(client *mocks.MockClient) {
 }
 
 // expectContainerCreated makes ContainerCreate succeed with the ID "ctr-123"
-func expectContainerCreated(client *mocks.MockClient) {
+func expectContainerCreated(client *mocks.MockDocker) {
 	client.EXPECT().
 		ContainerCreate(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(container.CreateResponse{ID: "ctr-123"}, nil).
@@ -58,7 +58,7 @@ func expectContainerCreated(client *mocks.MockClient) {
 }
 
 // expectContainerStarted makes ContainerStart succeed
-func expectContainerStarted(client *mocks.MockClient) {
+func expectContainerStarted(client *mocks.MockDocker) {
 	client.EXPECT().
 		ContainerStart(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
@@ -67,7 +67,7 @@ func expectContainerStarted(client *mocks.MockClient) {
 
 // expectContainerInspected makes ContainerInspect report the address
 // 10.42.0.5 on the network "app"
-func expectContainerInspected(client *mocks.MockClient) {
+func expectContainerInspected(client *mocks.MockDocker) {
 	client.EXPECT().
 		ContainerInspect(mock.Anything, mock.Anything).
 		Return(container.InspectResponse{
@@ -81,7 +81,7 @@ func expectContainerInspected(client *mocks.MockClient) {
 }
 
 func TestContainerCreatePullsAMissingImage(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		ImageList(mock.Anything, image.ListOptions{
 			Filters: filters.NewArgs(filters.Arg("reference", "nginx:1.27")),
@@ -104,7 +104,7 @@ func TestContainerCreatePullsAMissingImage(t *testing.T) {
 }
 
 func TestContainerCreateSkipsThePullForAPresentImage(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		ImageList(mock.Anything, image.ListOptions{
 			Filters: filters.NewArgs(filters.Arg("reference", "nginx:1.27")),
@@ -127,7 +127,7 @@ func TestContainerCreateUsesTheBlocksNameImageAndLabels(t *testing.T) {
 	var gotConfig *container.Config
 	var gotName string
 
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	expectImagePresent(client)
 	client.EXPECT().
 		ContainerCreate(mock.Anything, mock.Anything, &container.HostConfig{}, mock.Anything, (*v1.Platform)(nil), "web").
@@ -167,7 +167,7 @@ func TestContainerCreateUsesTheBlocksNameImageAndLabels(t *testing.T) {
 func TestContainerCreateAttachesTheFirstNetworkWithAliases(t *testing.T) {
 	var gotNetworking *network.NetworkingConfig
 
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	expectImagePresent(client)
 	client.EXPECT().
 		ContainerCreate(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -192,7 +192,7 @@ func TestContainerCreateAttachesTheFirstNetworkWithAliases(t *testing.T) {
 }
 
 func TestContainerCreateConnectsFurtherNetworks(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	expectImagePresent(client)
 	expectContainerCreated(client)
 	client.EXPECT().
@@ -219,7 +219,7 @@ func TestContainerCreateConnectsFurtherNetworks(t *testing.T) {
 }
 
 func TestContainerCreateConnectsFurtherNetworksBeforeStarting(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	expectImagePresent(client)
 	expectContainerCreated(client)
 	connect := client.EXPECT().
@@ -243,7 +243,7 @@ func TestContainerCreateConnectsFurtherNetworksBeforeStarting(t *testing.T) {
 }
 
 func TestContainerCreateStartsTheContainer(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	expectImagePresent(client)
 	expectContainerCreated(client)
 	client.EXPECT().
@@ -260,7 +260,7 @@ func TestContainerCreateStartsTheContainer(t *testing.T) {
 }
 
 func TestContainerCreateFillsTheDockerIDAndAddress(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	expectImagePresent(client)
 	expectContainerCreated(client)
 	expectContainerStarted(client)
@@ -288,7 +288,7 @@ func TestContainerCreateFillsTheDockerIDAndAddress(t *testing.T) {
 func TestContainerCreateReturnsPullErrors(t *testing.T) {
 	dockerErr := errors.New("pull access denied")
 
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		ImageList(mock.Anything, mock.Anything).
 		Return([]image.Summary{}, nil).
@@ -311,7 +311,7 @@ func TestContainerCreateReturnsPullErrors(t *testing.T) {
 func TestContainerCreateReturnsCreateErrors(t *testing.T) {
 	dockerErr := errors.New("name already in use")
 
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	expectImagePresent(client)
 	client.EXPECT().
 		ContainerCreate(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -331,7 +331,7 @@ func TestContainerCreateReturnsCreateErrors(t *testing.T) {
 func TestContainerCreateRemovesTheContainerWhenStartFails(t *testing.T) {
 	dockerErr := errors.New("port is already allocated")
 
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	expectImagePresent(client)
 	expectContainerCreated(client)
 	client.EXPECT().
@@ -353,7 +353,7 @@ func TestContainerCreateRemovesTheContainerWhenStartFails(t *testing.T) {
 }
 
 func TestContainerDestroyStopsAndRemovesTheContainer(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		ContainerStop(mock.Anything, "ctr-123", container.StopOptions{}).
 		Return(nil).
@@ -373,7 +373,7 @@ func TestContainerDestroyStopsAndRemovesTheContainer(t *testing.T) {
 }
 
 func TestContainerDestroySucceedsWhenTheContainerIsGone(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		ContainerStop(mock.Anything, "ctr-123", mock.Anything).
 		Return(errdefs.NotFound(errors.New("no such container"))).
@@ -392,7 +392,7 @@ func TestContainerDestroySucceedsWhenTheContainerIsGone(t *testing.T) {
 func TestContainerDestroyReturnsDockerErrors(t *testing.T) {
 	dockerErr := errors.New("daemon unavailable")
 
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		ContainerStop(mock.Anything, "ctr-123", mock.Anything).
 		Return(dockerErr).
@@ -409,7 +409,7 @@ func TestContainerDestroyReturnsDockerErrors(t *testing.T) {
 }
 
 func TestContainerReadKeepsTheDockerIDAndAddressFromTheSavedContainer(t *testing.T) {
-	provider := &containerProvider{client: mocks.NewMockClient(t)}
+	provider := &containerProvider{client: mocks.NewMockDocker(t)}
 
 	saved := testContainer()
 	saved.DockerID = "ctr-123"

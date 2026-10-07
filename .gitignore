@@ -9,6 +9,7 @@ plugins/example/build/
 *.test
 __debug_bin*
 example/*/build/
+example/plugin/.xcl-docker/
 plugins/example/bin/
 # stray `go build` output: without -o the binary is named after its package dir
 /example/example

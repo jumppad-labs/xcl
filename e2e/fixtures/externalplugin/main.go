@@ -8,8 +8,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/jumppad-labs/xcl/e2e/fixtures/services"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -159,13 +157,5 @@ func (p *ingressProvider) Functions() plugins.ProviderFunctions {
 
 // main serves the plugin to the host that started this process
 func main() {
-	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: plugins.HandshakeConfig,
-		Plugins: map[string]plugin.Plugin{
-			"plugin": &plugins.GRPCPlugin{
-				Impl: &ExternalPlugin{},
-			},
-		},
-		GRPCServer: plugin.DefaultGRPCServer,
-	})
+	plugins.Serve(&ExternalPlugin{})
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/hashicorp/go-plugin"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
@@ -46,14 +45,6 @@ func main() {
 	// Create the plugin implementation
 	personPlugin := &PersonPlugin{}
 
-	// Serve the plugin using go-plugin
-	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: plugins.HandshakeConfig,
-		Plugins: map[string]plugin.Plugin{
-			"plugin": &plugins.GRPCPlugin{
-				Impl: personPlugin,
-			},
-		},
-		GRPCServer: plugin.DefaultGRPCServer,
-	})
+	// Serve the plugin to the host that started this process
+	plugins.Serve(personPlugin)
 }

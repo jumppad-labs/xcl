@@ -1,4 +1,4 @@
-package docker
+package resources
 
 // The tests in this file run the providers against a real Docker engine. Each
 // one skips when no engine is reachable, so the suite still passes on a
@@ -13,9 +13,10 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
+	dockerclient "github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -26,16 +27,16 @@ const testImage = "nginx:1.27-alpine"
 func requireDocker(t *testing.T) {
 	t.Helper()
 
-	if err := Ping(context.Background()); err != nil {
+	if err := client.Ping(context.Background()); err != nil {
 		t.Skip(err.Error()) // Ping already says no Docker engine is reachable
 	}
 }
 
 // newDockerClient returns a real Docker client, closed when the test ends
-func newDockerClient(t *testing.T) Client {
+func newDockerClient(t *testing.T) client.Docker {
 	t.Helper()
 
-	c, err := NewClient()
+	c, err := client.New()
 	require.NoError(t, err)
 
 	if closer, ok := c.(interface{ Close() error }); ok {
@@ -58,12 +59,12 @@ func uniqueName(t *testing.T) string {
 
 // removeNetworkOnCleanup removes the network called name when the test ends,
 // a network that is already gone is ignored
-func removeNetworkOnCleanup(t *testing.T, c Client, name string) {
+func removeNetworkOnCleanup(t *testing.T, c client.Docker, name string) {
 	t.Helper()
 
 	t.Cleanup(func() {
 		err := c.NetworkRemove(context.Background(), name)
-		if err != nil && !client.IsErrNotFound(err) {
+		if err != nil && !dockerclient.IsErrNotFound(err) {
 			t.Errorf("unable to remove test network %s: %s", name, err)
 		}
 	})
@@ -71,12 +72,12 @@ func removeNetworkOnCleanup(t *testing.T, c Client, name string) {
 
 // removeContainerOnCleanup removes the container called name when the test
 // ends, a container that is already gone is ignored
-func removeContainerOnCleanup(t *testing.T, c Client, name string) {
+func removeContainerOnCleanup(t *testing.T, c client.Docker, name string) {
 	t.Helper()
 
 	t.Cleanup(func() {
 		err := c.ContainerRemove(context.Background(), name, container.RemoveOptions{Force: true})
-		if err != nil && !client.IsErrNotFound(err) {
+		if err != nil && !dockerclient.IsErrNotFound(err) {
 			t.Errorf("unable to remove test container %s: %s", name, err)
 		}
 	})
@@ -147,7 +148,7 @@ func TestNetworkDestroyRemovesItFromDocker(t *testing.T) {
 
 	_, err = c.NetworkInspect(context.Background(), name, network.InspectOptions{})
 	require.Error(t, err)
-	require.True(t, client.IsErrNotFound(err), "expected not found, got: %s", err)
+	require.True(t, dockerclient.IsErrNotFound(err), "expected not found, got: %s", err)
 }
 
 func TestContainerCreateRunsAContainerAttachedToTheNetwork(t *testing.T) {
@@ -203,5 +204,5 @@ func TestContainerDestroyRemovesItFromDocker(t *testing.T) {
 
 	_, err = c.ContainerInspect(context.Background(), containerName)
 	require.Error(t, err)
-	require.True(t, client.IsErrNotFound(err), "expected not found, got: %s", err)
+	require.True(t, dockerclient.IsErrNotFound(err), "expected not found, got: %s", err)
 }

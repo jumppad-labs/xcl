@@ -20,7 +20,10 @@ import (
 //
 // Registering a plugin, a plugin path or a discovery directory only records
 // it. Plugins are discovered, started and checked by Load, once per registry,
-// which Config calls at the start of the first Validate, Apply or Destroy. A
+// which Config calls, through Use, at the start of the first Validate, Apply,
+// Destroy or Load. An external plugin's process then runs only while an
+// operation uses it, Use stops it after each operation and starts it again
+// for the next. A
 // registry may be shared by several Configs and is safe for concurrent use.
 type PluginRegistry struct {
 	// mu guards typeInfo, pluginHosts and the recorded plugins
@@ -51,6 +54,18 @@ type PluginRegistry struct {
 	// is set.
 	active  atomic.Pointer[events.Emit]
 	loading atomic.Pointer[events.Emit]
+
+	// usersMu guards users, the number of operations using the plugins, set
+	// by Use. External plugin processes run while it is above zero.
+	usersMu sync.Mutex
+	users   int
+}
+
+// restartable is a plugin host whose process Use stops when no operation is
+// using it and starts again for the next, an external plugin's host
+type restartable interface {
+	Restart() error
+	Path() string
 }
 
 // NewPluginRegistry creates a new plugin registry with builtin types
@@ -478,6 +493,83 @@ func (r *PluginRegistry) pluginEmit(e events.Event) {
 
 	if emit := r.active.Load(); emit != nil {
 		(*emit)(e)
+	}
+}
+
+// Use makes the plugins ready for an operation and returns a function the
+// operation calls when it is done. The first Use loads them, as Load does.
+// External plugins run as processes only while an operation uses them: Use
+// starts any that were stopped, and done stops them once the last operation
+// using the registry is done. Nothing is left running between operations, so
+// a program never stops a plugin itself. Config calls Use around every
+// Validate, Apply, Destroy and Load.
+//
+// A plugin that fails to load or start again fails Use with an error matching
+// ErrPluginLoad, and done is then nil.
+func (r *PluginRegistry) Use(emit events.Emit) (done func(), err error) {
+	r.usersMu.Lock()
+	defer r.usersMu.Unlock()
+
+	if err := r.Load(emit); err != nil {
+		// a load that fails part way may have started some plugins
+		if r.users == 0 {
+			r.stopPlugins()
+		}
+
+		return nil, err
+	}
+
+	if r.users == 0 {
+		if err := r.restartPlugins(); err != nil {
+			r.stopPlugins()
+			return nil, err
+		}
+	}
+
+	r.users++
+
+	var once sync.Once
+
+	return func() {
+		once.Do(r.release)
+	}, nil
+}
+
+// release ends one operation's use of the plugins, stopping the external
+// plugin processes when it was the last
+func (r *PluginRegistry) release() {
+	r.usersMu.Lock()
+	defer r.usersMu.Unlock()
+
+	r.users--
+	if r.users == 0 {
+		r.stopPlugins()
+	}
+}
+
+// restartPlugins starts every external plugin process that is not running
+func (r *PluginRegistry) restartPlugins() error {
+	for _, host := range r.GetPluginHosts() {
+		external, ok := host.(restartable)
+		if !ok {
+			continue
+		}
+
+		if err := external.Restart(); err != nil {
+			return &xclerrors.PluginLoadError{Plugin: external.Path(), Err: err}
+		}
+	}
+
+	return nil
+}
+
+// stopPlugins stops every external plugin process, the in-process plugins
+// have nothing to stop
+func (r *PluginRegistry) stopPlugins() {
+	for _, host := range r.GetPluginHosts() {
+		if _, ok := host.(restartable); ok {
+			host.Stop()
+		}
 	}
 }
 

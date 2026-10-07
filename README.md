@@ -151,13 +151,14 @@ its state, with the secret encrypted, in a temporary directory.
 work, each laid out the way a plugin author would lay out their own project:
 
 - The Docker plugin ([`plugin/docker`](./example/plugin/docker)) is an
-  external plugin, served by its own binary
-  ([`plugin/cmd/docker-plugin`](./example/plugin/cmd/docker-plugin)) that xcl
-  starts and calls over gRPC. It provides `docker "network"` and
-  `docker "container"`, and creates real Docker networks and containers. Its
-  providers hold a narrow `Client` interface over the Docker SDK, which the
-  real SDK client satisfies and a Mockery mock stands in for in their unit
-  tests.
+  external plugin, a standalone program with its own `main` that xcl starts
+  as a separate process and calls over gRPC. It provides `docker "network"`
+  and `docker "container"`, defined with their providers in
+  [`plugin/docker/resources`](./example/plugin/docker/resources), and creates
+  real Docker networks and containers. Its providers hold a narrow `Docker` interface over the Docker SDK, kept in its
+  own `client` package
+  ([`plugin/docker/client`](./example/plugin/docker/client)), which the real
+  SDK client satisfies and a Mockery mock stands in for in their unit tests.
 - The template plugin ([`plugin/template`](./example/plugin/template)) is an
   in-process plugin, compiled into the program. It provides `template`, a
   block type with no subtype written `template "welcome" {}`, and renders a
@@ -184,8 +185,11 @@ directory, and the tests that need a real engine skip when none answers.
 ### Running them
 
 Every example keeps its state in a file, applies the configuration and prints
-what it read. The plugin example then `Destroy`s everything through
-the providers and prints what is left under `## Destroyed`. Each sends
+what it read. The plugin example is a command line tool, `xcl-docker`, with
+`apply <path>`, `status` and `destroy` commands, each a separate run sharing
+the state saved in `./.xcl-docker`: `status` reads it back with `Load`, and
+`destroy` removes everything through the providers and prints what is left
+under `## Destroyed`. Each sends
 everything xcl reports, lifecycle events, plugin log messages and errors, to
 the shared [`example/prettylog`](./example/prettylog) receiver, set up in one
 line, which writes styled lines to standard error. It shows info and above;
@@ -193,9 +197,10 @@ set `XCL_LOG_LEVEL=debug` to see plugin loading and `Init` messages too. The
 program's own report goes to standard output.
 
 Run any of them from its directory with `make run`. For `plugin` this builds
-the Docker plugin into `build/` first, and it has the extra Makefile targets
-`build`, `generate` and `clean`; every example has `run` and `test`. The plugin
-tests build the Docker plugin themselves.
+`xcl-docker` and the Docker plugin side by side into `build/`, then runs
+`apply ./config`, `status` and `destroy` in turn, and it has the extra Makefile
+targets `build`, `generate` and `clean`; every example has `run` and `test`.
+The plugin tests build both binaries themselves.
 
 Each example is a Go module of its own, pointed at this checkout with a
 `replace` directive, so it can be copied out of the repository: drop the
@@ -286,13 +291,20 @@ r.DiscoverPlugins([]string{"~/.xcl/plugins"}, "")    // directories to search
 ```
 
 Plugins load when they are first needed, at the start of the first
-`Validate`, `Apply` or `Destroy`, and only once per registry however many
-Configs share it. Discovery, loading and the rejection of a discovered binary
+`Validate`, `Apply`, `Destroy` or `Load`, and only once per registry however
+many Configs share it. Discovery, loading and the rejection of a discovered binary
 that is not a plugin are reported as `discover` and `load` events. A
 registered plugin that fails to load, such as a path that does not exist,
 fails that first operation with an error matching `xcl.ErrPluginLoad`, whose
 `*xcl.PluginLoadError` detail names the plugin. A plugin type whose name
 clashes with a known type fails it with a `*registry.TypeNameClashError`.
+
+An external plugin's process runs only while an operation is using it: xcl
+starts it for each `Validate`, `Apply`, `Destroy` or `Load` and stops it when
+the operation is done, so a program never stops a plugin itself and nothing
+is left running between operations. The process starts afresh each time, so
+the plugin's `Init` runs again and it keeps nothing in memory from one
+operation to the next. In-process plugins load once and stay loaded.
 
 ### Querying a configuration
 
@@ -492,7 +504,8 @@ which is adequate at one configuration's scale; see `docs/state.md`.
 Keep state between runs with a `StateStore`. `Apply` loads the saved state,
 applies the configuration and saves the result. `Destroy` needs no
 configuration: it destroys everything in the saved state, dependents before
-what they depend on.
+what they depend on. `Load` reads the saved state back without changing
+anything.
 
 ```go
 c, err := xcl.NewConfig(
@@ -503,9 +516,19 @@ c, err := xcl.NewConfig(
 
 err = c.Apply("./config")
 
-// later, remove everything that was applied
+// later, in another run, read back what was applied without applying it
+err = c.Load()
+
+// or remove everything that was applied
 err = c.Destroy()
 ```
+
+`Load` reads the saved state into the `Config`, so `Find`, `FindByType` and
+the other lookups answer from what was last saved. Like `Destroy` it needs no
+configuration, and it calls no provider. It loads the plugins first, as a
+saved plugin type is read back through its plugin's schema, and reports
+itself with `load_state` events. A program that applies in one run and
+reports in another, a `status` command, calls it before looking anything up.
 
 The state is saved after each resource is destroyed, so an interrupted
 `Destroy` picks up where it stopped. A resource whose destroy fails stays in
@@ -550,7 +573,7 @@ shape for all of them:
 |---|---|
 | `Time` | when it happened |
 | `Source` | `core` for xcl itself, otherwise the plugin's name |
-| `Operation` | `validate`, `apply`, `destroy`, `parse`, `create`, `read`, `changed`, `update`, `discover`, `load`, or `events` for a blocked announcement |
+| `Operation` | `validate`, `apply`, `destroy`, `load_state`, `parse`, `create`, `read`, `changed`, `update`, `discover`, `load`, or `events` for a blocked announcement |
 | `Phase` | `start`, `success`, `error`, `log` for a log message, `blocked` |
 | `ResourceType`, `ResourceID`, `File` | the resource the event is about and the file it was declared in |
 | `Duration` | how long a step took, or how long emitting was blocked |

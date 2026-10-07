@@ -9,8 +9,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/hashicorp/go-plugin"
-
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -82,11 +80,5 @@ func (p *WidgetPlugin) Init(log logger.Logger, state plugins.State) error {
 }
 
 func main() {
-	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: plugins.HandshakeConfig,
-		Plugins: map[string]plugin.Plugin{
-			"plugin": &plugins.GRPCPlugin{Impl: &WidgetPlugin{}},
-		},
-		GRPCServer: plugin.DefaultGRPCServer,
-	})
+	plugins.Serve(&WidgetPlugin{})
 }

@@ -15,7 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/example/plugin/docker"
+	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
+	"github.com/jumppad-labs/xcl/example/plugin/docker/resources"
 	"github.com/jumppad-labs/xcl/example/plugin/template"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 )
@@ -33,7 +34,7 @@ func TestMain(m *testing.M) {
 
 	dockerPlugin = filepath.Join(buildDir, "docker-plugin")
 
-	build := exec.Command("go", "build", "-o", dockerPlugin, "./cmd/docker-plugin")
+	build := exec.Command("go", "build", "-o", dockerPlugin, "./docker")
 	build.Stdout = os.Stdout
 	build.Stderr = os.Stderr
 
@@ -53,67 +54,74 @@ func TestMain(m *testing.M) {
 func requireDocker(t *testing.T) {
 	t.Helper()
 
-	if err := docker.Ping(context.Background()); err != nil {
+	if err := client.Ping(context.Background()); err != nil {
 		t.Skip(err.Error())
 	}
 }
 
-// newRegistry returns a plugin registry whose plugin hosts are stopped when
-// the test ends
-func newRegistry(t *testing.T) *registry.PluginRegistry {
+// applyExample applies the example's configuration with a nil event handler,
+// keeping the state in a temporary directory and writing the rendered template
+// to another. What it applied is destroyed when the test ends.
+func applyExample(t *testing.T) *xcl.Config {
 	t.Helper()
 
-	r := registry.NewPluginRegistry()
-	t.Cleanup(func() {
-		for _, host := range r.GetPluginHosts() {
-			host.Stop()
-		}
-	})
-
-	return r
+	return applyExampleWithState(t, t.TempDir())
 }
 
-// applyExample applies the example's configuration with a nil event handler,
-// writing the rendered template to a temporary directory. It does not destroy
-// what it applied, the caller does that or calls applyExampleWithCleanup.
-func applyExample(t *testing.T) *xcl.Config {
+// applyExampleWithState applies the example's configuration as applyExample
+// does, keeping the state in stateDir so a test can read it back in a second
+// Config, as a later run of the program would
+func applyExampleWithState(t *testing.T, stateDir string) *xcl.Config {
 	t.Helper()
 
 	requireDocker(t)
 	t.Setenv("HCL_VAR_output_dir", t.TempDir())
 
-	r := newRegistry(t)
-
-	c, err := apply(r, nil, "./config", dockerPlugin, t.TempDir())
-	if c != nil {
-		// destroy what was applied even when applying failed part way
-		t.Cleanup(func() {
-			if c.EntityCount() > 0 {
-				c.Destroy()
-			}
-		})
-	}
+	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
 	require.NoError(t, err)
-	require.NotNil(t, c)
+
+	// destroy what was applied even when applying fails part way
+	t.Cleanup(func() {
+		if c.EntityCount() > 0 {
+			c.Destroy()
+		}
+	})
+
+	err = apply(c, "./config")
+	require.NoError(t, err)
+
+	return c
+}
+
+// loadExample returns a Config holding the state saved in stateDir, built as
+// a later run of the program builds it
+func loadExample(t *testing.T, stateDir string) *xcl.Config {
+	t.Helper()
+
+	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
+	require.NoError(t, err)
+
+	err = load(c)
+	require.NoError(t, err)
 
 	return c
 }
 
 // newDockerClient returns a real Docker client, used to look at what the
 // example created
-func newDockerClient(t *testing.T) docker.Client {
+func newDockerClient(t *testing.T) client.Docker {
 	t.Helper()
 
-	client, err := docker.NewClient()
+	dockerClient, err := client.New()
 	require.NoError(t, err)
 
-	return client
+	return dockerClient
 }
 
 func TestApplyCreatesTheDockerNetwork(t *testing.T) {
 	c := applyExample(t)
 
-	networks, err := xcl.FindByType[docker.Network](c, "docker", "network")
+	networks, err := xcl.FindByType[resources.Network](c, "docker", "network")
 	require.NoError(t, err)
 	require.Len(t, networks, 1)
 
@@ -123,13 +131,13 @@ func TestApplyCreatesTheDockerNetwork(t *testing.T) {
 
 	inspect, err := newDockerClient(t).NetworkInspect(context.Background(), app.DockerID, network.InspectOptions{})
 	require.NoError(t, err)
-	require.Equal(t, docker.CreatedByValue, inspect.Labels[docker.LabelCreatedBy])
+	require.Equal(t, resources.CreatedByValue, inspect.Labels[resources.LabelCreatedBy])
 }
 
 func TestApplyCreatesTheDockerContainerOnTheNetwork(t *testing.T) {
 	c := applyExample(t)
 
-	web, err := xcl.Find[docker.Container](c, "docker.container.web")
+	web, err := xcl.Find[resources.Container](c, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.DockerID)
 	require.NotEmpty(t, web.IPAddress)
@@ -145,7 +153,7 @@ func TestApplyCreatesTheDockerContainerOnTheNetwork(t *testing.T) {
 func TestApplyRendersTheTemplateWithTheContainerAddress(t *testing.T) {
 	c := applyExample(t)
 
-	web, err := xcl.Find[docker.Container](c, "docker.container.web")
+	web, err := xcl.Find[resources.Container](c, "docker.container.web")
 	require.NoError(t, err)
 
 	welcome, err := xcl.Find[template.Template](c, "template.welcome")
@@ -175,10 +183,12 @@ func TestApplyFindsTheResourcesOfBothPlugins(t *testing.T) {
 func TestApplyFailsForAMissingDockerPlugin(t *testing.T) {
 	t.Setenv("HCL_VAR_output_dir", t.TempDir())
 
-	r := newRegistry(t)
 	missing := filepath.Join(t.TempDir(), "docker-plugin")
 
-	_, err := apply(r, nil, "./config", missing, t.TempDir())
+	c, err := newConfig(registry.NewPluginRegistry(), nil, missing, t.TempDir())
+	require.NoError(t, err)
+
+	err = apply(c, "./config")
 	require.Error(t, err)
 	require.ErrorIs(t, err, xcl.ErrPluginLoad)
 	require.Contains(t, err.Error(), "build it with `make build` in example/plugin")
@@ -200,22 +210,22 @@ func TestDestroyRemovesTheRenderedTemplate(t *testing.T) {
 func TestDestroyRemovesTheDockerResources(t *testing.T) {
 	c := applyExample(t)
 
-	app, err := xcl.Find[docker.Network](c, "docker.network.app")
+	app, err := xcl.Find[resources.Network](c, "docker.network.app")
 	require.NoError(t, err)
 
-	web, err := xcl.Find[docker.Container](c, "docker.container.web")
+	web, err := xcl.Find[resources.Container](c, "docker.container.web")
 	require.NoError(t, err)
 
 	err = destroy(io.Discard, c)
 	require.NoError(t, err)
 
-	client := newDockerClient(t)
+	dockerClient := newDockerClient(t)
 
-	_, err = client.ContainerInspect(context.Background(), web.DockerID)
+	_, err = dockerClient.ContainerInspect(context.Background(), web.DockerID)
 	require.Error(t, err)
 	require.True(t, dockerclient.IsErrNotFound(err), "expected the container to be gone, got: %s", err)
 
-	_, err = client.NetworkInspect(context.Background(), app.DockerID, network.InspectOptions{})
+	_, err = dockerClient.NetworkInspect(context.Background(), app.DockerID, network.InspectOptions{})
 	require.Error(t, err)
 	require.True(t, dockerclient.IsErrNotFound(err), "expected the network to be gone, got: %s", err)
 }
@@ -223,7 +233,7 @@ func TestDestroyRemovesTheDockerResources(t *testing.T) {
 func TestReportPrintsTheResourcesOfBothPlugins(t *testing.T) {
 	c := applyExample(t)
 
-	web, err := xcl.Find[docker.Container](c, "docker.container.web")
+	web, err := xcl.Find[resources.Container](c, "docker.container.web")
 	require.NoError(t, err)
 
 	out := &bytes.Buffer{}
@@ -239,4 +249,83 @@ func TestReportPrintsTheResourcesOfBothPlugins(t *testing.T) {
 	require.Contains(t, printed, "template.welcome")
 	require.Contains(t, printed, "Welcome to the app network.")
 	require.Contains(t, printed, "http://"+web.IPAddress+"/")
+}
+
+func TestStatusReportsWhatApplySaved(t *testing.T) {
+	stateDir := t.TempDir()
+	applied := applyExampleWithState(t, stateDir)
+
+	web, err := xcl.Find[resources.Container](applied, "docker.container.web")
+	require.NoError(t, err)
+
+	c := loadExample(t, stateDir)
+
+	out := &bytes.Buffer{}
+	err = report(out, c)
+	require.NoError(t, err)
+
+	printed := out.String()
+	require.Contains(t, printed, "docker.network.app")
+	require.Contains(t, printed, "docker.container.web")
+	require.Contains(t, printed, "ip_address="+web.IPAddress)
+	require.Contains(t, printed, "template.welcome")
+}
+
+func TestStatusWithNothingSavedReportsNothing(t *testing.T) {
+	c := loadExample(t, t.TempDir())
+
+	out := &bytes.Buffer{}
+	err := report(out, c)
+	require.NoError(t, err)
+
+	require.Equal(t, "## Networks\n## Containers\n## Templates\n", out.String())
+}
+
+func TestDestroyInALaterRunRemovesWhatApplySaved(t *testing.T) {
+	stateDir := t.TempDir()
+	applied := applyExampleWithState(t, stateDir)
+
+	web, err := xcl.Find[resources.Container](applied, "docker.container.web")
+	require.NoError(t, err)
+
+	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
+	require.NoError(t, err)
+
+	err = destroy(io.Discard, c)
+	require.NoError(t, err)
+
+	_, err = newDockerClient(t).ContainerInspect(context.Background(), web.DockerID)
+	require.Error(t, err)
+	require.True(t, dockerclient.IsErrNotFound(err), "expected the container to be gone, got: %s", err)
+
+	remaining := loadExample(t, stateDir)
+	require.Equal(t, 0, remaining.EntityCount())
+}
+
+func TestRunWithoutACommandPrintsUsage(t *testing.T) {
+	stderr := &bytes.Buffer{}
+
+	code := run(nil, io.Discard, stderr)
+
+	require.Equal(t, 2, code)
+	require.Contains(t, stderr.String(), "usage: xcl-docker <command> [flags]")
+}
+
+func TestRunWithAnUnknownCommandFails(t *testing.T) {
+	stderr := &bytes.Buffer{}
+
+	code := run([]string{"plan"}, io.Discard, stderr)
+
+	require.Equal(t, 2, code)
+	require.Contains(t, stderr.String(), `unknown command "plan"`)
+	require.Contains(t, stderr.String(), "usage: xcl-docker <command> [flags]")
+}
+
+func TestRunApplyWithoutAPathFails(t *testing.T) {
+	stderr := &bytes.Buffer{}
+
+	code := run([]string{"apply"}, io.Discard, stderr)
+
+	require.Equal(t, 2, code)
+	require.Contains(t, stderr.String(), "apply needs the path of the configuration to apply")
 }

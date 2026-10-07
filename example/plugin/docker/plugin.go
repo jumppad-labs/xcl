@@ -1,12 +1,14 @@
-package docker
+package main
 
 import (
+	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
+	"github.com/jumppad-labs/xcl/example/plugin/docker/resources"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 )
 
 // Plugin provides the block types docker "network" and docker "container".
-// It is served as an external plugin by ../cmd/docker-plugin.
+// main serves it as an external plugin.
 type Plugin struct {
 	plugins.PluginBase
 }
@@ -22,7 +24,7 @@ var _ plugins.Plugin = (*Plugin)(nil)
 // logs. During a call the providers log through plugins.Logger(ctx) instead,
 // which xcl binds to the resource and step being worked on.
 func (p *Plugin) Init(logger logger.Logger, state plugins.State) error {
-	client, err := NewClient()
+	dockerClient, err := client.New()
 	if err != nil {
 		return err
 	}
@@ -35,8 +37,8 @@ func (p *Plugin) Init(logger logger.Logger, state plugins.State) error {
 		state,
 		"docker",
 		"network",
-		&Network{},
-		&networkProvider{client: client},
+		&resources.Network{},
+		resources.NewNetworkProvider(dockerClient),
 	)
 	if err != nil {
 		return err
@@ -48,7 +50,7 @@ func (p *Plugin) Init(logger logger.Logger, state plugins.State) error {
 		state,
 		"docker",
 		"container",
-		&Container{},
-		&containerProvider{client: client},
+		&resources.Container{},
+		resources.NewContainerProvider(dockerClient),
 	)
 }

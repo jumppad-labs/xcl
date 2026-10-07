@@ -1,4 +1,4 @@
-package docker
+package resources
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jumppad-labs/xcl/example/plugin/docker/mocks"
+	"github.com/jumppad-labs/xcl/example/plugin/docker/client/mocks"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -26,7 +26,7 @@ func testNetwork() *Network {
 }
 
 func TestNetworkCreateAsksDockerForALabelledBridgeNetwork(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		NetworkCreate(context.Background(), "app", network.CreateOptions{
 			Driver:     "bridge",
@@ -49,7 +49,7 @@ func TestNetworkCreateAsksDockerForALabelledBridgeNetwork(t *testing.T) {
 func TestNetworkCreateSetsTheSubnetWhenGiven(t *testing.T) {
 	var got network.CreateOptions
 
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		NetworkCreate(context.Background(), "app", network.CreateOptions{
 			Driver:     "bridge",
@@ -81,7 +81,7 @@ func TestNetworkCreateSetsTheSubnetWhenGiven(t *testing.T) {
 }
 
 func TestNetworkCreateFillsTheDockerID(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		NetworkCreate(context.Background(), "app", network.CreateOptions{
 			Driver:     "bridge",
@@ -105,7 +105,7 @@ func TestNetworkCreateFillsTheDockerID(t *testing.T) {
 func TestNetworkCreateReturnsDockerErrors(t *testing.T) {
 	dockerErr := errors.New("daemon unavailable")
 
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		NetworkCreate(context.Background(), "app", network.CreateOptions{
 			Driver:     "bridge",
@@ -128,7 +128,7 @@ func TestNetworkCreateReturnsDockerErrors(t *testing.T) {
 }
 
 func TestNetworkDestroyRemovesTheNetworkByID(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		NetworkRemove(context.Background(), "net-123").
 		Return(nil).
@@ -144,7 +144,7 @@ func TestNetworkDestroyRemovesTheNetworkByID(t *testing.T) {
 }
 
 func TestNetworkDestroySucceedsWhenTheNetworkIsGone(t *testing.T) {
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		NetworkRemove(context.Background(), "net-123").
 		Return(errdefs.NotFound(errors.New("no such network"))).
@@ -162,7 +162,7 @@ func TestNetworkDestroySucceedsWhenTheNetworkIsGone(t *testing.T) {
 func TestNetworkDestroyReturnsDockerErrors(t *testing.T) {
 	dockerErr := errors.New("network has active endpoints")
 
-	client := mocks.NewMockClient(t)
+	client := mocks.NewMockDocker(t)
 	client.EXPECT().
 		NetworkRemove(context.Background(), "net-123").
 		Return(dockerErr).
@@ -179,7 +179,7 @@ func TestNetworkDestroyReturnsDockerErrors(t *testing.T) {
 }
 
 func TestNetworkReadKeepsTheDockerIDFromTheSavedNetwork(t *testing.T) {
-	provider := &networkProvider{client: mocks.NewMockClient(t)}
+	provider := &networkProvider{client: mocks.NewMockDocker(t)}
 
 	saved := testNetwork()
 	saved.DockerID = "net-123"

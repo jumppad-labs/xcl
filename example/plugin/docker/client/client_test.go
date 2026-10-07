@@ -1,4 +1,4 @@
-package docker
+package client
 
 import (
 	"context"
@@ -17,10 +17,10 @@ func TestPingFailsWhenNoEngineIsReachable(t *testing.T) {
 	require.Contains(t, err.Error(), "no Docker engine reachable")
 }
 
-func TestNewClientReturnsAClientFromTheEnvironment(t *testing.T) {
+func TestNewReturnsAClientFromTheEnvironment(t *testing.T) {
 	t.Setenv("DOCKER_HOST", "unix://"+filepath.Join(t.TempDir(), "none.sock"))
 
-	c, err := NewClient()
+	c, err := New()
 
 	require.NoError(t, err)
 	require.NotNil(t, c)

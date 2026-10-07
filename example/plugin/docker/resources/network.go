@@ -1,12 +1,13 @@
-package docker
+package resources
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
+	dockerclient "github.com/docker/docker/client"
 
+	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -32,10 +33,16 @@ type Network struct {
 type networkProvider struct {
 	plugins.DefaultChanged[*Network]
 
-	client Client
+	client client.Docker
 }
 
 var _ plugins.ResourceProvider[*Network] = (*networkProvider)(nil)
+
+// NewNetworkProvider returns the provider for docker "network" blocks, which
+// creates and removes networks through dockerClient
+func NewNetworkProvider(dockerClient client.Docker) plugins.ResourceProvider[*Network] {
+	return &networkProvider{client: dockerClient}
+}
 
 // Init logs that the provider is ready, it needs nothing else
 func (p *networkProvider) Init(state plugins.State, functions plugins.ProviderFunctions, log logger.Logger) error {
@@ -74,7 +81,7 @@ func (p *networkProvider) Create(ctx context.Context, n *Network) (*Network, err
 // removed
 func (p *networkProvider) Destroy(ctx context.Context, n *Network, force bool) error {
 	err := p.client.NetworkRemove(ctx, n.DockerID)
-	if err != nil && !client.IsErrNotFound(err) {
+	if err != nil && !dockerclient.IsErrNotFound(err) {
 		return fmt.Errorf("unable to remove network %s: %w", n.Meta.Name, err)
 	}
 
