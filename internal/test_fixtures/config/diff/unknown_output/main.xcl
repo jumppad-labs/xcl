@@ -1,0 +1,25 @@
+# A new network's provider id reaches resources through modules: net returns
+# the provider id of the network it creates as an output, app receives the
+# provider id of the root network as a variable.
+
+resource "network" "root" {
+  subnet = "10.0.0.0/16"
+}
+
+module "net" {
+  source = "./net"
+}
+
+module "app" {
+  source = "./app"
+
+  variables = {
+    network_name = resource.network.root.provider_id
+  }
+}
+
+resource "container" "from_output" {
+  network {
+    name = module.net.output.network_id
+  }
+}

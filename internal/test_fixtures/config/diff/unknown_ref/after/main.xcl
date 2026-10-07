@@ -1,0 +1,16 @@
+# Adds network two and names the user container's network block after its
+# provider id, a computed value only known once network two is created.
+
+resource "network" "one" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "network" "two" {
+  subnet = "10.1.0.0/16"
+}
+
+resource "container" "user" {
+  network {
+    name = resource.network.two.provider_id
+  }
+}

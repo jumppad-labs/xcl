@@ -1,0 +1,15 @@
+# A new network's provider id lands inside larger values of a new container:
+# one key of its env map and one element of its command list.
+
+resource "network" "one" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "container" "app" {
+  command = ["run", resource.network.one.provider_id, "--verbose"]
+
+  env = {
+    A = "x"
+    B = resource.network.one.provider_id
+  }
+}

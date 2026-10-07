@@ -138,7 +138,7 @@ type (
 )
 
 // Config defines the stack config
-// It orchestrates high-level operations (Apply, Validate, Destroy)
+// It orchestrates high-level operations (Apply, Validate, Diff, Destroy)
 // and manages the current state
 type Config struct {
 	entities        []any                    // what the configuration declares (private)
@@ -474,7 +474,8 @@ func convertVariablesToStringMap(vars map[string]any) map[string]string {
 	return result
 }
 
-// run runs the work of one Validate, Apply or Destroy and delivers its events.
+// run runs the work of one Validate, Apply, Diff or Destroy and delivers its
+// events.
 //
 // Without an event handler the work runs directly with a nil emit, so xcl is
 // silent and nothing extra is started. With one, the work runs on a worker

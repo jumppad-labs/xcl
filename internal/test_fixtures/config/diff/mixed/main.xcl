@@ -1,0 +1,27 @@
+# base with every kind of change at once: the web container is removed, the
+# api container's PORT is changed, and a backend network and a worker
+# container are added. The app network is left as it is.
+
+resource "network" "app" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "container" "api" {
+  network {
+    name = resource.network.app.meta.name
+  }
+
+  env = {
+    PORT = "9090"
+  }
+}
+
+resource "network" "backend" {
+  subnet = "10.1.0.0/16"
+}
+
+resource "container" "worker" {
+  network {
+    name = resource.network.backend.meta.name
+  }
+}

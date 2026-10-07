@@ -1,0 +1,26 @@
+# unknown_ref/after with a new follower container whose network block is
+# named after the user container's network name, itself named after network
+# two's provider id. user is saved, so its name is unknown only because it
+# was recorded as unknown, not because user is pending.
+
+resource "network" "one" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "network" "two" {
+  subnet = "10.1.0.0/16"
+}
+
+resource "container" "user" {
+  network {
+    name = resource.network.two.provider_id
+  }
+}
+
+resource "container" "follower" {
+  default = resource.container.user.default
+
+  network {
+    name = resource.container.user.network[0].name
+  }
+}
