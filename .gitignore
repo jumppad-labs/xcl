@@ -16,3 +16,4 @@ plugins/example/bin/
 /example/main
 # spektacular debug logs
 .spektacular/debug/
+.spektacular/tmp/

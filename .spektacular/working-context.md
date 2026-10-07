@@ -23,3 +23,13 @@ User wants to "do a diff between state and config". The diff "should show the re
 - Encoding/highlighting: encode.go `EncodeEntity`, `Highlight(renderer)`, `RevealSensitive()`; highlight package.
 - Library only today (Config.Validate/Apply/Destroy/Load in config.go); no CLI in repo.
 - Other repos: xcl-website (docs), xcl-vscode (syntax highlighting).
+
+# Orchestrator — spek-plan-epic 20261007105731-2388b579-diff (2026-10-07)
+- Epic chosen: 20261007105731-2388b579-diff (only epic with unplanned specs).
+- Specs: 20261007105731-2388b579-diff (ready), 20261007111826-cf3b66d8-diff-rendering-and-docs (blocked on the first).
+- Started child for 20261007105731-2388b579-diff.
+- Q (diff child): finished step auto-commits (auto_commit: workflow). User answered: finish and commit. Sent to child.
+- diff child FAILED at walkthrough -> finished: auto_commit_failed (git pathspec on untracked empty dir .spektacular/tmp/20261007105731-2388b579-diff; .spektacular/tmp/ not git-ignored). Child's attempt to edit .git/info/exclude was denied by permissions. Run stopped; epic summary not yet written; rendering-and-docs not started. Plan docs are staged (A) in git.
+- User switched auto_commit off (config.yaml set to 'off'). Resuming diff child to finish without commit.
+- diff plan DONE (no commit). Starting child for 20261007111826-cf3b66d8-diff-rendering-and-docs.
+- Both plans DONE; epic summary written (2 spec sections, no decisions); epic order added none. Next: end-of-planning review.
