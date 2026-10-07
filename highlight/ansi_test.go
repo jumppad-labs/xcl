@@ -236,6 +236,33 @@ func TestANSIRendererDefaultLeavesUnmatchedTokenUncoloured(t *testing.T) {
 	require.Equal(t, "=", output)
 }
 
+func TestANSIRendererThemeColoursInserted(t *testing.T) {
+	theme := `{"tokenColors": [{"scope": "markup.inserted", "settings": {"foreground": "#00ff00"}}]}`
+	renderer, err := highlight.NewANSIRenderer(highlight.WithTheme(strings.NewReader(theme)))
+	require.NoError(t, err)
+
+	output := renderer.Render(highlight.ScopeInserted, "+ added")
+
+	require.Equal(t, "\x1b[38;2;0;255;0m+ added\x1b[0m", output)
+}
+
+func TestANSIRendererThemeWithoutMarkupRuleLeavesDeletedUncoloured(t *testing.T) {
+	renderer := referenceThemeRenderer(t)
+
+	output := renderer.Render(highlight.ScopeDeleted, "- removed")
+
+	require.Equal(t, "- removed", output)
+}
+
+func TestANSIRendererDefaultColoursInsertedGreen(t *testing.T) {
+	renderer, err := highlight.NewANSIRenderer()
+	require.NoError(t, err)
+
+	output := renderer.Render(highlight.ScopeInserted, "+ added")
+
+	require.Equal(t, "\x1b[32m+ added\x1b[0m", output)
+}
+
 func TestANSIRendererLeavesUnlabelledTextUncoloured(t *testing.T) {
 	renderer := referenceThemeRenderer(t)
 
