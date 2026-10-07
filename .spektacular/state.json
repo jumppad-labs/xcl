@@ -15,16 +15,9 @@
     "split",
     "finished"
   ],
-  "created_at": "2026-10-06T11:21:08.954541622Z",
-  "updated_at": "2026-10-06T11:29:40.388343796Z",
+  "created_at": "2026-10-07T10:57:31.41887071Z",
+  "updated_at": "2026-10-07T11:18:41.39475218Z",
   "data": {
-    "epic": "20261006071139-7b266535-examples-and-output",
-    "name": "20261006112108-17623cda-encoder-syntax-highlighting",
-    "sources": [
-      {
-        "retrieved_date": "2026-10-06",
-        "uri": "https://github.com/jumppad-labs/xcl/issues/6"
-      }
-    ]
+    "name": "20261007105731-2388b579-diff"
   }
 }
