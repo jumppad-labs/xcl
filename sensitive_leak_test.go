@@ -13,6 +13,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/logger"
@@ -626,4 +627,51 @@ func TestLeakDiffEvents(t *testing.T) {
 
 	require.NotContains(t, text, knownSecret)
 	require.NotContains(t, text, leakDiffSecret)
+}
+
+func TestLeakDiffRenderingOfChangedCredential(t *testing.T) {
+	result := diffChangedCredential(t)
+	require.Equal(t, 1, result.Summary.Update)
+
+	text := string(diff.Render(result))
+
+	require.NotContains(t, text, diffCredentialBeforePassword)
+	require.NotContains(t, text, diffCredentialAfterPassword)
+	require.Contains(t, text, "      ~ password = (sensitive value)\n")
+}
+
+func TestLeakDiffRenderingOfChangedCredentialRevealed(t *testing.T) {
+	result := diffChangedCredential(t, diff.RevealSensitive())
+	require.Equal(t, 1, result.Summary.Update)
+
+	text := string(diff.Render(result))
+
+	require.Contains(t, text, `"`+diffCredentialBeforePassword+`" -> "`+diffCredentialAfterPassword+`"`)
+}
+
+func TestLeakDiffHighlightedRenderingOfChangedCredential(t *testing.T) {
+	result := diffChangedCredential(t)
+	require.Equal(t, 1, result.Summary.Update)
+
+	renderer, err := highlight.NewANSIRenderer()
+	require.NoError(t, err)
+
+	text := string(diff.Render(result, diff.Highlight(renderer)))
+
+	require.NotContains(t, text, diffCredentialBeforePassword)
+	require.NotContains(t, text, diffCredentialAfterPassword)
+	require.Contains(t, text, "(sensitive value)")
+}
+
+func TestLeakDiffHighlightedRenderingOfChangedCredentialRevealed(t *testing.T) {
+	result := diffChangedCredential(t, diff.RevealSensitive())
+	require.Equal(t, 1, result.Summary.Update)
+
+	renderer, err := highlight.NewANSIRenderer()
+	require.NoError(t, err)
+
+	text := string(diff.Render(result, diff.Highlight(renderer)))
+
+	require.Contains(t, text, diffCredentialBeforePassword)
+	require.Contains(t, text, diffCredentialAfterPassword)
 }

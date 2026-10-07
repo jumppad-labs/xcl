@@ -425,6 +425,30 @@ func TestDefaultThemeLeavesOperatorUnstyled(t *testing.T) {
 	require.Nil(t, resolved.fontStyle)
 }
 
+func TestDefaultThemeColoursInsertedGreen(t *testing.T) {
+	parsed := defaultTheme()
+
+	resolved := parsed.style(ScopeInserted)
+
+	require.Equal(t, &colour{basic: 32}, resolved.colour)
+}
+
+func TestDefaultThemeColoursDeletedRed(t *testing.T) {
+	parsed := defaultTheme()
+
+	resolved := parsed.style(ScopeDeleted)
+
+	require.Equal(t, &colour{basic: 31}, resolved.colour)
+}
+
+func TestDefaultThemeColoursChangedYellow(t *testing.T) {
+	parsed := defaultTheme()
+
+	resolved := parsed.style(ScopeChanged)
+
+	require.Equal(t, &colour{basic: 33}, resolved.colour)
+}
+
 func TestParseThemeRejectsUnreadableReader(t *testing.T) {
 	readErr := errors.New("disk on fire")
 

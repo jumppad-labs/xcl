@@ -10,6 +10,10 @@
 // the input exactly once and in order. Joining the pieces unchanged gives
 // back the input, so highlighting never changes the text itself.
 //
+// The package also names the scopes diff output is labelled with,
+// ScopeInserted, ScopeDeleted and ScopeChanged, so the same renderers and
+// themes colour a rendered diff.
+//
 // NewANSIRenderer returns the built-in terminal renderer. The package never
 // checks whether output is a terminal: whether to colour is the caller's
 // decision.

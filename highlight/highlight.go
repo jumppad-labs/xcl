@@ -87,6 +87,23 @@ const (
 	ScopeBlockComment = "comment.block.xcl"
 )
 
+// The scopes diff output is labelled with. They are not grammar scopes: they
+// are the TextMate diff scopes VS Code's own diff grammar uses, which colour
+// themes already style through their markup.inserted, markup.deleted and
+// markup.changed rules, so a theme colours an xcl diff the way it colours any
+// other diff. A theme with no such rules leaves diff output in the default
+// colour.
+const (
+	// ScopeInserted labels a created resource or an added value
+	ScopeInserted = "markup.inserted.diff"
+
+	// ScopeDeleted labels a deleted resource or a removed value
+	ScopeDeleted = "markup.deleted.diff"
+
+	// ScopeChanged labels an updated or replaced resource, or a changed value
+	ScopeChanged = "markup.changed.diff"
+)
+
 // Renderer turns one labelled piece of configuration text into output. Text
 // calls Render once for every piece of its input, in order, and joins what it
 // returns. scope is the TextMate scope the xcl-vscode grammar gives the
