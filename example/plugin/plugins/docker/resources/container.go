@@ -13,7 +13,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
 
-	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"

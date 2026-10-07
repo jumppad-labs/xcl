@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/docker/docker/api/types/network"
@@ -15,9 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
-	"github.com/jumppad-labs/xcl/example/plugin/docker/resources"
-	"github.com/jumppad-labs/xcl/example/plugin/template"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/resources"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/template"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
@@ -34,7 +35,7 @@ func TestMain(m *testing.M) {
 
 	dockerPlugin = filepath.Join(buildDir, "docker-plugin")
 
-	build := exec.Command("go", "build", "-o", dockerPlugin, "./docker")
+	build := exec.Command("go", "build", "-o", dockerPlugin, "./plugins/docker")
 	build.Stdout = os.Stdout
 	build.Stderr = os.Stderr
 
@@ -201,7 +202,7 @@ func TestDestroyRemovesTheRenderedTemplate(t *testing.T) {
 	require.NoError(t, err)
 	require.FileExists(t, welcome.Destination)
 
-	err = destroy(io.Discard, c)
+	err = destroy(c)
 	require.NoError(t, err)
 
 	require.NoFileExists(t, welcome.Destination)
@@ -216,7 +217,7 @@ func TestDestroyRemovesTheDockerResources(t *testing.T) {
 	web, err := xcl.Find[resources.Container](c, "docker.container.web")
 	require.NoError(t, err)
 
-	err = destroy(io.Discard, c)
+	err = destroy(c)
 	require.NoError(t, err)
 
 	dockerClient := newDockerClient(t)
@@ -230,25 +231,25 @@ func TestDestroyRemovesTheDockerResources(t *testing.T) {
 	require.True(t, dockerclient.IsErrNotFound(err), "expected the network to be gone, got: %s", err)
 }
 
-func TestReportPrintsTheResourcesOfBothPlugins(t *testing.T) {
+func TestStatusPrintsTheAppliedResourcesAsATree(t *testing.T) {
 	c := applyExample(t)
+
+	app, err := xcl.Find[resources.Network](c, "docker.network.app")
+	require.NoError(t, err)
 
 	web, err := xcl.Find[resources.Container](c, "docker.container.web")
 	require.NoError(t, err)
 
 	out := &bytes.Buffer{}
-	err = report(out, c)
+	err = status(out, c)
 	require.NoError(t, err)
 
-	printed := out.String()
-	require.Contains(t, printed, "## Networks")
-	require.Contains(t, printed, "docker.network.app")
-	require.Contains(t, printed, "## Containers")
-	require.Contains(t, printed, "docker.container.web")
-	require.Contains(t, printed, "## Templates")
-	require.Contains(t, printed, "template.welcome")
-	require.Contains(t, printed, "Welcome to the app network.")
-	require.Contains(t, printed, "http://"+web.IPAddress+"/")
+	// out is not a terminal, so the tree is plain text
+	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+	require.Len(t, lines, 3)
+	require.Equal(t, "● docker.network.app  10.42.0.0/24 · "+app.DockerID[:12], lines[0])
+	require.Equal(t, "└── ● docker.container.web  nginx:1.27-alpine · "+web.IPAddress+" · "+web.DockerID[:12], lines[1])
+	require.True(t, strings.HasPrefix(lines[2], "    └── ● template.welcome  "), "unexpected line: %q", lines[2])
 }
 
 func TestStatusReportsWhatApplySaved(t *testing.T) {
@@ -261,24 +262,65 @@ func TestStatusReportsWhatApplySaved(t *testing.T) {
 	c := loadExample(t, stateDir)
 
 	out := &bytes.Buffer{}
-	err = report(out, c)
+	err = status(out, c)
 	require.NoError(t, err)
 
 	printed := out.String()
 	require.Contains(t, printed, "docker.network.app")
 	require.Contains(t, printed, "docker.container.web")
-	require.Contains(t, printed, "ip_address="+web.IPAddress)
+	require.Contains(t, printed, web.IPAddress)
 	require.Contains(t, printed, "template.welcome")
 }
 
-func TestStatusWithNothingSavedReportsNothing(t *testing.T) {
+func TestStatusWithNothingSavedPrintsNothingApplied(t *testing.T) {
 	c := loadExample(t, t.TempDir())
 
 	out := &bytes.Buffer{}
-	err := report(out, c)
+	err := status(out, c)
 	require.NoError(t, err)
 
-	require.Equal(t, "## Networks\n## Containers\n## Templates\n", out.String())
+	require.Equal(t, "nothing applied\n", out.String())
+}
+
+func TestInspectPrintsTheContainerAsConfiguration(t *testing.T) {
+	stateDir := t.TempDir()
+	applied := applyExampleWithState(t, stateDir)
+
+	web, err := xcl.Find[resources.Container](applied, "docker.container.web")
+	require.NoError(t, err)
+
+	c := loadExample(t, stateDir)
+
+	out := &bytes.Buffer{}
+	err = inspect(out, c, "docker.container.web")
+	require.NoError(t, err)
+
+	// out is not a terminal, so the text is plain
+	printed := out.String()
+	require.True(t, strings.HasPrefix(printed, `docker "container" "web" {`), "unexpected text:\n%s", printed)
+	require.Contains(t, printed, `image = "nginx:1.27-alpine"`)
+	require.Contains(t, printed, "name    = docker.network.app.meta.name")
+	require.Contains(t, printed, `ip_address = "`+web.IPAddress+`" # set by the provider`)
+	require.Contains(t, printed, `docker_id  = "`+web.DockerID+`" # set by the provider`)
+}
+
+func TestInspectFailsForAVariable(t *testing.T) {
+	stateDir := t.TempDir()
+	applyExampleWithState(t, stateDir)
+
+	c := loadExample(t, stateDir)
+
+	err := inspect(io.Discard, c, "variable.output_dir")
+	require.Error(t, err)
+	require.ErrorIs(t, err, xcl.ErrNotEncodable)
+}
+
+func TestInspectFailsForAResourceNotInTheState(t *testing.T) {
+	c := loadExample(t, t.TempDir())
+
+	err := inspect(io.Discard, c, "docker.container.web")
+	require.Error(t, err)
+	require.Equal(t, "no resource docker.container.web in the saved state, xcl-docker status lists them", err.Error())
 }
 
 func TestDestroyInALaterRunRemovesWhatApplySaved(t *testing.T) {
@@ -291,7 +333,7 @@ func TestDestroyInALaterRunRemovesWhatApplySaved(t *testing.T) {
 	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
 	require.NoError(t, err)
 
-	err = destroy(io.Discard, c)
+	err = destroy(c)
 	require.NoError(t, err)
 
 	_, err = newDockerClient(t).ContainerInspect(context.Background(), web.DockerID)
@@ -319,6 +361,15 @@ func TestRunWithAnUnknownCommandFails(t *testing.T) {
 	require.Equal(t, 2, code)
 	require.Contains(t, stderr.String(), `unknown command "plan"`)
 	require.Contains(t, stderr.String(), "usage: xcl-docker <command> [flags]")
+}
+
+func TestRunInspectWithoutAnAddressFails(t *testing.T) {
+	stderr := &bytes.Buffer{}
+
+	code := run([]string{"inspect"}, io.Discard, stderr)
+
+	require.Equal(t, 2, code)
+	require.Contains(t, stderr.String(), "inspect needs the address of the resource to inspect")
 }
 
 func TestRunApplyWithoutAPathFails(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jumppad-labs/xcl/example/plugin/docker/client/mocks"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client/mocks"
 	"github.com/jumppad-labs/xcl/types"
 )
 

@@ -2,20 +2,21 @@
 // plugins that do real work. Their providers take part in the lifecycle,
 // creating real things on apply and removing them on destroy:
 //
-//   - The Docker plugin (./docker) is an external plugin, a standalone binary
-//     that xcl starts as a separate process and calls over gRPC. It provides
-//     docker "network" and docker "container", and creates real Docker
-//     networks and containers.
-//   - The template plugin (./template) is an in-process plugin, compiled into
-//     this program. It provides template, a block type with no subtype, and
-//     renders a Handlebars template to a file.
+//   - The Docker plugin (./plugins/docker) is an external plugin, a standalone
+//     binary that xcl starts as a separate process and calls over gRPC. It
+//     provides docker "network" and docker "container", and creates real
+//     Docker networks and containers.
+//   - The template plugin (./plugins/template) is an in-process plugin,
+//     compiled into this program. It provides template, a block type with no
+//     subtype, and renders a Handlebars template to a file.
 //
-// It has three commands, each a separate run of the program sharing the state
+// It has four commands, each a separate run of the program sharing the state
 // saved in a directory, ./.xcl-docker by default:
 //
-//	xcl-docker apply [flags] <path>   apply the configuration at path, print what it created
-//	xcl-docker status [flags]         print what the saved state holds
-//	xcl-docker destroy [flags]        remove everything in the saved state
+//	xcl-docker apply [flags] <path>       apply the configuration at path
+//	xcl-docker status [flags]             print what the saved state holds as a tree
+//	xcl-docker inspect [flags] <address>  print the resource at address as configuration
+//	xcl-docker destroy [flags]            remove everything in the saved state
 //
 // The flags are --state <dir>, the directory the state is kept in, and
 // --plugin <path>, the Docker plugin binary, docker-plugin next to the
@@ -41,9 +42,8 @@ import (
 	"path/filepath"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
-	"github.com/jumppad-labs/xcl/example/plugin/docker/resources"
-	"github.com/jumppad-labs/xcl/example/plugin/template"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/template"
 	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 )
@@ -59,11 +59,12 @@ const dockerPluginName = "docker-plugin"
 const usage = `usage: xcl-docker <command> [flags]
 
 commands:
-  apply [flags] <path>  apply the configuration at path and print what it created
-  status [flags]        print what the saved state holds
-  destroy [flags]       remove everything in the saved state
+  apply [flags] <path>       apply the configuration at path
+  status [flags]             print what the saved state holds as a tree
+  inspect [flags] <address>  print the resource at address as configuration
+  destroy [flags]            remove everything in the saved state
 
-flags, given before the path:
+flags, given before the path or address:
   --state <dir>     directory the state is kept in (default ./.xcl-docker)
   --plugin <path>   Docker plugin binary (default docker-plugin next to xcl-docker)
 `
@@ -102,11 +103,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return 2
 		}
 
-		err = applyCommand(stdout, stderr, flags.Arg(0), *dockerPlugin, *stateDir)
+		err = applyCommand(stderr, flags.Arg(0), *dockerPlugin, *stateDir)
 	case "status":
-		err = statusCommand(stdout, stderr, *dockerPlugin, *stateDir)
+		err = statusCommand(stdout, *dockerPlugin, *stateDir)
+	case "inspect":
+		if flags.NArg() != 1 {
+			fmt.Fprint(stderr, "inspect needs the address of the resource to inspect\n\n"+usage)
+			return 2
+		}
+
+		err = inspectCommand(stdout, flags.Arg(0), *dockerPlugin, *stateDir)
 	case "destroy":
-		err = destroyCommand(stdout, stderr, *dockerPlugin, *stateDir)
+		err = destroyCommand(stderr, *dockerPlugin, *stateDir)
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n\n%s", command, usage)
 		return 2
@@ -131,9 +139,10 @@ func defaultDockerPlugin() string {
 	return filepath.Join(filepath.Dir(executable), dockerPluginName)
 }
 
-// applyCommand applies the configuration at configDir and prints what it
-// created. The state is saved in stateDir, so status and destroy see it.
-func applyCommand(stdout, stderr io.Writer, configDir, dockerPlugin, stateDir string) error {
+// applyCommand applies the configuration at configDir. It prints nothing of
+// its own, the events written to stderr end with the apply's success or
+// error. The state is saved in stateDir, so status and destroy see it.
+func applyCommand(stderr io.Writer, configDir, dockerPlugin, stateDir string) error {
 	// The Docker plugin creates real containers, check an engine answers
 	// before applying anything
 	if err := client.Ping(context.Background()); err != nil {
@@ -150,19 +159,15 @@ func applyCommand(stdout, stderr io.Writer, configDir, dockerPlugin, stateDir st
 		return err
 	}
 
-	if err := apply(c, configDir); err != nil {
-		return err
-	}
-
-	return report(stdout, c)
+	return apply(c, configDir)
 }
 
-// statusCommand prints what the state saved in stateDir holds. It reads the
-// state alone, needing neither the configuration nor a Docker engine.
-func statusCommand(stdout, stderr io.Writer, dockerPlugin, stateDir string) error {
-	r := registry.NewPluginRegistry()
-
-	c, err := newConfig(r, eventHandler(stderr, r), dockerPlugin, stateDir)
+// statusCommand prints what the state saved in stateDir holds as a tree. It
+// reads the state alone, needing neither the configuration nor a Docker
+// engine. It prints only the tree, so xcl is given no event handler and stays
+// silent.
+func statusCommand(stdout io.Writer, dockerPlugin, stateDir string) error {
+	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
 	if err != nil {
 		return err
 	}
@@ -171,12 +176,29 @@ func statusCommand(stdout, stderr io.Writer, dockerPlugin, stateDir string) erro
 		return err
 	}
 
-	return report(stdout, c)
+	return status(stdout, c)
+}
+
+// inspectCommand prints the resource at address in the state saved in
+// stateDir as configuration text. Like status it reads the state alone and
+// prints only the text, so xcl is given no event handler and stays silent.
+func inspectCommand(stdout io.Writer, address, dockerPlugin, stateDir string) error {
+	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
+	if err != nil {
+		return err
+	}
+
+	if err := load(c); err != nil {
+		return err
+	}
+
+	return inspect(stdout, c, address)
 }
 
 // destroyCommand removes everything in the state saved in stateDir, working
-// from the state alone
-func destroyCommand(stdout, stderr io.Writer, dockerPlugin, stateDir string) error {
+// from the state alone. Like apply it prints nothing of its own, the events
+// written to stderr end with the destroy's success or error.
+func destroyCommand(stderr io.Writer, dockerPlugin, stateDir string) error {
 	if err := client.Ping(context.Background()); err != nil {
 		return err
 	}
@@ -188,7 +210,7 @@ func destroyCommand(stdout, stderr io.Writer, dockerPlugin, stateDir string) err
 		return err
 	}
 
-	return destroy(stdout, c)
+	return destroy(c)
 }
 
 // eventHandler returns the receiver every command gives xcl, which writes
@@ -249,60 +271,8 @@ func explainPluginLoad(err error) error {
 	return err
 }
 
-// report writes the networks, containers and rendered templates c applied to
-// out
-func report(out io.Writer, c *xcl.Config) error {
-	// Plugin types are held as types generated from the plugin's schema, the
-	// lookup copies them into the plugin's Go type
-	networks, err := xcl.FindByType[resources.Network](c, "docker", "network")
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintln(out, "## Networks")
-	for _, n := range networks {
-		fmt.Fprintf(out, "  %s name=%s subnet=%s docker_id=%s\n", n.Meta.ID, n.Meta.Name, n.Subnet, n.DockerID)
-	}
-
-	containers, err := xcl.FindByType[resources.Container](c, "docker", "container")
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintln(out, "## Containers")
-	for _, ctr := range containers {
-		fmt.Fprintf(out, "  %s image=%s ip_address=%s docker_id=%s\n", ctr.Meta.ID, ctr.Image, ctr.IPAddress, ctr.DockerID)
-	}
-
-	// template has no subtype, so its address has one segment before the name
-	templates, err := xcl.FindByType[template.Template](c, "template")
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintln(out, "## Templates")
-	for _, t := range templates {
-		rendered, err := os.ReadFile(t.Destination)
-		if err != nil {
-			return err
-		}
-
-		fmt.Fprintf(out, "  %s destination=%s\n", t.Meta.ID, t.Destination)
-		fmt.Fprintf(out, "%s", rendered)
-	}
-
-	return nil
-}
-
 // destroy removes everything c applied, dependents before what they depend
-// on, working only from the saved state, and writes what remains to out
-func destroy(out io.Writer, c *xcl.Config) error {
-	if err := explainPluginLoad(c.Destroy()); err != nil {
-		return err
-	}
-
-	fmt.Fprintln(out, "## Destroyed")
-	fmt.Fprintf(out, "  %d resources remaining\n", c.EntityCount())
-
-	return nil
+// on, working only from the saved state
+func destroy(c *xcl.Config) error {
+	return explainPluginLoad(c.Destroy())
 }

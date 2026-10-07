@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
-	"github.com/jumppad-labs/xcl/example/plugin/docker/resources"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/resources"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 )

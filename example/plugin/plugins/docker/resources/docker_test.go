@@ -16,7 +16,7 @@ import (
 	dockerclient "github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jumppad-labs/xcl/example/plugin/docker/client"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
 	"github.com/jumppad-labs/xcl/types"
 )
 

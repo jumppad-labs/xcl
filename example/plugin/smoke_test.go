@@ -23,7 +23,7 @@ func buildExample(t *testing.T) string {
 	output, err := build.CombinedOutput()
 	require.NoError(t, err, string(output))
 
-	buildPlugin := exec.Command("go", "build", "-o", filepath.Join(buildDir, dockerPluginName), "./docker")
+	buildPlugin := exec.Command("go", "build", "-o", filepath.Join(buildDir, dockerPluginName), "./plugins/docker")
 	output, err = buildPlugin.CombinedOutput()
 	require.NoError(t, err, string(output))
 
@@ -62,21 +62,31 @@ func TestSmokeApplyStatusDestroyShareTheSavedState(t *testing.T) {
 		runExample(t, binary, env, "destroy", "--state", stateDir)
 	})
 	require.NoError(t, err, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
-	require.Contains(t, stdout, "docker.network.app")
-	require.Contains(t, stdout, "docker.container.web")
-	require.Contains(t, stdout, "template.welcome")
+	require.Empty(t, stdout, "apply prints nothing of its own")
+	require.Contains(t, stderr, "apply success")
 
 	stdout, stderr, err = runExample(t, binary, env, "status", "--state", stateDir)
 	require.NoError(t, err, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
-	require.Contains(t, stdout, "docker.network.app")
-	require.Contains(t, stdout, "docker.container.web")
-	require.Contains(t, stdout, "template.welcome")
+	require.Empty(t, stderr, "status prints only its tree")
+	require.Contains(t, stdout, "● docker.network.app")
+	require.Contains(t, stdout, "└── ● docker.container.web")
+	require.Contains(t, stdout, "    └── ● template.welcome")
+
+	stdout, stderr, err = runExample(t, binary, env, "inspect", "--state", stateDir, "docker.container.web")
+	require.NoError(t, err, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
+	require.Empty(t, stderr, "inspect prints only the configuration")
+	require.Contains(t, stdout, `docker "container" "web" {`)
+	require.Contains(t, stdout, "# set by the provider")
 
 	stdout, stderr, err = runExample(t, binary, env, "destroy", "--state", stateDir)
 	require.NoError(t, err, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
-	require.Contains(t, stdout, "## Destroyed")
-	require.Contains(t, stdout, "0 resources remaining")
+	require.Empty(t, stdout, "destroy prints nothing of its own")
+	require.Contains(t, stderr, "destroy success")
 	require.NotContains(t, stderr, "error:")
+
+	stdout, _, err = runExample(t, binary, env, "status", "--state", stateDir)
+	require.NoError(t, err)
+	require.Equal(t, "nothing applied\n", stdout)
 }
 
 func TestSmokeApplyFailsForMissingPlugin(t *testing.T) {

@@ -150,16 +150,19 @@ its state, with the secret encrypted, in a temporary directory.
 ([`plugin/config`](./example/plugin/config)) through two plugins that do real
 work, each laid out the way a plugin author would lay out their own project:
 
-- The Docker plugin ([`plugin/docker`](./example/plugin/docker)) is an
-  external plugin, a standalone program with its own `main` that xcl starts
-  as a separate process and calls over gRPC. It provides `docker "network"`
-  and `docker "container"`, defined with their providers in
-  [`plugin/docker/resources`](./example/plugin/docker/resources), and creates
-  real Docker networks and containers. Its providers hold a narrow `Docker` interface over the Docker SDK, kept in its
-  own `client` package
-  ([`plugin/docker/client`](./example/plugin/docker/client)), which the real
-  SDK client satisfies and a Mockery mock stands in for in their unit tests.
-- The template plugin ([`plugin/template`](./example/plugin/template)) is an
+- The Docker plugin
+  ([`plugin/plugins/docker`](./example/plugin/plugins/docker)) is an external
+  plugin, a standalone program with its own `main` that xcl starts as a
+  separate process and calls over gRPC. It provides `docker "network"` and
+  `docker "container"`, defined with their providers in
+  [`plugin/plugins/docker/resources`](./example/plugin/plugins/docker/resources),
+  and creates real Docker networks and containers. Its providers hold a narrow
+  `Docker` interface over the Docker SDK, kept in its own `client` package
+  ([`plugin/plugins/docker/client`](./example/plugin/plugins/docker/client)),
+  which the real SDK client satisfies and a Mockery mock stands in for in
+  their unit tests.
+- The template plugin
+  ([`plugin/plugins/template`](./example/plugin/plugins/template)) is an
   in-process plugin, compiled into the program. It provides `template`, a
   block type with no subtype written `template "welcome" {}`, and renders a
   Handlebars template to a file.
@@ -186,15 +189,19 @@ directory, and the tests that need a real engine skip when none answers.
 
 Every example keeps its state in a file, applies the configuration and prints
 what it read. The plugin example is a command line tool, `xcl-docker`, with
-`apply <path>`, `status` and `destroy` commands, each a separate run sharing
-the state saved in `./.xcl-docker`: `status` reads it back with `Load`, and
-`destroy` removes everything through the providers and prints what is left
-under `## Destroyed`. Each sends
-everything xcl reports, lifecycle events, plugin log messages and errors, to
-the shared [`example/prettylog`](./example/prettylog) receiver, set up in one
-line, which writes styled lines to standard error. It shows info and above;
-set `XCL_LOG_LEVEL=debug` to see plugin loading and `Init` messages too. The
-program's own report goes to standard output.
+`apply <path>`, `status`, `inspect <address>` and `destroy` commands, each a
+separate run sharing the state saved in `./.xcl-docker`. `apply` and
+`destroy` print nothing of their own. `status` reads the state back with
+`Load` and prints it as a tree drawn with
+[Lip Gloss](https://github.com/charmbracelet/lipgloss), and `inspect` prints
+one resource as highlighted configuration text with `EncodeEntity`. Each
+example sends everything xcl reports, lifecycle events, plugin log messages
+and errors, to the shared [`example/prettylog`](./example/prettylog)
+receiver, set up in one line, which writes styled lines to standard error. It
+shows info and above; set `XCL_LOG_LEVEL=debug` to see plugin loading and
+`Init` messages too. The program's own output goes to standard output. The
+plugin example's `status` and `inspect` are the exception: they print only
+their output, so they give xcl no receiver.
 
 Run any of them from its directory with `make run`. For `plugin` this builds
 `xcl-docker` and the Docker plugin side by side into `build/`, then runs

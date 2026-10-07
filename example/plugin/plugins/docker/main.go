@@ -4,7 +4,7 @@
 // this binary as a separate process and talks to it over gRPC.
 //
 // Build it from the example/plugin directory with `make build`, which runs
-// `go build -o build/docker-plugin ./docker`.
+// `go build -o build/docker-plugin ./plugins/docker`.
 package main
 
 import (

@@ -1,6 +1,6 @@
 # Mockery v3 configuration, run with `make generate`. It generates the mock of
-# the Docker client interface in docker/client, which the provider unit tests
-# use in place of Docker.
+# the Docker client interface in plugins/docker/client, which the provider unit
+# tests use in place of Docker.
 dir: '{{.InterfaceDir}}/mocks'
 filename: 'mock_{{ snakecase .InterfaceName }}.go'
 structname: Mock{{.InterfaceName}}
@@ -9,6 +9,6 @@ template: testify
 template-data:
   unroll-variadic: true
 packages:
-  github.com/jumppad-labs/xcl/example/plugin/docker/client:
+  github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client:
     interfaces:
       Docker: {}
