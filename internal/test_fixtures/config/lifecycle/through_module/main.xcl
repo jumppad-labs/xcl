@@ -1,0 +1,26 @@
+# Provider-backed resources reached through provider-less entities: from_output
+# reads module net's output, which is backed by the network inside net.
+# Module app is given the root network as a variable, which the container
+# inside app reads.
+
+resource "network" "root" {
+  subnet = "10.0.0.0/16"
+}
+
+module "net" {
+  source = "./net"
+}
+
+module "app" {
+  source = "./app"
+
+  variables = {
+    network_name = resource.network.root.meta.name
+  }
+}
+
+resource "container" "from_output" {
+  network {
+    name = module.net.output.network_name
+  }
+}

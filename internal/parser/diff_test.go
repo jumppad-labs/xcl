@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/diff"
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/types"
@@ -189,6 +190,19 @@ func TestDiffReportsDriftAsUpdate(t *testing.T) {
 	require.Equal(t, diff.Summary{Update: 1, Unchanged: 2}, result.Summary)
 }
 
+func TestDiffReportsOverriddenChangeDetectionReplaceAsReplace(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, diffBaseConfig)
+
+	h.plugin.SetChangedResult(diffNetworkAppID, entity.Replace)
+
+	result := h.runDiff(t, diffBaseConfig)
+
+	require.Equal(t, []string{diffNetworkAppID}, diffAddresses(result))
+	require.Equal(t, diff.ActionReplace, diffActionFor(t, result, diffNetworkAppID))
+	require.Equal(t, diff.Summary{Replace: 1, Unchanged: 2}, result.Summary)
+}
+
 func TestDiffReportsResourceTheProviderNoLongerFindsAsCreate(t *testing.T) {
 	h := setupLifecycle(t)
 	h.applyAndSave(t, diffBaseConfig)
@@ -209,7 +223,7 @@ func TestDiffReportsFailedResourceAsReplace(t *testing.T) {
 	result := h.runDiff(t, lifecycleOriginalConfig)
 
 	require.Equal(t, []diff.Resource{
-		{Address: lifecycleNetworkID, Action: diff.ActionReplace},
+		{Address: lifecycleNetworkID, Action: diff.ActionReplace, Reason: diff.ReplaceFailed},
 	}, result.Resources)
 	require.Equal(t, diff.Summary{Replace: 1}, result.Summary)
 }
@@ -250,7 +264,7 @@ func TestDiffReportsDestroyFailedResourceAsReplace(t *testing.T) {
 	result := h.runDiff(t, lifecycleOriginalConfig)
 
 	require.Equal(t, []diff.Resource{
-		{Address: lifecycleNetworkID, Action: diff.ActionReplace},
+		{Address: lifecycleNetworkID, Action: diff.ActionReplace, Reason: diff.ReplaceFailed},
 	}, result.Resources)
 	require.Equal(t, diff.Summary{Replace: 1}, result.Summary)
 }

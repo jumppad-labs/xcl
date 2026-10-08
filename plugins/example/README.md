@@ -129,7 +129,7 @@ All resources support standard lifecycle operations:
 - **Destroy** - Clean up resources
 - **Read** - Report the real resource, given the saved copy and the configured copy; returns `plugins.ErrNotFound` when it no longer exists
 - **Update** - Update a resource that changed
-- **Changed** - Detect configuration edits and drift; the example embeds `plugins.DefaultChanged` rather than writing its own
+- **Changed** - Decide whether a resource is unchanged, needs an update, or must be replaced; the example embeds `plugins.DefaultChanged` and overrides `Changed` to answer `entity.Replace` when `first_name` or `last_name` changes, because the person's ID is derived from the name
 
 The example provider never changes a configured field; it only sets `PersonID`.
 

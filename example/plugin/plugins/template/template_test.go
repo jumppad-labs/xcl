@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/jumppad-labs/xcl/entity"
 )
 
 func TestTemplateCreateWritesTheRenderedFile(t *testing.T) {
@@ -136,4 +138,64 @@ func TestTemplateUpdateRendersTheFileAgain(t *testing.T) {
 	content, err := os.ReadFile(destination)
 	require.NoError(t, err)
 	require.Equal(t, "new content", string(content))
+}
+
+func TestTemplateChangedReplacesOnDestinationChange(t *testing.T) {
+	p := &provider{}
+
+	old := &Template{Source: "hello", Destination: "/tmp/old.txt"}
+	new := &Template{Source: "hello", Destination: "/tmp/new.txt"}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestTemplateChangedUpdatesOnSourceChange(t *testing.T) {
+	p := &provider{}
+
+	old := &Template{Source: "hello", Destination: "/tmp/out.txt"}
+	new := &Template{Source: "goodbye", Destination: "/tmp/out.txt"}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Update, change)
+}
+
+func TestTemplateChangedUpdatesOnVariablesChange(t *testing.T) {
+	p := &provider{}
+
+	old := &Template{
+		Source:      "hello {{name}}",
+		Destination: "/tmp/out.txt",
+		Variables:   map[string]string{"name": "world"},
+	}
+	new := &Template{
+		Source:      "hello {{name}}",
+		Destination: "/tmp/out.txt",
+		Variables:   map[string]string{"name": "xcl"},
+	}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Update, change)
+}
+
+func TestTemplateChangedReportsNoChangeForIdenticalTemplate(t *testing.T) {
+	p := &provider{}
+
+	old := &Template{
+		Source:      "hello {{name}}",
+		Destination: "/tmp/out.txt",
+		Variables:   map[string]string{"name": "world"},
+	}
+	new := &Template{
+		Source:      "hello {{name}}",
+		Destination: "/tmp/out.txt",
+		Variables:   map[string]string{"name": "world"},
+	}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.NoChange, change)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/types"
@@ -54,7 +55,7 @@ type PluginEntityProvider interface {
 	Destroy(ctx context.Context, entityType, entitySubType string, entityData []byte) error
 	Read(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) ([]byte, error)
 	Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
-	Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error)
+	Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
 }
 
 // RegisterResourceProvider registers a typed resource provider with the plugin.
@@ -199,12 +200,13 @@ func (p *PluginBase) Update(ctx context.Context, entityType, entitySubType strin
 	return rt.Adapter.Update(ctx, entityData)
 }
 
-// Changed checks if the entity has changed by comparing old and new.
-func (p *PluginBase) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error) {
+// Changed decides what applying new needs for the entity saved as old, given
+// the dependencies the same apply will update or replace.
+func (p *PluginBase) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
 	rt := p.getRegisteredType(entityType, entitySubType)
 	if rt == nil {
-		return false, errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
+		return entity.NoChange, errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
 	}
 
-	return rt.Adapter.Changed(ctx, oldEntityData, newEntityData)
+	return rt.Adapter.Changed(ctx, oldEntityData, newEntityData, dependencies)
 }

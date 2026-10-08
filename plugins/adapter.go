@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/logger"
 )
@@ -29,7 +30,7 @@ type ProviderAdapter interface {
 	Destroy(ctx context.Context, entityData []byte, force bool) error
 	Read(ctx context.Context, oldEntityData []byte, newEntityData []byte) ([]byte, error)
 	Update(ctx context.Context, entityData []byte) ([]byte, error)
-	Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte) (bool, error)
+	Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
 }
 
 // TypedProviderAdapter wraps a ResourceProvider[T] to implement ProviderAdapter.
@@ -204,20 +205,21 @@ func (a *TypedProviderAdapter[T]) Update(ctx context.Context, entityData []byte)
 	return updatedData, nil
 }
 
-func (a *TypedProviderAdapter[T]) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte) (bool, error) {
+func (a *TypedProviderAdapter[T]) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
 	// Create instances for old and new resources
 	var oldResource, newResource T
 
 	// Unmarshal old resource data
 	if err := json.Unmarshal(oldEntityData, &oldResource); err != nil {
-		return false, err
+		return entity.NoChange, err
 	}
 
 	// Unmarshal new resource data
 	if err := json.Unmarshal(newEntityData, &newResource); err != nil {
-		return false, err
+		return entity.NoChange, err
 	}
 
-	// Call the provider's Changed method with both resources
-	return a.provider.Changed(ctx, oldResource, newResource)
+	// Call the provider's Changed method with both resources and the
+	// dependencies the same apply will update or replace
+	return a.provider.Changed(ctx, oldResource, newResource, dependencies)
 }

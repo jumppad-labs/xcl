@@ -65,12 +65,13 @@ func TestApplyWithCancelledContextStartsNoProviderCall(t *testing.T) {
 
 	p := h.newParser(t, nil)
 
+	// a cancelled context fails the decide pass, which runs before any
+	// provider call that changes a resource, so Apply returns no state
 	st, err := p.Apply(ctx, lifecycleDependentConfig)
 	require.ErrorIs(t, err, context.Canceled)
-	require.NotNil(t, st)
+	require.Nil(t, st)
 
 	require.Empty(t, h.plugin.GetCalls())
-	require.Equal(t, 0, st.ResourceCount())
 }
 
 func TestApplyWithCancelledContextKeepsPreviousEntryOfExistingResource(t *testing.T) {
@@ -81,16 +82,18 @@ func TestApplyWithCancelledContextKeepsPreviousEntryOfExistingResource(t *testin
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
+	// the edited config changes the network, but a cancelled context fails
+	// the decide pass: Apply returns no state, so nothing is saved and the
+	// previous entry is kept by the untouched saved state
 	p := h.newParser(t, nil)
 
-	// the edited config changes the network, but it is never reached
 	st, err := p.Apply(ctx, lifecycleEditedConfig)
 	require.ErrorIs(t, err, context.Canceled)
-	require.NotNil(t, st)
+	require.Nil(t, st)
 
 	require.Empty(t, h.plugin.GetCalls())
 
-	network := findResource[structs.Network](t, st.GetResources(), lifecycleNetworkID)
+	network := findResource[structs.Network](t, h.loadSaved(t), lifecycleNetworkID)
 	require.Equal(t, "10.0.0.0/16", network.Subnet)
 	require.Equal(t, types.StatusCreated, network.Meta.Status)
 }

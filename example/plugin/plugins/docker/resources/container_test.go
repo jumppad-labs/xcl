@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client/mocks"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -421,4 +422,126 @@ func TestContainerReadKeepsTheDockerIDAndAddressFromTheSavedContainer(t *testing
 	require.NoError(t, err)
 	require.Equal(t, "ctr-123", got.DockerID)
 	require.Equal(t, "10.42.0.5", got.IPAddress)
+}
+
+func TestContainerChangedReplacesOnImageChange(t *testing.T) {
+	p := NewContainerProvider(mocks.NewMockDocker(t))
+
+	old := testContainer()
+	new := testContainer()
+	new.Image = "nginx:1.28"
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestContainerChangedReplacesOnCommandChange(t *testing.T) {
+	p := NewContainerProvider(mocks.NewMockDocker(t))
+
+	old := testContainer()
+	old.Command = []string{"nginx", "-g", "daemon off;"}
+	new := testContainer()
+	new.Command = []string{"nginx", "-g", "daemon on;"}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestContainerChangedReplacesOnEnvironmentChange(t *testing.T) {
+	p := NewContainerProvider(mocks.NewMockDocker(t))
+
+	old := testContainer()
+	old.Environment = map[string]string{"MODE": "dev"}
+	new := testContainer()
+	new.Environment = map[string]string{"MODE": "prod"}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestContainerChangedReplacesOnNetworkChange(t *testing.T) {
+	p := NewContainerProvider(mocks.NewMockDocker(t))
+
+	old := testContainer()
+	new := testContainer()
+	new.Networks = []NetworkAttachment{
+		{Name: "backend", Aliases: []string{"web.local"}},
+	}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestContainerChangedReplacesOnNetworkAliasesChange(t *testing.T) {
+	p := NewContainerProvider(mocks.NewMockDocker(t))
+
+	old := testContainer()
+	new := testContainer()
+	new.Networks = []NetworkAttachment{
+		{Name: "app", Aliases: []string{"www.local"}},
+	}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestContainerChangedReplacesWhenNetworkIsReplaced(t *testing.T) {
+	p := NewContainerProvider(mocks.NewMockDocker(t))
+
+	old := testContainer()
+	new := testContainer()
+	dependencies := []entity.DependencyChange{
+		{Address: "docker.network.app", Change: entity.Replace},
+	}
+
+	change, err := p.Changed(context.Background(), old, new, dependencies)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestContainerChangedReportsNoChangeWhenNetworkIsOnlyUpdated(t *testing.T) {
+	p := NewContainerProvider(mocks.NewMockDocker(t))
+
+	old := testContainer()
+	new := testContainer()
+	dependencies := []entity.DependencyChange{
+		{Address: "docker.network.app", Change: entity.Update},
+	}
+
+	change, err := p.Changed(context.Background(), old, new, dependencies)
+	require.NoError(t, err)
+	require.Equal(t, entity.NoChange, change)
+}
+
+func TestContainerChangedReportsNoChangeForIdenticalContainer(t *testing.T) {
+	p := NewContainerProvider(mocks.NewMockDocker(t))
+
+	old := testContainer()
+	old.Command = []string{"nginx"}
+	old.Environment = map[string]string{"MODE": "dev"}
+	new := testContainer()
+	new.Command = []string{"nginx"}
+	new.Environment = map[string]string{"MODE": "dev"}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.NoChange, change)
+}
+
+func TestContainerChangedTreatsEmptyAndNilCommandAsEqual(t *testing.T) {
+	p := NewContainerProvider(mocks.NewMockDocker(t))
+
+	old := testContainer()
+	old.Command = nil
+	new := testContainer()
+	new.Command = []string{}
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.NoChange, change)
 }

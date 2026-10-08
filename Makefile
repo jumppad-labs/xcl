@@ -4,7 +4,7 @@ protos:
 
 # Install mockery for generating mocks
 install-mockery:
-	go install github.com/vektra/mockery/v2@latest
+	go install github.com/vektra/mockery/v3@v3.8.0
 
 # Generate mocks using mockery configuration
 mocks:

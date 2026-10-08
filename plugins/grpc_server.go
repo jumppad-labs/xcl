@@ -147,10 +147,20 @@ func (s *GRPCServer) Changed(ctx context.Context, req *proto.ChangedRequest) (*p
 		return nil, err
 	}
 
-	changed, err := s.plugin.Changed(ctx, req.EntityType, req.EntitySubType, req.OldEntityData, req.NewEntityData)
+	dependencies, err := fromProtoDependencies(req.Dependencies)
+	if err != nil {
+		return &proto.ChangedResponse{Error: errorToString(err)}, nil
+	}
+
+	change, err := s.plugin.Changed(ctx, req.EntityType, req.EntitySubType, req.OldEntityData, req.NewEntityData, dependencies)
+	if err != nil {
+		return &proto.ChangedResponse{Error: errorToString(err)}, nil
+	}
+
+	protoChange, err := toProtoChange(change)
 	return &proto.ChangedResponse{
-		Changed: changed,
-		Error:   errorToString(err),
+		Change: protoChange,
+		Error:  errorToString(err),
 	}, nil
 }
 

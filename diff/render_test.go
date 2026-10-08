@@ -51,9 +51,61 @@ func TestRenderWritesReplacedResourceHeaderAndComment(t *testing.T) {
 	output := renderOne(diff.Resource{
 		Address: "resource.network.app",
 		Action:  diff.ActionReplace,
+		Reason:  diff.ReplaceFailed,
 	}, diff.Summary{Replace: 1})
 
 	require.Contains(t, output, "  # resource.network.app will be replaced, its last apply failed\n-/+ resource \"network\" \"app\" {}\n\n")
+}
+
+func TestRenderReplaceBecauseDependencyNamesTheDependency(t *testing.T) {
+	output := renderOne(diff.Resource{
+		Address:      "resource.container.web",
+		Action:       diff.ActionReplace,
+		Reason:       diff.ReplaceDependency,
+		ReplacedDeps: []string{"resource.network.app"},
+	}, diff.Summary{Replace: 1})
+
+	require.Contains(t, output, "  # resource.container.web will be replaced because resource.network.app is replaced\n-/+ resource \"container\" \"web\" {}\n\n")
+}
+
+func TestRenderReplaceBecauseOfSeveralDependenciesNamesThemAll(t *testing.T) {
+	output := renderOne(diff.Resource{
+		Address:      "resource.container.web",
+		Action:       diff.ActionReplace,
+		Reason:       diff.ReplaceDependency,
+		ReplacedDeps: []string{"resource.network.app", "resource.volume.data"},
+	}, diff.Summary{Replace: 1})
+
+	require.Contains(t, output, "  # resource.container.web will be replaced because resource.network.app, resource.volume.data are replaced\n-/+ resource \"container\" \"web\" {}\n\n")
+}
+
+func TestRenderReplaceBecauseOfUnnamedDependencySaysADependencyIsReplaced(t *testing.T) {
+	output := renderOne(diff.Resource{
+		Address: "resource.container.web",
+		Action:  diff.ActionReplace,
+		Reason:  diff.ReplaceDependency,
+	}, diff.Summary{Replace: 1})
+
+	require.Contains(t, output, "  # resource.container.web will be replaced because a dependency is replaced\n-/+ resource \"container\" \"web\" {}\n\n")
+}
+
+func TestRenderReplaceByProviderSaysItCannotBeUpdatedInPlace(t *testing.T) {
+	output := renderOne(diff.Resource{
+		Address: "resource.container.web",
+		Action:  diff.ActionReplace,
+		Reason:  diff.ReplaceProvider,
+	}, diff.Summary{Replace: 1})
+
+	require.Contains(t, output, "  # resource.container.web will be replaced, it cannot be updated in place\n-/+ resource \"container\" \"web\" {}\n\n")
+}
+
+func TestRenderReplaceWithoutReasonSaysOnlyItWillBeReplaced(t *testing.T) {
+	output := renderOne(diff.Resource{
+		Address: "resource.container.web",
+		Action:  diff.ActionReplace,
+	}, diff.Summary{Replace: 1})
+
+	require.Contains(t, output, "  # resource.container.web will be replaced\n-/+ resource \"container\" \"web\" {}\n\n")
 }
 
 func TestRenderWritesUpdatedValueAsBeforeAndAfter(t *testing.T) {
@@ -291,7 +343,7 @@ func designExampleDiff() *diff.Diff {
 					{Path: diff.Path{}.Attribute("db_host"), Unknown: true},
 				},
 			},
-			{Address: "resource.network.app", Action: diff.ActionReplace},
+			{Address: "resource.network.app", Action: diff.ActionReplace, Reason: diff.ReplaceFailed},
 			{Address: "resource.postgres.old", Action: diff.ActionDelete},
 		},
 	}

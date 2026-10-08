@@ -1,6 +1,11 @@
-# The configuration the plugin example applies. The docker blocks come from
-# the external Docker plugin, the template block from the in-process template
-# plugin.
+# The plugin example's main configuration (../config) with the network's
+# address range changed from 10.42.0.0/24 to 10.42.0.0/23. Docker can not move
+# a network to a new range in place, so applying it after ../config replaces
+# the network and the container attached to it, and updates the template that
+# reads the container's address. See `make replace`.
+#
+# The docker blocks come from the external Docker plugin, the template block
+# from the in-process template plugin.
 #
 # Variables can be overridden with environment variables prefixed HCL_VAR_,
 # i.e. HCL_VAR_output_dir.

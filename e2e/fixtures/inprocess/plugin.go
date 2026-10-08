@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/jumppad-labs/xcl/e2e/fixtures/services"
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 )
@@ -66,7 +67,8 @@ func (p *Plugin) Init(logger logger.Logger, state plugins.State) error {
 // postgresProvider handles the lifecycle of postgres blocks. A real provider
 // would create a database, this one only fills in the connection string.
 //
-// Change detection comes from the embedded DefaultChanged.
+// Change detection comes from the embedded DefaultChanged, except that a
+// changed location answers replace, see Changed.
 type postgresProvider struct {
 	plugins.DefaultChanged[*services.PostgreSQL]
 }
@@ -80,6 +82,17 @@ func (p *postgresProvider) Init(state plugins.State, functions plugins.ProviderF
 	logger.Debug("provider ready")
 
 	return nil
+}
+
+// Changed answers replace when the location changes, the connection identity changes with it, so the
+// e2e scenarios have a provider-decided replacement. Every other change is
+// left to DefaultChanged.
+func (p *postgresProvider) Changed(ctx context.Context, old *services.PostgreSQL, new *services.PostgreSQL, dependencies []entity.DependencyChange) (entity.Change, error) {
+	if old.Location != new.Location {
+		return entity.Replace, nil
+	}
+
+	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
 }
 
 // Create sets the computed connection string, configured fields are never

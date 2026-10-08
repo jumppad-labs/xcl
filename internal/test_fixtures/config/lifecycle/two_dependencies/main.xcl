@@ -1,0 +1,28 @@
+# user references three networks by name: replaced, updated and same. Tests
+# decide what happens to each network and check what user is told.
+
+resource "network" "replaced" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "network" "updated" {
+  subnet = "10.1.0.0/16"
+}
+
+resource "network" "same" {
+  subnet = "10.2.0.0/16"
+}
+
+resource "container" "user" {
+  network {
+    name = resource.network.replaced.meta.name
+  }
+
+  network {
+    name = resource.network.updated.meta.name
+  }
+
+  network {
+    name = resource.network.same.meta.name
+  }
+}

@@ -235,17 +235,20 @@ func NewParser(options *ParserOptions) *Parser {
 //  1. Load previous state from StateStore (if exists)
 //  2. Parse all HCL files from the given paths
 //  3. Reject a configuration that declares no blocks with ErrEmptyConfiguration
-//  4. Destroy the resources in previousState that are no longer in the
-//     configuration, children first, saving the state after each one
-//  5. Build a DAG based on resource dependencies
-//  6. Walk the DAG in dependency order
-//  7. Decode each resource body (HCL → Go structs)
-//  8. Call the provider lifecycle: resources not in previousState are
-//     created, resources in it are read, then updated if they changed
+//  4. Decide, without acting, what happens to every resource: the decide
+//     pass Diff runs, in dependency order, telling each resource's provider
+//     which of its dependencies are updated or replaced. A failure here
+//     returns no State, nothing has changed
+//  5. Destroy every resource being replaced and every resource no longer in
+//     the configuration, dependents first, saving the state after each one
+//  6. Walk the DAG in dependency order, decoding each resource body with
+//     real values, and follow its decision: create new and replaced
+//     resources, update updated ones, keep unchanged ones
 //
 // Returns the new State containing all parsed resources.
 //
-// When destroying a removed resource fails, nothing is created or changed:
+// When destroying a replaced or removed resource fails, nothing is created or
+// changed:
 // Apply returns the previous state minus the resources that were destroyed,
 // with the failed ones marked destroy_failed, together with the error. The
 // next Apply retries them first.
@@ -262,23 +265,40 @@ func NewParser(options *ParserOptions) *Parser {
 // partial State of what was reached together with ctx's error. Providers are
 // given a copy of ctx that is never cancelled.
 func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
-	currentState, previousState, err := p.parseAndValidate(paths...)
+	// decide: every resource's outcome is recorded before anything is
+	// created, updated or destroyed
+	decideState, decidePrevious, err := p.parseAndValidate(paths...)
 	if err != nil {
 		return nil, err
 	}
 
 	// an empty configuration would remove everything, Destroy does that
-	if currentState.ResourceCount() == 0 {
+	if decideState.ResourceCount() == 0 {
 		return nil, ErrEmptyConfiguration
+	}
+
+	// a failed decision changes nothing, not even the saved state
+	record, err := p.decide(ctx, events.OperationApply, diff.Options{}, decideState, decidePrevious)
+	if err != nil {
+		return nil, err
+	}
+
+	// act: the configuration is parsed again, so the values the decide pass
+	// read and the placeholders it held for unknown values never reach a
+	// provider; every resource is decoded with real values as its
+	// dependencies are created and updated
+	currentState, previousState, err := p.reparse(paths...)
+	if err != nil {
+		return nil, err
 	}
 
 	ce := errors.NewConfigError()
 
-	// destroy the resources that are no longer in the configuration before
-	// anything is created or changed, freeing what they held for their
-	// replacements
-	removed := removedResources(currentState, previousState)
-	if len(removed) > 0 {
+	// destroy the resources being replaced and those no longer in the
+	// configuration before anything is created or changed, dependents first,
+	// freeing what they held for their replacements
+	targets := record.toDestroy(previousState)
+	if len(targets) > 0 {
 		working := NewState()
 		for _, r := range previousState.GetResources() {
 			if err := working.AppendResource(r); err != nil {
@@ -297,14 +317,16 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
 			addresses: p.addressParser(),
 		}
 
-		// a failed removal stops the apply, the working state holds the
+		// a failed destroy stops the apply, the working state holds the
 		// previous state minus what was destroyed, with the failures marked
-		// destroy_failed so the next apply retries them first
-		if err := d.destroy(removed); err != nil {
+		// destroy_failed so the next apply replaces them again
+		if err := d.destroy(targets); err != nil {
 			ce.AppendError(err)
 			return working, ce
 		}
 
+		// a destroyed replacement is gone from the state, the walk creates
+		// it again like any new resource
 		previousState = working
 	}
 
@@ -313,7 +335,7 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
 
 	// Always walk the DAG to decode resources (fills in their fields from HCL)
 	// This decodes interpolations and resolves dependencies regardless of plugin execution
-	progress, errs := p.walk(ctx, currentState, previousState, functions)
+	progress, errs := p.walkWith(ctx, currentState, previousState, functions, &resourceLifecycle{mode: walkApply, recorder: record})
 
 	// a cancelled walk skipped the resources it had not reached, keep only
 	// the progress it made
@@ -373,9 +395,27 @@ func (p *Parser) Diff(ctx context.Context, options diff.Options, paths ...string
 		return nil, ErrEmptyConfiguration
 	}
 
+	record, err := p.decide(ctx, events.OperationDiff, options, currentState, previousState)
+	if err != nil {
+		return nil, err
+	}
+
+	return record.result(), nil
+}
+
+// decide runs the decide pass shared by Diff and Apply: it records what an
+// apply of current does with each entity, against the previous state, without
+// creating, updating or destroying anything. Resources in previous that are no
+// longer configured are deleted. The rest are walked in dependency order, so
+// every resource is decided after everything it depends on, and its provider
+// is told which of its dependencies the apply updates or replaces.
+//
+// Any failure, a provider's Read or Changed included, fails the whole pass and
+// returns no record: an apply acts on nothing until every decision is made.
+func (p *Parser) decide(ctx context.Context, operation string, options diff.Options, currentState, previousState *State) (*diffRecorder, error) {
 	recorder := newDiffRecorder()
 
-	// the resources Apply's removal phase would destroy through a provider
+	// the resources Apply's destroy phase removes through a provider
 	for _, r := range removedResources(currentState, previousState) {
 		meta, err := types.GetMeta(r)
 		if err != nil {
@@ -387,18 +427,20 @@ func (p *Parser) Diff(ctx context.Context, options diff.Options, paths ...string
 		}
 
 		recorder.record(diff.Resource{Address: meta.ID, Action: diff.ActionDelete})
+		recorder.decide(meta.ID, decision{action: diff.ActionDelete})
 	}
 
 	lifecycle := &resourceLifecycle{
-		mode:        walkDiff,
-		recorder:    recorder,
-		diffOptions: options,
+		mode:          walkDecide,
+		operationName: operation,
+		recorder:      recorder,
+		diffOptions:   options,
 	}
 
 	_, errs := p.walkWith(ctx, currentState, previousState, p.getFunctions, lifecycle)
 
 	if len(errs) == 0 && ctx.Err() != nil {
-		errs = append(errs, fmt.Errorf("diff stopped before every resource was reached: %w", ctx.Err()))
+		errs = append(errs, fmt.Errorf("%s stopped before every resource was reached: %w", operation, ctx.Err()))
 	}
 
 	if len(errs) > 0 {
@@ -410,7 +452,9 @@ func (p *Parser) Diff(ctx context.Context, options diff.Options, paths ...string
 		return nil, ce
 	}
 
-	return recorder.result(), nil
+	p.logDecisions(operation, recorder)
+
+	return recorder, nil
 }
 
 // Destroy destroys every resource in saved, working only from the saved state:
@@ -476,6 +520,49 @@ func (p *Parser) Destroy(ctx context.Context, saved []any) (*State, error) {
 	}
 
 	return working, err
+}
+
+// logDecisions logs, at debug level, how many entities the decide pass found
+// for each action and why each replaced entity is replaced
+func (p *Parser) logDecisions(operation string, recorder *diffRecorder) {
+	if !emitting(&p.options) {
+		return
+	}
+
+	log := logger.New(p.options.Emit, events.Event{
+		Source:    events.SourceCore,
+		Operation: operation,
+	})
+
+	summary := recorder.result().Summary
+	log.Debug("decided every entity",
+		"create", summary.Create,
+		"update", summary.Update,
+		"replace", summary.Replace,
+		"delete", summary.Delete,
+		"unchanged", summary.Unchanged,
+	)
+
+	for _, id := range recorder.replaced() {
+		dec, _ := recorder.lookup(id)
+		log.Debug("entity will be replaced",
+			"id", id,
+			"reason", string(dec.reason),
+			"replaced_dependencies", dec.replacedDeps,
+		)
+	}
+}
+
+// reparse parses and validates the configuration again, as parseAndValidate
+// does, without emitting events: the configuration was already parsed,
+// reported and validated once in the same operation, and a receiver sees each
+// resource parsed once
+func (p *Parser) reparse(paths ...string) (*State, *State, error) {
+	emitEvent := p.options.Emit
+	p.options.Emit = nil
+	defer func() { p.options.Emit = emitEvent }()
+
+	return p.parseAndValidate(paths...)
 }
 
 // removedResources returns the resources in previous that are no longer in
@@ -1382,15 +1469,6 @@ func processDisabled(bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (b
 	return isDisabled, nil
 }
 
-// walk builds a DAG from the state and walks it with the given callback
-// This is the core parsing logic that processes resources in dependency order
-// and calls the provider lifecycle for each resource
-//
-// It returns the progress of the walk, which is nil when the walk did not start.
-func (p *Parser) walk(ctx context.Context, currentState, previousState *State, functions functionsForFile) (*applyProgress, []error) {
-	return p.walkWith(ctx, currentState, previousState, functions, &resourceLifecycle{mode: walkApply})
-}
-
 // walkWith walks the configuration with a lifecycle prepared for the walk's
 // mode: the walk fills in what every walk shares, the context, the previous
 // state, the provider resolver and the bodies
@@ -1425,6 +1503,8 @@ func (p *Parser) walkWith(ctx context.Context, currentState, previousState *Stat
 	lifecycle.types = p.typeRegistry
 	lifecycle.bodies = p.parsedResources.bodies
 	lifecycle.progress = newApplyProgress()
+	lifecycle.current = currentState
+	lifecycle.addresses = p.addressParser()
 
 	w.Callback = walkCallback(p.parsedResources, currentState, p.addressParser(), lifecycle, &p.options, functions)
 	w.Reverse = false

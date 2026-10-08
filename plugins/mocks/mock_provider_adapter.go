@@ -7,6 +7,7 @@ package mocks
 import (
 	"context"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	mock "github.com/stretchr/testify/mock"
@@ -49,25 +50,25 @@ func (_m *MockProviderAdapter) EXPECT() *MockProviderAdapter_Expecter {
 }
 
 // Changed provides a mock function for the type MockProviderAdapter
-func (_mock *MockProviderAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte) (bool, error) {
-	ret := _mock.Called(ctx, oldEntityData, newEntityData)
+func (_mock *MockProviderAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
+	ret := _mock.Called(ctx, oldEntityData, newEntityData, dependencies)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Changed")
 	}
 
-	var r0 bool
+	var r0 entity.Change
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte) (bool, error)); ok {
-		return returnFunc(ctx, oldEntityData, newEntityData)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte, []entity.DependencyChange) (entity.Change, error)); ok {
+		return returnFunc(ctx, oldEntityData, newEntityData, dependencies)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte) bool); ok {
-		r0 = returnFunc(ctx, oldEntityData, newEntityData)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte, []entity.DependencyChange) entity.Change); ok {
+		r0 = returnFunc(ctx, oldEntityData, newEntityData, dependencies)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Get(0).(entity.Change)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte, []byte) error); ok {
-		r1 = returnFunc(ctx, oldEntityData, newEntityData)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte, []byte, []entity.DependencyChange) error); ok {
+		r1 = returnFunc(ctx, oldEntityData, newEntityData, dependencies)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -83,11 +84,12 @@ type MockProviderAdapter_Changed_Call struct {
 //   - ctx context.Context
 //   - oldEntityData []byte
 //   - newEntityData []byte
-func (_e *MockProviderAdapter_Expecter) Changed(ctx any, oldEntityData any, newEntityData any) *MockProviderAdapter_Changed_Call {
-	return &MockProviderAdapter_Changed_Call{Call: _e.mock.On("Changed", ctx, oldEntityData, newEntityData)}
+//   - dependencies []entity.DependencyChange
+func (_e *MockProviderAdapter_Expecter) Changed(ctx any, oldEntityData any, newEntityData any, dependencies any) *MockProviderAdapter_Changed_Call {
+	return &MockProviderAdapter_Changed_Call{Call: _e.mock.On("Changed", ctx, oldEntityData, newEntityData, dependencies)}
 }
 
-func (_c *MockProviderAdapter_Changed_Call) Run(run func(ctx context.Context, oldEntityData []byte, newEntityData []byte)) *MockProviderAdapter_Changed_Call {
+func (_c *MockProviderAdapter_Changed_Call) Run(run func(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange)) *MockProviderAdapter_Changed_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -101,21 +103,26 @@ func (_c *MockProviderAdapter_Changed_Call) Run(run func(ctx context.Context, ol
 		if args[2] != nil {
 			arg2 = args[2].([]byte)
 		}
+		var arg3 []entity.DependencyChange
+		if args[3] != nil {
+			arg3 = args[3].([]entity.DependencyChange)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
 }
 
-func (_c *MockProviderAdapter_Changed_Call) Return(b bool, err error) *MockProviderAdapter_Changed_Call {
-	_c.Call.Return(b, err)
+func (_c *MockProviderAdapter_Changed_Call) Return(change entity.Change, err error) *MockProviderAdapter_Changed_Call {
+	_c.Call.Return(change, err)
 	return _c
 }
 
-func (_c *MockProviderAdapter_Changed_Call) RunAndReturn(run func(ctx context.Context, oldEntityData []byte, newEntityData []byte) (bool, error)) *MockProviderAdapter_Changed_Call {
+func (_c *MockProviderAdapter_Changed_Call) RunAndReturn(run func(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)) *MockProviderAdapter_Changed_Call {
 	_c.Call.Return(run)
 	return _c
 }

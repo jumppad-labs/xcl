@@ -28,7 +28,7 @@ func ExampleRender() {
 					{Path: diff.Path{}.Attribute("db_host"), Unknown: true},
 				},
 			},
-			{Address: "resource.network.app", Action: diff.ActionReplace},
+			{Address: "resource.network.app", Action: diff.ActionReplace, Reason: diff.ReplaceFailed},
 			{Address: "resource.postgres.old", Action: diff.ActionDelete},
 		},
 	}

@@ -1,6 +1,10 @@
 package plugins
 
-import "context"
+import (
+	"context"
+
+	"github.com/jumppad-labs/xcl/entity"
+)
 
 // PluginHost is the unified interface for both in-process and external plugins.
 // This interface abstracts the communication mechanism, allowing the rest of the
@@ -24,8 +28,9 @@ type PluginHost interface {
 	// Update updates an existing entity
 	Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
 
-	// Changed checks if the entity has changed by comparing old and new
-	Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error)
+	// Changed decides what applying new needs for the entity saved as old,
+	// given the dependencies the same apply will update or replace
+	Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
 
 	// Stop shuts down the plugin host and cleans up resources
 	Stop()

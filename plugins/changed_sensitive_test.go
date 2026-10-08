@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -23,18 +24,18 @@ func TestDefaultChangedReportsChangeWhenOnlyASensitiveValueDiffers(t *testing.T)
 	old := &sensitiveResource{Name: "web", Password: types.NewSensitive("first")}
 	new := &sensitiveResource{Name: "web", Password: types.NewSensitive("second")}
 
-	changed, err := DefaultChanged[*sensitiveResource]{}.Changed(context.Background(), old, new)
+	change, err := DefaultChanged[*sensitiveResource]{}.Changed(context.Background(), old, new, nil)
 	require.NoError(t, err)
-	require.True(t, changed)
+	require.Equal(t, entity.Update, change)
 }
 
 func TestDefaultChangedReportsNoChangeWhenSensitiveValuesAreEqual(t *testing.T) {
 	old := &sensitiveResource{Name: "web", Password: types.NewSensitive("same")}
 	new := &sensitiveResource{Name: "web", Password: types.NewSensitive("same")}
 
-	changed, err := DefaultChanged[*sensitiveResource]{}.Changed(context.Background(), old, new)
+	change, err := DefaultChanged[*sensitiveResource]{}.Changed(context.Background(), old, new, nil)
 	require.NoError(t, err)
-	require.False(t, changed)
+	require.Equal(t, entity.NoChange, change)
 }
 
 // The adapter hands the provider the real value and returns what the provider
@@ -55,13 +56,14 @@ func TestTypedProviderAdapterChangedDetectsOnlyASensitiveValueChange(t *testing.
 	provider := &sensitiveEchoProvider{}
 	adapter := NewTypedProviderAdapter[*sensitiveResource](provider, &sensitiveResource{})
 
-	changed, err := adapter.Changed(
+	change, err := adapter.Changed(
 		context.Background(),
 		[]byte(`{"name":"web","password":"first"}`),
 		[]byte(`{"name":"web","password":"second"}`),
+		nil,
 	)
 	require.NoError(t, err)
-	require.True(t, changed)
+	require.Equal(t, entity.Update, change)
 }
 
 // sensitiveEchoProvider records what Create received and returns it.

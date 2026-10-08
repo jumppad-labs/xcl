@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 )
@@ -11,7 +12,8 @@ import (
 // ExampleProvider is a basic implementation of Provider[*Person]
 // that demonstrates the structure and lifecycle methods for Person resources.
 //
-// It embeds DefaultChanged to get change detection without writing any.
+// It embeds DefaultChanged for change detection, and overrides Changed to
+// replace a person whose name changes.
 type ExampleProvider struct {
 	plugins.DefaultChanged[*Person]
 
@@ -29,6 +31,18 @@ func (p *ExampleProvider) Init(state plugins.State, functions plugins.ProviderFu
 	p.state = state
 	p.functions = functions
 	return nil
+}
+
+// Changed answers replace when the first or last name changes: the person's
+// ID is derived from the name, so a renamed person can not be updated in
+// place. Any other change is left to DefaultChanged, which answers update or
+// no change.
+func (p *ExampleProvider) Changed(ctx context.Context, old *Person, new *Person, dependencies []entity.DependencyChange) (entity.Change, error) {
+	if old.FirstName != new.FirstName || old.LastName != new.LastName {
+		return entity.Replace, nil
+	}
+
+	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
 }
 
 func (p *ExampleProvider) Create(ctx context.Context, person *Person) (*Person, error) {

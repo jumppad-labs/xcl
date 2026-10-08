@@ -7,17 +7,14 @@ package e2e_test
 // as it was and reported no create, update or destroy step, then runs Apply
 // and checks the diff against what the apply's lifecycle events show it did.
 //
-// The diff never under-reports and may over-report. A resource the diff
-// reports as an update has every computed value unknown, so each resource
-// referencing one is reported as an update with that value unknown, though
-// the apply may find the value unchanged and leave it alone. The contract
-// between the two is therefore:
-//
-//   - an apply never changes a resource the diff did not list: every resource
-//     the apply creates, updates, replaces or deletes is in the diff with that
-//     same action
-//   - every resource the diff lists that the apply leaves alone was listed with
-//     at least one change that is unknown
+// The diff lists exactly what the apply does: for each action, the resources
+// the diff lists are the resources the apply then creates, updates, replaces
+// or deletes, nothing more and nothing less. A computed value the diff can not
+// know yet is shown as unknown, and a resource referencing a computed value of
+// a resource that changes is planned, and applied, at least as an update, so
+// an unknown value never leaves the diff listing a resource the apply leaves
+// alone. A replacement is read from the apply's lifecycle events as a destroy
+// followed by a create of the same resource.
 //
 // A failed resource is produced through the plugin configuration itself: a
 // postgres location holding a space makes the in-process provider's connect
@@ -30,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -230,45 +228,21 @@ func diffSets(found *diff.Diff) diffActionSets {
 // replaced, one only created was created, one only destroyed was deleted and
 // one updated was updated.
 func applySets(recorded []xcl.Event) diffActionSets {
-	provided := map[string]bool{}
-	created := map[string]bool{}
-	updated := map[string]bool{}
-	destroyed := map[string]bool{}
-
-	for _, e := range recorded {
-		if e.ResourceID == "" {
-			continue
-		}
-
-		if e.Phase == events.PhaseStart {
-			provided[e.ResourceID] = true
-		}
-
-		if e.Phase != events.PhaseSuccess {
-			continue
-		}
-
-		switch e.Operation {
-		case events.OperationCreate:
-			created[e.ResourceID] = true
-		case events.OperationUpdate:
-			updated[e.ResourceID] = true
-		case events.OperationDestroy:
-			destroyed[e.ResourceID] = true
-		}
-	}
-
 	sets := diffActionSets{Create: []string{}, Update: []string{}, Replace: []string{}, Delete: []string{}}
 
-	for id := range provided {
+	for id, operations := range testutil.ResourceOperations(recorded) {
+		created := slices.Contains(operations, events.OperationCreate)
+		destroyed := slices.Contains(operations, events.OperationDestroy)
+		updated := slices.Contains(operations, events.OperationUpdate)
+
 		switch {
-		case created[id] && destroyed[id]:
+		case created && destroyed:
 			sets.Replace = append(sets.Replace, id)
-		case created[id]:
+		case created:
 			sets.Create = append(sets.Create, id)
-		case destroyed[id]:
+		case destroyed:
 			sets.Delete = append(sets.Delete, id)
-		case updated[id]:
+		case updated:
 			sets.Update = append(sets.Update, id)
 		}
 	}
@@ -281,34 +255,14 @@ func applySets(recorded []xcl.Event) diffActionSets {
 	return sets
 }
 
-// requireDiffPredictsApply requires the contract between a diff and the apply
-// that follows it: every resource the apply created, updated, replaced or
-// deleted is in the diff with that same action, and every resource the diff
-// lists that the apply left alone was listed with at least one unknown change
-func requireDiffPredictsApply(t *testing.T, found *diff.Diff, applied diffActionSets) {
+// requireDiffEqualsApply requires that the diff lists, for each action,
+// exactly the resources the apply that followed it took that action on:
+// nothing the apply left alone and nothing the apply changed without the diff
+// listing it
+func requireDiffEqualsApply(t *testing.T, found *diff.Diff, applied diffActionSets) {
 	t.Helper()
 
-	predicted := diffSets(found)
-
-	require.Subset(t, predicted.Create, applied.Create, "the apply created a resource the diff did not list as a create")
-	require.Subset(t, predicted.Update, applied.Update, "the apply updated a resource the diff did not list as an update")
-	require.Subset(t, predicted.Replace, applied.Replace, "the apply replaced a resource the diff did not list as a replace")
-	require.Subset(t, predicted.Delete, applied.Delete, "the apply deleted a resource the diff did not list as a delete")
-
-	changed := map[string]bool{}
-	for _, addresses := range [][]string{applied.Create, applied.Update, applied.Replace, applied.Delete} {
-		for _, address := range addresses {
-			changed[address] = true
-		}
-	}
-
-	for _, r := range found.Resources {
-		if changed[r.Address] {
-			continue
-		}
-
-		require.NotEmpty(t, diffUnknownPaths(r), "the diff lists %s as %s but the apply left it alone and none of its changes is unknown", r.Address, r.Action)
-	}
+	require.Equal(t, diffSets(found), applied, "the diff did not list exactly what the apply did")
 }
 
 // diffResource returns the resource at address in found, failing the test
@@ -338,6 +292,19 @@ func diffUnknownPaths(r diff.Resource) []string {
 
 	sort.Strings(paths)
 	return paths
+}
+
+// diffResourceEvents returns the events in recorded for the resource at
+// address during operation
+func diffResourceEvents(recorded []xcl.Event, address, operation string) []xcl.Event {
+	found := []xcl.Event{}
+	for _, e := range recorded {
+		if e.ResourceID == address && e.Operation == operation {
+			found = append(found, e)
+		}
+	}
+
+	return found
 }
 
 // diffEventText returns everything an event could show a reader: the event
@@ -380,7 +347,7 @@ func TestDiffOfUnappliedPluginConfigurationPredictsApply(t *testing.T) {
 	}
 
 	require.Equal(t, expected, diffSets(found))
-	requireDiffPredictsApply(t, found, applySets(applied))
+	requireDiffEqualsApply(t, found, applySets(applied))
 }
 
 func TestDiffOfUnappliedPluginConfigurationReportsComputedValuesUnknown(t *testing.T) {
@@ -405,7 +372,7 @@ func TestDiffOfUnchangedPluginConfigurationReportsNoChanges(t *testing.T) {
 	require.Equal(t, 0, found.Changed())
 	require.Empty(t, found.Resources)
 	require.Equal(t, 6, found.Summary.Unchanged)
-	requireDiffPredictsApply(t, found, applySets(applied))
+	requireDiffEqualsApply(t, found, applySets(applied))
 }
 
 func TestDiffOfEditedRedisPortPredictsApply(t *testing.T) {
@@ -431,7 +398,7 @@ func TestDiffOfEditedRedisPortPredictsApply(t *testing.T) {
 	ingress := diffResource(t, found, "resource.ingress.web")
 	require.Equal(t, []string{"app_url"}, diffUnknownPaths(ingress))
 
-	requireDiffPredictsApply(t, found, applySets(applied))
+	requireDiffEqualsApply(t, found, applySets(applied))
 }
 
 func TestDiffOfEditedReplicaLocationPredictsApply(t *testing.T) {
@@ -443,15 +410,19 @@ func TestDiffOfEditedReplicaLocationPredictsApply(t *testing.T) {
 	found, _ := scenario.diff()
 	applied := scenario.apply()
 
+	// The in-process postgres provider answers replace for a changed location,
+	// its connection identity changes with it, so the edit is planned and
+	// applied as a replacement rather than an update. Nothing references the
+	// replica, so nothing else changes.
 	expected := diffActionSets{
 		Create:  []string{},
-		Update:  []string{"resource.postgres.replica"},
-		Replace: []string{},
+		Update:  []string{},
+		Replace: []string{"resource.postgres.replica"},
 		Delete:  []string{},
 	}
 
 	require.Equal(t, expected, diffSets(found))
-	requireDiffPredictsApply(t, found, applySets(applied))
+	requireDiffEqualsApply(t, found, applySets(applied))
 }
 
 func TestDiffOfRemovedIngressPredictsApply(t *testing.T) {
@@ -474,7 +445,7 @@ func TestDiffOfRemovedIngressPredictsApply(t *testing.T) {
 	}
 
 	require.Equal(t, expected, diffSets(found))
-	requireDiffPredictsApply(t, found, applySets(applied))
+	requireDiffEqualsApply(t, found, applySets(applied))
 }
 
 func TestDiffOfFailedReplicaPredictsReplaceByApply(t *testing.T) {
@@ -487,8 +458,112 @@ func TestDiffOfFailedReplicaPredictsReplaceByApply(t *testing.T) {
 	found, _ := scenario.diff()
 	applied := scenario.apply()
 
+	// Restoring the location is itself a location change, which the fixture
+	// provider also answers with replace, so the action alone can not tell
+	// the two apart. TestDiffOfFailedReplicaNeverAsksItsProvider shows the
+	// replacement here comes from the failure: the provider is never asked.
 	require.Equal(t, []string{"resource.postgres.replica"}, diffSets(found).Replace)
-	requireDiffPredictsApply(t, found, applySets(applied))
+	requireDiffEqualsApply(t, found, applySets(applied))
+}
+
+func TestDiffOfFailedReplicaNeverAsksItsProvider(t *testing.T) {
+	scenario := newPluginDiffScenario(t)
+
+	scenario.edit("main.xcl", `location = "replica.localhost"`, `location = "`+diffFailingLocation+`"`)
+	scenario.applyFails()
+	scenario.edit("main.xcl", `location = "`+diffFailingLocation+`"`, `location = "replica.localhost"`)
+
+	_, reported := scenario.diff()
+
+	require.Empty(t, diffResourceEvents(reported, "resource.postgres.replica", events.OperationChanged))
+}
+
+func TestDiffOfEditedReplicaLocationAsksItsProvider(t *testing.T) {
+	scenario := newPluginDiffScenario(t)
+	scenario.apply()
+
+	scenario.edit("main.xcl", `location = "replica.localhost"`, `location = "replica2.localhost"`)
+
+	_, reported := scenario.diff()
+
+	require.NotEmpty(t, diffResourceEvents(reported, "resource.postgres.replica", events.OperationChanged))
+}
+
+// TestDiffOfProviderReplacePredictsApply changes the hostname of the ingress,
+// which the external plugin's ingress provider answers with replace. Nothing
+// references the ingress, so it is the only resource that changes.
+func TestDiffOfProviderReplacePredictsApply(t *testing.T) {
+	scenario := newPluginDiffScenario(t)
+	scenario.apply()
+
+	scenario.edit("main.xcl", `hostname = "example.com"`, `hostname = "example.org"`)
+
+	found, _ := scenario.diff()
+	applied := scenario.apply()
+
+	expected := diffActionSets{
+		Create:  []string{},
+		Update:  []string{},
+		Replace: []string{"resource.ingress.web"},
+		Delete:  []string{},
+	}
+
+	require.Equal(t, expected, diffSets(found))
+	requireDiffEqualsApply(t, found, applySets(applied))
+}
+
+// TestDiffOfDependentReplacePredictsApply changes the location of
+// postgres.main, which the in-process postgres provider answers with replace.
+// No fixture provider answers replace because a dependency is replaced, so
+// the dependents show the floor instead: app.web references the location and
+// the computed connection_string of postgres.main, and ingress.web references
+// only the computed url of app.web, so ingress.web changes for no reason but
+// a computed value of a changing dependency. Both are planned and applied as
+// updates, and the diff still lists exactly what the apply does.
+func TestDiffOfDependentReplacePredictsApply(t *testing.T) {
+	scenario := newPluginDiffScenario(t)
+	scenario.apply()
+
+	scenario.edit("main.xcl", `location = "localhost"
+  port     = 5432`, `location = "primary.localhost"
+  port     = 5432`)
+
+	found, _ := scenario.diff()
+	applied := scenario.apply()
+
+	expected := diffActionSets{
+		Create:  []string{},
+		Update:  []string{"resource.app.web", "resource.ingress.web"},
+		Replace: []string{"resource.postgres.main"},
+		Delete:  []string{},
+	}
+
+	require.Equal(t, expected, diffSets(found))
+	requireDiffEqualsApply(t, found, applySets(applied))
+}
+
+func TestDiffOfRemovalAndReplacePredictsApply(t *testing.T) {
+	scenario := newPluginDiffScenario(t)
+	scenario.apply()
+
+	scenario.edit("main.xcl", `resource "ingress" "web" {
+  hostname = "example.com"
+  app_url  = resource.app.web.url
+}`, "")
+	scenario.edit("main.xcl", `location = "replica.localhost"`, `location = "replica2.localhost"`)
+
+	found, _ := scenario.diff()
+	applied := scenario.apply()
+
+	expected := diffActionSets{
+		Create:  []string{},
+		Update:  []string{},
+		Replace: []string{"resource.postgres.replica"},
+		Delete:  []string{"resource.ingress.web"},
+	}
+
+	require.Equal(t, expected, diffSets(found))
+	requireDiffEqualsApply(t, found, applySets(applied))
 }
 
 func TestDiffOfChangedPasswordPredictsApply(t *testing.T) {
@@ -514,7 +589,7 @@ func TestDiffOfChangedPasswordPredictsApply(t *testing.T) {
 	ingress := diffResource(t, found, "resource.ingress.web")
 	require.Equal(t, []string{"app_url"}, diffUnknownPaths(ingress))
 
-	requireDiffPredictsApply(t, found, applySets(applied))
+	requireDiffEqualsApply(t, found, applySets(applied))
 }
 
 func TestDiffOfChangedPasswordReportsSensitivePasswordChange(t *testing.T) {

@@ -173,7 +173,9 @@ func TestProviderCallLogsAtInfo(t *testing.T) {
 
 	calls := []xcl.Event{}
 	for _, e := range recorded {
-		if e.Phase == events.PhaseLog && e.Operation != events.OperationLoad {
+		// the decide pass writes debug log events from the core logger, only
+		// the logs the providers write are counted
+		if e.Phase == events.PhaseLog && e.Operation != events.OperationLoad && e.Source != events.SourceCore {
 			calls = append(calls, e)
 		}
 	}

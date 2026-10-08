@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/jumppad-labs/xcl/e2e/fixtures/services"
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 )
@@ -113,7 +114,8 @@ func appURL(app *services.App) string {
 // type this plugin provides. It is a separate provider, registered in Init
 // alongside the app one.
 //
-// Change detection comes from the embedded DefaultChanged.
+// Change detection comes from the embedded DefaultChanged, except that a
+// changed hostname answers replace, see Changed.
 type ingressProvider struct {
 	plugins.DefaultChanged[*services.Ingress]
 }
@@ -123,6 +125,17 @@ var _ plugins.ResourceProvider[*services.Ingress] = (*ingressProvider)(nil)
 // Init is called once, when the plugin process starts, see appProvider.Init
 func (p *ingressProvider) Init(state plugins.State, functions plugins.ProviderFunctions, logger logger.Logger) error {
 	return nil
+}
+
+// Changed answers replace when the hostname changes, the route is identified by its hostname, so the
+// e2e scenarios have a provider-decided replacement. Every other change is
+// left to DefaultChanged.
+func (p *ingressProvider) Changed(ctx context.Context, old *services.Ingress, new *services.Ingress, dependencies []entity.DependencyChange) (entity.Change, error) {
+	if old.Hostname != new.Hostname {
+		return entity.Replace, nil
+	}
+
+	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
 }
 
 // Create receives the ingress with the computed url of the app it routes to,

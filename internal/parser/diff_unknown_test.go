@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/diff"
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/types"
@@ -102,28 +103,26 @@ func TestDiffOfSavedResourceReferencingNewComputedValueCountsEachAction(t *testi
 	require.Equal(t, diff.Summary{Create: 1, Update: 1, Unchanged: 1}, result.Summary)
 }
 
-func TestDiffNeverReadsResourceHoldingUnknownValue(t *testing.T) {
+func TestDiffReadsResourceHoldingUnknownValueWithSavedValues(t *testing.T) {
 	h := applyUnknownRefBefore(t)
 
-	h.runDiff(t, diffUnknownRefAfterConfig)
+	result := h.runDiff(t, diffUnknownRefAfterConfig)
 
-	require.Empty(t, callsFor(h.plugin.GetCalls(), diffUnknownUserID))
-	require.NotContains(t, h.plugin.GetReadResources(), diffUnknownUserID)
-	require.NotContains(t, h.plugin.GetChangedCalls(), diffUnknownUserID+"->"+diffUnknownUserID)
+	// decide pass reads every saved resource; unknowns carry saved values
+	read := readCallFor(t, h.plugin, diffUnknownUserID)
+	require.Equal(t, []string{diffUnknownFixedNetworkName}, containerNetworkNames(t, read.New))
+	require.Equal(t, diff.ActionUpdate, diffActionFor(t, result, diffUnknownUserID))
 }
 
-func TestDiffReadsOnlyResourcesWithoutUnknownValues(t *testing.T) {
+func TestDiffReadsEverySavedResourceIncludingThoseWithUnknownValues(t *testing.T) {
 	h := applyUnknownRefBefore(t)
 
 	h.runDiff(t, diffUnknownRefAfterConfig)
 
-	// network one is saved and fully known, network two is new and user
-	// holds an unknown
-	require.Equal(t, []string{diffUnknownNetworkOneID}, h.plugin.GetReadResources())
-	require.Equal(t, []string{
-		"read " + diffUnknownNetworkOneID,
-		"changed " + diffUnknownNetworkOneID,
-	}, h.plugin.GetCalls())
+	// decide pass reads every saved resource; unknowns carry saved values.
+	// network one and user are saved, network two is new so it is never read
+	require.Equal(t, sorted(diffUnknownNetworkOneID, diffUnknownUserID), sortedCopy(h.plugin.GetReadResources()))
+	require.Empty(t, callsFor(h.plugin.GetCalls(), diffUnknownNetworkTwoID))
 }
 
 func TestDiffWithUnknownValuesMakesNoCreateUpdateOrDestroyCalls(t *testing.T) {
@@ -559,4 +558,57 @@ func TestWithPlaceholdersKeepsMarksOfTheReplacedUnknown(t *testing.T) {
 
 	require.True(t, got.IsKnown())
 	require.True(t, got.HasMark("sensitive"))
+}
+
+func TestDiffShowsComputedValuesOfReplacedDependencyAsUnknown(t *testing.T) {
+	h := applyComputedRef(t)
+	h.plugin.SetChangedResult(computedRefNetworkID, entity.Replace)
+
+	result := h.runDiff(t, lifecycleComputedRefConfig)
+
+	// user names its network after the replaced network's provider id, which
+	// the replacement assigns afresh
+	user := diffResourceAt(t, result, computedRefUserID)
+	require.Equal(t, diff.Change{
+		Path:    diff.Path{}.Attribute("network").Index(0).Attribute("name"),
+		Before:  "id-one",
+		After:   nil,
+		Unknown: true,
+	}, changeAt(t, user, diffUnknownNetworkNamePath))
+}
+
+func TestDiffRendersComputedValuesOfReplacedDependencyAsKnownAfterApply(t *testing.T) {
+	h := applyComputedRef(t)
+	h.plugin.SetChangedResult(computedRefNetworkID, entity.Replace)
+
+	result := h.runDiff(t, lifecycleComputedRefConfig)
+
+	output := string(diff.Render(result))
+	require.Contains(t, output, "      ~ network[0].name = \"id-one\" -> (known after apply)\n")
+}
+
+func TestDiffShowsComputedValuesOfUpdatedDependencyAsUnknown(t *testing.T) {
+	h := applyComputedRef(t)
+	h.plugin.SetChangedResult(computedRefNetworkID, entity.Update)
+
+	result := h.runDiff(t, lifecycleComputedRefConfig)
+
+	user := diffResourceAt(t, result, computedRefUserID)
+	require.Equal(t, diff.ActionUpdate, user.Action)
+	require.Equal(t, diff.Change{
+		Path:    diff.Path{}.Attribute("network").Index(0).Attribute("name"),
+		Before:  "id-one",
+		After:   nil,
+		Unknown: true,
+	}, changeAt(t, user, diffUnknownNetworkNamePath))
+}
+
+func TestDiffRendersComputedValuesOfUpdatedDependencyAsKnownAfterApply(t *testing.T) {
+	h := applyComputedRef(t)
+	h.plugin.SetChangedResult(computedRefNetworkID, entity.Update)
+
+	result := h.runDiff(t, lifecycleComputedRefConfig)
+
+	output := string(diff.Render(result))
+	require.Contains(t, output, "      ~ network[0].name = \"id-one\" -> (known after apply)\n")
 }

@@ -78,10 +78,10 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		}
 
 		// Build a fresh context for this resource dynamically
-		// a diff reads values only known once an apply has run as unknown,
-		// apply has no recorder
+		// the decide pass reads values only known once an apply has run as
+		// unknown, the act pass decodes real values
 		var unknown unknownValues
-		if lifecycle.recorder != nil {
+		if lifecycle.mode == walkDecide {
 			unknown = lifecycle.recorder
 		}
 
@@ -133,7 +133,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		// only known once an apply has run; builtins hold cty values, which
 		// keep unknowns as they are
 		var diag hcl.Diagnostics
-		if lifecycle.mode == walkDiff && !isBuiltinType(rMeta.Type) {
+		if lifecycle.mode == walkDecide && !isBuiltinType(rMeta.Type) {
 			var unknownPaths []diff.Path
 			unknownPaths, diag = decodeForDiff(bdy, ctx, r)
 			lifecycle.recorder.recordUnknown(rMeta.ID, unknownPaths)
@@ -187,8 +187,8 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 
 		// Call provider lifecycle methods, a step skipped because the operation
 		// was cancelled leaves the resource as never reached
-		if lifecycle.mode == walkDiff {
-			err = lifecycle.diff(r)
+		if lifecycle.mode == walkDecide {
+			err = lifecycle.decide(r)
 		} else {
 			err = lifecycle.apply(r)
 		}

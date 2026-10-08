@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -57,18 +58,18 @@ func TestDefaultChangedReportsNoChangeForIdenticalResources(t *testing.T) {
 	old := &testResource{Name: "web", Count: 2}
 	new := &testResource{Name: "web", Count: 2}
 
-	changed, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new)
+	change, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new, nil)
 	require.NoError(t, err)
-	require.False(t, changed)
+	require.Equal(t, entity.NoChange, change)
 }
 
 func TestDefaultChangedReportsChangeWhenFieldDiffers(t *testing.T) {
 	old := &testResource{Name: "web", Count: 2}
 	new := &testResource{Name: "web", Count: 3}
 
-	changed, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new)
+	change, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new, nil)
 	require.NoError(t, err)
-	require.True(t, changed)
+	require.Equal(t, entity.Update, change)
 }
 
 func TestDefaultChangedIgnoresMetaDifferences(t *testing.T) {
@@ -82,9 +83,9 @@ func TestDefaultChangedIgnoresMetaDifferences(t *testing.T) {
 	new.Meta.Line = 42
 	new.Meta.Status = types.StatusFailed
 
-	changed, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new)
+	change, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new, nil)
 	require.NoError(t, err)
-	require.False(t, changed)
+	require.Equal(t, entity.NoChange, change)
 }
 
 func TestDefaultChangedIgnoresDependsOnAndDisabled(t *testing.T) {
@@ -96,25 +97,37 @@ func TestDefaultChangedIgnoresDependsOnAndDisabled(t *testing.T) {
 	new.DependsOn = []string{"resource.network.other", "resource.volume.data"}
 	new.Disabled = true
 
-	changed, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new)
+	change, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new, nil)
 	require.NoError(t, err)
-	require.False(t, changed)
+	require.Equal(t, entity.NoChange, change)
 }
 
 func TestDefaultChangedReportsNoChangeForTwoNilResources(t *testing.T) {
 	var old *testResource
 	var new *testResource
 
-	changed, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new)
+	change, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new, nil)
 	require.NoError(t, err)
-	require.False(t, changed)
+	require.Equal(t, entity.NoChange, change)
 }
 
 func TestDefaultChangedReportsChangeWhenOneResourceIsNil(t *testing.T) {
 	var old *testResource
 	new := &testResource{Name: "web", Count: 2}
 
-	changed, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new)
+	change, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new, nil)
 	require.NoError(t, err)
-	require.True(t, changed)
+	require.Equal(t, entity.Update, change)
+}
+
+func TestDefaultChangedIgnoresDependencies(t *testing.T) {
+	old := &testResource{Name: "web", Count: 2}
+	new := &testResource{Name: "web", Count: 2}
+	dependencies := []entity.DependencyChange{
+		{Address: "resource.network.main", Change: entity.Replace},
+	}
+
+	change, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new, dependencies)
+	require.NoError(t, err)
+	require.Equal(t, entity.NoChange, change)
 }

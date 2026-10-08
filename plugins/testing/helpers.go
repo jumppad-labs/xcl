@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/schema"
@@ -150,9 +151,9 @@ func (ops *TestPluginOperations) TestChanged(entityType, entitySubType string, h
 		dataJSON, err := wire.Marshal(obj)
 		require.NoError(ops.host.t, err, "Should marshal test data to JSON for object %d", i)
 
-		changed, err := ops.host.Changed(context.Background(), entityType, entitySubType, dataJSON, dataJSON)
+		change, err := ops.host.Changed(context.Background(), entityType, entitySubType, dataJSON, dataJSON, nil)
 		require.NoError(ops.host.t, err, "Should check for changes without error for object %d", i)
-		require.False(ops.host.t, changed, "Newly created object %d should not be changed", i)
+		require.Equal(ops.host.t, entity.NoChange, change, "Newly created object %d should not be changed", i)
 	}
 }
 
@@ -199,9 +200,9 @@ func (ops *TestPluginOperations) TestCRUDOperations(entityType, entitySubType st
 	require.NoError(ops.host.t, err, "Should create resource successfully")
 
 	// Test Changed
-	changed, err := ops.host.Changed(context.Background(), entityType, entitySubType, dataJSON, dataJSON)
+	change, err := ops.host.Changed(context.Background(), entityType, entitySubType, dataJSON, dataJSON, nil)
 	require.NoError(ops.host.t, err, "Should check for changes without error")
-	require.False(ops.host.t, changed, "Newly created resource should not be changed")
+	require.Equal(ops.host.t, entity.NoChange, change, "Newly created resource should not be changed")
 
 	// Test Destroy
 	err = ops.host.Destroy(context.Background(), entityType, entitySubType, dataJSON)

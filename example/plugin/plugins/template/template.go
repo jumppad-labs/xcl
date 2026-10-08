@@ -17,6 +17,7 @@ import (
 
 	"github.com/infinytum/raymond/v2"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -46,6 +47,19 @@ type provider struct {
 }
 
 var _ plugins.ResourceProvider[*Template] = (*provider)(nil)
+
+// Changed answers replace when the destination changes: Update renders to the
+// new path but would leave the file at the old one behind, so the template is
+// destroyed, removing its file, and created again. A change to the source or
+// variables is left to DefaultChanged, which answers update, and Update
+// renders the file again.
+func (p *provider) Changed(ctx context.Context, old *Template, new *Template, dependencies []entity.DependencyChange) (entity.Change, error) {
+	if old.Destination != new.Destination {
+		return entity.Replace, nil
+	}
+
+	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+}
 
 // Init logs that the provider is ready, it needs nothing else
 func (p *provider) Init(state plugins.State, functions plugins.ProviderFunctions, log logger.Logger) error {

@@ -64,11 +64,11 @@ sets:
 
 | Status | Meaning | Next apply |
 |---|---|---|
-| `created` | the provider created the resource | read, then updated if changed |
-| `updated` | the provider updated the resource | read, then updated if changed |
-| `failed` | a provider call for the resource failed | rebuilt: destroyed, then created |
+| `created` | the provider created the resource | read, then left alone, updated or replaced as its provider's `Changed` answers |
+| `updated` | the provider updated the resource | read, then left alone, updated or replaced as its provider's `Changed` answers |
+| `failed` | creating or updating the resource failed, including the create of a replacement | replaced, without asking its provider: destroyed, then created |
 | `destroyed` | the provider destroyed the resource | — (never saved) |
-| `destroy_failed` | destroying the resource failed | removed again if its block is gone, otherwise rebuilt: the destroy is tried again, then created |
+| `destroy_failed` | destroying the resource failed, including the destroy of a replacement | removed again if its block is gone, otherwise replaced: the destroy is tried again, then created |
 
 `destroyed` is never saved: a destroyed resource is removed from the state
 instead. A `destroy_failed` resource is retried by the next `Destroy`, or by
@@ -81,27 +81,33 @@ together with the error, and `Config.Apply` saves it before returning the
 error, so the next apply picks up where this one stopped:
 
 - resources the walk reached are saved with their new values and status;
-- the failing resource is saved as `failed`, or `destroy_failed` if a
-  rebuild's destroy failed;
+- the failing resource is saved as `failed`, whether it was being created,
+  updated, or created again as a replacement;
 - resources that existed before but were not reached keep their previous
   entry;
 - new resources that were not reached are left out.
 
-When a removed resource fails to be destroyed, the apply stops before
-anything is created or changed, and the state saved is the previous state
-minus what was destroyed, with the failures kept as `destroy_failed` (see
-[State during a destroy](#state-during-a-destroy)). The next apply retries
-the removal first.
+When a replaced or removed resource fails to be destroyed, the apply stops
+before anything is created or changed, and the state saved is the previous
+state minus what was destroyed, with the failures kept as `destroy_failed`
+(see [State during a destroy](#state-during-a-destroy)). The next apply
+decides a failed replacement replace again and retries the destroy first,
+and retries a failed removal first.
 
 Nothing is saved when the configuration doesn't parse or validate, declares
 no blocks (`xcl.ErrEmptyConfiguration`), or the dependency graph can't be
-built: no provider was called, so the previous state still stands. See
+built: no provider was called, so the previous state still stands. Nothing
+is saved either when deciding fails or is cancelled: an error from a
+provider's `Read` or `Changed` while the apply decides what to do marks no
+resource failed, since nothing has been created, updated or destroyed, and
+the previous state still stands. See
 [Parser & Resource Lifecycle](parser-lifecycle.md#state-saved-after-a-failed-apply)
 for how the state is built.
 
 ## State during a destroy
 
-`Config.Destroy` and the removal phase of `Config.Apply` save the state
+`Config.Destroy` and the destroy phase of `Config.Apply` (its replaced and
+removed resources) save the state
 through the `StateStore` after every resource they destroy, not once at the
 end ([`internal/parser/destroy.go`](../internal/parser/destroy.go#L22)):
 
@@ -222,11 +228,13 @@ file accordingly.
 start of every run to get the "previous state", the state saved by the last
 apply. `Config.Destroy` calls them too, to get the state to destroy.
 `Parser.Apply` uses each resource's entry in it to decide between
-create, read-then-update and rebuild (see
+create, replace (for a resource saved as `failed` or `destroy_failed`) and
+read-then-ask, where its provider's `Changed` answers no change, update or
+replace (see
 [Parser & Resource Lifecycle](parser-lifecycle.md)). `Config.Apply` calls
 `Save()` after adopting the entities the parse produced, including after a failed apply
 (see [State saved after a failed apply](#state-saved-after-a-failed-apply)).
-Destroying, in `Config.Destroy` or an apply's removal phase, calls `Save()`
+Destroying, in `Config.Destroy` or an apply's destroy phase, calls `Save()`
 after every resource (see [State during a destroy](#state-during-a-destroy)).
 
 `state/mocks/mock_state_store.go` is a generated mock of this interface

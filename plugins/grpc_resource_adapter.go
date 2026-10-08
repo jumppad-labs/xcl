@@ -3,6 +3,7 @@ package plugins
 import (
 	"context"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 )
 
@@ -49,8 +50,8 @@ func (a *GRPCResourceProviderAdapter) Update(ctx context.Context, entityData []b
 	return a.wrapper.Update(ctx, a.resourceType, a.resourceSubType, entityData)
 }
 
-func (a *GRPCResourceProviderAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte) (bool, error) {
-	return a.wrapper.Changed(ctx, a.resourceType, a.resourceSubType, oldEntityData, newEntityData)
+func (a *GRPCResourceProviderAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
+	return a.wrapper.Changed(ctx, a.resourceType, a.resourceSubType, oldEntityData, newEntityData, dependencies)
 }
 
 // Ensure GRPCResourceProviderAdapter implements ProviderAdapter

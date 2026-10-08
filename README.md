@@ -286,8 +286,44 @@ print only their output, so they give xcl no receiver.
 Run any of them from its directory with `make run`. For `plugin` this builds
 `xcl-docker` and the Docker plugin side by side into `build/`, then runs
 `apply ./config`, `status` and `destroy` in turn, and it has the extra Makefile
-targets `build`, `generate` and `clean`; every example has `run` and `test`.
-The plugin tests build both binaries themselves.
+targets `build`, `replace`, `generate` and `clean`; every example has `run`
+and `test`. The plugin tests build both binaries themselves.
+
+`./config` is the plugin example's whole configuration and applies on its
+own. Next to it, [`plugin/config-subnet`](./example/plugin/config-subnet) is
+the same configuration with the network's address range widened from
+`10.42.0.0/24` to `10.42.0.0/23`. Docker cannot move a network to a new range
+in place, so the network's provider answers replace when its `subnet`
+changes, and the container's provider answers replace when a resource it
+depends on is replaced, since it would be left attached to a network that no
+longer exists. `make replace` applies `./config`, then plans and applies
+`./config-subnet`, prints the state and destroys everything. The plan shows
+each replacement as `-/+` with the reason above it:
+
+```
+  # docker.container.web will be replaced because docker.network.app is replaced
+-/+ docker "container" "web" {}
+
+  # docker.network.app will be replaced, it cannot be updated in place
+-/+ docker "network" "app" {
+      ~ subnet = "10.42.0.0/24" -> "10.42.0.0/23"
+    }
+
+  # template.welcome will be updated
+  ~ template "welcome" {
+      ~ variables["address"] = "10.42.0.2" -> (known after apply)
+    }
+
+Diff: 0 to create, 1 to update, 2 to replace, 0 to delete, 0 unchanged.
+```
+
+The container's configuration is unchanged; it is replaced only because its
+network is. The template reads the container's address, which is only known
+once the new container exists, so it is updated. Applying `./config-subnet`
+reads and asks about all three first, then destroys the container and the
+network, dependents first, creates the network on `10.42.0.0/23` and the
+container on it, and updates the template with the container's new address.
+Planning `./config-subnet` again shows `Diff: no changes, 3 unchanged.`
 
 Each example is a Go module of its own, pointed at this checkout with a
 `replace` directive, so it can be copied out of the repository: drop the

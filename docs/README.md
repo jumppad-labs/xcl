@@ -13,14 +13,16 @@ not at end users writing `.xcl` config.
 - [Plugin Architecture](plugins.md) — how providers are authored, hosted
   (in-process vs. out-of-process/gRPC), and registered.
 - [Parser & Resource Lifecycle](parser-lifecycle.md) — how HCL is parsed into
-  a dependency graph and walked, and how `Create`/`Read`/`Changed`/`Update`/
-  `Destroy` get invoked on providers, chosen from the state saved by the last
-  apply, and how removed resources and `Config.Destroy` are destroyed
-  children first.
+  a dependency graph and walked, and how an apply first decides every
+  resource (`Read`, then `Changed` answering no change, update or replace)
+  and then acts: replaced and removed resources are destroyed children first,
+  then `Create`/`Update` run in dependency order; and how `Config.Destroy`
+  destroys children first.
 - [Plugin Developer Guide](plugin-developer-guide.md) — the provider contract
   (`Create`/`Read`/`Changed`/`Update`/`Destroy`), what `old` and `new` are,
-  what each method may and may not touch, computed fields, and what happens
-  when a call fails.
+  how `Changed` answers an `entity.Change` (no change, update or replace)
+  from the dependency list it is given, what each method may and may not
+  touch, computed fields, and what happens when a call fails.
 - [State & Persistence](state.md) — what `State` holds, the resource
   statuses, what is saved after a failed apply and during a destroy, and how
   `FileStateStore` serializes it to disk.
@@ -32,6 +34,7 @@ not at end users writing `.xcl` config.
 | Path | Purpose |
 |---|---|
 | `config.go`, `options.go`, `events.go` | Public facade: `Config`, functional options, the `Event`/`EventHandler` aliases, and the runner that delivers each operation's events |
+| `entity/` | `entity.Change` and `entity.DependencyChange`: the answer a provider's `Changed` gives and the dependency list it is given |
 | `types/` | Shared resource metadata: `types.Meta`, `types.ResourceBase`, reflection helpers |
 | `plugins/` | Provider contract (`ProviderAdapter`) and hosting (in-process / gRPC) |
 | `registry/` | Public plugin sources: the `Registry` and `Plugin` interfaces, `InProcess`/`Executable` starters, and the local registry `NewLocal` (in-process plugins, plugin binaries, plugin directories) |

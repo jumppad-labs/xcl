@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl"
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/testutil"
@@ -227,9 +228,9 @@ func TestInProcessPluginChanged(t *testing.T) {
 	// Test each person individually
 	for i, personJSON := range peopleData {
 		// Call Changed on the plugin
-		changed, err := ph.Changed(context.Background(), "resource", "person", personJSON, personJSON)
+		change, err := ph.Changed(context.Background(), "resource", "person", personJSON, personJSON, nil)
 		require.NoError(t, err, "Should check changed status for person %d", i)
-		require.False(t, changed, "Person %d should not have changed", i)
+		require.Equal(t, entity.NoChange, change, "Person %d should not have changed", i)
 	}
 }
 
@@ -293,9 +294,9 @@ func TestExternalPluginCRUDOperations(t *testing.T) {
 		require.NoError(t, err, "Should create person %d", i)
 
 		// Test Changed
-		changed, err := ph.Changed(context.Background(), "resource", "person", personJSON, personJSON)
+		change, err := ph.Changed(context.Background(), "resource", "person", personJSON, personJSON, nil)
 		require.NoError(t, err, "Should check changed status for person %d", i)
-		require.False(t, changed, "Person %d should not have changed", i)
+		require.Equal(t, entity.NoChange, change, "Person %d should not have changed", i)
 
 		// Test Destroy
 		err = ph.Destroy(context.Background(), "resource", "person", personJSON)
@@ -483,9 +484,9 @@ func TestInProcessPluginChangedReportsNoChangeForIdenticalData(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 
-	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
+	change, err := ph.Changed(context.Background(), "resource", "person", oldData, newData, nil)
 	require.NoError(t, err, "Should check changed status")
-	require.False(t, changed, "Identical data should not be reported as changed")
+	require.Equal(t, entity.NoChange, change, "Identical data should not be reported as changed")
 }
 
 // TestInProcessPluginChangedReportsChangeWhenFieldDiffers tests that the
@@ -496,9 +497,9 @@ func TestInProcessPluginChangedReportsChangeWhenFieldDiffers(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":31,"email":"test@example.com"}`)
 
-	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
+	change, err := ph.Changed(context.Background(), "resource", "person", oldData, newData, nil)
 	require.NoError(t, err, "Should check changed status")
-	require.True(t, changed, "A different age should be reported as changed")
+	require.Equal(t, entity.Update, change, "A different age should be reported as changed")
 }
 
 // TestInProcessPluginChangedIgnoresMetadata tests that the default change
@@ -509,9 +510,9 @@ func TestInProcessPluginChangedIgnoresMetadata(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test","file":"old.hcl","line":1},"first_name":"Test","last_name":"User","age":30}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test","file":"new.hcl","line":42},"first_name":"Test","last_name":"User","age":30}`)
 
-	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
+	change, err := ph.Changed(context.Background(), "resource", "person", oldData, newData, nil)
 	require.NoError(t, err, "Should check changed status")
-	require.False(t, changed, "Differences only in meta should not be reported as changed")
+	require.Equal(t, entity.NoChange, change, "Differences only in meta should not be reported as changed")
 }
 
 // TestInProcessPluginReadHelperReturnsConfiguredCopy tests the TestRead helper
@@ -548,9 +549,9 @@ func TestExternalPluginChangedReportsChangeWhenFieldDiffers(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":31,"email":"test@example.com"}`)
 
-	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
+	change, err := ph.Changed(context.Background(), "resource", "person", oldData, newData, nil)
 	require.NoError(t, err, "Should check changed status")
-	require.True(t, changed, "A different age should be reported as changed")
+	require.Equal(t, entity.Update, change, "A different age should be reported as changed")
 }
 
 // TestExternalPluginChangedReportsNoChangeForIdenticalData tests that the
@@ -565,9 +566,61 @@ func TestExternalPluginChangedReportsNoChangeForIdenticalData(t *testing.T) {
 	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
 
-	changed, err := ph.Changed(context.Background(), "resource", "person", oldData, newData)
+	change, err := ph.Changed(context.Background(), "resource", "person", oldData, newData, nil)
 	require.NoError(t, err, "Should check changed status")
-	require.False(t, changed, "Identical data should not be reported as changed")
+	require.Equal(t, entity.NoChange, change, "Identical data should not be reported as changed")
+}
+
+// TestExternalPluginChangedAnswersWithDependencies tests that a dependency
+// list crosses to the external plugin and the plugin still answers
+func TestExternalPluginChangedAnswersWithDependencies(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	ph := setupExternalPlugin(t)
+
+	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
+	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":31,"email":"test@example.com"}`)
+	dependencies := []entity.DependencyChange{
+		{Address: "resource.person.parent", Change: entity.Replace},
+		{Address: "resource.person.sibling", Change: entity.Update},
+	}
+
+	change, err := ph.Changed(context.Background(), "resource", "person", oldData, newData, dependencies)
+	require.NoError(t, err, "Should check changed status")
+	require.Equal(t, entity.Update, change, "A different age should be reported as an update")
+}
+
+// TestInProcessPluginChangedReplacesOnNameChange tests that the person
+// provider answers replace when the first name changes, since the person's ID
+// is derived from the name
+func TestInProcessPluginChangedReplacesOnNameChange(t *testing.T) {
+	ph := setupInProcessPlugin(t)
+
+	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
+	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Renamed","last_name":"User","age":30,"email":"test@example.com"}`)
+
+	change, err := ph.Changed(context.Background(), "resource", "person", oldData, newData, nil)
+	require.NoError(t, err, "Should check changed status")
+	require.Equal(t, entity.Replace, change, "A different first name should be reported as a replace")
+}
+
+// TestExternalPluginChangedReplacesOnNameChange tests that the replace answer
+// for a name change crosses from the external plugin to the host
+func TestExternalPluginChangedReplacesOnNameChange(t *testing.T) {
+	// Build the plugin first
+	buildCmd := plugintesting.BuildPlugin(t, ".")
+	require.NoError(t, buildCmd, "Plugin should build successfully")
+
+	ph := setupExternalPlugin(t)
+
+	oldData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"User","age":30,"email":"test@example.com"}`)
+	newData := []byte(`{"meta":{"id":"resource.person.test","type":"resource","name":"test"},"first_name":"Test","last_name":"Renamed","age":30,"email":"test@example.com"}`)
+
+	change, err := ph.Changed(context.Background(), "resource", "person", oldData, newData, nil)
+	require.NoError(t, err, "Should check changed status")
+	require.Equal(t, entity.Replace, change, "A different last name should be reported as a replace")
 }
 
 // TestInProcessPluginProviderLogsNameThePluginAsSource tests that a provider

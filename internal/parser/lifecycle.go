@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/jumppad-labs/xcl/diff"
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/wire"
@@ -44,8 +46,19 @@ type resourceLifecycle struct {
 	// mode is what the walk does with each resource, apply unless set
 	mode walkMode
 
-	// recorder collects what an apply would do in a diff walk, nil in apply
+	// operationName is the core operation the walk is part of, a diff or an
+	// apply; apply unless set. A decide walk runs for both.
+	operationName string
+
+	// recorder is the decision record a decide walk fills, nil in apply
 	recorder *diffRecorder
+
+	// current is the parsed configuration, the dependencies of a resource
+	// are resolved against it
+	current ResourceProvider
+
+	// addresses resolves the addresses in a resource's links
+	addresses *resources.AddressParser
 
 	// diffOptions are the settings of a diff walk
 	diffOptions diff.Options
@@ -53,20 +66,21 @@ type resourceLifecycle struct {
 
 // operation is the core operation the lifecycle's walk is part of
 func (l *resourceLifecycle) operation() string {
-	if l.mode == walkDiff {
-		return events.OperationDiff
+	if l.operationName != "" {
+		return l.operationName
 	}
 
 	return events.OperationApply
 }
 
-// apply runs the provider lifecycle for a decoded resource. The path is chosen
-// from the resource's entry in the previous state:
+// apply runs the provider lifecycle for a decoded resource, following the
+// decision the decide pass recorded for it:
 //
-//   - absent: the resource is created
-//   - created or updated: the resource is read, then updated if it changed
-//   - failed, destroy_failed or anything else: the resource is rebuilt, it is
-//     destroyed using its saved copy, then created
+//   - create or replace: the resource is created, a replaced resource was
+//     destroyed before the walk started
+//   - update: the resource is updated in place
+//   - unchanged: no provider is called, the resource keeps what was read and
+//     its previous status
 //
 // The outcome is recorded in the apply progress. A resource whose provider call
 // failed is recorded as failed, an error before any provider call records
@@ -120,13 +134,73 @@ func (l *resourceLifecycle) run(r any) error {
 		return reportedError{err}
 	}
 
+	// the decide pass recorded what happens to every provider-backed
+	// resource, the act pass only follows it
+	dec, ok := l.recorder.lookup(meta.ID)
+	if !ok {
+		return fmt.Errorf("no decision was made for resource %s", meta.ID)
+	}
+
+	switch dec.action {
+	case diff.ActionCreate, diff.ActionReplace:
+		// a replaced resource was destroyed before the walk started
+		return l.create(r, adapter)
+	case diff.ActionUpdate:
+		return l.update(r, dec, adapter)
+	default:
+		return l.keep(r, dec)
+	}
+}
+
+// update calls the provider's Update for a resource decided update. It is
+// sent the configuration as decoded now, with real values, and the computed
+// values the decide pass read.
+func (l *resourceLifecycle) update(r any, dec decision, adapter plugins.ProviderAdapter) error {
+	meta, err := types.GetMeta(r)
+	if err != nil {
+		return err
+	}
+
+	if err := carryComputedValues(r, dec.read); err != nil {
+		return err
+	}
+
+	data, err := wire.Marshal(r)
+	if err != nil {
+		return fmt.Errorf("unable to serialize resource %s: %w", meta.ID, err)
+	}
+
+	duration, err := l.callProvider(events.OperationUpdate, r, data, func(ctx context.Context) ([]byte, error) {
+		return adapter.Update(ctx, data)
+	})
+	if errors.Is(err, errNotReached) {
+		return err
+	}
+
+	if err != nil {
+		meta.Status = types.StatusFailed
+		return err
+	}
+
+	l.warnChangedConfiguredValues(events.OperationUpdate, r, data)
+
+	meta.Status = types.StatusUpdated
+
+	emitLifecycle(l.options, meta, events.OperationUpdate, events.PhaseSuccess, duration, nil, data, r)
+
+	return nil
+}
+
+// keep saves a resource decided unchanged as its provider read it while
+// deciding, with its previous status. No provider is called.
+func (l *resourceLifecycle) keep(r any, dec decision) error {
+	meta, err := types.GetMeta(r)
+	if err != nil {
+		return err
+	}
+
 	old, err := findByID(l.previous.GetResources(), meta.ID)
 	if err != nil {
-		var notFound state.ResourceNotFoundError
-		if errors.As(err, &notFound) {
-			return l.create(r, adapter)
-		}
-
 		return fmt.Errorf("unable to find resource %s in previous state: %w", meta.ID, err)
 	}
 
@@ -135,34 +209,47 @@ func (l *resourceLifecycle) run(r any) error {
 		return err
 	}
 
-	switch oldMeta.Status {
-	case types.StatusCreated, types.StatusUpdated:
-		return l.read(r, old, adapter)
-	default:
-		return l.rebuild(r, old, adapter)
+	if err := replaceValues(r, dec.read); err != nil {
+		return err
 	}
+
+	// replaceValues keeps the configured meta, the saved status carries over
+	meta, err = types.GetMeta(r)
+	if err != nil {
+		return err
+	}
+
+	meta.Status = oldMeta.Status
+	return nil
 }
 
-// diff records what an apply would do with a decoded resource, choosing as
-// run does from the resource's entry in the previous state, without creating,
-// updating or destroying anything:
+// decide records what an apply does with a decoded resource, choosing from
+// the resource's entry in the previous state, without creating, updating or
+// destroying anything:
 //
-//   - absent: the resource would be created
-//   - created or updated: the resource is refreshed through its provider, it
-//     would be created again when the provider no longer finds it, updated
-//     when it changed, and is otherwise unchanged
-//   - failed, destroy_failed or anything else: the resource would be
-//     replaced, no provider is called
+//   - absent: the resource is created
+//   - created or updated: the resource is read through its provider and its
+//     provider asks whether it changed, told which of its dependencies the
+//     same apply updates or replaces. It is created again when the provider
+//     no longer finds it, and otherwise updated, replaced or left unchanged
+//     as the provider answers
+//   - failed, destroy_failed or anything else: the resource is replaced, no
+//     provider is called
 //
-// Resources without a provider take no part in a diff: they are neither
-// recorded nor reported in an event.
-func (l *resourceLifecycle) diff(r any) error {
+// A resource whose configured values are only known once the apply has run
+// is read with its saved values in their place, and is at least updated: its
+// inputs change, whatever its provider says.
+//
+// Resources without a provider take no part: they are neither recorded nor
+// reported in an event. A provider error fails the decision, the resource is
+// not marked failed since nothing was attempted.
+func (l *resourceLifecycle) decide(r any) error {
 	meta, err := types.GetMeta(r)
 	if err != nil {
 		return err
 	}
 
-	err = l.diffResource(r, meta)
+	err = l.decideResource(r, meta)
 	if errors.Is(err, errNotReached) {
 		return err
 	}
@@ -175,9 +262,9 @@ func (l *resourceLifecycle) diff(r any) error {
 	return err
 }
 
-// diffResource chooses and records the action an apply would take for a
+// decideResource chooses and records the action an apply takes for a
 // resource
-func (l *resourceLifecycle) diffResource(r any, meta *types.Meta) error {
+func (l *resourceLifecycle) decideResource(r any, meta *types.Meta) error {
 	if handledWithoutProvider(l.types, meta) {
 		return nil
 	}
@@ -194,6 +281,7 @@ func (l *resourceLifecycle) diffResource(r any, meta *types.Meta) error {
 		var notFound state.ResourceNotFoundError
 		if errors.As(err, &notFound) {
 			l.recordPending(meta, diff.ActionCreate, nil, r)
+			l.recorder.decide(meta.ID, decision{action: diff.ActionCreate})
 			return nil
 		}
 
@@ -208,27 +296,59 @@ func (l *resourceLifecycle) diffResource(r any, meta *types.Meta) error {
 	switch oldMeta.Status {
 	case types.StatusCreated, types.StatusUpdated:
 	default:
-		l.recordPending(meta, diff.ActionReplace, old, r)
+		l.recordReplace(meta, diff.ReplaceFailed, nil, old, r)
+		l.recorder.decide(meta.ID, decision{action: diff.ActionReplace, reason: diff.ReplaceFailed})
 		return nil
 	}
 
-	// a resource that depends on a value only known once an apply has run
-	// is not read: its provider would be asked about a half-resolved
-	// resource. It is reported as updated, its unknown values say why
-	if len(l.recorder.unknownPaths(meta.ID)) > 0 {
-		l.recordPending(meta, diff.ActionUpdate, old, r)
-		return nil
+	// every parent is decided before its dependents, so the record knows
+	// what happens to each dependency
+	dependencies, err := dependencyChanges(r, l.current, l.addresses, l.types, l.recorder)
+	if err != nil {
+		return fmt.Errorf("unable to resolve the dependencies of %s: %w", meta.ID, err)
 	}
 
-	outcome, copies, err := l.refresh(r, old, adapter)
+	// a value only known once the apply has run is read as what was saved,
+	// the provider is told why through its dependencies
+	unknown := l.recorder.unknownPaths(meta.ID)
+	if len(unknown) > 0 {
+		withSavedValues(r, old, unknown)
+	}
+
+	outcome, copies, err := l.refresh(r, old, adapter, dependencies)
 	if err != nil {
 		return err
+	}
+
+	// the inputs of a resource with unknown values change, so it is at
+	// least updated; a provider may still answer replace
+	if len(unknown) > 0 && outcome == refreshUnchanged {
+		outcome = refreshChanged
 	}
 
 	switch outcome {
 	case refreshNotFound:
 		// refresh restored the configured values
 		l.recordPending(meta, diff.ActionCreate, nil, r)
+		l.recorder.decide(meta.ID, decision{action: diff.ActionCreate, dependencies: dependencies})
+
+	case refreshReplace:
+		configured, err := decodeCopy(r, copies.configured)
+		if err != nil {
+			return err
+		}
+
+		reason, replacedDeps := replaceReason(dependencies)
+
+		l.recordReplace(meta, reason, replacedDeps, old, configured)
+		l.recorder.decide(meta.ID, decision{
+			action:       diff.ActionReplace,
+			reason:       reason,
+			replacedDeps: replacedDeps,
+			dependencies: dependencies,
+			read:         copies.read,
+		})
+
 	case refreshChanged:
 		// the configuration as written is compared, not what the provider
 		// read back, so drift alone lists no changes
@@ -238,11 +358,33 @@ func (l *resourceLifecycle) diffResource(r any, meta *types.Meta) error {
 		}
 
 		l.recordPending(meta, diff.ActionUpdate, old, configured)
+		l.recorder.decide(meta.ID, decision{action: diff.ActionUpdate, dependencies: dependencies, read: copies.read})
+
 	default:
 		l.recorder.recordUnchanged()
+		l.recorder.decide(meta.ID, decision{dependencies: dependencies, read: copies.read})
 	}
 
 	return nil
+}
+
+// replaceReason returns why a provider answered replace: because of the
+// replaced dependencies it was told about, sorted, or, when there were none,
+// because it cannot update the resource in place
+func replaceReason(dependencies []entity.DependencyChange) (diff.ReplaceReason, []string) {
+	replaced := []string{}
+	for _, dependency := range dependencies {
+		if dependency.Change == entity.Replace {
+			replaced = append(replaced, dependency.Address)
+		}
+	}
+
+	if len(replaced) == 0 {
+		return diff.ReplaceProvider, nil
+	}
+
+	sort.Strings(replaced)
+	return diff.ReplaceDependency, replaced
 }
 
 // recordPending records a resource an apply would create, replace or update.
@@ -252,12 +394,23 @@ func (l *resourceLifecycle) diffResource(r any, meta *types.Meta) error {
 // diff may list a resource an apply then leaves alone, never the other way
 // round.
 func (l *resourceLifecycle) recordPending(meta *types.Meta, action diff.Action, saved, configured any) {
+	l.recordPendingResource(meta, diff.Resource{Action: action}, saved, configured)
+}
+
+// recordReplace records a resource an apply would replace, with the reason
+// and the replaced dependencies behind it, see recordPending
+func (l *resourceLifecycle) recordReplace(meta *types.Meta, reason diff.ReplaceReason, replacedDeps []string, saved, configured any) {
+	l.recordPendingResource(meta, diff.Resource{Action: diff.ActionReplace, Reason: reason, ReplacedDeps: replacedDeps}, saved, configured)
+}
+
+// recordPendingResource records resource, completed with the entity's
+// address and changes, see recordPending
+func (l *resourceLifecycle) recordPendingResource(meta *types.Meta, resource diff.Resource, saved, configured any) {
+	resource.Address = meta.ID
+	resource.Changes = l.changes(meta, resource.Action, saved, configured)
+
 	l.recorder.markPending(meta.ID)
-	l.recorder.record(diff.Resource{
-		Address: meta.ID,
-		Action:  action,
-		Changes: l.changes(meta, action, saved, configured),
-	})
+	l.recorder.record(resource)
 }
 
 // changes returns the changes to a resource's configured values an apply
@@ -321,8 +474,13 @@ const (
 	// configured values have been restored
 	refreshNotFound refreshOutcome = iota
 
-	// refreshChanged is a resource the provider reports as changed
+	// refreshChanged is a resource the provider reports as changed, it can be
+	// updated in place
 	refreshChanged
+
+	// refreshReplace is a resource the provider reports as changed in a way it
+	// cannot update in place, it must be destroyed and created again
+	refreshReplace
 
 	// refreshUnchanged is a resource the provider reports as unchanged
 	refreshUnchanged
@@ -351,8 +509,9 @@ type refreshed struct {
 //
 // A resource the provider no longer finds has its configured values restored,
 // since its computed values went with the real resource. A provider error
-// marks the resource failed.
-func (l *resourceLifecycle) refresh(r any, old any, adapter plugins.ProviderAdapter) (refreshOutcome, refreshed, error) {
+// does not mark the resource failed: refresh only runs while deciding, when
+// nothing has been attempted.
+func (l *resourceLifecycle) refresh(r any, old any, adapter plugins.ProviderAdapter, dependencies []entity.DependencyChange) (refreshOutcome, refreshed, error) {
 	copies := refreshed{}
 
 	meta, err := types.GetMeta(r)
@@ -400,7 +559,6 @@ func (l *resourceLifecycle) refresh(r any, old any, adapter plugins.ProviderAdap
 	}
 
 	if err != nil {
-		meta.Status = types.StatusFailed
 		return refreshUnchanged, copies, err
 	}
 
@@ -413,10 +571,10 @@ func (l *resourceLifecycle) refresh(r any, old any, adapter plugins.ProviderAdap
 
 	l.warnChangedConfiguredValues(events.OperationRead, r, newData)
 
-	changed := false
+	change := entity.NoChange
 	duration, err = l.callProvider(events.OperationChanged, r, copies.read, func(ctx context.Context) ([]byte, error) {
 		var changedErr error
-		changed, changedErr = adapter.Changed(ctx, copies.old, copies.read)
+		change, changedErr = adapter.Changed(ctx, copies.old, copies.read, dependencies)
 		return nil, changedErr
 	})
 	if errors.Is(err, errNotReached) {
@@ -424,107 +582,19 @@ func (l *resourceLifecycle) refresh(r any, old any, adapter plugins.ProviderAdap
 	}
 
 	if err != nil {
-		meta.Status = types.StatusFailed
 		return refreshUnchanged, copies, err
 	}
 
 	emitLifecycle(l.options, meta, events.OperationChanged, events.PhaseSuccess, duration, nil, copies.read, r)
 
-	if changed {
+	switch change {
+	case entity.Update:
 		return refreshChanged, copies, nil
+	case entity.Replace:
+		return refreshReplace, copies, nil
+	default:
+		return refreshUnchanged, copies, nil
 	}
-
-	return refreshUnchanged, copies, nil
-}
-
-// read handles a resource that exists in the previous state. It is refreshed
-// through its provider and updated only when it changed. A resource the
-// provider no longer finds is created again from its configuration.
-func (l *resourceLifecycle) read(r any, old any, adapter plugins.ProviderAdapter) error {
-	meta, err := types.GetMeta(r)
-	if err != nil {
-		return err
-	}
-
-	oldMeta, err := types.GetMeta(old)
-	if err != nil {
-		return err
-	}
-
-	outcome, copies, err := l.refresh(r, old, adapter)
-	if err != nil {
-		return err
-	}
-
-	switch outcome {
-	case refreshNotFound:
-		return l.create(r, adapter)
-	case refreshUnchanged:
-		// an unchanged resource keeps what was read and its previous status
-		meta.Status = oldMeta.Status
-		return nil
-	}
-
-	duration, err := l.callProvider(events.OperationUpdate, r, copies.read, func(ctx context.Context) ([]byte, error) {
-		return adapter.Update(ctx, copies.read)
-	})
-	if errors.Is(err, errNotReached) {
-		return err
-	}
-
-	if err != nil {
-		meta.Status = types.StatusFailed
-		return err
-	}
-
-	l.warnChangedConfiguredValues(events.OperationUpdate, r, copies.read)
-
-	meta.Status = types.StatusUpdated
-
-	emitLifecycle(l.options, meta, events.OperationUpdate, events.PhaseSuccess, duration, nil, copies.read, r)
-
-	return nil
-}
-
-// rebuild handles a resource saved as failed or destroy_failed. The resource is
-// destroyed using its saved copy, then created again, whether or not its
-// configuration changed. When the destroy fails the resource keeps the saved
-// copy, which holds the identity needed to try the destroy again, and is marked
-// destroy_failed.
-func (l *resourceLifecycle) rebuild(r any, old any, adapter plugins.ProviderAdapter) error {
-	meta, err := types.GetMeta(r)
-	if err != nil {
-		return err
-	}
-
-	// the previous resource is never modified, it is only serialized
-	oldData, err := wire.Marshal(old)
-	if err != nil {
-		return fmt.Errorf("unable to serialize previous resource %s: %w", meta.ID, err)
-	}
-
-	duration, err := l.callProvider(events.OperationDestroy, r, oldData, func(ctx context.Context) ([]byte, error) {
-		return nil, adapter.Destroy(ctx, oldData, false)
-	})
-	if errors.Is(err, errNotReached) {
-		return err
-	}
-
-	if err != nil {
-		// keep the saved copy, it holds the identity needed to destroy it later
-		if keepErr := replaceValues(r, oldData); keepErr != nil {
-			return errors.Join(err, keepErr)
-		}
-
-		meta.Status = types.StatusDestroyFailed
-		return err
-	}
-
-	// the destroyed copy is what this step acted on, the create that follows
-	// reports the resource it builds in its place
-	emitLifecycle(l.options, meta, events.OperationDestroy, events.PhaseSuccess, duration, nil, oldData, old)
-
-	return l.create(r, adapter)
 }
 
 // replaceValues replaces the values of a resource with the given serialized copy.
@@ -638,7 +708,7 @@ func (l *resourceLifecycle) callProvider(operation string, r any, data []byte, c
 
 // firstStep is the provider step that would run first for a resource: create
 // when it has no entry in the previous state, read when it was created or
-// updated, and destroy for a rebuild
+// updated, and destroy for a replacement of a failed resource
 func (l *resourceLifecycle) firstStep(meta *types.Meta) string {
 	old, err := findByID(l.previous.GetResources(), meta.ID)
 	if err != nil {

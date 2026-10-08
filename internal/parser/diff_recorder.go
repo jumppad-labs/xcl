@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"github.com/jumppad-labs/xcl/diff"
+	"github.com/jumppad-labs/xcl/entity"
+	"github.com/jumppad-labs/xcl/types"
 )
 
 // walkMode is what a walk of the configuration does with each entity
@@ -14,17 +16,44 @@ const (
 	// walkApply runs each entity's provider lifecycle
 	walkApply walkMode = iota
 
-	// walkDiff records what an apply would do with each entity, without
-	// creating, updating or destroying anything
-	walkDiff
+	// walkDecide records what an apply does with each entity, without
+	// creating, updating or destroying anything. Plans and applies share it.
+	walkDecide
 )
 
-// diffRecorder collects the outcome of a diff walk. The walk's callbacks run
-// concurrently, so every method is guarded by mu. The DAG visits a parent
-// before its dependents, so what is recorded for an entity is in place before
-// any entity that depends on it consults it.
+// decision is one entity's outcome from the decide pass
+type decision struct {
+	// action is what the apply does with the entity: create, update, replace
+	// or delete. It is empty for an entity left unchanged.
+	action diff.Action
+
+	// reason says why the entity is replaced, empty for any other action
+	reason diff.ReplaceReason
+
+	// replacedDeps are the addresses of the replaced dependencies behind a
+	// replacement with reason diff.ReplaceDependency, sorted
+	replacedDeps []string
+
+	// dependencies are what the entity's provider was told about the
+	// dependencies the same apply will update or replace
+	dependencies []entity.DependencyChange
+
+	// read is the entity as its provider read it while deciding, empty when
+	// it was not read
+	read []byte
+}
+
+// diffRecorder is the decision record of one operation: what the decide pass
+// found out for each entity, the diff it reports, and the pending and unknown
+// bookkeeping dependents consult. The walk's callbacks run concurrently, so
+// every method is guarded by mu. The DAG visits a parent before its
+// dependents, so what is recorded for an entity is in place before any entity
+// that depends on it consults it.
 type diffRecorder struct {
 	mu sync.Mutex
+
+	// decisions holds the decision for each entity, by entity ID
+	decisions map[string]decision
 
 	// pending holds the IDs of the entities an apply would create, replace
 	// or update, whose computed values are unknown until it does
@@ -44,9 +73,70 @@ type diffRecorder struct {
 
 func newDiffRecorder() *diffRecorder {
 	return &diffRecorder{
-		pending: map[string]bool{},
-		unknown: map[string][]diff.Path{},
+		decisions: map[string]decision{},
+		pending:   map[string]bool{},
+		unknown:   map[string][]diff.Path{},
 	}
+}
+
+// decide records the decision for the entity, replacing any recorded before
+func (r *diffRecorder) decide(id string, dec decision) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.decisions[id] = dec
+}
+
+// lookup returns the decision recorded for the entity, false when none was
+func (r *diffRecorder) lookup(id string) (decision, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	dec, ok := r.decisions[id]
+	return dec, ok
+}
+
+// replaced returns the IDs of the entities decided replace, sorted
+func (r *diffRecorder) replaced() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	ids := []string{}
+	for id, dec := range r.decisions {
+		if dec.action == diff.ActionReplace {
+			ids = append(ids, id)
+		}
+	}
+
+	sort.Strings(ids)
+	return ids
+}
+
+// toDestroy returns the entities saved in previous that the apply destroys
+// before it creates or updates anything: those decided replace and those
+// decided delete. They are returned in the order previous holds them.
+func (r *diffRecorder) toDestroy(previous *State) []any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	targets := []any{}
+	for _, saved := range previous.GetResources() {
+		meta, err := types.GetMeta(saved)
+		if err != nil {
+			continue
+		}
+
+		dec, ok := r.decisions[meta.ID]
+		if !ok {
+			continue
+		}
+
+		if dec.action == diff.ActionReplace || dec.action == diff.ActionDelete {
+			targets = append(targets, saved)
+		}
+	}
+
+	return targets
 }
 
 // markPending records that an apply would create, replace or update the

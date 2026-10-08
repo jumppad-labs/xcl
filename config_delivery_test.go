@@ -36,9 +36,10 @@ resource "network" "three" {
 
 // independentNetworksEventCount is the number of events the first apply of
 // independentNetworksConfig delivers: the apply start, the TestPlugin's load
-// start and load success, a parse for each network, a create start and a
-// create success for each network, and the apply success
-const independentNetworksEventCount = 13
+// start and load success, a parse for each network, the decide pass's
+// "decided every entity" debug log, a create start and a create success for
+// each network, and the apply success
+const independentNetworksEventCount = 14
 
 // dependentChainConfig declares network.first and container.second, which
 // depends on network.first through a reference

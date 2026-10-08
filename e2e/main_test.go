@@ -12,7 +12,11 @@ import (
 // for the whole suite by TestMain
 var externalPlugin string
 
-// TestMain builds the external plugin into a temporary directory before the
+// externalPersonPlugin is the path of the example person plugin binary, from
+// plugins/example, built once for the whole suite by TestMain
+var externalPersonPlugin string
+
+// TestMain builds the external plugins into a temporary directory before the
 // tests run and removes it afterwards, so the suite never depends on a binary
 // built by hand
 func TestMain(m *testing.M) {
@@ -27,6 +31,15 @@ func TestMain(m *testing.M) {
 	build := exec.Command("go", "build", "-o", externalPlugin, "./fixtures/externalplugin")
 	if output, err := build.CombinedOutput(); err != nil {
 		fmt.Fprintf(os.Stderr, "unable to build the external plugin: %s\n%s", err, output)
+		os.RemoveAll(dir)
+		os.Exit(1)
+	}
+
+	externalPersonPlugin = filepath.Join(dir, "example")
+
+	build = exec.Command("go", "build", "-o", externalPersonPlugin, "../plugins/example")
+	if output, err := build.CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "unable to build the example person plugin: %s\n%s", err, output)
 		os.RemoveAll(dir)
 		os.Exit(1)
 	}
