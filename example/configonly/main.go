@@ -29,6 +29,7 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
 	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/kr/pretty"
 )
 
 type appConfig struct {
@@ -44,71 +45,32 @@ func main() {
 	// is what types the entity an event carries, which is how the receiver
 	// shows each resource's configuration as it is created
 	r := registry.NewPluginRegistry()
+	r.RegisterType(&resources.ConfigMap{}, "config_map")
+	r.RegisterType(&resources.Secret{}, "secret")
+	r.RegisterType(&resources.Deployment{}, "deployment")
+	r.RegisterType(&resources.Service{}, "service")
+	r.RegisterType(&resources.Ingress{}, "ingress")
 
-	cfg, err := loadConfig(dir, r)
-	if err := run(dir); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
-		os.Exit(1)
-	}
-}
-
-// run loads the configuration in dir, works out its ingress routes and prints
-// one line per route. It is separate from main only so the temporary state
-// directory is removed before main exits, os.Exit skips deferred calls.
-func run(dir string) error {
-
-	return nil
-}
-
-// appConfig is the application's view of the configuration, filled by one
-// Decode call. A slice field receives every block of its registered type, in
-// the order the blocks were written, so the configuration can declare as many
-// of each as it needs. It holds only what the program reads, reading a new
-// block type needs only a new field.
-
-// loadConfig registers the example's block types on r, applies the
-// configuration in dir with options added to the registry, and gathers it into
-// an appConfig.
-func loadConfig(dir string, r *registry.PluginRegistry, options ...xcl.ConfigOption) (*appConfig, error) {
-	// Register each Go type under the block type name used in configuration.
-	// A registered type needs nothing else: no plugin, no provider, no schema
-	// to write by hand. Every type the configuration declares must be
-	// registered, even the ones the program does not read.
-	if err := r.RegisterType(&resources.ConfigMap{}, "config_map"); err != nil {
-		return nil, err
-	}
-
-	if err := r.RegisterType(&resources.Secret{}, "secret"); err != nil {
-		return nil, err
-	}
-
-	if err := r.RegisterType(&resources.Deployment{}, "deployment"); err != nil {
-		return nil, err
-	}
-
-	if err := r.RegisterType(&resources.Service{}, "service"); err != nil 
-		return nil, err
-	}
-
-	if err := r.RegisterType(&resources.Ingress{}, "ingress"); err != nil {
-		return nil, err
-	}
-
-	c, err := xcl.NewConfig(append([]xcl.ConfigOption{xcl.WithPluginRegistry(r)}, options...)...)
+	c, err := xcl.NewConfig(xcl.WithPluginRegistry(r))
 	if err != nil {
-		return nil, err
+		fmt.Printf("Error creating config: %s", err)
+		os.Exit(1)
 	}
 
 	if err := c.Apply(dir); err != nil {
-		return nil, fmt.Errorf("loading configuration from %s: %w", dir, err)
+		fmt.Printf("Error parsing config: %s", err)
+		os.Exit(1)
 	}
 
 	// gather the configuration into the application's own struct, Decode is
 	// an ordinary method so this works on every supported Go version
 	var cfg appConfig
 	if err := c.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("reading configuration from %s: %w", dir, err)
+		fmt.Printf("Error decoding config: %s", err)
 	}
 
-	return &cfg, nil
+	// write object to the output
+	fmt.Println("")
+	fmt.Println("-- Config Loaded ---------------")
+	pretty.Println(cfg)
 }

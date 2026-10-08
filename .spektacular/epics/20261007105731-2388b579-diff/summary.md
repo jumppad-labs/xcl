@@ -97,7 +97,7 @@ None.
 - A README section
 - Multi-line or wrapped values
 - Output formats other than text
-- Correcting the design document's example
+- Correcting the design document's exampl
 - CHANGELOG entries
 
 ### Drafting assumptions
