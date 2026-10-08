@@ -1,22 +1,28 @@
 {
-  "kind": "spec",
-  "current_step": "finished",
+  "kind": "plan",
+  "current_step": "walkthrough",
   "completed_steps": [
     "new",
-    "interview",
     "overview",
-    "requirements",
-    "acceptance_criteria",
-    "constraints",
-    "technical_approach",
-    "success_metrics",
-    "non_goals",
+    "discovery",
+    "architecture",
+    "components",
+    "data_structures",
+    "implementation_detail",
+    "dependencies",
+    "testing_approach",
+    "milestones",
+    "tasks",
+    "open_questions",
+    "out_of_scope",
+    "assemble",
     "verification",
-    "split",
-    "finished"
+    "write_plan",
+    "write_context",
+    "write_research"
   ],
-  "created_at": "2026-10-08T13:23:54.768750144Z",
-  "updated_at": "2026-10-08T13:43:52.202529718Z",
+  "created_at": "2026-10-08T16:33:47.053262318Z",
+  "updated_at": "2026-10-08T17:01:29.052469256Z",
   "data": {
     "name": "20261008132354-4538504f-replacement-deps"
   }
