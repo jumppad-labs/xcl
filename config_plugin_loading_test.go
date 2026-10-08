@@ -14,7 +14,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,15 +61,13 @@ func setupMissingPluginConfig(t *testing.T) (*Config, *eventRecorder) {
 
 	isolateHome(t)
 
-	pr := registry.NewPluginRegistry()
-
-	err := pr.RegisterPluginWithPath(missingPluginPath)
-	require.NoError(t, err)
+	local := registry.NewLocal()
+	local.RegisterExternalPlugin(missingPluginPath)
 
 	recorder := &eventRecorder{}
 
 	c, err := NewConfig(
-		WithPluginRegistry(pr),
+		WithRegistry(local),
 		WithEventHandler(recorder.Record),
 	)
 	require.NoError(t, err)
@@ -108,13 +106,6 @@ func indexOf(recorder *eventRecorder, match func(Event) bool) int {
 	return -1
 }
 
-func TestRegisterPluginWithPathAcceptsMissingBinary(t *testing.T) {
-	pr := registry.NewPluginRegistry()
-
-	err := pr.RegisterPluginWithPath(missingPluginPath)
-	require.NoError(t, err)
-}
-
 func TestFirstValidateFailsNamingMissingPlugin(t *testing.T) {
 	c, _ := setupMissingPluginConfig(t)
 
@@ -125,7 +116,8 @@ func TestFirstValidateFailsNamingMissingPlugin(t *testing.T) {
 
 	var loadErr *PluginLoadError
 	require.True(t, errors.As(err, &loadErr))
-	require.Equal(t, missingPluginPath, loadErr.Plugin)
+	require.Equal(t, filepath.Base(missingPluginPath), loadErr.Plugin)
+	require.Equal(t, "local", loadErr.Registry)
 }
 
 func TestFirstValidateEmitsLoadErrorForMissingPlugin(t *testing.T) {
@@ -193,29 +185,27 @@ func TestSecondValidateReturnsTheSameLoadFailure(t *testing.T) {
 	require.Len(t, eventsFor(recorder, events.OperationValidate, events.PhaseError), 2)
 }
 
-func TestSharedRegistryStartsExternalPluginOnce(t *testing.T) {
+// TestSharedRegistryStartsExternalPluginForEachConfig asserts a registry only
+// lists plugins: two Configs given the same registry each load and start the
+// plugin themselves
+func TestSharedRegistryStartsExternalPluginForEachConfig(t *testing.T) {
 	// built before HOME is isolated, so the build uses the real module cache
 	binary := buildExamplePlugin(t)
 
 	isolateHome(t)
 
-	pr := registry.NewPluginRegistry()
-	t.Cleanup(func() {
-		for _, host := range pr.GetPluginHosts() {
-			host.Stop()
-		}
-	})
-
-	err := pr.RegisterPluginWithPath(binary)
-	require.NoError(t, err)
+	local := registry.NewLocal()
+	local.RegisterExternalPlugin(binary)
 
 	firstRecorder := &eventRecorder{}
-	first, err := NewConfig(WithPluginRegistry(pr), WithEventHandler(firstRecorder.Record))
+	first, err := NewConfig(WithRegistry(local), WithEventHandler(firstRecorder.Record))
 	require.NoError(t, err)
+	stopPluginHosts(t, first)
 
 	secondRecorder := &eventRecorder{}
-	second, err := NewConfig(WithPluginRegistry(pr), WithEventHandler(secondRecorder.Record))
+	second, err := NewConfig(WithRegistry(local), WithEventHandler(secondRecorder.Record))
 	require.NoError(t, err)
+	stopPluginHosts(t, second)
 
 	path := writeConfigFile(t, variableOnlyConfig)
 
@@ -225,50 +215,58 @@ func TestSharedRegistryStartsExternalPluginOnce(t *testing.T) {
 	err = second.Validate(path)
 	require.NoError(t, err)
 
-	require.Len(t, pr.GetPluginHosts(), 1)
+	firstHosts := first.catalog.GetPluginHosts()
+	secondHosts := second.catalog.GetPluginHosts()
+	require.Len(t, firstHosts, 1)
+	require.Len(t, secondHosts, 1)
+	require.NotSame(t, firstHosts[0], secondHosts[0])
 
-	loaded := append(
-		eventsFor(firstRecorder, events.OperationLoad, events.PhaseSuccess),
-		eventsFor(secondRecorder, events.OperationLoad, events.PhaseSuccess)...,
-	)
-	require.Len(t, loaded, 1)
-	require.Equal(t, "person", loaded[0].Meta["block_types"])
+	firstLoaded := eventsFor(firstRecorder, events.OperationLoad, events.PhaseSuccess)
+	require.Len(t, firstLoaded, 1)
+	require.Equal(t, "person", firstLoaded[0].Meta["block_types"])
+
+	secondLoaded := eventsFor(secondRecorder, events.OperationLoad, events.PhaseSuccess)
+	require.Len(t, secondLoaded, 1)
+	require.Equal(t, "person", secondLoaded[0].Meta["block_types"])
 }
 
-// TestRegisterTypeAcceptsNameOfUnloadedPluginType asserts a name a plugin
-// provides is accepted before the plugin has loaded, the clash is reported
-// when it loads
-func TestRegisterTypeAcceptsNameOfUnloadedPluginType(t *testing.T) {
-	pr := registry.NewPluginRegistry()
+// TestNewConfigAcceptsDeclaredTypeNamedLikeUnloadedPluginType asserts a name
+// a plugin provides is accepted before the plugin has loaded, the clash is
+// reported when it loads
+func TestNewConfigAcceptsDeclaredTypeNamedLikeUnloadedPluginType(t *testing.T) {
+	local := registry.NewLocal()
+	local.RegisterPlugin(&parser.TestPlugin{})
 
-	err := pr.RegisterPlugin(&parser.TestPlugin{})
+	c, err := NewConfig(
+		WithType(&registered.Database{}, "resource", "network"),
+		WithRegistry(local),
+	)
 	require.NoError(t, err)
-
-	err = pr.RegisterType(&registered.Database{}, "resource", "network")
-	require.NoError(t, err)
+	require.NotNil(t, c)
 }
 
 func TestFirstValidateFailsWithClashForPluginType(t *testing.T) {
 	isolateHome(t)
 
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
+	local.RegisterPlugin(&parser.TestPlugin{})
 
-	err := pr.RegisterPlugin(&parser.TestPlugin{})
-	require.NoError(t, err)
-
-	err = pr.RegisterType(&registered.Database{}, "resource", "network")
-	require.NoError(t, err)
-
-	c, err := NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(
+		WithType(&registered.Database{}, "resource", "network"),
+		WithRegistry(local),
+	)
 	require.NoError(t, err)
 
 	err = c.Validate(writeConfigFile(t, variableOnlyConfig))
 	require.Error(t, err)
 
-	var clash *registry.TypeNameClashError
+	var clash *TypeNameClashError
 	require.True(t, errors.As(err, &clash))
 	require.Equal(t, "resource.network", clash.Name)
-	require.Equal(t, "registered type", clash.Existing)
+	require.Equal(t, "TestPlugin", clash.Provider)
+	require.Equal(t, "local", clash.Registry)
+	require.Equal(t, "type *registered.Database", clash.Existing)
+	require.Empty(t, clash.ExistingRegistry)
 }
 
 func TestValidateEmitsLoadEventsForRegisteredPlugin(t *testing.T) {
@@ -374,15 +372,11 @@ func setupUnloadedPluginConfig(t *testing.T) *Config {
 
 	isolateHome(t)
 
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
+	local.RegisterPlugin(&parser.TestPlugin{})
+	local.RegisterPlugin(&serverPlugin{})
 
-	err := pr.RegisterPlugin(&parser.TestPlugin{})
-	require.NoError(t, err)
-
-	err = pr.RegisterPlugin(&serverPlugin{})
-	require.NoError(t, err)
-
-	c, err := NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(WithRegistry(local))
 	require.NoError(t, err)
 
 	return c

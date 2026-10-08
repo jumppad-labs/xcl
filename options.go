@@ -4,26 +4,67 @@ import (
 	"fmt"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 )
 
 // ConfigOption is a functional option for configuring Config
 type ConfigOption func(*Config) error
 
-// WithPluginRegistry sets the plugin registry to use
-// If not provided, only the builtin resource types will be available
-func WithPluginRegistry(pr *registry.PluginRegistry) ConfigOption {
+// typeDecl is one Go type declared with WithType
+type typeDecl struct {
+	prototype any
+	name      []string
+}
+
+// WithType declares a plain Go type as a block type. name is the block type
+// and an optional subtype: WithType(&Database{}, "database") is declared as
+// database "main" {}, and WithType(&Database{}, "resource", "database") as
+// resource "database" "main" {}. prototype is a pointer to a struct that
+// embeds types.ResourceBase. A declared type has no provider, it is only
+// decoded into.
+//
+// A declaration that is wrong on every run is a programmer error and panics
+// here, naming the type: an empty name, more than one subtype, an empty
+// subtype, or a prototype that is not a pointer to a struct embedding
+// types.ResourceBase. NewConfig panics on a declaration that clashes with
+// another one or with a builtin. A plugin providing the same block type is
+// reported by the first operation that loads plugins.
+func WithType(prototype any, name ...string) ConfigOption {
+	if err := catalog.ValidateDeclaration(prototype, name...); err != nil {
+		panic(fmt.Sprintf("xcl: %s", err))
+	}
+
+	declared := typeDecl{prototype: prototype, name: append([]string{}, name...)}
+
 	return func(c *Config) error {
-		c.pluginRegistry = pr
+		c.types = append(c.types, declared)
+		return nil
+	}
+}
+
+// WithRegistry adds a registry the Config gets plugins from. It may be given
+// any number of times: registries load in the order they were given, and
+// within a registry its plugins load in the order they were registered.
+// Nothing is loaded until the first operation that needs plugins. A nil
+// registry is a programmer error and panics.
+func WithRegistry(r registry.Registry) ConfigOption {
+	if r == nil {
+		panic("xcl: registry must not be nil")
+	}
+
+	return func(c *Config) error {
+		c.registries = append(c.registries, r)
 		return nil
 	}
 }
 
 // WithStateStore sets the state store for persistence
 // Uses the existing state.StateStore interface from state/state_store.go
-// If not provided, state will not be persisted
+// Without WithStateStore or WithStatePath nothing is persisted; this is the
+// supported mode for configuration-only use.
 func WithStateStore(ss state.StateStore) ConfigOption {
 	return func(c *Config) error {
 		c.stateStore = ss
@@ -35,6 +76,8 @@ func WithStateStore(ss state.StateStore) ConfigOption {
 // in the directory dir, creating the directory when it does not exist.
 // NewConfig returns an error when the store cannot be created. When both
 // WithStatePath and WithStateStore are given, the one given last is used.
+// Without either, nothing is persisted; this is the supported mode for
+// configuration-only use.
 func WithStatePath(dir string) ConfigOption {
 	return func(c *Config) error {
 		store, err := state.NewFileStateStore(dir)

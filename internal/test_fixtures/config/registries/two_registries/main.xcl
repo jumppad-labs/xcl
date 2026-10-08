@@ -1,0 +1,10 @@
+# person is provided by a plugin from one registry and network by a plugin
+# from another, so applying this needs both registries
+resource "person" "ada" {
+  first_name = "Ada"
+  last_name  = "Lovelace"
+}
+
+resource "network" "one" {
+  subnet = "10.0.1.0/24"
+}

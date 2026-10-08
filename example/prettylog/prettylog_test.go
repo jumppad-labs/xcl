@@ -13,7 +13,7 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/example/prettylog"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 )
 
 // ansiCodes matches the escape sequences a terminal styles text with, the
@@ -123,7 +123,7 @@ func TestLevelFromEnvDefaultsToInfoForUnknownLevel(t *testing.T) {
 // came from core, the resource and the operation
 func TestHandlerWritesLifecycleEventWithSourceResourceAndOperation(t *testing.T) {
 	out := &bytes.Buffer{}
-	handler := prettylog.Handler(out, slog.LevelInfo, nil)
+	handler := prettylog.Handler(out, slog.LevelInfo)
 
 	handler(createStart())
 
@@ -139,7 +139,7 @@ func TestHandlerWritesLifecycleEventWithSourceResourceAndOperation(t *testing.T)
 // log message is written as one line showing the message and the plugin
 func TestHandlerWritesPluginLogEventWithMessageAndSource(t *testing.T) {
 	out := &bytes.Buffer{}
-	handler := prettylog.Handler(out, slog.LevelInfo, nil)
+	handler := prettylog.Handler(out, slog.LevelInfo)
 
 	handler(pluginLog())
 
@@ -155,7 +155,7 @@ func TestHandlerWritesPluginLogEventWithMessageAndSource(t *testing.T) {
 // is below an info handler's level and is not written
 func TestHandlerAtInfoWritesNothingForDebugLogEvent(t *testing.T) {
 	out := &bytes.Buffer{}
-	handler := prettylog.Handler(out, slog.LevelInfo, nil)
+	handler := prettylog.Handler(out, slog.LevelInfo)
 
 	handler(pluginDebugLog())
 
@@ -166,7 +166,7 @@ func TestHandlerAtInfoWritesNothingForDebugLogEvent(t *testing.T) {
 // written once the handler's level is debug
 func TestHandlerAtDebugWritesDebugLogEvent(t *testing.T) {
 	out := &bytes.Buffer{}
-	handler := prettylog.Handler(out, slog.LevelDebug, nil)
+	handler := prettylog.Handler(out, slog.LevelDebug)
 
 	handler(pluginDebugLog())
 
@@ -181,7 +181,7 @@ func TestHandlerAtDebugWritesDebugLogEvent(t *testing.T) {
 // above the level is written as a line of its own
 func TestHandlerWritesOneLinePerEvent(t *testing.T) {
 	out := &bytes.Buffer{}
-	handler := prettylog.Handler(out, slog.LevelInfo, nil)
+	handler := prettylog.Handler(out, slog.LevelInfo)
 
 	createSuccess := createStart()
 	createSuccess.Phase = events.PhaseSuccess
@@ -208,60 +208,68 @@ func TestHandlerWritesOneLinePerEvent(t *testing.T) {
 	require.Contains(t, written[4], "apply success")
 }
 
-// encodeFixtureRegistry returns a registry holding every type the encode
-// fixture declares, a type registered under resource, one registered without
-// a subtype and the plugin that provides the network and container types
-func encodeFixtureRegistry(t *testing.T) *registry.PluginRegistry {
-	t.Helper()
+// encodeFixtureOptions returns the options declaring every type the encode
+// fixture uses: a type declared under resource, one declared without a subtype
+// and a local registry holding the plugin that provides the network and
+// container types
+func encodeFixtureOptions() []xcl.ConfigOption {
+	local := registry.NewLocal()
+	local.RegisterPlugin(&fixturePlugin{})
 
-	pr := registry.NewPluginRegistry()
-
-	err := pr.RegisterType(&Database{}, "resource", typeDatabase)
-	require.NoError(t, err)
-
-	err = pr.RegisterType(&Cache{}, typeCache)
-	require.NoError(t, err)
-
-	err = pr.RegisterPlugin(&fixturePlugin{})
-	require.NoError(t, err)
-
-	return pr
+	return []xcl.ConfigOption{
+		xcl.WithType(&Database{}, "resource", typeDatabase),
+		xcl.WithType(&Cache{}, typeCache),
+		xcl.WithRegistry(local),
+	}
 }
 
-// applyEncodeFixture applies the encode fixture with a prettylog handler
-// writing to out at the given level, which is the whole of what an application
-// does to get configuration under its create lines
-func applyEncodeFixture(t *testing.T, out *bytes.Buffer, level slog.Level) {
+// applyFixture applies the fixture at path with a prettylog handler writing
+// to out at the given level, at the event data level given. The handler is
+// made from only the writer and the level, which is the whole of what an
+// application does to get configuration under its create lines: the Config
+// delivering each event is what turns its data into an entity.
+func applyFixture(t *testing.T, out *bytes.Buffer, level slog.Level, data xcl.EventDataLevel, path string) {
 	t.Helper()
 
 	t.Setenv("HOME", t.TempDir())
 
-	pr := encodeFixtureRegistry(t)
-
-	c, err := xcl.NewConfig(
-		xcl.WithPluginRegistry(pr),
-		xcl.WithEventHandler(prettylog.Handler(out, level, pr)),
-		xcl.WithEventData(xcl.EventDataProcessed),
+	options := append(encodeFixtureOptions(),
+		xcl.WithEventHandler(prettylog.Handler(out, level)),
+		xcl.WithEventData(data),
 	)
+
+	c, err := xcl.NewConfig(options...)
 	require.NoError(t, err)
 
-	err = c.Apply("testdata/encode/main.xcl")
+	err = c.Apply(path)
 	require.NoError(t, err)
 }
 
-// savedCacheRecord is one saved entity record for the bare cache type, the
-// shape an event carries at xcl.EventDataProcessed
+// applyEncodeFixture applies the encode fixture, which declares every shape
+// configuration text has to handle, asking for processed event data
+func applyEncodeFixture(t *testing.T, out *bytes.Buffer, level slog.Level) {
+	t.Helper()
+
+	applyFixture(t, out, level, xcl.EventDataProcessed, "testdata/encode/main.xcl")
+}
+
+// applyCacheFixture applies the cache fixture, a single bare cache, asking
+// for processed event data
+func applyCacheFixture(t *testing.T, out *bytes.Buffer, level slog.Level) {
+	t.Helper()
+
+	applyFixture(t, out, level, xcl.EventDataProcessed, "testdata/cache/main.xcl")
+}
+
+// savedCacheRecord is the saved entity record for the cache fixture's cache,
+// the shape an event carries at xcl.EventDataProcessed
 func savedCacheRecord() []byte {
 	return []byte(`{"meta":{"id":"cache.main","name":"main","type":"cache"},"location":"us-east"}`)
 }
 
-// savedWidgetRecord is a saved entity record naming a type no registry in
-// these tests knows, so converting it fails with xcl.ErrUnregisteredType
-func savedWidgetRecord() []byte {
-	return []byte(`{"meta":{"id":"resource.widget.main","name":"main","type":"resource","subtype":"widget"}}`)
-}
-
-// cacheCreateSuccess is a create success event carrying the saved cache record
+// cacheCreateSuccess is a hand-built create success event carrying the saved
+// cache record. It was not delivered by a Config, so it carries no way to
+// turn that record into an entity.
 func cacheCreateSuccess() events.Event {
 	return events.Event{
 		Time:         time.Now(),
@@ -299,6 +307,34 @@ func lineContaining(t *testing.T, written []string, parts ...string) int {
 	return -1
 }
 
+// configurationLines returns the raw lines written to out directly after the
+// cache's create success line that are indented beneath it, leaving any
+// styling in place
+func configurationLines(t *testing.T, out *bytes.Buffer) []string {
+	t.Helper()
+
+	raw := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+
+	plain := []string{}
+	for _, line := range raw {
+		plain = append(plain, ansiCodes.ReplaceAllString(line, ""))
+	}
+
+	success := lineContaining(t, plain, "create success", "resource=cache.main")
+
+	configuration := []string{}
+	for _, line := range raw[success+1:] {
+		if !strings.HasPrefix(line, "  ") {
+			break
+		}
+		configuration = append(configuration, line)
+	}
+
+	require.NotEmpty(t, configuration, "the configuration should follow the create success line")
+
+	return configuration
+}
+
 // TestHandlerWritesConfigurationAfterCreateSuccess asserts a real apply writes
 // the created resource's configuration beneath the line announcing it, and
 // that the configuration holds the value the provider filled in
@@ -319,12 +355,29 @@ func TestHandlerWritesConfigurationAfterCreateSuccess(t *testing.T) {
 	require.Regexp(t, `provider_id\s+=\s+"id-main"`, written[computed])
 }
 
+// TestHandlerWritesConfigurationWithoutRegistry asserts a handler made from
+// only a writer and a level, given no registry of any kind, writes a created
+// resource's configuration text beneath its success line when a real Config
+// delivers the event
+func TestHandlerWritesConfigurationWithoutRegistry(t *testing.T) {
+	t.Setenv("CLICOLOR_FORCE", "")
+
+	out := &bytes.Buffer{}
+
+	applyCacheFixture(t, out, slog.LevelInfo)
+
+	require.Equal(t, []string{
+		`  cache "main" {`,
+		`    location = "us-east"`,
+		`  }`,
+	}, configurationLines(t, out))
+}
+
 // TestHandlerWritesNothingExtraForOtherEvents asserts an event that is not a
 // create success writes no configuration, even when it carries the data
 func TestHandlerWritesNothingExtraForOtherEvents(t *testing.T) {
 	out := &bytes.Buffer{}
-	pr := encodeFixtureRegistry(t)
-	handler := prettylog.Handler(out, slog.LevelInfo, pr)
+	handler := prettylog.Handler(out, slog.LevelInfo)
 
 	start := cacheCreateSuccess()
 	start.Phase = events.PhaseStart
@@ -337,13 +390,11 @@ func TestHandlerWritesNothingExtraForOtherEvents(t *testing.T) {
 	require.NotContains(t, out.String(), `cache "main" {`)
 }
 
-// TestHandlerWritesNothingExtraWithoutData asserts a create success that
-// carries no data writes only its own line, which is every run that has not
-// asked for xcl.EventDataProcessed
+// TestHandlerWritesNothingExtraWithoutData asserts a hand-built create success
+// that carries no data writes only its own line
 func TestHandlerWritesNothingExtraWithoutData(t *testing.T) {
 	out := &bytes.Buffer{}
-	pr := encodeFixtureRegistry(t)
-	handler := prettylog.Handler(out, slog.LevelInfo, pr)
+	handler := prettylog.Handler(out, slog.LevelInfo)
 
 	success := cacheCreateSuccess()
 	success.Data = nil
@@ -354,20 +405,21 @@ func TestHandlerWritesNothingExtraWithoutData(t *testing.T) {
 	require.Len(t, written, 1)
 	require.Contains(t, written[0], "create success")
 	require.NotContains(t, out.String(), `cache "main" {`)
+	require.NotContains(t, out.String(), "unable to show configuration")
 }
 
-// TestHandlerWritesNothingWhenRegistryIsNil asserts an application that passes
-// no registry gets the plain lines, there being nothing to type the record with
-func TestHandlerWritesNothingWhenRegistryIsNil(t *testing.T) {
+// TestHandlerWritesNothingExtraWhenConfigSendsNoData asserts a real apply that
+// has not asked for xcl.EventDataProcessed, which is every run by default,
+// still writes its create success line and no configuration block
+func TestHandlerWritesNothingExtraWhenConfigSendsNoData(t *testing.T) {
 	out := &bytes.Buffer{}
-	handler := prettylog.Handler(out, slog.LevelInfo, nil)
 
-	handler(cacheCreateSuccess())
+	applyFixture(t, out, slog.LevelInfo, xcl.EventDataNone, "testdata/cache/main.xcl")
 
 	written := lines(out)
-	require.Len(t, written, 1)
-	require.Contains(t, written[0], "create success")
+	lineContaining(t, written, "create success", "resource=cache.main")
 	require.NotContains(t, out.String(), `cache "main" {`)
+	require.NotContains(t, out.String(), "unable to show configuration")
 }
 
 // TestHandlerWritesNothingAboveInfoLevel asserts a run asking only for
@@ -390,41 +442,31 @@ func TestHandlerSkipsBuiltinsSilently(t *testing.T) {
 	require.NotContains(t, out.String(), "unable to show configuration")
 }
 
-// TestHandlerReportsUnconvertibleData asserts a record naming a type the
-// registry does not know is reported as one warning naming the resource
-func TestHandlerReportsUnconvertibleData(t *testing.T) {
+// TestHandlerReportsDataItCannotDecode asserts a hand-built create success
+// carrying data, which no Config delivered and so has no way to become an
+// entity, is reported as one warning naming the resource
+func TestHandlerReportsDataItCannotDecode(t *testing.T) {
 	out := &bytes.Buffer{}
-	pr := encodeFixtureRegistry(t)
-	handler := prettylog.Handler(out, slog.LevelInfo, pr)
+	handler := prettylog.Handler(out, slog.LevelInfo)
 
-	unconvertible := cacheCreateSuccess()
-	unconvertible.ResourceType = "widget.main"
-	unconvertible.ResourceID = "resource.widget.main"
-	unconvertible.Data = savedWidgetRecord()
-
-	handler(unconvertible)
+	handler(cacheCreateSuccess())
 
 	written := lines(out)
 
 	warning := lineContaining(t, written, "unable to show configuration")
 	require.Contains(t, written[warning], "WARN")
-	require.Contains(t, written[warning], "resource=resource.widget.main")
+	require.Contains(t, written[warning], "resource=cache.main")
 	require.Contains(t, written[warning], "error=")
+	require.NotContains(t, out.String(), `cache "main" {`)
 }
 
 // TestHandlerKeepsWritingAfterAFailure asserts a resource that cannot be shown
 // does not stop the events after it being written
 func TestHandlerKeepsWritingAfterAFailure(t *testing.T) {
 	out := &bytes.Buffer{}
-	pr := encodeFixtureRegistry(t)
-	handler := prettylog.Handler(out, slog.LevelInfo, pr)
+	handler := prettylog.Handler(out, slog.LevelInfo)
 
-	unconvertible := cacheCreateSuccess()
-	unconvertible.ResourceType = "widget.main"
-	unconvertible.ResourceID = "resource.widget.main"
-	unconvertible.Data = savedWidgetRecord()
-
-	handler(unconvertible)
+	handler(cacheCreateSuccess())
 	handler(pluginLog())
 
 	written := lines(out)
@@ -433,17 +475,6 @@ func TestHandlerKeepsWritingAfterAFailure(t *testing.T) {
 	later := lineContaining(t, written, "created database")
 
 	require.Greater(t, later, warning, "the event after the failure should still be written")
-}
-
-// configurationLines returns the raw lines written to out after the first,
-// which is the create success line, leaving any styling in place
-func configurationLines(t *testing.T, out *bytes.Buffer) []string {
-	t.Helper()
-
-	raw := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
-	require.Greater(t, len(raw), 1, "the configuration should follow the create success line")
-
-	return raw[1:]
 }
 
 // TestHandlerColoursConfigurationWhenColourIsForced asserts that when the
@@ -455,10 +486,8 @@ func TestHandlerColoursConfigurationWhenColourIsForced(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 
 	out := &bytes.Buffer{}
-	pr := encodeFixtureRegistry(t)
-	handler := prettylog.Handler(out, slog.LevelInfo, pr)
 
-	handler(cacheCreateSuccess())
+	applyCacheFixture(t, out, slog.LevelInfo)
 
 	configuration := configurationLines(t, out)
 
@@ -467,7 +496,10 @@ func TestHandlerColoursConfigurationWhenColourIsForced(t *testing.T) {
 	require.Contains(t, strings.Join(configuration, "\n"), "\x1b[34mlocation\x1b[0m")
 	require.Contains(t, strings.Join(configuration, "\n"), "\x1b[33m")
 
-	plain, err := xcl.EncodeSavedEntity(pr, savedCacheRecord(), xcl.IncludeComputed())
+	c, err := xcl.NewConfig(encodeFixtureOptions()...)
+	require.NoError(t, err)
+
+	plain, err := c.EncodeSavedEntity(savedCacheRecord(), xcl.IncludeComputed())
 	require.NoError(t, err)
 
 	expected := []string{}
@@ -498,10 +530,8 @@ func TestHandlerWritesPlainConfigurationToNonTerminal(t *testing.T) {
 	t.Setenv("CLICOLOR_FORCE", "")
 
 	out := &bytes.Buffer{}
-	pr := encodeFixtureRegistry(t)
-	handler := prettylog.Handler(out, slog.LevelInfo, pr)
 
-	handler(cacheCreateSuccess())
+	applyCacheFixture(t, out, slog.LevelInfo)
 
 	configuration := configurationLines(t, out)
 

@@ -40,7 +40,6 @@ import (
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 )
 
@@ -93,7 +92,7 @@ func newPluginDiffScenario(t *testing.T) *diffScenario {
 		recorder:  &testutil.EventRecorder{},
 	}
 
-	scenario.config = newPluginConfig(t, registry.NewPluginRegistry(), scenario.recorder.Record, scenario.stateDir, testStateKey)
+	scenario.config = newPluginConfig(t, scenario.recorder.Record, scenario.stateDir, testStateKey)
 
 	return scenario
 }
@@ -113,7 +112,7 @@ func newKubeDiffScenario(t *testing.T) *diffScenario {
 		recorder:  &testutil.EventRecorder{},
 	}
 
-	scenario.config = newKubeConfig(t, registry.NewPluginRegistry(), scenario.recorder.Record, scenario.stateDir, testStateKey)
+	scenario.config = newKubeConfig(t, scenario.recorder.Record, scenario.stateDir, testStateKey)
 
 	return scenario
 }

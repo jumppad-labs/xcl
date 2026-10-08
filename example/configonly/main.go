@@ -1,7 +1,7 @@
 // Command configonly shows XCL used for configuration only: an application
 // reads its configuration into its own Go types and acts on it. The block
-// types are plain Go types registered on the plugin registry, there is no
-// plugin and no provider.
+// types are plain Go types declared with xcl.WithType, there is no plugin, no
+// provider and no registry.
 //
 // The configuration it reads (./config) is a small Kubernetes-like
 // deployment, and the Go types it reads it into are in ./resources. Between
@@ -14,8 +14,9 @@
 // deployment, container and port its traffic reaches; and main prints one
 // line per route.
 //
-// The state is kept, encrypted, in a temporary directory that is removed when
-// the program ends.
+// The example keeps no state: without a state option xcl holds the applied
+// configuration in memory only, which is all a program that only reads its
+// configuration needs.
 //
 // Run it from this directory with `make run`, see the Makefile for the other
 // targets. The configuration directory can be passed as an argument:
@@ -28,24 +29,15 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/example/prettylog"
 )
-
-type appConfig struct {
-	Deployments []*resources.Deployment
-	Services    []*resources.Service
-	Ingresses   []*resources.Ingress
-}
 
 func main() {
 	dir := "./config"
+	if len(os.Args) > 1 {
+		dir = os.Args[1]
+	}
 
-	// the registry is built here so that the event receiver can share it: it
-	// is what types the entity an event carries, which is how the receiver
-	// shows each resource's configuration as it is created
-	r := registry.NewPluginRegistry()
-
-	cfg, err := loadConfig(dir, r)
 	if err := run(dir); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
@@ -53,9 +45,29 @@ func main() {
 }
 
 // run loads the configuration in dir, works out its ingress routes and prints
-// one line per route. It is separate from main only so the temporary state
-// directory is removed before main exits, os.Exit skips deferred calls.
+// one line per route.
 func run(dir string) error {
+	cfg, err := loadConfig(dir,
+		// Every event xcl produces goes to the pretty receiver on stderr, so
+		// stdout holds only the routes
+		xcl.WithEventHandler(prettylog.Handler(os.Stderr, prettylog.LevelFromEnv())),
+		// events carry nothing by default, this asks for each resource as it
+		// is processed, which is what the receiver turns back into
+		// configuration text. Sensitive fields are redacted in events.
+		xcl.WithEventData(xcl.EventDataProcessed),
+	)
+	if err != nil {
+		return err
+	}
+
+	routes, err := ingressRoutes(cfg)
+	if err != nil {
+		return err
+	}
+
+	for _, route := range routes {
+		fmt.Println(route)
+	}
 
 	return nil
 }
@@ -65,36 +77,28 @@ func run(dir string) error {
 // the order the blocks were written, so the configuration can declare as many
 // of each as it needs. It holds only what the program reads, reading a new
 // block type needs only a new field.
+type appConfig struct {
+	Deployments []*resources.Deployment
+	Services    []*resources.Service
+	Ingresses   []*resources.Ingress
+}
 
-// loadConfig registers the example's block types on r, applies the
-// configuration in dir with options added to the registry, and gathers it into
-// an appConfig.
-func loadConfig(dir string, r *registry.PluginRegistry, options ...xcl.ConfigOption) (*appConfig, error) {
-	// Register each Go type under the block type name used in configuration.
-	// A registered type needs nothing else: no plugin, no provider, no schema
+// loadConfig declares the example's block types, applies the configuration in
+// dir with the caller's options, and gathers it into an appConfig.
+func loadConfig(dir string, options ...xcl.ConfigOption) (*appConfig, error) {
+	// Declare each Go type under the block type name used in configuration.
+	// A declared type needs nothing else: no plugin, no provider, no schema
 	// to write by hand. Every type the configuration declares must be
-	// registered, even the ones the program does not read.
-	if err := r.RegisterType(&resources.ConfigMap{}, "config_map"); err != nil {
-		return nil, err
+	// declared here, even the ones the program does not read.
+	types := []xcl.ConfigOption{
+		xcl.WithType(&resources.ConfigMap{}, "config_map"),
+		xcl.WithType(&resources.Secret{}, "secret"),
+		xcl.WithType(&resources.Deployment{}, "deployment"),
+		xcl.WithType(&resources.Service{}, "service"),
+		xcl.WithType(&resources.Ingress{}, "ingress"),
 	}
 
-	if err := r.RegisterType(&resources.Secret{}, "secret"); err != nil {
-		return nil, err
-	}
-
-	if err := r.RegisterType(&resources.Deployment{}, "deployment"); err != nil {
-		return nil, err
-	}
-
-	if err := r.RegisterType(&resources.Service{}, "service"); err != nil 
-		return nil, err
-	}
-
-	if err := r.RegisterType(&resources.Ingress{}, "ingress"); err != nil {
-		return nil, err
-	}
-
-	c, err := xcl.NewConfig(append([]xcl.ConfigOption{xcl.WithPluginRegistry(r)}, options...)...)
+	c, err := xcl.NewConfig(append(types, options...)...)
 	if err != nil {
 		return nil, err
 	}

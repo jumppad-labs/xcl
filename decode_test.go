@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -103,16 +102,11 @@ func setupDisabledConfig(t *testing.T) *Config {
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
-
-	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
-
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	c, err := NewConfig(
-		WithPluginRegistry(reg),
+		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
 		WithStateStore(store),
 	)
 	require.NoError(t, err)
@@ -134,16 +128,11 @@ func setupOrderedConfig(t *testing.T, fixture string) *Config {
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
-
-	err := reg.RegisterType(&registered.Cache{}, registered.TypeCache)
-	require.NoError(t, err)
-
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	c, err := NewConfig(
-		WithPluginRegistry(reg),
+		WithType(&registered.Cache{}, registered.TypeCache),
 		WithStateStore(store),
 	)
 	require.NoError(t, err)
@@ -502,15 +491,10 @@ func TestDecodeRejectsAPointerToANonStruct(t *testing.T) {
 func TestDecodeBeforeApplyLeavesCollectionsEmptyAndSinglesUnset(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
-
-	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
-
-	err = reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
-	require.NoError(t, err)
-
-	c, err := NewConfig(WithPluginRegistry(reg))
+	c, err := NewConfig(
+		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
+		WithType(&registered.App{}, "resource", registered.TypeApp),
+	)
 	require.NoError(t, err)
 
 	target := struct {

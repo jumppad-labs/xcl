@@ -61,7 +61,7 @@ it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
 
 ### 2. `ProviderAdapter` — the uniform contract
 
-The rest of the engine (the parser's DAG walk, the plugin registry) can't
+The rest of the engine (the parser's DAG walk, the catalog) can't
 work with a different generic type per resource — it needs one interface it
 can call regardless of which plugin or resource type it's dealing with:
 
@@ -194,39 +194,75 @@ doesn't have `T` compiled in, so it can't decode `entityData` itself. When a
 resource of a given type needs to be *instantiated* from HCL (not just
 passed through as `[]byte`), the host reconstructs a Go type dynamically
 from the schema via `schema.CreateInstanceFromSchema` — see
-[`plugins/registry/plugin_registry.go:createEntityFromPlugins`](../plugins/registry/plugin_registry.go).
+[`internal/catalog/catalog.go:createEntityFromPlugins`](../internal/catalog/catalog.go).
 
-## `PluginRegistry` — tying it together
+## Registries and the catalog — tying it together
 
-[`plugins/registry/plugin_registry.go`](../plugins/registry/plugin_registry.go)
-holds a `[]plugins.PluginHost` plus the compiled-in builtin types.
-`NewPluginRegistry()` takes no logger, and registering only records:
-`RegisterPlugin` for in-process plugins, `RegisterPluginWithPath` for a gRPC
-plugin binary, and `DiscoverPlugins(dirs, pattern)` for directories to search
-for binaries named like `pattern` (`xcl-plugin-*` when empty).
+Plugins come only from registries. The public
+[`registry`](../registry/registry.go) package defines a `Registry`, which
+provides plugins, and a `Plugin`, which starts itself and returns the
+`plugins.PluginHost` xcl talks to it through. `registry.InProcess(p)` starts a
+compiled-in plugin with the direct host, and `registry.Executable(path)` starts
+a plugin binary over gRPC. Third parties write registries of their own against
+the same interfaces.
+
+The local registry, [`registry/local.go`](../registry/local.go), takes no
+logger, and registering only records:
+
+```go
+local := registry.NewLocal()
+local.RegisterPlugin(&template.TemplatePlugin{})
+local.RegisterExternalPlugin("./bin/xcl-plugin-docker")
+local.RegisterPluginDirectory("~/.xcl/plugins")
+```
+
+`RegisterPlugin` is for in-process plugins, `RegisterExternalPlugin` for a
+gRPC plugin binary, and `RegisterPluginDirectory` for a directory to search
+for executables named like the registry's pattern, `xcl-plugin-*` unless the
+registry was created with `registry.NewLocal(registry.PluginPattern("acme-plugin-*"))`.
+A directory that does not exist provides no plugins.
+
+A `Config` is given registries with `xcl.WithRegistry(local)`, any number of
+times, and plain Go types with `xcl.WithType`. `NewConfig` builds the
+`Config`'s own catalog,
+[`internal/catalog/catalog.go`](../internal/catalog/catalog.go), from both: it
+holds the compiled-in builtin types, the declared types, the registries and,
+once loaded, a `[]plugins.PluginHost`. The catalog is private to xcl.
 
 Nothing is started until `Load(emit)`, which `Config` calls at the start of
-the first `Validate`, `Apply`, `Destroy` or `Load` (and the parser calls
-again, which is free). An external plugin's process then runs only while an
-operation is using it: `Config` starts it for each operation and stops it
-when the operation is done, so nothing is left running between operations. `Load` runs once per registry however many `Config`s share it, and
-later calls return the first call's result, failure included. It reports what
-it does to `emit`:
+the first `Validate`, `Apply`, `Destroy`, `Diff` or `Load` (and the parser
+calls again, which is free). An external plugin's process then runs only while
+an operation is using it: `Config` starts it for each operation and stops it
+when the operation is done, so nothing is left running between operations.
+`Load` runs once per `Config`, and later calls return the first call's
+result, failure included. Registries load in the order they were given, and
+each registry's plugins in the order they were registered, a directory's
+binaries at the point the directory was registered. It reports what it does
+to `emit`:
 
 - a `discover` start, `discover` log events for the binaries found, then a
-  success with `Meta` `dirs` and `count` (or an error), when there are
-  directories to search;
+  success with `Meta` `dirs`, `registry` and `count` (or an error), for each
+  directory a local registry searches;
 - for each plugin, a `load` start, then a `load` success whose `Meta` names
-  the `plugin` and its `block_types`, or a `load` error.
+  the `plugin`, its `registry` and its `block_types`, or a `load` error.
 
-A registered plugin that fails to start fails the load, and so the
-operation, with a `*xcl.PluginLoadError` (from
+Any plugin that fails to start fails the load, and so the operation, a
+discovered binary as much as a registered one. The error is a
+`*xcl.PluginLoadError` (from
 [`errors/plugin_load_error.go`](../errors/plugin_load_error.go), re-exported
-from the root package) that names the plugin and matches `xcl.ErrPluginLoad`
-with `errors.Is`. A discovered binary that fails to start is rejected, with a
-`load` error event whose `Meta` has `rejected=true`, and skipped; discovery
-fails only when every discovered plugin fails. `Loaded()` reports whether
-`Load` has run.
+from the root package) that names the `Plugin` and its `Registry` and matches
+`xcl.ErrPluginLoad` with `errors.Is`; a registry that cannot provide its
+plugins at all, such as a directory that cannot be read, gives one with an
+empty `Plugin`. `Loaded()` reports whether `Load` has run.
+
+As each plugin loads, every type it provides is checked against the builtins,
+the declared types and the plugins already loaded. A block type provided twice
+anywhere, by two plugins in one registry, by plugins in two registries, or by
+a plugin and a declared type or a builtin, fails the load with a
+`*xcl.TypeNameClashError` naming the `Name`, the `Provider` and its
+`Registry`, and the `Existing` provider and its `ExistingRegistry`. There is
+no precedence between providers. A plugin type that uses a keyword in the
+other form from the one it already has fails it with a `*xcl.TypeFormError`.
 
 `Activate(emit)` routes the messages plugins write outside a provider call,
 such as `Init` messages and go-plugin's, to the operation in progress; `Config`
@@ -238,7 +274,7 @@ Its two jobs, used from two different places in the parser:
 - **`CreateEntity(entityType, subtype, name) (any, error)`** — instantiate
   a new (empty) entity for an HCL block, from its type and subtype. Tries builtins first,
   then [configuration-only types](#configuration-only-types) (a real
-  instance of the registered Go type), then walks plugin hosts' `GetTypes()`
+  instance of the declared Go type), then walks plugin hosts' `GetTypes()`
   looking for a schema match, and builds a dynamic instance via
   `schema.CreateInstanceFromSchema` if found. Used while *parsing* HCL,
   before any dependency graph exists.
@@ -252,7 +288,7 @@ These are two different methods on the same struct because they solve two
 different problems (build a Go value vs. look up an RPC target) — code that
 only needs the second one can depend on the narrower
 `parser.ProviderResolver` interface instead of the concrete
-`*PluginRegistry` (see the "testing" note in [Parser & Resource
+`*catalog.Catalog` (see the "testing" note in [Parser & Resource
 Lifecycle](parser-lifecycle.md)).
 
 ## Plugin logging
@@ -307,7 +343,7 @@ different resources, so each call carries its own.
 `Plugin.Init(logger, state)` and each provider's `Init` get a plugin scoped
 logger, for messages written outside a provider call. Its events have the
 plugin's name as `Source` and `load` as `Operation`, and no resource. The
-registry forwards them to the operation loading the plugins, or later to the
+catalog forwards them to the operation loading the plugins, or later to the
 active operation (see `Activate` above); with neither, they are dropped.
 
 ### Across the process boundary
@@ -369,51 +405,56 @@ loading is a `load` event rather than a log message.
 
 ## Configuration-only types
 
-Not every block type needs a plugin. `PluginRegistry.RegisterType(resource any,
-name ...string)` registers a plain Go type (a pointer to a struct embedding
+Not every block type needs a plugin. `xcl.WithType(prototype any,
+name ...string)` declares a plain Go type (a pointer to a struct embedding
 `types.ResourceBase`) under a name made of a type and an optional subtype,
-with no plugin and no provider. A plugin registers its types the same way, through
+with no plugin and no provider, when the `Config` is created. A plugin
+registers its types the same way, through
 `PluginBase.RegisterType(entityType, subtype, ...)`, and neither has to use
 the `resource` type:
 
 ```go
-r := registry.NewPluginRegistry()
-err := r.RegisterType(&PostgreSQL{}, "resource", "postgres") // resource "postgres" "main" {}
-err = r.RegisterType(&Server{}, "server", "big")             // server "big" "web" {}
-err = r.RegisterType(&Cache{}, "cache")                      // cache "main" {}
+c, err := xcl.NewConfig(
+    xcl.WithType(&PostgreSQL{}, "resource", "postgres"), // resource "postgres" "main" {}
+    xcl.WithType(&Server{}, "server", "big"),            // server "big" "web" {}
+    xcl.WithType(&Cache{}, "cache"),                     // cache "main" {}
+)
 ```
 
 The type is the keyword a block leads with and the subtype its first label.
 A type keyword takes a subtype for every registration or for none, so the
 parser knows from the keyword alone how many labels a block has, and an
 address such as `server.big.web` is read by position. `resource` always takes
-a subtype. Registering a keyword in the other form from the one it already
-has fails with a `*registry.TypeFormError`.
+a subtype.
 
-`CreateEntity` builds registered types with `reflect.New`, like builtins, so
+`CreateEntity` builds declared types with `reflect.New`, like builtins, so
 blocks decode into the developer's own type and state reload returns that
 type. The parser learns about them through the one-method
 `parser.TypeRegistry` interface (`IsRegisteredType(entityType, subtype)`),
-which `*PluginRegistry` satisfies. The lifecycle and the destroy walk treat a registered type like a
+which `*catalog.Catalog` satisfies. The lifecycle and the destroy walk treat a declared type like a
 builtin: it gets a success event and no provider is ever called for it. On
 apply its status is left unchanged; on destroy it is removed from the state.
 
-A type and subtype are unique across the registry, and a clash is a
-`*registry.TypeNameClashError` naming them, i.e. `resource.postgres`. When it
-is found depends on when the type arrives:
+`WithType` returns no error. A declaration that is wrong on every run is a
+mistake in the code and panics, naming the type:
 
-- `RegisterType` checks immediately, against builtins, registered types and
-  the types of plugins that have already loaded, and leaves the registry
-  unchanged on a clash.
-- Plugin types are checked when plugins load, against all of those and the
-  other types the same plugin provides. A clashing plugin is stopped and not
-  added, and the load fails, and with it the operation, even when other
-  discovered plugins loaded. A registered type that shares a name with a
-  plugin that has not loaded yet is accepted by `RegisterType` and reported
-  here.
+- `WithType` itself panics on an empty name, more than one subtype, an empty
+  subtype, or a prototype that is not a pointer to a struct embedding
+  `types.ResourceBase`.
+- `NewConfig` panics on a declared type that duplicates another declared
+  type or a builtin (`variable`, `output`, `module`, `root`), or that uses its
+  keyword in both forms.
+
+Plugin types are checked when plugins load, against the builtins, the
+declared types, the plugins already loaded and the other types the same
+plugin provides, whatever order the registrations were made in. A clash is a
+`*xcl.TypeNameClashError` naming it, i.e. `resource.postgres`, and a keyword
+in the other form a `*xcl.TypeFormError`. A clashing plugin is stopped and
+not added, and the load fails, and with it the operation, even when other
+plugins loaded. There is no precedence between providers.
 
 [`example/configonly`](../example/configonly) parses a Kubernetes-like
-configuration into registered types this way, with no plugin at all.
+configuration into declared types this way, with no plugin at all.
 [`example/plugin`](../example/plugin) is the other half of the picture, three
 block types provided by two plugins instead: `docker.network` and
 `docker.container` from an external Docker plugin, and `template`, a type with

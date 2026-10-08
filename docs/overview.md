@@ -10,7 +10,7 @@ persisted in between runs.
 
 ```
 Config            (repo root, package xcl)
-  owns: PluginRegistry, StateStore, the entities currently declared
+  owns: Catalog, StateStore, the entities currently declared
   entry point: NewConfig(opts...) (*Config, error), then Apply()/Validate()/Destroy()
 
 Parser            (internal/parser)
@@ -20,23 +20,30 @@ Parser            (internal/parser)
   or one Destroy() call: walk the saved state children first, calling
   each resource's provider
 
-PluginRegistry    (plugins/registry)
-  aggregates PluginHosts, answers "what Go type is resource X" and
-  "what ProviderAdapter handles resource X"
+Catalog           (internal/catalog)
+  built by NewConfig from the types declared with WithType and the
+  registries added with WithRegistry; loads the registries' plugins on
+  the first operation, aggregates PluginHosts, answers "what Go type is
+  resource X" and "what ProviderAdapter handles resource X"
 ```
 
 `Config` is the only piece meant to be constructed directly by a library
 user. `Parser` is constructed fresh, internally, on every
 `Apply`/`Validate`/`Destroy` call — it is not held onto between calls.
-`PluginRegistry` and `StateStore` are the two pieces of long-lived state
-`Config` owns and passes into each new `Parser` via `ParserOptions`.
+The `Catalog` and the `StateStore` are the two pieces of long-lived state
+`Config` owns and passes into each new `Parser` via `ParserOptions`. The
+catalog is private; applications reach it only through `WithType` and
+`WithRegistry`. The public [`registry`](../registry) package defines where
+plugins come from: the `Registry` and `Plugin` interfaces, and the local
+registry, `registry.NewLocal()`.
 
 ## Entry point
 
 ```go
 cfg, err := xcl.NewConfig(
-    xcl.WithPluginRegistry(pluginRegistry),
-    xcl.WithStateStore(stateStore),       // or xcl.WithStatePath("./.xcl")
+    xcl.WithType(&Server{}, "server"),    // a plain Go type, no plugin
+    xcl.WithRegistry(local),              // plugins, i.e. registry.NewLocal()
+    xcl.WithStateStore(stateStore),       // or xcl.WithStatePath("./.xcl"), or neither to persist nothing
     xcl.WithVariables(vars),
 )
 
@@ -49,6 +56,10 @@ err := cfg.Destroy()                   // destroys everything in the saved state
 ([`options.go`](../options.go)) onto a `Config` holding no entities yet. An
 option can fail, `WithStatePath` does when it cannot create the state
 directory, and the first failure is returned from `NewConfig`.
+`WithType` and `WithRegistry` return no error: a mistake in the code, such
+as an empty type name or a type declared twice, panics, and a plugin that
+fails to load (`*xcl.PluginLoadError`) or a block type provided twice
+(`*xcl.TypeNameClashError`) is returned by the first operation.
 With no options, you get a config that parses and validates HCL but never
 touches a real provider or disk — useful for testing.
 
@@ -57,7 +68,7 @@ touches a real provider or disk — useful for testing.
 [`config.go:110`](../config.go#L110):
 
 1. Construct a `parser.Parser` for this call only, handing it `Config`'s
-   `StateStore`, `PluginRegistry`, and variables via `ParserOptions`.
+   `StateStore`, `Catalog`, and variables via `ParserOptions`.
 2. Call `p.Apply(paths...)`, see
    [Parser & Resource Lifecycle](parser-lifecycle.md).
 3. Adopt the entities the parse produced as the configuration's own.
@@ -152,7 +163,7 @@ is the canonical way engine code reads this off an arbitrary resource value —
 it walks embedded fields by reflection, so it works uniformly whether the
 resource is a compiled-in Go struct or one dynamically built by
 `schema.CreateInstanceFromSchema` (see [Plugin Architecture](plugins.md)).
-This is what lets `internal/parser` and `plugins/registry` operate on
+This is what lets `internal/parser` and `internal/catalog` operate on
 resources as `any` without knowing their concrete type.
 
 ## Where to go next

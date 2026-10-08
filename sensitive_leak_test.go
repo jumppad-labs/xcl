@@ -18,7 +18,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -31,7 +31,6 @@ const knownSecret = "s3cr3t-leak-check-7f1d"
 // leakFixture is an applied sensitive_leak configuration
 type leakFixture struct {
 	config   *Config
-	registry *registry.PluginRegistry
 	plugin   *parser.TestPlugin
 	store    *state.FileStateStore
 	stateDir string
@@ -70,13 +69,11 @@ func applyLeakFixtureWithOptions(t *testing.T, name string, level EventDataLevel
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
-	require.NoError(t, reg.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret))
-	require.NoError(t, reg.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer))
+	local := registry.NewLocal()
 
 	plugin := &parser.TestPlugin{}
 	plugin.SetLogOnCreate(messages...)
-	require.NoError(t, reg.RegisterPlugin(plugin))
+	local.RegisterPlugin(plugin)
 
 	stateDir := t.TempDir()
 	store, err := state.NewFileStateStore(stateDir)
@@ -88,7 +85,9 @@ func applyLeakFixtureWithOptions(t *testing.T, name string, level EventDataLevel
 	recorder := &eventRecorder{}
 
 	all := []ConfigOption{
-		WithPluginRegistry(reg),
+		WithType(&registered.Secret{}, "resource", registered.TypeSecret),
+		WithType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer),
+		WithRegistry(local),
 		WithStateStore(store),
 		WithStateMask(stateMasker),
 		WithEventHandler(recorder.Record),
@@ -101,7 +100,6 @@ func applyLeakFixtureWithOptions(t *testing.T, name string, level EventDataLevel
 
 	return &leakFixture{
 		config:   c,
-		registry: reg,
 		plugin:   plugin,
 		store:    store,
 		stateDir: stateDir,
@@ -386,7 +384,7 @@ func TestLeakEncodeSavedEntityOfRegisteredSecret(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, f.store.Path(), "resource.secret.a")
 
-	out, err := EncodeSavedEntity(f.registry, record)
+	out, err := f.config.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.NotContains(t, string(out), knownSecret)
@@ -398,7 +396,7 @@ func TestLeakEncodeSavedEntityOfPluginCredential(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, f.store.Path(), "resource.credential.b")
 
-	out, err := EncodeSavedEntity(f.registry, record)
+	out, err := f.config.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.NotContains(t, string(out), knownSecret)
@@ -410,7 +408,7 @@ func TestLeakEncodeSavedEntityOfInterpolatedConsumer(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, f.store.Path(), "resource.secret_consumer.interpolated")
 
-	out, err := EncodeSavedEntity(f.registry, record)
+	out, err := f.config.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.NotContains(t, string(out), knownSecret)

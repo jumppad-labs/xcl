@@ -14,6 +14,10 @@ plugins/example/bin/
 # stray `go build` output: without -o the binary is named after its package dir
 /example/example
 /example/main
+/configonly
+example/configonly/configonly
+example/plugin/plugin
+example/prettylog/prettylog
 # spektacular debug logs
 .spektacular/debug/
 .spektacular/tmp/

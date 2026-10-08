@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	plugintesting "github.com/jumppad-labs/xcl/plugins/testing"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
@@ -24,16 +24,16 @@ const (
 )
 
 // applyTokenPerson applies the token fixture with a fresh parser sharing the
-// registry and store, saves the state the way Config does and returns the
+// catalog and store, saves the state the way Config does and returns the
 // events the apply fired
-func applyTokenPerson(t *testing.T, reg *registry.PluginRegistry, store *state.FileStateStore, level events.DataLevel) ([]any, *applyEventCollector) {
+func applyTokenPerson(t *testing.T, cat *catalog.Catalog, store *state.FileStateStore, level events.DataLevel) ([]any, *applyEventCollector) {
 	t.Helper()
 
 	collector := &applyEventCollector{}
 
 	options := parser.DefaultOptions()
 	options.ModuleCache = filepath.Join(t.TempDir(), parser.ConfigDirectory, "cache")
-	options.PluginRegistry = reg
+	options.Catalog = cat
 	options.StateStore = store
 	options.Emit = collector.Record
 	options.EventData = level
@@ -50,15 +50,6 @@ func applyTokenPerson(t *testing.T, reg *registry.PluginRegistry, store *state.F
 	require.NoError(t, store.Save(encoded))
 
 	return st.GetResources(), collector
-}
-
-func newTokenRegistry(t *testing.T) *registry.PluginRegistry {
-	t.Helper()
-
-	reg := registry.NewPluginRegistry()
-	require.NoError(t, reg.RegisterPlugin(&PersonPlugin{}))
-
-	return reg
 }
 
 // eventData returns the data of the one success event for the person and
@@ -85,7 +76,7 @@ func TestExamplePersonTokenRevealsAfterApply(t *testing.T) {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
-	resources, _ := applyTokenPerson(t, newTokenRegistry(t), store, events.DataNone)
+	resources, _ := applyTokenPerson(t, newPersonCatalog(), store, events.DataNone)
 
 	require.Equal(t, "tok-s3cret", findPerson(t, resources, tokenPersonID).Token.Reveal())
 }
@@ -96,7 +87,7 @@ func TestExamplePersonTokenIsRealInStateFile(t *testing.T) {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
-	applyTokenPerson(t, newTokenRegistry(t), store, events.DataNone)
+	applyTokenPerson(t, newPersonCatalog(), store, events.DataNone)
 
 	contents, err := os.ReadFile(store.Path())
 	require.NoError(t, err)
@@ -109,12 +100,12 @@ func TestExamplePersonTokenRevealsInDecodedState(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newTokenRegistry(t)
+	cat := newPersonCatalog()
 
 	store, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
 
-	applyTokenPerson(t, reg, store, events.DataNone)
+	applyTokenPerson(t, cat, store, events.DataNone)
 
 	reloaded, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
@@ -122,7 +113,7 @@ func TestExamplePersonTokenRevealsInDecodedState(t *testing.T) {
 	records, err := reloaded.Load()
 	require.NoError(t, err)
 
-	saved, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
+	saved, err := savedentity.DecodeAll(cat, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	require.Equal(t, "tok-s3cret", findPerson(t, saved, tokenPersonID).Token.Reveal())
@@ -137,12 +128,12 @@ func TestExamplePersonTokenRevealsAfterSecondApply(t *testing.T) {
 
 	firstStore, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
-	applyTokenPerson(t, newTokenRegistry(t), firstStore, events.DataNone)
+	applyTokenPerson(t, newPersonCatalog(), firstStore, events.DataNone)
 
 	secondStore, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
 
-	resources, second := applyTokenPerson(t, newTokenRegistry(t), secondStore, events.DataNone)
+	resources, second := applyTokenPerson(t, newPersonCatalog(), secondStore, events.DataNone)
 
 	// the person was only read, so it came from state and the configuration
 	require.Empty(t, second.successfulResources("create"))
@@ -162,7 +153,7 @@ func TestExamplePersonProcessedEventDataShowsOnlyTheMarker(t *testing.T) {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
-	_, collector := applyTokenPerson(t, newTokenRegistry(t), store, events.DataProcessed)
+	_, collector := applyTokenPerson(t, newPersonCatalog(), store, events.DataProcessed)
 
 	data := collector.eventData(t, "create")
 	require.NotEmpty(t, data)
@@ -177,7 +168,7 @@ func TestExamplePersonRawEventDataShowsOnlyTheMarker(t *testing.T) {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
-	_, collector := applyTokenPerson(t, newTokenRegistry(t), store, events.DataRaw)
+	_, collector := applyTokenPerson(t, newPersonCatalog(), store, events.DataRaw)
 
 	data := collector.eventData(t, "create")
 	require.NotEmpty(t, data)

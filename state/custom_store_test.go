@@ -67,10 +67,7 @@ func TestCustomStateStoreRoundTripsAnApply(t *testing.T) {
 	reg := testRegistry(t)
 	store := &memoryStore{}
 
-	c, err := xcl.NewConfig(
-		xcl.WithPluginRegistry(reg),
-		xcl.WithStateStore(store),
-	)
+	c, err := xcl.NewConfig(append(testTypeOptions(), xcl.WithStateStore(store))...)
 	require.NoError(t, err)
 
 	err = c.Apply(appliedConfig)
@@ -81,7 +78,7 @@ func TestCustomStateStoreRoundTripsAnApply(t *testing.T) {
 	records, err := store.Load()
 	require.NoError(t, err)
 
-	// the store is handed raw JSON records, typing them needs the registry
+	// the store is handed raw JSON records, typing them needs the catalog
 	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
@@ -95,10 +92,7 @@ func TestCustomStateStoreIsHandedEntitiesWithBothAxes(t *testing.T) {
 	reg := testRegistry(t)
 	store := &memoryStore{}
 
-	c, err := xcl.NewConfig(
-		xcl.WithPluginRegistry(reg),
-		xcl.WithStateStore(store),
-	)
+	c, err := xcl.NewConfig(append(testTypeOptions(), xcl.WithStateStore(store))...)
 	require.NoError(t, err)
 
 	err = c.Apply(appliedConfig)
@@ -107,7 +101,7 @@ func TestCustomStateStoreIsHandedEntitiesWithBothAxes(t *testing.T) {
 	records, err := store.Load()
 	require.NoError(t, err)
 
-	// the store is handed raw JSON records, typing them needs the registry
+	// the store is handed raw JSON records, typing them needs the catalog
 	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
@@ -136,19 +130,13 @@ func TestCustomStateStoreIsReadBackByALaterRun(t *testing.T) {
 	reg := testRegistry(t)
 	store := &memoryStore{}
 
-	first, err := xcl.NewConfig(
-		xcl.WithPluginRegistry(reg),
-		xcl.WithStateStore(store),
-	)
+	first, err := xcl.NewConfig(append(testTypeOptions(), xcl.WithStateStore(store))...)
 	require.NoError(t, err)
 
 	err = first.Apply(appliedConfig)
 	require.NoError(t, err)
 
-	second, err := xcl.NewConfig(
-		xcl.WithPluginRegistry(reg),
-		xcl.WithStateStore(store),
-	)
+	second, err := xcl.NewConfig(append(testTypeOptions(), xcl.WithStateStore(store))...)
 	require.NoError(t, err)
 
 	err = second.Apply(appliedConfig)
@@ -159,7 +147,7 @@ func TestCustomStateStoreIsReadBackByALaterRun(t *testing.T) {
 	records, err := store.Load()
 	require.NoError(t, err)
 
-	// the store is handed raw JSON records, typing them needs the registry
+	// the store is handed raw JSON records, typing them needs the catalog
 	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 	require.ElementsMatch(t, testAppliedIDs, testLoadedIDs(t, loaded))

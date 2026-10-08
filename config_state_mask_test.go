@@ -14,7 +14,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
 // stateMaskKey and otherStateMaskKey are two different 32 byte AES-256 keys
@@ -114,7 +113,7 @@ func TestStateWithEncryptionMaskerHoldsNoSecret(t *testing.T) {
 	dir := t.TempDir()
 
 	c, err := NewConfig(
-		WithPluginRegistry(newSecretRegistry(t)),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -134,10 +133,9 @@ func TestStateWithEncryptionMaskerReloadsRealValue(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	first, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -145,7 +143,7 @@ func TestStateWithEncryptionMaskerReloadsRealValue(t *testing.T) {
 	require.NoError(t, first.Apply(sensitiveBasicPath(t)))
 
 	second, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -165,10 +163,9 @@ func TestStateWithDifferentKeyFailsToLoad(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	first, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -176,7 +173,7 @@ func TestStateWithDifferentKeyFailsToLoad(t *testing.T) {
 	require.NoError(t, first.Apply(sensitiveBasicPath(t)))
 
 	second, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, otherStateMaskKey)),
 	)
@@ -191,10 +188,9 @@ func TestEncryptedStateWithoutMaskerFailsToLoad(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	first, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -202,7 +198,7 @@ func TestEncryptedStateWithoutMaskerFailsToLoad(t *testing.T) {
 	require.NoError(t, first.Apply(sensitiveBasicPath(t)))
 
 	second, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 	)
 	require.NoError(t, err)
@@ -216,10 +212,9 @@ func TestEncryptedStateDestroyWithSameKeySucceeds(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	applied, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -227,7 +222,7 @@ func TestEncryptedStateDestroyWithSameKeySucceeds(t *testing.T) {
 	require.NoError(t, applied.Apply(sensitiveBasicPath(t)))
 
 	destroyer, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -244,10 +239,9 @@ func TestPlainStateLoadsWithMaskerAndIsEncryptedOnSave(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	plain, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 	)
 	require.NoError(t, err)
@@ -256,7 +250,7 @@ func TestPlainStateLoadsWithMaskerAndIsEncryptedOnSave(t *testing.T) {
 	require.Contains(t, readStateDir(t, dir), "from-literal")
 
 	masked, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -277,10 +271,9 @@ func TestDestroySavesEncryptedState(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	store := &recordingStore{}
-	reg := newSecretRegistry(t)
 
 	applied, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStateStore(store),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -290,7 +283,7 @@ func TestDestroySavesEncryptedState(t *testing.T) {
 	savesAfterApply := len(store.saves)
 
 	destroyer, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStateStore(store),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -327,10 +320,9 @@ func TestCustomReversibleStateMaskerOutputInState(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	first, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(reverseStateMasker{}),
 	)
@@ -344,7 +336,7 @@ func TestCustomReversibleStateMaskerOutputInState(t *testing.T) {
 	require.Contains(t, contents, `"value": "reversed:\"laretil-morf\""`)
 
 	second, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(reverseStateMasker{}),
 	)
@@ -437,19 +429,25 @@ func allPlaintextStateWarnings(recorder *eventRecorder) []Event {
 	return found
 }
 
-// newNonSensitiveRegistry registers the types used by the registered/basic
+// withNonSensitiveTypes declares the types used by the registered/basic
 // fixture, none of which has a sensitive field
-func newNonSensitiveRegistry(t *testing.T) *registry.PluginRegistry {
-	t.Helper()
+func withNonSensitiveTypes() ConfigOption {
+	declared := []ConfigOption{
+		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
+		WithType(&registered.App{}, "resource", registered.TypeApp),
+		WithType(&registered.Consumer{}, "resource", registered.TypeConsumer),
+		WithType(&registered.Cache{}, "resource", registered.TypeCache),
+	}
 
-	reg := registry.NewPluginRegistry()
+	return func(c *Config) error {
+		for _, option := range declared {
+			if err := option(c); err != nil {
+				return err
+			}
+		}
 
-	require.NoError(t, reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase))
-	require.NoError(t, reg.RegisterType(&registered.App{}, "resource", registered.TypeApp))
-	require.NoError(t, reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer))
-	require.NoError(t, reg.RegisterType(&registered.Cache{}, "resource", registered.TypeCache))
-
-	return reg
+		return nil
+	}
 }
 
 func TestPlainStateWithSensitiveValueWarnsOnce(t *testing.T) {
@@ -459,7 +457,7 @@ func TestPlainStateWithSensitiveValueWarnsOnce(t *testing.T) {
 	recorder := &eventRecorder{}
 
 	c, err := NewConfig(
-		WithPluginRegistry(newSecretRegistry(t)),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithEventHandler(recorder.Record),
 	)
@@ -489,7 +487,7 @@ func TestPlainStateWithoutSensitiveValuesDoesNotWarn(t *testing.T) {
 	recorder := &eventRecorder{}
 
 	c, err := NewConfig(
-		WithPluginRegistry(newNonSensitiveRegistry(t)),
+		withNonSensitiveTypes(),
 		WithStatePath(dir),
 		WithEventHandler(recorder.Record),
 	)
@@ -510,7 +508,7 @@ func TestNoStateStoreDoesNotWarn(t *testing.T) {
 	recorder := &eventRecorder{}
 
 	c, err := NewConfig(
-		WithPluginRegistry(newSecretRegistry(t)),
+		withSecretTypes(),
 		WithEventHandler(recorder.Record),
 	)
 	require.NoError(t, err)
@@ -528,7 +526,7 @@ func TestStateMaskerDoesNotWarn(t *testing.T) {
 	recorder := &eventRecorder{}
 
 	c, err := NewConfig(
-		WithPluginRegistry(newSecretRegistry(t)),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 		WithEventHandler(recorder.Record),
@@ -545,10 +543,9 @@ func TestDestroyWithPlainSensitiveStateWarnsOnce(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	applied, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 	)
 	require.NoError(t, err)
@@ -559,7 +556,7 @@ func TestDestroyWithPlainSensitiveStateWarnsOnce(t *testing.T) {
 	recorder := &eventRecorder{}
 
 	destroyer, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStatePath(dir),
 		WithEventHandler(recorder.Record),
 	)

@@ -15,8 +15,8 @@ import (
 	"slices"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -52,7 +52,7 @@ type ReadOptions struct {
 // Masked values are treated as read says, before the record is typed. A
 // masked value that cannot be opened fails with
 // *xclerrors.UnrecoverableError naming the record and the masker.
-func Decode(registry *registry.PluginRegistry, data []byte, read ReadOptions) (any, error) {
+func Decode(registry *catalog.Catalog, data []byte, read ReadOptions) (any, error) {
 	var record map[string]any
 	if err := json.Unmarshal(data, &record); err != nil {
 		return nil, &xclerrors.InvalidSavedDataError{Err: err}
@@ -126,7 +126,7 @@ func Decode(registry *registry.PluginRegistry, data []byte, read ReadOptions) (a
 // unreadable record: it is returned at once as *xclerrors.UnrecoverableError,
 // so the load fails with xclerrors.ErrUnrecoverable naming the entity and the
 // masker.
-func DecodeAll(registry *registry.PluginRegistry, loaded []any, read ReadOptions) ([]any, error) {
+func DecodeAll(registry *catalog.Catalog, loaded []any, read ReadOptions) ([]any, error) {
 	entities := make([]any, 0, len(loaded))
 	unresolved := []string{}
 

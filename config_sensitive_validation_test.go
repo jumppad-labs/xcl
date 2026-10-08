@@ -6,7 +6,6 @@ import (
 
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -17,17 +16,13 @@ func newSensitiveCheckConfig(t *testing.T) *Config {
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
-
-	require.NoError(t, reg.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret))
-	require.NoError(t, reg.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer))
-	require.NoError(t, reg.RegisterType(&registered.SecretShape{}, "resource", registered.TypeSecretShapes))
-
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	c, err := NewConfig(
-		WithPluginRegistry(reg),
+		WithType(&registered.Secret{}, "resource", registered.TypeSecret),
+		WithType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer),
+		WithType(&registered.SecretShape{}, "resource", registered.TypeSecretShapes),
 		WithStateStore(store),
 	)
 	require.NoError(t, err)

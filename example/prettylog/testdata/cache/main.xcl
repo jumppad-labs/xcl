@@ -1,0 +1,5 @@
+# a single bare registered type, so the configuration an apply writes is one
+# small block a test can compare line for line
+cache "main" {
+  location = "us-east"
+}

@@ -13,7 +13,7 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error)
 in order:
 
 1. `parseAndValidate` — load previous state, parse all HCL files under
-   `paths` into Go resource instances (via `PluginRegistry.CreateEntity`
+   `paths` into Go resource instances (via `Catalog.CreateEntity`
    for typing), then **validate the configuration as a whole**. Nothing is
    acted upon unless validation passes, and validation itself decodes no
    bodies and reaches no provider.
@@ -180,7 +180,7 @@ version has saved; a `parents` key it still carries is ignored.
 ## Resolving the provider: `ProviderResolver`
 
 Both callbacks need to turn a resource into a `plugins.ProviderAdapter`.
-Rather than depending on the concrete `*registry.PluginRegistry`, they
+Rather than depending on the concrete `*catalog.Catalog`, they
 depend on a narrow interface defined in this package:
 
 ```go
@@ -190,28 +190,29 @@ type ProviderResolver interface {
 }
 ```
 
-`*registry.PluginRegistry` satisfies this structurally (Go interfaces are
-implicit), so production code is unaffected — `ParserOptions.PluginRegistry`
-is still what gets passed in practice. But `walkCallback`,
+`*catalog.Catalog` ([`internal/catalog/catalog.go`](../internal/catalog/catalog.go))
+satisfies this structurally (Go interfaces are implicit), so production code
+is unaffected — `ParserOptions.Catalog` is still what gets passed in
+practice. But `walkCallback`,
 `destroyWalkCallback`, and `resourceLifecycle` only ever call this one
 method, so tests can substitute
 [`internal/parser/mocks.MockProviderResolver`](../internal/parser/mocks/mock_provider_resolver.go)
 instead of standing up a real registry + real (or fake) plugin.
 
 `ParserOptions` exposes this as its own field, defaulting to
-`PluginRegistry` when unset:
+`Catalog` when unset:
 
 ```go
 // internal/parser/parser.go
-ProviderResolver ProviderResolver // overrides provider lookup; defaults to PluginRegistry
+ProviderResolver ProviderResolver // overrides provider lookup; defaults to Catalog
 ```
 
 This is what `TestParserProcessesResourcesInCorrectOrder` uses to verify
 DAG-walk ordering with a single mock adapter/resolver pair instead of the
 hand-written `TestPlugin` fake ([`internal/parser/test_plugin.go`](../internal/parser/test_plugin.go)).
-Note `PluginRegistry.CreateEntity` (used in step 1 of `Apply`, to
+Note `Catalog.CreateEntity` (used in step 1 of `Apply`, to
 instantiate resources from HCL) is a *different* method not covered by
-`ProviderResolver` — a real registry is still needed for that part even in
+`ProviderResolver` — a real catalog is still needed for that part even in
 tests that mock the lifecycle-call path.
 
 ## Events: `ParserOptions.Emit`

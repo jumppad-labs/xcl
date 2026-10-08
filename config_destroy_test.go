@@ -12,7 +12,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/mock"
@@ -26,7 +26,6 @@ import (
 type destroyFixture struct {
 	config     *Config
 	plugin     *parser.TestPlugin
-	registry   *registry.PluginRegistry
 	store      *state.FileStateStore
 	statePath  string
 	configDir  string
@@ -49,11 +48,10 @@ func setupDestroyConfig(t *testing.T, log logger.Logger) *destroyFixture {
 		os.Setenv("HOME", home)
 	})
 
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 
 	testPlugin := &parser.TestPlugin{}
-	err := pr.RegisterPlugin(testPlugin)
-	require.NoError(t, err)
+	local.RegisterPlugin(testPlugin)
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
@@ -71,7 +69,7 @@ func setupDestroyConfig(t *testing.T, log logger.Logger) *destroyFixture {
 	recorder := &eventRecorder{}
 
 	c, err := NewConfig(
-		WithPluginRegistry(pr),
+		WithRegistry(local),
 		WithStateStore(store),
 		WithEventHandler(recorder.Record),
 		// the destroy tests assert on what events carry, which is nothing
@@ -83,7 +81,6 @@ func setupDestroyConfig(t *testing.T, log logger.Logger) *destroyFixture {
 	return &destroyFixture{
 		config:     c,
 		plugin:     testPlugin,
-		registry:   pr,
 		store:      store,
 		statePath:  statePath,
 		configDir:  configDir,
@@ -241,13 +238,12 @@ func TestConfigDestroyWithNothingSavedSucceeds(t *testing.T) {
 // TestConfigDestroyWithNoStateStoreAndNothingAppliedSucceeds asserts a Config
 // without a state store that never applied anything destroys nothing
 func TestConfigDestroyWithNoStateStoreAndNothingAppliedSucceeds(t *testing.T) {
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 
 	testPlugin := &parser.TestPlugin{}
-	err := pr.RegisterPlugin(testPlugin)
-	require.NoError(t, err)
+	local.RegisterPlugin(testPlugin)
 
-	c, err := NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(WithRegistry(local))
 	require.NoError(t, err)
 
 	err = c.Destroy()
@@ -358,8 +354,8 @@ func TestConfigDestroyReturnsErrorNamingFailedResource(t *testing.T) {
 	loaded, err := f.store.Load()
 	require.NoError(t, err)
 
-	// the store hands back raw records, typing them needs the registry
-	saved, err := savedentity.DecodeAll(f.registry, loaded, savedentity.ReadOptions{})
+	// the store hands back raw records, typing them needs the Config's types
+	saved, err := savedentity.DecodeAll(f.config.catalog, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	second, err := testutil.EntityByID(saved, "resource.container.second")
@@ -413,7 +409,7 @@ func TestConfigDestroyRetriesFailedResources(t *testing.T) {
 }
 
 // TestConfigDestroyFailsWhenSavedStateHasUnknownType asserts destroying with
-// a registry that can not create a saved type fails with an UnknownTypesError,
+// a Config that can not create a saved type fails with an UnknownTypesError,
 // calls no provider and leaves the saved state untouched
 func TestConfigDestroyFailsWhenSavedStateHasUnknownType(t *testing.T) {
 	f := setupDestroyConfig(t, logger.Nop())
@@ -422,14 +418,10 @@ func TestConfigDestroyFailsWhenSavedStateHasUnknownType(t *testing.T) {
 	before, err := os.ReadFile(f.statePath)
 	require.NoError(t, err)
 
-	emptyRegistry := registry.NewPluginRegistry()
 	store, err := state.NewFileStateStore(filepath.Dir(f.statePath))
 	require.NoError(t, err)
 
-	c, err := NewConfig(
-		WithPluginRegistry(emptyRegistry),
-		WithStateStore(store),
-	)
+	c, err := NewConfig(WithStateStore(store))
 	require.NoError(t, err)
 
 	err = c.Destroy()

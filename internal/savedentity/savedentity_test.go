@@ -17,12 +17,13 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -37,51 +38,68 @@ const registeredConfig = "../test_fixtures/config/registered/basic/main.xcl"
 // no Go declaration here and resolve only once the registry has loaded.
 const pluginConfig = "../test_fixtures/config/query/main.xcl"
 
-// testRegisteredRegistry returns a registry holding the types
+// testRegisteredRegistry returns a catalog holding the types
 // registeredConfig declares, and points HOME at the test's temp directory so
 // an apply never writes to the user's home folder.
-func testRegisteredRegistry(t *testing.T) *registry.PluginRegistry {
+func testRegisteredRegistry(t *testing.T) *catalog.Catalog {
 	t.Helper()
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
-	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
-
-	err = reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
-	require.NoError(t, err)
-
-	err = reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
+	reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
 
 	return reg
 }
 
-// testPluginRegistry returns a registry holding the types pluginConfig
+// testRegisteredOptions returns the Config options declaring the same types
+// testRegisteredRegistry holds, for the apply that writes the records
+func testRegisteredOptions() []xcl.ConfigOption {
+	return []xcl.ConfigOption{
+		xcl.WithType(&registered.Database{}, "resource", registered.TypeDatabase),
+		xcl.WithType(&registered.App{}, "resource", registered.TypeApp),
+		xcl.WithType(&registered.Consumer{}, "resource", registered.TypeConsumer),
+	}
+}
+
+// testPluginRegistry returns a catalog holding the types pluginConfig
 // declares: database is a registered Go type, and container, network, template
 // and sidecar come from the TestPlugin.
-func testPluginRegistry(t *testing.T) *registry.PluginRegistry {
+func testPluginRegistry(t *testing.T) *catalog.Catalog {
 	t.Helper()
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
-	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 
-	err = reg.RegisterPlugin(&parser.TestPlugin{})
-	require.NoError(t, err)
+	local := registry.NewLocal()
+	local.RegisterPlugin(&parser.TestPlugin{})
+	reg.AddRegistry(local)
 
 	return reg
 }
 
-// testApplyToStateFile applies config with reg through a file state store and
-// returns the path the state was written to, so the saved records can be read
-// straight off disk.
-func testApplyToStateFile(t *testing.T, reg *registry.PluginRegistry, config string) string {
+// testPluginOptions returns the Config options declaring the same types
+// testPluginRegistry holds, for the apply that writes the records
+func testPluginOptions() []xcl.ConfigOption {
+	local := registry.NewLocal()
+	local.RegisterPlugin(&parser.TestPlugin{})
+
+	return []xcl.ConfigOption{
+		xcl.WithType(&registered.Database{}, "resource", registered.TypeDatabase),
+		xcl.WithRegistry(local),
+	}
+}
+
+// testApplyToStateFile applies config with the given type options through a
+// file state store and returns the path the state was written to, so the
+// saved records can be read straight off disk.
+func testApplyToStateFile(t *testing.T, options []xcl.ConfigOption, config string) string {
 	t.Helper()
 
 	store, err := state.NewFileStateStore(t.TempDir())
@@ -89,10 +107,7 @@ func testApplyToStateFile(t *testing.T, reg *registry.PluginRegistry, config str
 
 	statePath := store.Path()
 
-	c, err := xcl.NewConfig(
-		xcl.WithPluginRegistry(reg),
-		xcl.WithStateStore(store),
-	)
+	c, err := xcl.NewConfig(append(options, xcl.WithStateStore(store))...)
 	require.NoError(t, err)
 
 	err = c.Apply(config)
@@ -139,7 +154,7 @@ func testSavedRecord(t *testing.T, statePath string, id string) []byte {
 func TestDecodeReturnsTypedRegisteredEntity(t *testing.T) {
 	reg := testRegisteredRegistry(t)
 
-	statePath := testApplyToStateFile(t, reg, registeredConfig)
+	statePath := testApplyToStateFile(t, testRegisteredOptions(), registeredConfig)
 
 	record := testSavedRecord(t, statePath, "resource.database.main")
 
@@ -168,7 +183,7 @@ func TestDecodeReturnsTypedRegisteredEntity(t *testing.T) {
 func TestDecodeReturnsTypedPluginEntity(t *testing.T) {
 	reg := testPluginRegistry(t)
 
-	statePath := testApplyToStateFile(t, reg, pluginConfig)
+	statePath := testApplyToStateFile(t, testPluginOptions(), pluginConfig)
 
 	// a plugin's types resolve only once the registry has loaded
 	err := reg.Load(nil)
@@ -209,7 +224,7 @@ func TestDecodeReturnsTypedPluginEntity(t *testing.T) {
 func TestDecodeReturnsTypedBuiltin(t *testing.T) {
 	reg := testRegisteredRegistry(t)
 
-	statePath := testApplyToStateFile(t, reg, registeredConfig)
+	statePath := testApplyToStateFile(t, testRegisteredOptions(), registeredConfig)
 
 	variableRecord := testSavedRecord(t, statePath, "variable.environment")
 
@@ -256,7 +271,7 @@ func TestDecodeReturnsTypedBuiltin(t *testing.T) {
 // A record naming a type nobody registered has to say which type that was, so
 // the caller can register it or its plugin rather than guess.
 func TestDecodeFailsForUnregisteredType(t *testing.T) {
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
 	record := []byte(`{"meta":{"id":"resource.widget.main","name":"main","type":"resource","subtype":"widget"}}`)
 
@@ -275,7 +290,7 @@ func TestDecodeFailsForUnregisteredType(t *testing.T) {
 // Bytes that are not JSON at all are not a record, and the failure has to be
 // the one a caller can match rather than whatever encoding/json returned.
 func TestDecodeFailsForInvalidJSON(t *testing.T) {
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
 	record := []byte("this is not json")
 
@@ -290,7 +305,7 @@ func TestDecodeFailsForInvalidJSON(t *testing.T) {
 // Valid JSON that carries no meta names no type and no entity, so it is not a
 // record either, and fails the same way as bytes that would not parse.
 func TestDecodeFailsForRecordWithoutMeta(t *testing.T) {
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
 	record := []byte(`{"location":"us-east","port":5432}`)
 
@@ -307,7 +322,7 @@ func TestDecodeFailsForRecordWithoutMeta(t *testing.T) {
 // fail, so an older state can still be destroyed. No apply writes the key any
 // more, so the record is hand written.
 func TestDecodeIgnoresLegacyParentsKey(t *testing.T) {
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
 	record := []byte(`{"meta":{"id":"variable.example","name":"example","type":"variable","parents":["x"]}}`)
 
@@ -325,13 +340,12 @@ const testSecretID = "resource.secret.db"
 
 // testSecretRegistry returns a registry holding registered.Secret, the
 // registered type whose password field is sensitive.
-func testSecretRegistry(t *testing.T) *registry.PluginRegistry {
+func testSecretRegistry(t *testing.T) *catalog.Catalog {
 	t.Helper()
 
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
-	err := reg.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
 
 	return reg
 }

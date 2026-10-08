@@ -7,35 +7,29 @@ import (
 
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
 
 // applyEncodeSensitiveConfig applies the given configuration text with a file
-// state store and returns the applied configuration, the registry and the
-// path the state was written to
-func applyEncodeSensitiveConfig(t *testing.T, text string) (*Config, *registry.PluginRegistry, string) {
+// state store and returns the applied configuration and the path the state was
+// written to
+func applyEncodeSensitiveConfig(t *testing.T, text string) (*Config, string) {
 	t.Helper()
 
 	t.Setenv("HOME", t.TempDir())
 
-	pr := registry.NewPluginRegistry()
-
-	err := pr.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
-	require.NoError(t, err)
-
-	err = pr.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
-
-	err = pr.RegisterPlugin(&parser.TestPlugin{})
-	require.NoError(t, err)
+	local := registry.NewLocal()
+	local.RegisterPlugin(&parser.TestPlugin{})
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	c, err := NewConfig(
-		WithPluginRegistry(pr),
+		WithType(&registered.Secret{}, "resource", registered.TypeSecret),
+		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
+		WithRegistry(local),
 		WithStateStore(store),
 	)
 	require.NoError(t, err)
@@ -47,7 +41,7 @@ func applyEncodeSensitiveConfig(t *testing.T, text string) (*Config, *registry.P
 	err = c.Apply(path)
 	require.NoError(t, err)
 
-	return c, pr, store.Path()
+	return c, store.Path()
 }
 
 const encodeSensitiveSecretConfig = `
@@ -66,7 +60,7 @@ resource "credential" "db" {
 `
 
 func TestEncodeEntityShowsSensitiveAsMarkerByDefault(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeSensitiveSecretConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeSensitiveSecretConfig)
 
 	secret := encodeEntityByID(t, c, "resource.secret.login")
 
@@ -81,7 +75,7 @@ func TestEncodeEntityShowsSensitiveAsMarkerByDefault(t *testing.T) {
 }
 
 func TestEncodeEntityRevealsSensitiveWhenAsked(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeSensitiveSecretConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeSensitiveSecretConfig)
 
 	secret := encodeEntityByID(t, c, "resource.secret.login")
 
@@ -95,11 +89,11 @@ func TestEncodeEntityRevealsSensitiveWhenAsked(t *testing.T) {
 }
 
 func TestEncodeSavedEntityShowsSensitiveAsMarkerByDefault(t *testing.T) {
-	_, reg, statePath := applyEncodeSensitiveConfig(t, encodeSensitiveSecretConfig)
+	c, statePath := applyEncodeSensitiveConfig(t, encodeSensitiveSecretConfig)
 
 	record := encodeSavedRecordByID(t, statePath, "resource.secret.login")
 
-	out, err := EncodeSavedEntity(reg, record)
+	out, err := c.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	text := string(out)
@@ -109,11 +103,11 @@ func TestEncodeSavedEntityShowsSensitiveAsMarkerByDefault(t *testing.T) {
 }
 
 func TestEncodeSavedEntityRevealsSensitiveFromStateWhenAsked(t *testing.T) {
-	_, reg, statePath := applyEncodeSensitiveConfig(t, encodeSensitiveSecretConfig)
+	c, statePath := applyEncodeSensitiveConfig(t, encodeSensitiveSecretConfig)
 
 	record := encodeSavedRecordByID(t, statePath, "resource.secret.login")
 
-	out, err := EncodeSavedEntity(reg, record, RevealSensitive())
+	out, err := c.EncodeSavedEntity(record, RevealSensitive())
 	require.NoError(t, err)
 
 	text := string(out)
@@ -123,7 +117,7 @@ func TestEncodeSavedEntityRevealsSensitiveFromStateWhenAsked(t *testing.T) {
 }
 
 func TestEncodeEntityShowsSensitiveNumberAsMarkerByDefault(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeSensitiveCredentialConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeSensitiveCredentialConfig)
 
 	credential := encodeEntityByID(t, c, "resource.credential.db")
 
@@ -138,7 +132,7 @@ func TestEncodeEntityShowsSensitiveNumberAsMarkerByDefault(t *testing.T) {
 }
 
 func TestEncodeEntityRevealsSensitiveNumberWhenAsked(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeSensitiveCredentialConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeSensitiveCredentialConfig)
 
 	credential := encodeEntityByID(t, c, "resource.credential.db")
 
@@ -153,7 +147,7 @@ func TestEncodeEntityRevealsSensitiveNumberWhenAsked(t *testing.T) {
 }
 
 func TestEncodeEntityWithoutSensitiveFieldsIsUnchangedByDefault(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, `
+	c, _ := applyEncodeSensitiveConfig(t, `
 resource "database" "main" {
   location = "us-east"
   port     = 5432
@@ -175,7 +169,7 @@ resource "database" "main" {
 }
 
 func TestEncodeEntityWithoutSensitiveFieldsIsUnchangedWhenRevealing(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, `
+	c, _ := applyEncodeSensitiveConfig(t, `
 resource "database" "main" {
   location = "us-east"
   port     = 5432

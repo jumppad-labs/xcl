@@ -10,7 +10,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/mock"
@@ -34,11 +34,10 @@ func setupConfig(t *testing.T) (*Config, *parser.TestPlugin, *statemocks.MockSta
 		os.Setenv("HOME", home)
 	})
 
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 
 	testPlugin := &parser.TestPlugin{}
-	err := pr.RegisterPlugin(testPlugin)
-	require.NoError(t, err)
+	local.RegisterPlugin(testPlugin)
 
 	ss := &statemocks.MockStateStore{}
 	ss.On("Exists").Return(false)
@@ -46,7 +45,7 @@ func setupConfig(t *testing.T) (*Config, *parser.TestPlugin, *statemocks.MockSta
 	ss.On("Save", mock.Anything).Return(nil)
 
 	c, err := NewConfig(
-		WithPluginRegistry(pr),
+		WithRegistry(local),
 		WithStateStore(ss),
 	)
 	require.NoError(t, err)
@@ -283,7 +282,7 @@ func TestApplySavesStateWhenProviderFails(t *testing.T) {
 	require.NotNil(t, savedRecords)
 
 	// a store is handed each entity's raw JSON record
-	saved, err := savedentity.DecodeAll(c.pluginRegistry, savedRecords, savedentity.ReadOptions{})
+	saved, err := savedentity.DecodeAll(c.catalog, savedRecords, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	consul, err := testutil.EntityByID(saved, "resource.container.consul")

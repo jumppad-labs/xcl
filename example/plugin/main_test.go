@@ -19,7 +19,6 @@ import (
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/resources"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/template"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
 // dockerPlugin is the path of the Docker plugin binary TestMain builds for the
@@ -78,7 +77,7 @@ func applyExampleWithState(t *testing.T, stateDir string) *xcl.Config {
 	requireDocker(t)
 	t.Setenv("HCL_VAR_output_dir", t.TempDir())
 
-	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
+	c, err := newConfig(nil, dockerPlugin, stateDir)
 	require.NoError(t, err)
 
 	// destroy what was applied even when applying fails part way
@@ -99,7 +98,7 @@ func applyExampleWithState(t *testing.T, stateDir string) *xcl.Config {
 func loadExample(t *testing.T, stateDir string) *xcl.Config {
 	t.Helper()
 
-	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
+	c, err := newConfig(nil, dockerPlugin, stateDir)
 	require.NoError(t, err)
 
 	err = load(c)
@@ -186,12 +185,13 @@ func TestApplyFailsForAMissingDockerPlugin(t *testing.T) {
 
 	missing := filepath.Join(t.TempDir(), "docker-plugin")
 
-	c, err := newConfig(registry.NewPluginRegistry(), nil, missing, t.TempDir())
+	c, err := newConfig(nil, missing, t.TempDir())
 	require.NoError(t, err)
 
 	err = apply(c, "./config")
 	require.Error(t, err)
 	require.ErrorIs(t, err, xcl.ErrPluginLoad)
+	require.Contains(t, err.Error(), "from registry local failed to load")
 	require.Contains(t, err.Error(), "build it with `make build` in example/plugin")
 }
 
@@ -330,7 +330,7 @@ func TestDestroyInALaterRunRemovesWhatApplySaved(t *testing.T) {
 	web, err := xcl.Find[resources.Container](applied, "docker.container.web")
 	require.NoError(t, err)
 
-	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
+	c, err := newConfig(nil, dockerPlugin, stateDir)
 	require.NoError(t, err)
 
 	err = destroy(c)
