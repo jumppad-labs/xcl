@@ -36,8 +36,9 @@ func setupQueryConfig(t *testing.T) *Config {
 	ss.On("Load").Return(nil, nil)
 	ss.On("Save", mock.Anything).Return(nil)
 
+	local.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+
 	c, err := NewConfig(
-		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
 		WithRegistry(local),
 		WithStateStore(ss),
 	)

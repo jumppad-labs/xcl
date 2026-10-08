@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/declaration"
 	"github.com/jumppad-labs/xcl/plugins"
 )
 
@@ -16,14 +17,15 @@ const LocalName = "local"
 // plugin directories for when no PluginPattern is given
 const DefaultPluginPattern = "xcl-plugin-*"
 
-// Local is a registry of plugins found on this machine: plugins compiled into
-// the program, plugin binaries named by path, and directories searched for
-// plugin binaries. Registering only records, nothing is started or searched
-// until a Config loads its plugins, and its plugins load in the order they
-// were registered.
+// Local is a registry of types and plugins found on this machine: plain Go
+// types, plugins compiled into the program, plugin binaries named by path, and
+// directories searched for plugin binaries. Registering only records, nothing
+// is started or searched until a Config loads its plugins, and its plugins
+// load in the order they were registered.
 type Local struct {
 	mu      sync.Mutex
 	pattern string
+	types   []Type
 	entries []localEntry
 }
 
@@ -51,6 +53,7 @@ func PluginPattern(pattern string) LocalOption {
 // NewLocal returns an empty local registry
 //
 //	local := registry.NewLocal()
+//	local.RegisterType(&resources.Deployment{}, "deployment")
 //	local.RegisterPlugin(&template.TemplatePlugin{})
 //	local.RegisterExternalPlugin("./bin/xcl-plugin-docker")
 //	local.RegisterPluginDirectory("~/.xcl/plugins")
@@ -67,6 +70,50 @@ func NewLocal(options ...LocalOption) *Local {
 // Name returns LocalName
 func (l *Local) Name() string {
 	return LocalName
+}
+
+// RegisterType declares prototype, a plain Go type, as a block type. name is
+// the block type and an optional subtype:
+//
+//	local.RegisterType(&Database{}, "database")             // database "main" {}
+//	local.RegisterType(&Database{}, "resource", "database") // resource "database" "main" {}
+//
+// prototype is a pointer to a struct that embeds types.ResourceBase. A
+// declared type has no provider, it is only decoded into.
+//
+// A declaration that is wrong on every run is a programmer error and panics
+// here, naming the type: an empty name, more than one subtype, an empty
+// subtype, or a prototype that is not a pointer to a struct embedding
+// types.ResourceBase. A declaration that clashes with another one, in this
+// registry or another, or with a builtin, is returned by xcl.NewConfig. A
+// plugin providing the same block type is reported when plugins load.
+func (l *Local) RegisterType(prototype any, name ...string) {
+	if err := declaration.Validate(prototype, name...); err != nil {
+		panic(fmt.Sprintf("xcl: registry %s: %s", LocalName, err))
+	}
+
+	declared := Type{Type: name[0], Prototype: prototype}
+	if len(name) == 2 {
+		declared.Subtype = name[1]
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.types = append(l.types, declared)
+}
+
+// Types returns the Go types declared with RegisterType, in the order they
+// were registered, or nil when none were
+func (l *Local) Types() []Type {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if len(l.types) == 0 {
+		return nil
+	}
+
+	return append([]Type{}, l.types...)
 }
 
 // RegisterPlugin registers p, a plugin compiled into the program. A nil p is

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,14 +26,15 @@ func bareFixturePath(t *testing.T) string {
 }
 
 // newDeclaredTypesConfig returns a Config that declares the cache and database
-// types with WithType and has no state
+// types on a local registry and has no state
 func newDeclaredTypesConfig(t *testing.T) *Config {
 	t.Helper()
 
-	c, err := NewConfig(
-		WithType(&registered.Cache{}, registered.TypeCache),
-		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
-	)
+	local := registry.NewLocal()
+	local.RegisterType(&registered.Cache{}, registered.TypeCache)
+	local.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+
+	c, err := NewConfig(WithRegistry(local))
 	require.NoError(t, err)
 
 	return c

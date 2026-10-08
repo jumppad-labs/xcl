@@ -60,8 +60,8 @@ addresses its diff reports.
 | `TestDiffOfFailedReplicaPredictsReplaceByApply` | a resource saved as failed is replaced |
 | `TestDiffOfChangedPasswordPredictsApply` | a changed sensitive value is an update, and what references a computed value of the updated databases is an update with that value unknown although the apply leaves it alone |
 | `TestDiffOfChangedPasswordReportsSensitivePasswordChange` | the change is marked sensitive and carries neither value |
-| `TestDiffOfKubeConfigurationReportsNothing` | declared types only (`xcl.WithType`): no resources, every count zero |
-| `TestApplyOfKubeConfigurationHandsNothingToAProvider` | declared types only (`xcl.WithType`): no provider call |
+| `TestDiffOfKubeConfigurationReportsNothing` | declared types only (`RegisterType` on a local registry): no resources, every count zero |
+| `TestApplyOfKubeConfigurationHandsNothingToAProvider` | declared types only (`RegisterType` on a local registry): no provider call |
 | `TestDiffOfUnappliedPluginConfigurationMarshalsNoPassword`, `TestDiffOfChangedPasswordMarshalsNoPassword` | no password in the diff's JSON |
 | `TestDiffOfUnappliedPluginConfigurationFormatsNoPasswordWithV`, `TestDiffOfChangedPasswordFormatsNoPasswordWithV` | no password in the diff formatted with `%v` |
 | `TestDiffOfUnappliedPluginConfigurationFormatsNoPasswordWithPlusV`, `TestDiffOfChangedPasswordFormatsNoPasswordWithPlusV` | no password in the diff formatted with `%+v` |

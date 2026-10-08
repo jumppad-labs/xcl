@@ -10,6 +10,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -59,18 +60,14 @@ func (r *recordingStore) Clear() error {
 	return nil
 }
 
-// withSecretTypes declares the Secret and SecretConsumer fixture types
+// withSecretTypes declares the Secret and SecretConsumer fixture types on a
+// local registry and returns the option adding it
 func withSecretTypes() ConfigOption {
-	secret := WithType(&registered.Secret{}, "resource", registered.TypeSecret)
-	consumer := WithType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer)
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
+	declared.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer)
 
-	return func(c *Config) error {
-		if err := secret(c); err != nil {
-			return err
-		}
-
-		return consumer(c)
-	}
+	return WithRegistry(declared)
 }
 
 func sensitiveBasicPath(t *testing.T) string {

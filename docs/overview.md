@@ -21,8 +21,8 @@ Parser            (internal/parser)
   each resource's provider
 
 Catalog           (internal/catalog)
-  built by NewConfig from the types declared with WithType and the
-  registries added with WithRegistry; loads the registries' plugins on
+  built by NewConfig from the registries added with WithRegistry,
+  reading the Go types each declares; loads the registries' plugins on
   the first operation, aggregates PluginHosts, answers "what Go type is
   resource X" and "what ProviderAdapter handles resource X"
 ```
@@ -32,17 +32,20 @@ user. `Parser` is constructed fresh, internally, on every
 `Apply`/`Validate`/`Destroy` call — it is not held onto between calls.
 The `Catalog` and the `StateStore` are the two pieces of long-lived state
 `Config` owns and passes into each new `Parser` via `ParserOptions`. The
-catalog is private; applications reach it only through `WithType` and
-`WithRegistry`. The public [`registry`](../registry) package defines where
-plugins come from: the `Registry` and `Plugin` interfaces, and the local
-registry, `registry.NewLocal()`.
+catalog is private; applications reach it only through `WithRegistry`. The
+public [`registry`](../registry) package defines where Go types and plugins
+come from: the `Registry` (`Name()`, `Types()`, `Plugins(ctx, emit)`), `Type`
+and `Plugin` types, and the local registry, `registry.NewLocal()`.
 
 ## Entry point
 
 ```go
+local := registry.NewLocal()
+local.RegisterType(&Server{}, "server")   // a plain Go type, no plugin
+local.RegisterPlugin(&MyPlugin{})         // an in-process plugin
+
 cfg, err := xcl.NewConfig(
-    xcl.WithType(&Server{}, "server"),    // a plain Go type, no plugin
-    xcl.WithRegistry(local),              // plugins, i.e. registry.NewLocal()
+    xcl.WithRegistry(local),              // Go types and plugins
     xcl.WithStateStore(stateStore),       // or xcl.WithStatePath("./.xcl"), or neither to persist nothing
     xcl.WithVariables(vars),
 )
@@ -56,10 +59,14 @@ err := cfg.Destroy()                   // destroys everything in the saved state
 ([`options.go`](../options.go)) onto a `Config` holding no entities yet. An
 option can fail, `WithStatePath` does when it cannot create the state
 directory, and the first failure is returned from `NewConfig`.
-`WithType` and `WithRegistry` return no error: a mistake in the code, such
-as an empty type name or a type declared twice, panics, and a plugin that
-fails to load (`*xcl.PluginLoadError`) or a block type provided twice
-(`*xcl.TypeNameClashError`) is returned by the first operation.
+Registration returns no error. A mistake in a single call, such as an empty
+type name or a nil registry, panics. Declared Go types that clash, the same
+block type declared twice in one registry or across two, or a builtin name,
+are a `*xcl.TypeNameClashError` returned by `NewConfig`, and a keyword used in
+both forms a `*xcl.TypeFormError`. A plugin that fails to load
+(`*xcl.PluginLoadError`) or a block type a plugin provides that something else
+already provides (`*xcl.TypeNameClashError`) is returned by the first
+operation.
 With no options, you get a config that parses and validates HCL but never
 touches a real provider or disk — useful for testing.
 

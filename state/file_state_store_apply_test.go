@@ -15,6 +15,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/internal/testutil"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -58,10 +59,13 @@ func testRegistry(t *testing.T) *catalog.Catalog {
 // testTypeOptions returns the options that declare the types appliedConfig
 // declares, so a Config resolves the same types testRegistry holds
 func testTypeOptions() []xcl.ConfigOption {
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	declared.RegisterType(&registered.App{}, "resource", registered.TypeApp)
+	declared.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
+
 	return []xcl.ConfigOption{
-		xcl.WithType(&registered.Database{}, "resource", registered.TypeDatabase),
-		xcl.WithType(&registered.App{}, "resource", registered.TypeApp),
-		xcl.WithType(&registered.Consumer{}, "resource", registered.TypeConsumer),
+		xcl.WithRegistry(declared),
 	}
 }
 

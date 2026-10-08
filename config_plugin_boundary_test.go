@@ -654,8 +654,11 @@ func TestExternalPluginRejectedForTypeClashWritesNothing(t *testing.T) {
 	binary := buildExamplePlugin(t)
 	t.Setenv("HOME", t.TempDir())
 
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Database{}, "resource", "person")
+
 	c, err := NewConfig(
-		WithType(&registered.Database{}, "resource", "person"),
+		WithRegistry(declared),
 		WithRegistry(externalPersonRegistry(binary)),
 	)
 	require.NoError(t, err)

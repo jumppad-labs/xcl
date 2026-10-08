@@ -262,7 +262,7 @@ entities in memory needs no decoding.
 
 **A type that is not registered fails the load.** When a saved record's type
 can't be created by the catalog (e.g. a plugin that's no longer loaded, or
-a type the `Config` was not given with `WithType`), decoding returns
+a type no registry given to the `Config` declares with `RegisterType`), decoding returns
 [`state.UnknownTypesError`](../state/errors.go) naming every such type,
 sorted and unique, instead of dropping the records — a state returned
 without them would be saved without them, erasing resources that still

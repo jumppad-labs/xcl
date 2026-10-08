@@ -185,6 +185,96 @@ func TestLocalRegisterNilPluginPanics(t *testing.T) {
 	})
 }
 
+// Gadget is a second plain Go resource type, declared alongside Thing
+type Gadget struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Colour string `xcl:"colour" json:"colour"`
+}
+
+func TestLocalTypesKeepRegistrationOrder(t *testing.T) {
+	local := NewLocal()
+	local.RegisterType(&Thing{}, "resource", "thing")
+	local.RegisterType(&Gadget{}, "gadget")
+	local.RegisterType(&Thing{}, "server", "big")
+
+	declared := local.Types()
+
+	require.Len(t, declared, 3)
+	require.Equal(t, Type{Type: "resource", Subtype: "thing", Prototype: &Thing{}}, declared[0])
+	require.Equal(t, Type{Type: "gadget", Prototype: &Gadget{}}, declared[1])
+	require.Equal(t, Type{Type: "server", Subtype: "big", Prototype: &Thing{}}, declared[2])
+}
+
+// A registry with no Go types returns nil, as the Registry interface asks
+func TestLocalTypesIsEmptyWithoutRegistrations(t *testing.T) {
+	local := NewLocal()
+	local.RegisterPlugin(&thingPlugin{})
+
+	require.Nil(t, local.Types())
+}
+
+// A clash between declarations is returned by NewConfig, which sees every
+// registry, so registering the same type twice only records it twice
+func TestLocalRegisterDuplicateTypeDoesNotPanic(t *testing.T) {
+	local := NewLocal()
+
+	require.NotPanics(t, func() {
+		local.RegisterType(&Thing{}, "resource", "thing")
+		local.RegisterType(&Gadget{}, "resource", "thing")
+	})
+
+	require.Len(t, local.Types(), 2)
+}
+
+func TestLocalRegisterTypePanicsOnEmptyName(t *testing.T) {
+	local := NewLocal()
+
+	require.PanicsWithValue(t, "xcl: registry local: an entity type must be named", func() {
+		local.RegisterType(&Thing{}, "")
+	})
+}
+
+func TestLocalRegisterTypePanicsOnMoreThanOneSubtype(t *testing.T) {
+	local := NewLocal()
+
+	require.PanicsWithValue(t, `xcl: registry local: type "server" takes at most one subtype, got 2`, func() {
+		local.RegisterType(&Thing{}, "server", "big", "small")
+	})
+}
+
+func TestLocalRegisterTypePanicsOnEmptySubtype(t *testing.T) {
+	local := NewLocal()
+
+	require.PanicsWithValue(t,
+		`xcl: registry local: type "server" was given an empty subtype, leave it out to register the type without one`,
+		func() {
+			local.RegisterType(&Thing{}, "server", "")
+		},
+	)
+}
+
+func TestLocalRegisterTypePanicsOnNonEntityType(t *testing.T) {
+	local := NewLocal()
+
+	require.PanicsWithValue(t,
+		`xcl: registry local: type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`,
+		func() {
+			local.RegisterType(Thing{}, "resource", "thing")
+		},
+	)
+}
+
+func TestLocalRegisterTypePanicRecordsNothing(t *testing.T) {
+	local := NewLocal()
+
+	require.Panics(t, func() {
+		local.RegisterType(&Thing{}, "")
+	})
+
+	require.Nil(t, local.Types())
+}
+
 func TestLocalRegisterMissingPathDoesNotFail(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "xcl-plugin-missing")
 

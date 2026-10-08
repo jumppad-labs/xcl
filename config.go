@@ -127,12 +127,15 @@ type (
 	NotUniqueError     = xclerrors.NotUniqueError
 	PluginLoadError    = xclerrors.PluginLoadError
 
-	// TypeNameClashError is returned when plugins load and a block type is
-	// provided twice, it names both providers and their registries
+	// TypeNameClashError is returned when a block type is provided twice, it
+	// names both providers and their registries. NewConfig returns it for two
+	// declared Go types or a declared type with a builtin name, and the first
+	// operation that loads plugins for a clash involving a plugin
 	TypeNameClashError = xclerrors.TypeNameClashError
 
-	// TypeFormError is returned when plugins load and a plugin's type uses a
-	// keyword in the other form from the one it already has
+	// TypeFormError is returned when a type uses a keyword in the other form
+	// from the one it already has: by NewConfig for a declared Go type, and
+	// when plugins load for a plugin's type
 	TypeFormError = xclerrors.TypeFormError
 
 	InvalidDecodeTargetError = xclerrors.InvalidDecodeTargetError
@@ -152,7 +155,6 @@ type (
 type Config struct {
 	entities        []any               // what the configuration declares (private)
 	catalog         *catalog.Catalog    // the Config's own block types and plugins, built by NewConfig
-	types           []typeDecl          // types declared with WithType, registered by NewConfig
 	registries      []registry.Registry // registries added with WithRegistry, in order
 	stateStore      state.StateStore    // Persistence for state
 	variables       map[string]any      // Variables for HCL parsing
@@ -195,12 +197,15 @@ func (c *Config) addressParser() *resources.AddressParser {
 // resource types and no state. The options are applied in order, and the
 // first one to fail stops NewConfig and its error is returned.
 //
-// Types and registries may be given in any order: NewConfig collects every
-// option first, then builds the Config's own catalog from the types declared
-// with WithType and the registries added with WithRegistry. A declared type
-// that duplicates another, or a builtin, or that uses its type keyword in
-// both forms, is a programmer error and panics. Plugins are not loaded here,
-// they load on the first operation that needs them.
+// Options may be given in any order: NewConfig collects every option first,
+// then builds the Config's own catalog from the registries added with
+// WithRegistry, reading each registry's Types in the order the registries
+// were given. A declared Go type that duplicates another, in one registry or
+// across two, is returned as a *TypeNameClashError naming both and their
+// registries, one with a builtin name as a *TypeNameClashError naming
+// "builtin", and one that uses its type keyword in both forms as a
+// *TypeFormError. Plugins are not loaded here, they load on the first
+// operation that needs them.
 func NewConfig(opts ...ConfigOption) (*Config, error) {
 	c := &Config{
 		entities:  []any{},
@@ -216,11 +221,13 @@ func NewConfig(opts ...ConfigOption) (*Config, error) {
 
 	c.catalog = catalog.New()
 
-	for _, declared := range c.types {
-		c.catalog.RegisterType(declared.prototype, declared.name...)
-	}
-
 	for _, r := range c.registries {
+		for _, declared := range r.Types() {
+			if err := c.catalog.DeclareType(declared, r.Name()); err != nil {
+				return nil, err
+			}
+		}
+
 		c.catalog.AddRegistry(r)
 	}
 

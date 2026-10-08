@@ -8,6 +8,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -30,9 +31,12 @@ func setupBareTypeConfig(t *testing.T) *Config {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Cache{}, registered.TypeCache)
+	declared.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+
 	c, err := NewConfig(
-		WithType(&registered.Cache{}, registered.TypeCache),
-		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
+		WithRegistry(declared),
 		WithStateStore(store),
 	)
 	require.NoError(t, err)

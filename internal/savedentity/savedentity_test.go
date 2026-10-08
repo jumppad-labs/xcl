@@ -58,10 +58,13 @@ func testRegisteredRegistry(t *testing.T) *catalog.Catalog {
 // testRegisteredOptions returns the Config options declaring the same types
 // testRegisteredRegistry holds, for the apply that writes the records
 func testRegisteredOptions() []xcl.ConfigOption {
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	declared.RegisterType(&registered.App{}, "resource", registered.TypeApp)
+	declared.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
+
 	return []xcl.ConfigOption{
-		xcl.WithType(&registered.Database{}, "resource", registered.TypeDatabase),
-		xcl.WithType(&registered.App{}, "resource", registered.TypeApp),
-		xcl.WithType(&registered.Consumer{}, "resource", registered.TypeConsumer),
+		xcl.WithRegistry(declared),
 	}
 }
 
@@ -89,9 +92,9 @@ func testPluginRegistry(t *testing.T) *catalog.Catalog {
 func testPluginOptions() []xcl.ConfigOption {
 	local := registry.NewLocal()
 	local.RegisterPlugin(&parser.TestPlugin{})
+	local.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 
 	return []xcl.ConfigOption{
-		xcl.WithType(&registered.Database{}, "resource", registered.TypeDatabase),
 		xcl.WithRegistry(local),
 	}
 }

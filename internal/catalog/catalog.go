@@ -15,6 +15,7 @@ import (
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/declaration"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -32,7 +33,7 @@ import (
 // operation and starts it again for the next. A catalog is safe for
 // concurrent use.
 type Catalog struct {
-	// mu guards typeInfo, hosts and registries
+	// mu guards typeInfo, declaredBy, hosts and registries
 	mu sync.RWMutex
 
 	// typeInfo is the single place the details of every non plugin type live,
@@ -41,6 +42,10 @@ type Catalog struct {
 	// here because they have no Go type; they are read from their host
 	typeInfo map[string]types.TypeInfo
 	hosts    []loadedHost
+
+	// declaredBy is the name of the registry each declared Go type came from,
+	// keyed by types.TypeKey, empty for a type registered without one
+	declaredBy map[string]string
 
 	// registries are the registries plugins are loaded from, in the order
 	// they were added
@@ -88,103 +93,79 @@ func New() *Catalog {
 	}
 
 	return &Catalog{
-		typeInfo: typeInfo,
+		typeInfo:   typeInfo,
+		declaredBy: map[string]string{},
 	}
 }
 
 // RegisterType registers a plain Go type as an entity type, without a plugin
-// or provider. Blocks of the type are decoded into new instances of the Go
-// type, take part in references and state, and never trigger a provider call.
-//
-// name is the entity's type followed by an optional subtype. The type is the
-// keyword its declarations lead with, and a subtype, when given, is the first
-// label:
+// or provider, declared by no registry. It is DeclareType for a caller that
+// has a prototype and a name rather than a registry.Type, such as a test:
 //
 //	c.RegisterType(&Server{}, "server")                 // server "web" {}
 //	c.RegisterType(&Server{}, "server", "big")          // server "big" "web" {}
 //	c.RegisterType(&Postgres{}, "resource", "postgres") // resource "postgres" "main" {}
 //
-// prototype must be a pointer to a struct that embeds types.ResourceBase. A
-// type keyword takes a subtype for every registration or for none, so an
-// address can be read by position; "resource" always takes one.
-//
-// Registration is a programmer's declaration, so a mistake panics, naming the
-// type: a missing or malformed name, a prototype of the wrong kind, a type and
-// subtype that a builtin or a registered type already provides, or a type
-// keyword in the other form from the one it already has. A type also provided
-// by a plugin is accepted here, and the clash is reported when plugins load.
-func (c *Catalog) RegisterType(prototype any, name ...string) {
-	if err := c.registerType(prototype, name...); err != nil {
-		panic(fmt.Sprintf("xcl: %s", err))
-	}
-}
-
-// registerType is RegisterType returning the problem instead of panicking
-// ValidateDeclaration checks the shape of a type declaration on its own,
-// without the catalog: the type must be named, take at most one subtype that
-// is not empty, and prototype must be a non-nil pointer to a struct that
-// embeds types.ResourceBase. The checks that need every declaration, such as
-// duplicates, are made when the type is registered.
-func ValidateDeclaration(prototype any, name ...string) error {
-	if len(name) == 0 || name[0] == "" {
-		return fmt.Errorf("an entity type must be named")
-	}
-
-	if len(name) > 2 {
-		return fmt.Errorf("type %q takes at most one subtype, got %d", name[0], len(name)-1)
-	}
-
-	entityType := name[0]
-
-	sub := ""
-	if len(name) == 2 {
-		sub = name[1]
-		if sub == "" {
-			return fmt.Errorf("type %q was given an empty subtype, leave it out to register the type without one", entityType)
-		}
-	}
-
-	key := types.TypeKey(entityType, sub)
-
-	value := reflect.ValueOf(prototype)
-	if prototype == nil || value.Kind() != reflect.Ptr || value.IsNil() || value.Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("type %q must be a pointer to a struct that embeds types.ResourceBase", key)
-	}
-
-	if _, err := types.GetMeta(prototype); err != nil {
-		return fmt.Errorf("type %q must be a pointer to a struct that embeds types.ResourceBase: %w", key, err)
-	}
-
-	return nil
-}
-
-func (c *Catalog) registerType(prototype any, name ...string) error {
-	if err := ValidateDeclaration(prototype, name...); err != nil {
+// name is the entity's type followed by an optional subtype. It returns the
+// same errors as DeclareType.
+func (c *Catalog) RegisterType(prototype any, name ...string) error {
+	if err := declaration.Validate(prototype, name...); err != nil {
 		return err
 	}
 
-	entityType := name[0]
-
-	sub := ""
+	declared := registry.Type{Type: name[0], Prototype: prototype}
 	if len(name) == 2 {
-		sub = name[1]
+		declared.Subtype = name[1]
 	}
 
-	key := types.TypeKey(entityType, sub)
+	return c.DeclareType(declared, "")
+}
+
+// DeclareType registers t, a plain Go type declared by the registry called
+// registryName, as an entity type, without a plugin or provider. Blocks of
+// the type are decoded into new instances of the Go type, take part in
+// references and state, and never trigger a provider call.
+//
+// The type is the keyword its declarations lead with, and a subtype, when
+// given, is the first label. t.Prototype must be a pointer to a struct that
+// embeds types.ResourceBase. A type keyword takes a subtype for every
+// registration or for none, so an address can be read by position;
+// "resource" always takes one.
+//
+// Nothing is registered when t does not fit with what the catalog already
+// holds, and the problem is returned instead: a malformed declaration, a
+// type and subtype that a builtin or another declared type already provides,
+// a *TypeNameClashError naming both and their registries, or a type keyword
+// in the other form from the one it already has, a *TypeFormError. A type
+// also provided by a plugin is accepted here, and the clash is reported when
+// plugins load.
+func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
+	name := []string{t.Type}
+	if t.Subtype != "" {
+		name = append(name, t.Subtype)
+	}
+
+	if err := declaration.Validate(t.Prototype, name...); err != nil {
+		return err
+	}
+
+	key := types.TypeKey(t.Type, t.Subtype)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if clash := c.checkDeclared(entityType, sub); clash != nil {
-		clash.Provider = describeGoType(prototype)
+	if clash := c.checkDeclared(t.Type, t.Subtype); clash != nil {
+		clash.Provider = describeGoType(t.Prototype)
+		clash.Registry = registryName
 		return clash
 	}
 
-	if err := c.checkForm(entityType, sub); err != nil {
+	if err := c.checkForm(t.Type, t.Subtype); err != nil {
 		return err
 	}
 
-	c.typeInfo[key] = types.TypeInfo{Type: entityType, Subtype: sub, Prototype: prototype}
+	c.typeInfo[key] = types.TypeInfo{Type: t.Type, Subtype: t.Subtype, Prototype: t.Prototype}
+	c.declaredBy[key] = registryName
 
 	return nil
 }
@@ -289,11 +270,11 @@ func (c *Catalog) Types() []types.TypeInfo {
 }
 
 // KnownType returns true when the type entityType with subtype is one this
-// catalog knows from any of its sources: a builtin, a type registered with
-// RegisterType, or one provided by a loaded plugin.
+// catalog knows from any of its sources: a builtin, a type declared with
+// DeclareType or RegisterType, or one provided by a loaded plugin.
 //
 // It is deliberately separate from IsRegisteredType, which answers the much
-// narrower question of whether a type came from RegisterType alone. The
+// narrower question of whether a type is a declared Go type. The
 // lifecycle depends on that narrow meaning to decide what reaches a provider,
 // so widening it would silently change provider routing.
 func (c *Catalog) KnownType(entityType, subtype string) bool {
@@ -302,8 +283,8 @@ func (c *Catalog) KnownType(entityType, subtype string) bool {
 }
 
 // IsRegisteredType returns true when the type entityType with subtype was
-// registered with RegisterType. Builtin and plugin types are not registered
-// types.
+// declared with DeclareType or RegisterType. Builtin and plugin types are not
+// registered types.
 func (c *Catalog) IsRegisteredType(entityType, subtype string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -341,9 +322,10 @@ func (c *Catalog) CreateEntity(entityType, subtype, name string) (any, error) {
 	return entity, nil
 }
 
-// checkDeclared returns a *TypeNameClashError, with Provider left for the
-// caller to fill in, when the type entityType with subtype is already
-// provided by a builtin or a registered type. mu must be held
+// checkDeclared returns a *TypeNameClashError, with Provider and Registry
+// left for the caller to fill in, when the type entityType with subtype is
+// already provided by a builtin or a declared type. A declared type is named
+// with the registry it came from. mu must be held
 func (c *Catalog) checkDeclared(entityType, subtype string) *xclerrors.TypeNameClashError {
 	key := types.TypeKey(entityType, subtype)
 
@@ -353,12 +335,15 @@ func (c *Catalog) checkDeclared(entityType, subtype string) *xclerrors.TypeNameC
 	}
 
 	if info, ok := c.typeInfo[key]; ok {
-		existing := describeGoType(info.Prototype)
 		if info.Builtin {
-			existing = "builtin"
+			return &xclerrors.TypeNameClashError{Name: key, Existing: "builtin"}
 		}
 
-		return &xclerrors.TypeNameClashError{Name: key, Existing: existing}
+		return &xclerrors.TypeNameClashError{
+			Name:             key,
+			Existing:         describeGoType(info.Prototype),
+			ExistingRegistry: c.declaredBy[key],
+		}
 	}
 
 	return nil

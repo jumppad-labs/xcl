@@ -236,9 +236,9 @@ func TestSharedRegistryStartsExternalPluginForEachConfig(t *testing.T) {
 func TestNewConfigAcceptsDeclaredTypeNamedLikeUnloadedPluginType(t *testing.T) {
 	local := registry.NewLocal()
 	local.RegisterPlugin(&parser.TestPlugin{})
+	local.RegisterType(&registered.Database{}, "resource", "network")
 
 	c, err := NewConfig(
-		WithType(&registered.Database{}, "resource", "network"),
 		WithRegistry(local),
 	)
 	require.NoError(t, err)
@@ -250,9 +250,9 @@ func TestFirstValidateFailsWithClashForPluginType(t *testing.T) {
 
 	local := registry.NewLocal()
 	local.RegisterPlugin(&parser.TestPlugin{})
+	local.RegisterType(&registered.Database{}, "resource", "network")
 
 	c, err := NewConfig(
-		WithType(&registered.Database{}, "resource", "network"),
 		WithRegistry(local),
 	)
 	require.NoError(t, err)
@@ -266,7 +266,7 @@ func TestFirstValidateFailsWithClashForPluginType(t *testing.T) {
 	require.Equal(t, "TestPlugin", clash.Provider)
 	require.Equal(t, "local", clash.Registry)
 	require.Equal(t, "type *registered.Database", clash.Existing)
-	require.Empty(t, clash.ExistingRegistry)
+	require.Equal(t, "local", clash.ExistingRegistry)
 }
 
 func TestValidateEmitsLoadEventsForRegisteredPlugin(t *testing.T) {

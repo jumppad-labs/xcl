@@ -276,11 +276,20 @@ func TestDuplicateTypeWithinRegistryFailsLoad(t *testing.T) {
 	require.Equal(t, "local", clash.ExistingRegistry)
 }
 
+// typesRegistry returns a registry called "types" that declares Database as
+// resource.person, the block type the person plugin provides
+func typesRegistry() registry.Registry {
+	local := registry.NewLocal()
+	local.RegisterType(&registered.Database{}, "resource", "person")
+
+	return namedRegistry{Registry: local, name: "types"}
+}
+
 func TestPluginTypeClashingWithDeclaredTypeFailsLoad(t *testing.T) {
 	isolateHome(t)
 
 	c, err := NewConfig(
-		WithType(&registered.Database{}, "resource", "person"),
+		WithRegistry(typesRegistry()),
 		WithRegistry(inProcessPersonRegistry()),
 	)
 	require.NoError(t, err)
@@ -296,15 +305,15 @@ func TestPluginTypeClashingWithDeclaredTypeFailsLoad(t *testing.T) {
 	require.Equal(t, inProcessPersonPluginName, clash.Provider)
 	require.Equal(t, "local", clash.Registry)
 	require.Equal(t, "type *registered.Database", clash.Existing)
-	require.Empty(t, clash.ExistingRegistry)
+	require.Equal(t, "types", clash.ExistingRegistry)
 }
 
-func TestPluginTypeClashingWithTypeDeclaredAfterRegistryFailsLoad(t *testing.T) {
+func TestPluginTypeClashingWithTypeDeclaredInALaterRegistryFailsLoad(t *testing.T) {
 	isolateHome(t)
 
 	c, err := NewConfig(
 		WithRegistry(inProcessPersonRegistry()),
-		WithType(&registered.Database{}, "resource", "person"),
+		WithRegistry(typesRegistry()),
 	)
 	require.NoError(t, err)
 
@@ -319,5 +328,5 @@ func TestPluginTypeClashingWithTypeDeclaredAfterRegistryFailsLoad(t *testing.T) 
 	require.Equal(t, inProcessPersonPluginName, clash.Provider)
 	require.Equal(t, "local", clash.Registry)
 	require.Equal(t, "type *registered.Database", clash.Existing)
-	require.Empty(t, clash.ExistingRegistry)
+	require.Equal(t, "types", clash.ExistingRegistry)
 }

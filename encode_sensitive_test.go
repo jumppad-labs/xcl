@@ -26,9 +26,10 @@ func applyEncodeSensitiveConfig(t *testing.T, text string) (*Config, string) {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
+	local.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
+	local.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+
 	c, err := NewConfig(
-		WithType(&registered.Secret{}, "resource", registered.TypeSecret),
-		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
 		WithRegistry(local),
 		WithStateStore(store),
 	)

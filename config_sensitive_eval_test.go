@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -20,9 +21,12 @@ func applySensitiveFixture(t *testing.T, name string) (*Config, error) {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
+	declared.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer)
+
 	c, err := NewConfig(
-		WithType(&registered.Secret{}, "resource", registered.TypeSecret),
-		WithType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer),
+		WithRegistry(declared),
 		WithStateStore(store),
 	)
 	require.NoError(t, err)

@@ -62,17 +62,17 @@ func applyEncodeFixture(t *testing.T) (*Config, string) {
 	return c, statePath
 }
 
-// encodeFixtureOptions returns the options declaring every type the encode fixture
-// uses: a type declared under resource, one declared without a subtype and a
-// registry holding the plugin that provides the network and container types.
-// Each call returns a new registry and plugin.
+// encodeFixtureOptions returns the options declaring every type the encode
+// fixture uses, on one local registry: a type declared under resource, one
+// declared without a subtype and the plugin that provides the network and
+// container types. Each call returns a new registry and plugin.
 func encodeFixtureOptions() []ConfigOption {
 	local := registry.NewLocal()
 	local.RegisterPlugin(&parser.TestPlugin{})
+	local.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	local.RegisterType(&registered.Cache{}, registered.TypeCache)
 
 	return []ConfigOption{
-		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
-		WithType(&registered.Cache{}, registered.TypeCache),
 		WithRegistry(local),
 	}
 }

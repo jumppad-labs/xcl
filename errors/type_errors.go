@@ -3,10 +3,11 @@ package errors
 import "fmt"
 
 // TypeNameClashError is returned when a block type, with its subtype where it
-// has one, is provided twice: by two plugins in one registry, by plugins in
-// two registries, or by a plugin and a type declared with WithType, or a
-// builtin. A plugin's clash is reported when plugins load, whatever order the
-// registrations were made in. There is no precedence between providers.
+// has one, is provided twice: by two declared Go types, in one registry or
+// across two, by a declared type and a builtin, by two plugins, or by a plugin
+// and a declared type. A clash between declared types is returned by
+// NewConfig. A plugin's clash is reported when plugins load, whatever order
+// the registrations were made in. There is no precedence between providers.
 type TypeNameClashError struct {
 	// Name is the clashing type, as its type and subtype joined by a dot, i.e.
 	// "resource.postgres", or its type alone when it has no subtype
@@ -16,7 +17,7 @@ type TypeNameClashError struct {
 	// "type <Go type>" for a declared type
 	Provider string
 
-	// Registry is the registry Provider came from, empty for a declared type
+	// Registry is the registry Provider came from
 	Registry string
 
 	// Existing is what already provides the name: "builtin", a plugin's name,
@@ -24,7 +25,7 @@ type TypeNameClashError struct {
 	Existing string
 
 	// ExistingRegistry is the registry Existing came from, empty for a
-	// builtin or a declared type
+	// builtin
 	ExistingRegistry string
 }
 

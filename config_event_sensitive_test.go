@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -24,9 +25,12 @@ func applySensitiveFixtureWithEventData(t *testing.T, level EventDataLevel) (*ev
 
 	recorder := &eventRecorder{}
 
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
+	declared.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer)
+
 	c, err := NewConfig(
-		WithType(&registered.Secret{}, "resource", registered.TypeSecret),
-		WithType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer),
+		WithRegistry(declared),
 		WithStateStore(store),
 		WithEventHandler(recorder.Record),
 		WithEventData(level),

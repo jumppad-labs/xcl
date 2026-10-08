@@ -28,16 +28,17 @@ const testPassword = "e2e-s3cret-password"
 // state with, fixed so every run encrypts the same way
 var testStateKey = []byte("0123456789abcdef0123456789abcdef")
 
-// kubeTypes returns the options that declare the block types the kube
+// newKubeRegistry returns a local registry declaring the block types the kube
 // configuration uses
-func kubeTypes() []xcl.ConfigOption {
-	return []xcl.ConfigOption{
-		xcl.WithType(&kube.ConfigMap{}, "config_map"),
-		xcl.WithType(&kube.Secret{}, "secret"),
-		xcl.WithType(&kube.Deployment{}, "deployment"),
-		xcl.WithType(&kube.Service{}, "service"),
-		xcl.WithType(&kube.Ingress{}, "ingress"),
-	}
+func newKubeRegistry() *registry.Local {
+	local := registry.NewLocal()
+	local.RegisterType(&kube.ConfigMap{}, "config_map")
+	local.RegisterType(&kube.Secret{}, "secret")
+	local.RegisterType(&kube.Deployment{}, "deployment")
+	local.RegisterType(&kube.Service{}, "service")
+	local.RegisterType(&kube.Ingress{}, "ingress")
+
+	return local
 }
 
 // newLocalRegistry returns a local registry holding the in-process plugin and
@@ -55,7 +56,7 @@ func newLocalRegistry() *registry.Local {
 func newKubeConfig(t testing.TB, handler xcl.EventHandler, stateDir string, stateKey []byte) *xcl.Config {
 	t.Helper()
 
-	return newConfig(t, handler, stateDir, stateKey, kubeTypes()...)
+	return newConfig(t, handler, stateDir, stateKey, xcl.WithRegistry(newKubeRegistry()))
 }
 
 // newPluginConfig returns a Config for the plugin configuration, with the

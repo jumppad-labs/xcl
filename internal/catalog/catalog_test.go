@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -205,7 +204,7 @@ func createThing(t *testing.T, c *Catalog) {
 func TestRegisterTypeSucceedsWithoutPlugins(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "resource", "thing"))
 
 	require.True(t, c.IsRegisteredType("resource", "thing"))
 	require.Empty(t, c.GetPluginHosts())
@@ -214,7 +213,7 @@ func TestRegisterTypeSucceedsWithoutPlugins(t *testing.T) {
 func TestCreateResourceReturnsRegisteredGoType(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "resource", "thing"))
 
 	resource, err := c.CreateEntity("resource", "thing", "my_thing")
 	require.NoError(t, err)
@@ -226,23 +225,53 @@ func TestCreateResourceReturnsRegisteredGoType(t *testing.T) {
 	require.Equal(t, "thing", thing.Meta.Subtype)
 }
 
-func TestRegisterTypePanicsForDuplicateName(t *testing.T) {
+// A declared type that clashes is returned, not panicked, because a clash
+// between registries comes from how they are combined, not from one bad line
+
+func TestDeclareTypeFailsForDuplicateNameInOneRegistry(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	err := c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &Thing{}}, "local")
+	require.NoError(t, err)
 
-	require.PanicsWithValue(t,
-		`xcl: type "resource.thing" is provided by both type *catalog.Thing and type *catalog.Gadget`,
-		func() { c.RegisterType(&Gadget{}, "resource", "thing") },
-	)
+	err = c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &Gadget{}}, "local")
+	require.EqualError(t, err,
+		`type "resource.thing" is provided by both type *catalog.Thing (registry local) and type *catalog.Gadget (registry local)`)
+
+	var clash *xclerrors.TypeNameClashError
+	require.True(t, errors.As(err, &clash))
+	require.Equal(t, "resource.thing", clash.Name)
+	require.Equal(t, "type *catalog.Gadget", clash.Provider)
+	require.Equal(t, "local", clash.Registry)
+	require.Equal(t, "type *catalog.Thing", clash.Existing)
+	require.Equal(t, "local", clash.ExistingRegistry)
 }
 
-func TestRegisterTypePanicForDuplicateNameKeepsTheFirstType(t *testing.T) {
+func TestDeclareTypeFailsForDuplicateNameAcrossRegistries(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	err := c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &Thing{}}, "first")
+	require.NoError(t, err)
 
-	require.Panics(t, func() { c.RegisterType(&Gadget{}, "resource", "thing") })
+	err = c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &Gadget{}}, "second")
+
+	var clash *xclerrors.TypeNameClashError
+	require.True(t, errors.As(err, &clash))
+	require.Equal(t, "resource.thing", clash.Name)
+	require.Equal(t, "type *catalog.Gadget", clash.Provider)
+	require.Equal(t, "second", clash.Registry)
+	require.Equal(t, "type *catalog.Thing", clash.Existing)
+	require.Equal(t, "first", clash.ExistingRegistry)
+}
+
+func TestDeclareTypeFailureForDuplicateNameKeepsTheFirstType(t *testing.T) {
+	c := New()
+
+	err := c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &Thing{}}, "local")
+	require.NoError(t, err)
+
+	err = c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &Gadget{}}, "local")
+	require.Error(t, err)
 
 	resource, err := c.CreateEntity("resource", "thing", "my_thing")
 	require.NoError(t, err)
@@ -252,54 +281,74 @@ func TestRegisterTypePanicForDuplicateNameKeepsTheFirstType(t *testing.T) {
 	require.Equal(t, "my_thing", thing.Meta.Name)
 }
 
-func TestRegisterTypePanicsForBuiltinNameVariable(t *testing.T) {
+func TestDeclareTypeFailsForBuiltinNameVariable(t *testing.T) {
 	c := New()
 
-	require.PanicsWithValue(t,
-		`xcl: type "variable" is provided by both builtin and type *catalog.Thing`,
-		func() { c.RegisterType(&Thing{}, "variable") },
-	)
+	err := c.DeclareType(registry.Type{Type: "variable", Prototype: &Thing{}}, "local")
+
+	var clash *xclerrors.TypeNameClashError
+	require.True(t, errors.As(err, &clash))
+	require.Equal(t, "variable", clash.Name)
+	require.Equal(t, "type *catalog.Thing", clash.Provider)
+	require.Equal(t, "local", clash.Registry)
+	require.Equal(t, "builtin", clash.Existing)
+	require.Empty(t, clash.ExistingRegistry)
 
 	require.False(t, c.IsRegisteredType("variable", ""))
 }
 
-func TestRegisterTypePanicsForBuiltinNameOutput(t *testing.T) {
+func TestDeclareTypeFailsForBuiltinNameOutput(t *testing.T) {
 	c := New()
 
-	require.PanicsWithValue(t,
-		`xcl: type "output" is provided by both builtin and type *catalog.Thing`,
-		func() { c.RegisterType(&Thing{}, "output") },
-	)
+	err := c.DeclareType(registry.Type{Type: "output", Prototype: &Thing{}}, "local")
+	require.EqualError(t, err, `type "output" is provided by both builtin and type *catalog.Thing (registry local)`)
 
 	require.False(t, c.IsRegisteredType("output", ""))
 }
 
-func TestRegisterTypePanicsForBuiltinNameModule(t *testing.T) {
+func TestDeclareTypeFailsForBuiltinNameModule(t *testing.T) {
 	c := New()
 
-	require.PanicsWithValue(t,
-		`xcl: type "module" is provided by both builtin and type *catalog.Thing`,
-		func() { c.RegisterType(&Thing{}, "module") },
-	)
+	err := c.DeclareType(registry.Type{Type: "module", Prototype: &Thing{}}, "local")
+	require.EqualError(t, err, `type "module" is provided by both builtin and type *catalog.Thing (registry local)`)
 
 	require.False(t, c.IsRegisteredType("module", ""))
 }
 
-func TestRegisterTypePanicsForBuiltinNameRoot(t *testing.T) {
+func TestDeclareTypeFailsForBuiltinNameRoot(t *testing.T) {
 	c := New()
 
-	require.PanicsWithValue(t,
-		`xcl: type "root" is provided by both builtin and type *catalog.Thing`,
-		func() { c.RegisterType(&Thing{}, "root") },
-	)
+	err := c.DeclareType(registry.Type{Type: "root", Prototype: &Thing{}}, "local")
+	require.EqualError(t, err, `type "root" is provided by both builtin and type *catalog.Thing (registry local)`)
 
 	require.False(t, c.IsRegisteredType("root", ""))
+}
+
+func TestDeclareTypeFailsForABuiltinTypeWithASubtype(t *testing.T) {
+	c := New()
+
+	err := c.DeclareType(registry.Type{Type: "variable", Subtype: "big", Prototype: &Thing{}}, "local")
+
+	var clash *xclerrors.TypeNameClashError
+	require.True(t, errors.As(err, &clash))
+	require.Equal(t, "variable.big", clash.Name)
+	require.Equal(t, "builtin", clash.Existing)
+}
+
+func TestRegisterTypeReturnsAClashWithoutARegistry(t *testing.T) {
+	c := New()
+
+	err := c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, err)
+
+	err = c.RegisterType(&Gadget{}, "resource", "thing")
+	require.EqualError(t, err, `type "resource.thing" is provided by both type *catalog.Thing and type *catalog.Gadget`)
 }
 
 func TestRegisterTypeAcceptsComputedField(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&ComputedThing{}, "resource", "computed_thing")
+	require.NoError(t, c.RegisterType(&ComputedThing{}, "resource", "computed_thing"))
 
 	resource, err := c.CreateEntity("resource", "computed_thing", "my_thing")
 	require.NoError(t, err)
@@ -311,68 +360,39 @@ func TestRegisterTypeAcceptsComputedField(t *testing.T) {
 	require.Equal(t, "computed_thing", thing.Meta.Subtype)
 }
 
-func TestRegisterTypePanicsForNonPointer(t *testing.T) {
+// The shape of a declaration is checked by the declaration package, whose
+// tests cover each case. A registry other than the local one may hand the
+// catalog a malformed type, so it is returned rather than registered.
+
+func TestDeclareTypeFailsForAMalformedDeclaration(t *testing.T) {
 	c := New()
 
-	require.PanicsWithValue(t,
-		`xcl: type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`,
-		func() { c.RegisterType(Thing{}, "resource", "thing") },
-	)
+	err := c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &NotAResource{}}, "custom")
+	require.ErrorContains(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
 
 	require.False(t, c.IsRegisteredType("resource", "thing"))
 }
 
-func TestRegisterTypePanicsForNil(t *testing.T) {
+func TestDeclareTypeFailsForAnUnnamedDeclaration(t *testing.T) {
 	c := New()
 
-	require.PanicsWithValue(t,
-		`xcl: type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`,
-		func() { c.RegisterType(nil, "resource", "thing") },
-	)
-
-	require.False(t, c.IsRegisteredType("resource", "thing"))
+	err := c.DeclareType(registry.Type{Prototype: &Thing{}}, "custom")
+	require.EqualError(t, err, "an entity type must be named")
 }
 
-func TestRegisterTypePanicsForNilPointer(t *testing.T) {
+func TestRegisterTypeFailsForMoreThanOneSubtype(t *testing.T) {
 	c := New()
 
-	var thing *Thing
+	err := c.RegisterType(&Thing{}, "server", "big", "small")
+	require.EqualError(t, err, `type "server" takes at most one subtype, got 2`)
 
-	require.PanicsWithValue(t,
-		`xcl: type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`,
-		func() { c.RegisterType(thing, "resource", "thing") },
-	)
-
-	require.False(t, c.IsRegisteredType("resource", "thing"))
-}
-
-func TestRegisterTypePanicsForPointerToNonStruct(t *testing.T) {
-	c := New()
-
-	size := 1
-
-	require.PanicsWithValue(t,
-		`xcl: type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`,
-		func() { c.RegisterType(&size, "resource", "thing") },
-	)
-
-	require.False(t, c.IsRegisteredType("resource", "thing"))
-}
-
-func TestRegisterTypePanicsForTypeWithoutResourceBase(t *testing.T) {
-	c := New()
-
-	value := recoverPanic(func() { c.RegisterType(&NotAResource{}, "resource", "thing") })
-	require.NotNil(t, value)
-	require.Contains(t, fmt.Sprint(value), `xcl: type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
-
-	require.False(t, c.IsRegisteredType("resource", "thing"))
+	require.False(t, c.KnownType("server", "big"))
 }
 
 func TestIsRegisteredTypeReportsRegisteredTypes(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "resource", "thing"))
 
 	require.True(t, c.IsRegisteredType("resource", "thing"))
 }
@@ -406,7 +426,7 @@ func TestIsRegisteredTypeIgnoresPluginTypes(t *testing.T) {
 func TestRegisterTypeWithoutASubtypeRecordsTheTypeAlone(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "thing"))
 
 	info, ok := c.Type("thing", "")
 	require.True(t, ok)
@@ -417,7 +437,7 @@ func TestRegisterTypeWithoutASubtypeRecordsTheTypeAlone(t *testing.T) {
 func TestRegisterTypeWithASubtypeRecordsBoth(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, c.RegisterType(&Thing{}, "server", "big"))
 
 	info, ok := c.Type("server", "big")
 	require.True(t, ok)
@@ -428,7 +448,7 @@ func TestRegisterTypeWithASubtypeRecordsBoth(t *testing.T) {
 func TestCreateEntityWithoutASubtypeMakesTheTypeItsOwn(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "thing"))
 
 	entity, err := c.CreateEntity("thing", "", "my_thing")
 	require.NoError(t, err)
@@ -443,7 +463,7 @@ func TestCreateEntityWithoutASubtypeMakesTheTypeItsOwn(t *testing.T) {
 func TestCreateEntityWithASubtypeOfAnyTypeSetsBoth(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, c.RegisterType(&Thing{}, "server", "big"))
 
 	entity, err := c.CreateEntity("server", "big", "web")
 	require.NoError(t, err)
@@ -458,7 +478,7 @@ func TestCreateEntityWithASubtypeOfAnyTypeSetsBoth(t *testing.T) {
 func TestCreateEntityUnderTheResourceTypeSetsBoth(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "resource", "thing"))
 
 	entity, err := c.CreateEntity("resource", "thing", "my_thing")
 	require.NoError(t, err)
@@ -472,7 +492,7 @@ func TestCreateEntityUnderTheResourceTypeSetsBoth(t *testing.T) {
 func TestCreateEntityFailsForATypeRegisteredWithADifferentSubtype(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, c.RegisterType(&Thing{}, "server", "big"))
 
 	_, err := c.CreateEntity("server", "small", "web")
 	require.ErrorContains(t, err, "server.small")
@@ -481,115 +501,78 @@ func TestCreateEntityFailsForATypeRegisteredWithADifferentSubtype(t *testing.T) 
 func TestRegisterTypeAcceptsSeveralSubtypesOfOneType(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "server", "big")
-	c.RegisterType(&Gadget{}, "server", "small")
+	require.NoError(t, c.RegisterType(&Thing{}, "server", "big"))
+	require.NoError(t, c.RegisterType(&Gadget{}, "server", "small"))
 
 	require.True(t, c.IsRegisteredType("server", "big"))
 	require.True(t, c.IsRegisteredType("server", "small"))
 }
 
-func TestRegisterTypePanicsForTheSameSubtypeTwice(t *testing.T) {
+func TestDeclareTypeFailsForTheSameSubtypeTwice(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "server", "big")
+	err := c.DeclareType(registry.Type{Type: "server", Subtype: "big", Prototype: &Thing{}}, "local")
+	require.NoError(t, err)
 
-	require.PanicsWithValue(t,
-		`xcl: type "server.big" is provided by both type *catalog.Thing and type *catalog.Gadget`,
-		func() { c.RegisterType(&Gadget{}, "server", "big") },
-	)
+	err = c.DeclareType(registry.Type{Type: "server", Subtype: "big", Prototype: &Gadget{}}, "local")
+	require.EqualError(t, err,
+		`type "server.big" is provided by both type *catalog.Thing (registry local) and type *catalog.Gadget (registry local)`)
 }
 
 // A type keyword takes a subtype for every registration or for none, so an
 // address such as server.big.web can always be read by position.
 
-func TestRegisterTypePanicsForASubtypeForATypeRegisteredWithoutOne(t *testing.T) {
+func TestDeclareTypeFailsForASubtypeForATypeDeclaredWithoutOne(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "server")
+	err := c.DeclareType(registry.Type{Type: "server", Prototype: &Thing{}}, "local")
+	require.NoError(t, err)
 
-	require.PanicsWithValue(t,
-		`xcl: type "server" is declared without a subtype, i.e. 'server "<name>" {}', so it can not be registered with one`,
-		func() { c.RegisterType(&Gadget{}, "server", "big") },
-	)
+	err = c.DeclareType(registry.Type{Type: "server", Subtype: "big", Prototype: &Gadget{}}, "local")
+	require.EqualError(t, err,
+		`type "server" is declared without a subtype, i.e. 'server "<name>" {}', so it can not be registered with one`)
+
+	var form *xclerrors.TypeFormError
+	require.True(t, errors.As(err, &form))
+	require.Equal(t, "server", form.Type)
+	require.False(t, form.TakesSubtype)
 
 	require.False(t, c.IsRegisteredType("server", "big"))
 }
 
-func TestRegisterTypePanicsForNoSubtypeForATypeRegisteredWithOne(t *testing.T) {
+func TestDeclareTypeFailsForNoSubtypeForATypeDeclaredWithOne(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "server", "big")
+	err := c.DeclareType(registry.Type{Type: "server", Subtype: "big", Prototype: &Thing{}}, "local")
+	require.NoError(t, err)
 
-	require.PanicsWithValue(t,
-		`xcl: type "server" takes a subtype, i.e. 'server "<subtype>" "<name>" {}', so it must be registered with one`,
-		func() { c.RegisterType(&Gadget{}, "server") },
-	)
+	err = c.DeclareType(registry.Type{Type: "server", Prototype: &Gadget{}}, "local")
+	require.EqualError(t, err,
+		`type "server" takes a subtype, i.e. 'server "<subtype>" "<name>" {}', so it must be registered with one`)
+
+	var form *xclerrors.TypeFormError
+	require.True(t, errors.As(err, &form))
+	require.Equal(t, "server", form.Type)
+	require.True(t, form.TakesSubtype)
 
 	require.False(t, c.IsRegisteredType("server", ""))
 }
 
-func TestRegisterTypePanicsForTheResourceTypeWithoutASubtype(t *testing.T) {
+func TestDeclareTypeFailsForTheResourceTypeWithoutASubtype(t *testing.T) {
 	c := New()
 
-	require.PanicsWithValue(t,
-		`xcl: type "resource" takes a subtype, i.e. 'resource "<subtype>" "<name>" {}', so it must be registered with one`,
-		func() { c.RegisterType(&Thing{}, "resource") },
-	)
-}
+	err := c.DeclareType(registry.Type{Type: "resource", Prototype: &Thing{}}, "local")
 
-func TestRegisterTypePanicsForABuiltinTypeWithASubtype(t *testing.T) {
-	c := New()
-
-	require.PanicsWithValue(t,
-		`xcl: type "variable.big" is provided by both builtin and type *catalog.Thing`,
-		func() { c.RegisterType(&Thing{}, "variable", "big") },
-	)
-}
-
-func TestRegisterTypePanicsForMoreThanOneSubtype(t *testing.T) {
-	c := New()
-
-	require.PanicsWithValue(t,
-		`xcl: type "server" takes at most one subtype, got 2`,
-		func() { c.RegisterType(&Thing{}, "server", "big", "small") },
-	)
-
-	require.False(t, c.KnownType("server", "big"))
-}
-
-func TestRegisterTypePanicsForAnEmptySubtype(t *testing.T) {
-	c := New()
-
-	require.PanicsWithValue(t,
-		`xcl: type "server" was given an empty subtype, leave it out to register the type without one`,
-		func() { c.RegisterType(&Thing{}, "server", "") },
-	)
-
-	require.False(t, c.KnownType("server", ""))
-}
-
-func TestRegisterTypePanicsForNoName(t *testing.T) {
-	c := New()
-
-	require.PanicsWithValue(t,
-		"xcl: an entity type must be named",
-		func() { c.RegisterType(&Thing{}) },
-	)
-}
-
-func TestRegisterTypePanicsForAnEmptyType(t *testing.T) {
-	c := New()
-
-	require.PanicsWithValue(t,
-		"xcl: an entity type must be named",
-		func() { c.RegisterType(&Thing{}, "") },
-	)
+	var form *xclerrors.TypeFormError
+	require.True(t, errors.As(err, &form))
+	require.Equal(t, "resource", form.Type)
+	require.True(t, form.TakesSubtype)
 }
 
 func TestTakesSubtypeReportsTheFormOfARegisteredTypeWithASubtype(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, c.RegisterType(&Thing{}, "server", "big"))
 
 	takes, known := c.TakesSubtype("server")
 	require.True(t, known)
@@ -599,7 +582,7 @@ func TestTakesSubtypeReportsTheFormOfARegisteredTypeWithASubtype(t *testing.T) {
 func TestTakesSubtypeReportsTheFormOfARegisteredTypeWithoutASubtype(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Gadget{}, "cache")
+	require.NoError(t, c.RegisterType(&Gadget{}, "cache"))
 
 	takes, known := c.TakesSubtype("cache")
 	require.True(t, known)
@@ -623,7 +606,7 @@ func TestTakesSubtypeIgnoresAnUnknownType(t *testing.T) {
 
 // KnownType answers for every source the catalog draws on, which is what the
 // parser asks before accepting a leading keyword. IsRegisteredType stays the
-// narrow question of whether RegisterType alone provided a name, because the
+// narrow question of whether a declared Go type provided a name, because the
 // lifecycle reads it to decide what never reaches a provider.
 
 func TestKnownTypeReportsABuiltin(t *testing.T) {
@@ -635,7 +618,7 @@ func TestKnownTypeReportsABuiltin(t *testing.T) {
 func TestKnownTypeReportsARegisteredType(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "resource", "thing"))
 
 	require.True(t, c.KnownType("resource", "thing"))
 }
@@ -643,7 +626,7 @@ func TestKnownTypeReportsARegisteredType(t *testing.T) {
 func TestKnownTypeReportsARegisteredTypeWithoutASubtype(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "thing"))
 
 	require.True(t, c.KnownType("thing", ""))
 }
@@ -671,31 +654,13 @@ func TestKnownTypeIgnoresAnUnknownName(t *testing.T) {
 	require.False(t, c.KnownType("nosuchtype", ""))
 }
 
-func TestRegisterTypeClashingWithBuiltinPanicsImmediately(t *testing.T) {
-	c := New()
-
-	require.Panics(t, func() { c.RegisterType(&Thing{}, "output") })
-
-	require.False(t, c.Loaded())
-}
-
-func TestRegisterTypeClashingWithRegisteredTypePanicsImmediately(t *testing.T) {
-	c := New()
-
-	c.RegisterType(&Thing{}, "resource", "thing")
-
-	require.Panics(t, func() { c.RegisterType(&Gadget{}, "resource", "thing") })
-
-	require.False(t, c.Loaded())
-}
-
 // thing and resource.thing are different types, one declared thing "x" {} and
 // the other resource "thing" "x" {}, so registering both is not a clash
 func TestRegisterTypeAcceptsATypeNamedLikeAResourceSubtype(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "thing")
-	c.RegisterType(&Gadget{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "thing"))
+	require.NoError(t, c.RegisterType(&Gadget{}, "resource", "thing"))
 
 	require.True(t, c.IsRegisteredType("thing", ""))
 	require.True(t, c.IsRegisteredType("resource", "thing"))
@@ -705,7 +670,7 @@ func TestRegisterTypeMatchingPluginTypeSucceedsBeforeLoad(t *testing.T) {
 	c := New()
 	c.AddRegistry(localWith(&thingPlugin{}))
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "resource", "thing"))
 
 	require.True(t, c.IsRegisteredType("resource", "thing"))
 }
@@ -734,10 +699,11 @@ func TestAddRegistryWithMissingPluginPathDoesNotLoad(t *testing.T) {
 func TestLoadFailsForPluginTypeClashingWithDeclaredType(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	err := c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &Thing{}}, "types")
+	require.NoError(t, err)
 	c.AddRegistry(localWith(&thingPlugin{}))
 
-	err := c.Load(nil)
+	err = c.Load(nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, `"resource.thing"`)
 
@@ -747,13 +713,13 @@ func TestLoadFailsForPluginTypeClashingWithDeclaredType(t *testing.T) {
 	require.Equal(t, "thingPlugin", clash.Provider)
 	require.Equal(t, registry.LocalName, clash.Registry)
 	require.Equal(t, "type *catalog.Thing", clash.Existing)
-	require.Empty(t, clash.ExistingRegistry)
+	require.Equal(t, "types", clash.ExistingRegistry)
 }
 
 func TestLoadFailsForPluginClashingWithEarlierRegisteredTypeLeavingNoHost(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "resource", "thing"))
 	c.AddRegistry(localWith(&thingPlugin{}))
 
 	err := c.Load(nil)
@@ -767,15 +733,17 @@ func TestLoadFailsWithClashForTypeRegisteredAfterRegistryAdded(t *testing.T) {
 	c := New()
 
 	c.AddRegistry(localWith(&thingPlugin{}))
-	c.RegisterType(&Thing{}, "resource", "thing")
+	err := c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &Thing{}}, "types")
+	require.NoError(t, err)
 
-	err := c.Load(nil)
+	err = c.Load(nil)
 	require.Error(t, err)
 
 	var clash *xclerrors.TypeNameClashError
 	require.True(t, errors.As(err, &clash))
 	require.Equal(t, "resource.thing", clash.Name)
 	require.Equal(t, "type *catalog.Thing", clash.Existing)
+	require.Equal(t, "types", clash.ExistingRegistry)
 
 	require.Empty(t, c.GetPluginHosts())
 }
@@ -783,7 +751,7 @@ func TestLoadFailsWithClashForTypeRegisteredAfterRegistryAdded(t *testing.T) {
 func TestLoadFailsForPluginTypeInTheOtherFormOfADeclaredType(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Gadget{}, "server")
+	require.NoError(t, c.RegisterType(&Gadget{}, "server"))
 	c.AddRegistry(localWith(&bigServerPlugin{}))
 
 	err := c.Load(nil)
@@ -852,7 +820,7 @@ func TestLoadFailsForPluginReportingSameTypeTwice(t *testing.T) {
 func TestLoadAcceptsPluginWithUniqueTypes(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Gadget{}, "resource", "gadget")
+	require.NoError(t, c.RegisterType(&Gadget{}, "resource", "gadget"))
 	c.AddRegistry(localWith(&thingPlugin{}))
 
 	err := c.Load(nil)

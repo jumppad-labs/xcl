@@ -15,7 +15,7 @@ import (
 func TestTypePathReturnsTheResourcePathForAResourceRegistration(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "resource", "thing"))
 
 	path, ok := c.TypePath(reflect.TypeFor[Thing]())
 	require.True(t, ok)
@@ -25,7 +25,7 @@ func TestTypePathReturnsTheResourcePathForAResourceRegistration(t *testing.T) {
 func TestTypePathReturnsTheTypePathForARegistrationWithoutASubtype(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "thing"))
 
 	path, ok := c.TypePath(reflect.TypeFor[Thing]())
 	require.True(t, ok)
@@ -35,7 +35,7 @@ func TestTypePathReturnsTheTypePathForARegistrationWithoutASubtype(t *testing.T)
 func TestTypePathReturnsTheTypeAndSubtypeOfAnyType(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "server", "big")
+	require.NoError(t, c.RegisterType(&Thing{}, "server", "big"))
 
 	path, ok := c.TypePath(reflect.TypeFor[Thing]())
 	require.True(t, ok)
@@ -53,7 +53,7 @@ func TestTypePathReturnsTheBuiltinPathForABuiltinType(t *testing.T) {
 func TestTypePathResolvesAPointerAndANonPointerAlike(t *testing.T) {
 	c := New()
 
-	c.RegisterType(&Thing{}, "resource", "thing")
+	require.NoError(t, c.RegisterType(&Thing{}, "resource", "thing"))
 
 	value, valueOK := c.TypePath(reflect.TypeFor[Thing]())
 	require.True(t, valueOK)

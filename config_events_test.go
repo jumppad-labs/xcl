@@ -63,8 +63,9 @@ func applyQueryFixtureWithEventData(t *testing.T, level EventDataLevel) *eventRe
 
 	recorder := &eventRecorder{}
 
+	local.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+
 	c, err := NewConfig(
-		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
 		WithRegistry(local),
 		WithEventHandler(recorder.Record),
 		WithEventData(level),
@@ -144,8 +145,9 @@ func TestValidateCallsEventHandlerWhenResourceIsParsed(t *testing.T) {
 
 	recorder := &eventRecorder{}
 
+	local.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+
 	c, err := NewConfig(
-		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
 		WithRegistry(local),
 		WithEventHandler(recorder.Record),
 	)

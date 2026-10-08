@@ -209,16 +209,16 @@ func TestHandlerWritesOneLinePerEvent(t *testing.T) {
 }
 
 // encodeFixtureOptions returns the options declaring every type the encode
-// fixture uses: a type declared under resource, one declared without a subtype
-// and a local registry holding the plugin that provides the network and
+// fixture uses: a local registry declaring a type under resource and one
+// without a subtype, and holding the plugin that provides the network and
 // container types
 func encodeFixtureOptions() []xcl.ConfigOption {
 	local := registry.NewLocal()
+	local.RegisterType(&Database{}, "resource", typeDatabase)
+	local.RegisterType(&Cache{}, typeCache)
 	local.RegisterPlugin(&fixturePlugin{})
 
 	return []xcl.ConfigOption{
-		xcl.WithType(&Database{}, "resource", typeDatabase),
-		xcl.WithType(&Cache{}, typeCache),
 		xcl.WithRegistry(local),
 	}
 }

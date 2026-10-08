@@ -14,6 +14,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/mask"
+	"github.com/jumppad-labs/xcl/registry"
 )
 
 // stateMaskKey and otherStateMaskKey are two different 32 byte AES-256 keys
@@ -430,24 +431,16 @@ func allPlaintextStateWarnings(recorder *eventRecorder) []Event {
 }
 
 // withNonSensitiveTypes declares the types used by the registered/basic
-// fixture, none of which has a sensitive field
+// fixture, none of which has a sensitive field, on a local registry and
+// returns the option adding it
 func withNonSensitiveTypes() ConfigOption {
-	declared := []ConfigOption{
-		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
-		WithType(&registered.App{}, "resource", registered.TypeApp),
-		WithType(&registered.Consumer{}, "resource", registered.TypeConsumer),
-		WithType(&registered.Cache{}, "resource", registered.TypeCache),
-	}
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	declared.RegisterType(&registered.App{}, "resource", registered.TypeApp)
+	declared.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
+	declared.RegisterType(&registered.Cache{}, "resource", registered.TypeCache)
 
-	return func(c *Config) error {
-		for _, option := range declared {
-			if err := option(c); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
+	return WithRegistry(declared)
 }
 
 func TestPlainStateWithSensitiveValueWarnsOnce(t *testing.T) {

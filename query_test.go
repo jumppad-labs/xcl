@@ -7,6 +7,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -31,11 +32,14 @@ func setupFindConfig(t *testing.T) *Config {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	declared.RegisterType(&registered.App{}, "resource", registered.TypeApp)
+	declared.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
+	declared.RegisterType(&registered.Cache{}, "resource", registered.TypeCache)
+
 	c, err := NewConfig(
-		WithType(&registered.Database{}, "resource", registered.TypeDatabase),
-		WithType(&registered.App{}, "resource", registered.TypeApp),
-		WithType(&registered.Consumer{}, "resource", registered.TypeConsumer),
-		WithType(&registered.Cache{}, "resource", registered.TypeCache),
+		WithRegistry(declared),
 		WithStateStore(store),
 	)
 	require.NoError(t, err)

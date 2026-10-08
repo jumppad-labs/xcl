@@ -84,9 +84,10 @@ func applyLeakFixtureWithOptions(t *testing.T, name string, level EventDataLevel
 
 	recorder := &eventRecorder{}
 
+	local.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
+	local.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer)
+
 	all := []ConfigOption{
-		WithType(&registered.Secret{}, "resource", registered.TypeSecret),
-		WithType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer),
 		WithRegistry(local),
 		WithStateStore(store),
 		WithStateMask(stateMasker),

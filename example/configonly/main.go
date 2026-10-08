@@ -1,7 +1,7 @@
 // Command configonly shows XCL used for configuration only: an application
 // reads its configuration into its own Go types and acts on it. The block
-// types are plain Go types declared with xcl.WithType, there is no plugin, no
-// provider and no registry.
+// types are plain Go types declared on a local registry with RegisterType and
+// added with xcl.WithRegistry, there is no plugin and no provider.
 //
 // The configuration it reads (./config) is a small Kubernetes-like
 // deployment, and the Go types it reads it into are in ./resources. Between
@@ -30,6 +30,7 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
 	"github.com/jumppad-labs/xcl/example/prettylog"
+	"github.com/jumppad-labs/xcl/registry"
 )
 
 func main() {
@@ -86,19 +87,19 @@ type appConfig struct {
 // loadConfig declares the example's block types, applies the configuration in
 // dir with the caller's options, and gathers it into an appConfig.
 func loadConfig(dir string, options ...xcl.ConfigOption) (*appConfig, error) {
-	// Declare each Go type under the block type name used in configuration.
-	// A declared type needs nothing else: no plugin, no provider, no schema
-	// to write by hand. Every type the configuration declares must be
-	// declared here, even the ones the program does not read.
-	types := []xcl.ConfigOption{
-		xcl.WithType(&resources.ConfigMap{}, "config_map"),
-		xcl.WithType(&resources.Secret{}, "secret"),
-		xcl.WithType(&resources.Deployment{}, "deployment"),
-		xcl.WithType(&resources.Service{}, "service"),
-		xcl.WithType(&resources.Ingress{}, "ingress"),
-	}
+	// Declare each Go type under the block type name used in configuration,
+	// on a local registry. A declared type needs nothing else: no plugin, no
+	// provider, no schema to write by hand. Every type the configuration
+	// declares must be declared here, even the ones the program does not
+	// read.
+	local := registry.NewLocal()
+	local.RegisterType(&resources.ConfigMap{}, "config_map")
+	local.RegisterType(&resources.Secret{}, "secret")
+	local.RegisterType(&resources.Deployment{}, "deployment")
+	local.RegisterType(&resources.Service{}, "service")
+	local.RegisterType(&resources.Ingress{}, "ingress")
 
-	c, err := xcl.NewConfig(append(types, options...)...)
+	c, err := xcl.NewConfig(append([]xcl.ConfigOption{xcl.WithRegistry(local)}, options...)...)
 	if err != nil {
 		return nil, err
 	}

@@ -64,16 +64,17 @@ node in graph.
 
 ### Configuration only
 
-An application that only reads its configuration declares each Go type under
-the block type name it is written with, applies the configuration and reads
-it back. No plugin, no provider and no registry is needed:
+An application that only reads its configuration declares each Go type, on a
+local registry, under the block type name it is written with, applies the
+configuration and reads it back. No plugin and no provider is needed:
 
 ```go
-c, err := xcl.NewConfig(
-	xcl.WithType(&resources.Deployment{}, "deployment"), // deployment "api" {}
-	xcl.WithType(&resources.Service{}, "service"),       // service "api" {}
-	xcl.WithType(&PostgreSQL{}, "resource", "postgres"), // resource "postgres" "main" {}
-)
+local := registry.NewLocal()
+local.RegisterType(&resources.Deployment{}, "deployment") // deployment "api" {}
+local.RegisterType(&resources.Service{}, "service")       // service "api" {}
+local.RegisterType(&PostgreSQL{}, "resource", "postgres") // resource "postgres" "main" {}
+
+c, err := xcl.NewConfig(xcl.WithRegistry(local))
 if err != nil {
 	return err
 }
@@ -93,8 +94,8 @@ supported mode for configuration-only use, see
 
 ### With plugins
 
-Plugins come from registries. The local registry holds plugins compiled into
-the program, plugin binaries named by path, and directories searched for
+Plugins come from registries, the same place Go types are declared. The local
+registry holds plugins compiled into the program, plugin binaries named by path, and directories searched for
 plugin binaries. Registering only records a plugin, nothing is started until
 the first operation needs it:
 
@@ -112,17 +113,28 @@ c, err := xcl.NewConfig(
 
 `WithRegistry` may be given more than once. Registries load in the order they
 were given, and the plugins of each in the order they were registered.
-`WithType` and `WithRegistry` combine freely in one `NewConfig`.
+One registry can hold Go types and plugins together. `WithRegistry` is the
+one way a `Config` gets anything beyond the builtins, and the registry the one
+place types and plugins are registered.
 
-**Registration problems.** Registration returns no errors. A mistake in the
-code, wrong on every run, panics straight away naming the type: an empty
-name, more than one subtype or an empty subtype, a prototype that is not a
-pointer to a struct embedding `types.ResourceBase`, the same type declared
-twice, a type keyword used both with and without a subtype, a builtin name,
-or a nil plugin or registry. A problem with the environment is returned by
-the first `Validate`, `Apply`, `Destroy`, `Diff` or `Load`: a missing or
-failing plugin as a `*xcl.PluginLoadError` (matching `xcl.ErrPluginLoad`),
-and a block type provided twice anywhere as a `*xcl.TypeNameClashError`.
+**Registration problems.** Registration returns no errors. Problems are
+reported in one of three places:
+
+- A mistake in a single call, wrong on every run, panics straight away
+  naming the type: an empty name, more than one subtype or an empty subtype,
+  a prototype that is not a pointer to a struct embedding
+  `types.ResourceBase`, or a nil plugin or registry.
+- Declared Go types that do not fit together are an error returned by
+  `NewConfig`: the same block type declared twice, in one registry or across
+  two, or with a builtin name, is a `*xcl.TypeNameClashError` naming both Go
+  types and their registries, and a type keyword used both with and without a
+  subtype is a `*xcl.TypeFormError`.
+- A problem with the environment is returned by the first `Validate`,
+  `Apply`, `Destroy`, `Diff` or `Load`: any missing or failing plugin,
+  including one found in a plugin directory, as a `*xcl.PluginLoadError`
+  (matching `xcl.ErrPluginLoad`), and a block type a plugin provides that a
+  declared type or another plugin already provides as a
+  `*xcl.TypeNameClashError` naming both providers and their registries.
 
 ## Example
 
@@ -135,7 +147,8 @@ a Go module of its own with its own configuration and Go types.
 often needed for: an application reading its configuration into its own Go
 types and acting on it. The block types
 ([`configonly/resources`](./example/configonly/resources)) are plain Go types
-declared with `xcl.WithType`, with no plugin, no provider and no registry.
+declared on a local registry with `RegisterType`, with no plugin and no
+provider.
 
 Its configuration ([`configonly/config`](./example/configonly/config)) is a
 small Kubernetes-like deployment split across three files, `deployment.xcl`,
@@ -308,46 +321,52 @@ type PostgreSQL struct {
 ### Configuration only types
 
 When a block only holds configuration and nothing needs to be created, read or
-destroyed, declare its Go type with `xcl.WithType` when the `Config` is
-created. No plugin, provider or registry is needed.
+destroyed, declare its Go type on a registry with `RegisterType` and give the
+registry to the `Config`. No plugin or provider is needed.
 
 Everything a configuration declares is an entity, and an entity has a type
 and an optional subtype. The type is the keyword a block leads with, and the
 subtype, when there is one, is its first label:
 
 ```go
-c, err := xcl.NewConfig(
-	// a type with a subtype, declared: server "big" "web" {}, addressed server.big.web
-	xcl.WithType(&Server{}, "server", "big"),
+local := registry.NewLocal()
 
-	// a type without one, declared: cache "main" {}, addressed cache.main
-	xcl.WithType(&Cache{}, "cache"),
+// a type with a subtype, declared: server "big" "web" {}, addressed server.big.web
+local.RegisterType(&Server{}, "server", "big")
 
-	// resource is a type like any other: resource "postgres" "main" {}
-	xcl.WithType(&PostgreSQL{}, "resource", "postgres"),
-)
+// a type without one, declared: cache "main" {}, addressed cache.main
+local.RegisterType(&Cache{}, "cache")
+
+// resource is a type like any other: resource "postgres" "main" {}
+local.RegisterType(&PostgreSQL{}, "resource", "postgres")
+
+c, err := xcl.NewConfig(xcl.WithRegistry(local))
+if err != nil {
+	return err
+}
 err = c.Apply("./config")
 ```
 
 Declared blocks are decoded into your own Go type, take part in references
 (`server.big.web.location`, `cache.main.location`) and dependency ordering,
 work in modules and when disabled, and are saved to state when there is a
-state store. They are never passed to a provider. `WithType` takes a pointer
-to a struct that embeds `types.ResourceBase`.
+state store. They are never passed to a provider. `RegisterType` takes a
+pointer to a struct that embeds `types.ResourceBase`.
 
 A type keyword takes a subtype for every declaration or for none, so an
 address can always be read by position. `resource` always takes one.
 Declaring `server` without a subtype after declaring it with one, or the
-other way round, panics in `NewConfig`; a plugin type that does so fails the
-first operation with a `*xcl.TypeFormError`.
+other way round, is a `*xcl.TypeFormError` returned by `NewConfig`; a plugin
+type that does so fails the first operation with a `*xcl.TypeFormError`.
 
 Every type and subtype must be unique across builtin blocks (`variable`,
 `output`, `module`, `root`), declared types and plugin types.
 `server` and `resource "server"` are different types and do not clash.
-Declaring a type and subtype a builtin or another declared type already has
-is a mistake in the code and panics in `NewConfig`, naming it, i.e.
-`resource.postgres`. A clash with a type a plugin provides is reported when
-the plugins load, see below.
+Declaring a type and subtype a builtin or another declared type already has,
+in the same registry or another, is a `*xcl.TypeNameClashError` returned by
+`NewConfig`, naming it, i.e. `resource.postgres`, and both Go types and their
+registries. A clash with a type a plugin provides is reported when the plugins
+load, see below.
 
 ### Registering plugins
 

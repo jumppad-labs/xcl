@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -48,9 +49,12 @@ func setupCacheClientConfig(t *testing.T) *Config {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Cache{}, registered.TypeCache)
+	declared.RegisterType(&cacheClient{}, "cache_client")
+
 	c, err := NewConfig(
-		WithType(&registered.Cache{}, registered.TypeCache),
-		WithType(&cacheClient{}, "cache_client"),
+		WithRegistry(declared),
 		WithStateStore(store),
 	)
 	require.NoError(t, err)

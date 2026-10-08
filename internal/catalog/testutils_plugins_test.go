@@ -48,21 +48,14 @@ func (r failingRegistry) Name() string {
 	return r.name
 }
 
+// Types returns nil, the registry declares no Go types
+func (r failingRegistry) Types() []registry.Type {
+	return nil
+}
+
 // Plugins always fails
 func (r failingRegistry) Plugins(ctx context.Context, emit events.Emit) ([]registry.Plugin, error) {
 	return nil, fmt.Errorf("registry %s is unreachable", r.name)
-}
-
-// recoverPanic runs f and returns the value it panicked with, nil when it did
-// not panic
-func recoverPanic(f func()) (value any) {
-	defer func() {
-		value = recover()
-	}()
-
-	f()
-
-	return nil
 }
 
 // testPluginSetup builds plugin binaries into a temporary directory

@@ -198,9 +198,11 @@ from the schema via `schema.CreateInstanceFromSchema` — see
 
 ## Registries and the catalog — tying it together
 
-Plugins come only from registries. The public
-[`registry`](../registry/registry.go) package defines a `Registry`, which
-provides plugins, and a `Plugin`, which starts itself and returns the
+Plain Go types and plugins come only from registries. The public
+[`registry`](../registry/registry.go) package defines a `Registry`, which has
+a `Name()`, declares plain Go types through `Types() []registry.Type` (nil for
+a registry with none) and provides plugins through `Plugins(ctx, emit)`, and a
+`Plugin`, which starts itself and returns the
 `plugins.PluginHost` xcl talks to it through. `registry.InProcess(p)` starts a
 compiled-in plugin with the direct host, and `registry.Executable(path)` starts
 a plugin binary over gRPC. Third parties write registries of their own against
@@ -211,21 +213,25 @@ logger, and registering only records:
 
 ```go
 local := registry.NewLocal()
+local.RegisterType(&resources.Deployment{}, "deployment")
 local.RegisterPlugin(&template.TemplatePlugin{})
 local.RegisterExternalPlugin("./bin/xcl-plugin-docker")
 local.RegisterPluginDirectory("~/.xcl/plugins")
 ```
 
-`RegisterPlugin` is for in-process plugins, `RegisterExternalPlugin` for a
+`RegisterType` declares a plain Go type, `RegisterPlugin` is for in-process
+plugins, `RegisterExternalPlugin` for a
 gRPC plugin binary, and `RegisterPluginDirectory` for a directory to search
 for executables named like the registry's pattern, `xcl-plugin-*` unless the
 registry was created with `registry.NewLocal(registry.PluginPattern("acme-plugin-*"))`.
 A directory that does not exist provides no plugins.
 
 A `Config` is given registries with `xcl.WithRegistry(local)`, any number of
-times, and plain Go types with `xcl.WithType`. `NewConfig` builds the
-`Config`'s own catalog,
-[`internal/catalog/catalog.go`](../internal/catalog/catalog.go), from both: it
+times; it is the one way in for types and plugins alike. `NewConfig` builds
+the `Config`'s own catalog,
+[`internal/catalog/catalog.go`](../internal/catalog/catalog.go), from them,
+reading every registry's `Types()` once, in the order the registries were
+given, and returning an error when they clash (see below). The catalog
 holds the compiled-in builtin types, the declared types, the registries and,
 once loaded, a `[]plugins.PluginHost`. The catalog is private to xcl.
 
@@ -405,20 +411,23 @@ loading is a `load` event rather than a log message.
 
 ## Configuration-only types
 
-Not every block type needs a plugin. `xcl.WithType(prototype any,
-name ...string)` declares a plain Go type (a pointer to a struct embedding
+Not every block type needs a plugin. A registry's
+`RegisterType(prototype any, name ...string)`, i.e. on `registry.NewLocal()`,
+declares a plain Go type (a pointer to a struct embedding
 `types.ResourceBase`) under a name made of a type and an optional subtype,
-with no plugin and no provider, when the `Config` is created. A plugin
+with no plugin and no provider, and the registry is given to the `Config`
+with `xcl.WithRegistry`. A plugin
 registers its types the same way, through
 `PluginBase.RegisterType(entityType, subtype, ...)`, and neither has to use
 the `resource` type:
 
 ```go
-c, err := xcl.NewConfig(
-    xcl.WithType(&PostgreSQL{}, "resource", "postgres"), // resource "postgres" "main" {}
-    xcl.WithType(&Server{}, "server", "big"),            // server "big" "web" {}
-    xcl.WithType(&Cache{}, "cache"),                     // cache "main" {}
-)
+local := registry.NewLocal()
+local.RegisterType(&PostgreSQL{}, "resource", "postgres") // resource "postgres" "main" {}
+local.RegisterType(&Server{}, "server", "big")            // server "big" "web" {}
+local.RegisterType(&Cache{}, "cache")                     // cache "main" {}
+
+c, err := xcl.NewConfig(xcl.WithRegistry(local))
 ```
 
 The type is the keyword a block leads with and the subtype its first label.
@@ -435,15 +444,21 @@ which `*catalog.Catalog` satisfies. The lifecycle and the destroy walk treat a d
 builtin: it gets a success event and no provider is ever called for it. On
 apply its status is left unchanged; on destroy it is removed from the state.
 
-`WithType` returns no error. A declaration that is wrong on every run is a
-mistake in the code and panics, naming the type:
+`RegisterType` returns no error. Problems with a declaration are reported
+where they can first be seen:
 
-- `WithType` itself panics on an empty name, more than one subtype, an empty
-  subtype, or a prototype that is not a pointer to a struct embedding
-  `types.ResourceBase`.
-- `NewConfig` panics on a declared type that duplicates another declared
-  type or a builtin (`variable`, `output`, `module`, `root`), or that uses its
-  keyword in both forms.
+- A declaration that is wrong on every run is a mistake in the code, and
+  `RegisterType` itself panics, naming the type, on an empty name, more than
+  one subtype, an empty subtype, or a prototype that is not a pointer to a
+  struct embedding `types.ResourceBase`. `xcl.WithRegistry` panics on a nil
+  registry.
+- Declared types that do not fit together come from how registries are
+  combined, so they are an error returned by `NewConfig`, not a panic. A
+  declared type that duplicates another declared type, in the same registry
+  or another, or a builtin (`variable`, `output`, `module`, `root`), is a
+  `*xcl.TypeNameClashError` naming both Go types (`Provider` and `Existing`,
+  as `type <Go type>`, or `builtin`) and their registries; one that uses its
+  keyword in both forms is a `*xcl.TypeFormError`.
 
 Plugin types are checked when plugins load, against the builtins, the
 declared types, the plugins already loaded and the other types the same
