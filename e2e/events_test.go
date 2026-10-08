@@ -59,6 +59,12 @@ func TestRegisteredTypesReportNoLogEvents(t *testing.T) {
 	recorded := kubeLifecycleEvents(t)
 
 	for _, e := range recorded {
+		// the decide pass writes debug log events from the core logger that
+		// name no resource, they are not written for a registered type
+		if e.Source == events.SourceCore && e.ResourceID == "" && e.Meta[events.KeyLevel] == events.LevelDebug {
+			continue
+		}
+
 		require.NotEqual(t, events.PhaseLog, e.Phase, "unexpected log event: %+v", e)
 	}
 }

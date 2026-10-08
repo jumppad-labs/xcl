@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
@@ -214,4 +215,105 @@ func TestTypedProviderAdapterCreateEmitsNoLogEventsOfItsOwn(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Empty(t, recorder.Events())
+}
+
+// changedRecordingProvider is a fake provider that records the dependencies
+// passed to Changed and returns the configured change and error.
+type changedRecordingProvider struct {
+	changedDependencies []entity.DependencyChange
+	changedCalled       bool
+
+	changedResult entity.Change
+	changedError  error
+}
+
+func (p *changedRecordingProvider) Init(state State, functions ProviderFunctions, log logger.Logger) error {
+	return nil
+}
+
+func (p *changedRecordingProvider) Create(ctx context.Context, resource *testResource) (*testResource, error) {
+	return resource, nil
+}
+
+func (p *changedRecordingProvider) Destroy(ctx context.Context, resource *testResource, force bool) error {
+	return nil
+}
+
+func (p *changedRecordingProvider) Read(ctx context.Context, old *testResource, new *testResource) (*testResource, error) {
+	return new, nil
+}
+
+func (p *changedRecordingProvider) Update(ctx context.Context, resource *testResource) (*testResource, error) {
+	return resource, nil
+}
+
+func (p *changedRecordingProvider) Changed(ctx context.Context, old *testResource, new *testResource, dependencies []entity.DependencyChange) (entity.Change, error) {
+	p.changedCalled = true
+	p.changedDependencies = dependencies
+
+	return p.changedResult, p.changedError
+}
+
+func (p *changedRecordingProvider) Functions() ProviderFunctions {
+	return nil
+}
+
+// changedTestPlugin is an in-process plugin that registers a single
+// changedRecordingProvider for the type resource.test.
+type changedTestPlugin struct {
+	PluginBase
+
+	provider *changedRecordingProvider
+}
+
+func (p *changedTestPlugin) Init(log logger.Logger, state State) error {
+	p.SetState(state)
+
+	return RegisterResourceProvider(&p.PluginBase, log, state, "resource", "test", &testResource{}, p.provider)
+}
+
+func TestTypedProviderAdapterChangedPassesDependenciesToProvider(t *testing.T) {
+	provider := &changedRecordingProvider{changedResult: entity.Update}
+	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+
+	dependencies := []entity.DependencyChange{
+		{Address: "resource.network.main", Change: entity.Replace},
+		{Address: "resource.volume.data", Change: entity.Update},
+	}
+
+	change, err := adapter.Changed(
+		context.Background(),
+		[]byte(`{"name":"web","count":1}`),
+		[]byte(`{"name":"web","count":1}`),
+		dependencies,
+	)
+	require.NoError(t, err)
+	require.Equal(t, entity.Update, change)
+
+	require.True(t, provider.changedCalled)
+	require.Equal(t, dependencies, provider.changedDependencies)
+}
+
+func TestDirectPluginHostChangedReturnsProviderAnswer(t *testing.T) {
+	provider := &changedRecordingProvider{changedResult: entity.Replace}
+	plugin := &changedTestPlugin{provider: provider}
+
+	host, err := NewDirectPluginHost(nil, emptyState{}, plugin)
+	require.NoError(t, err)
+
+	dependencies := []entity.DependencyChange{
+		{Address: "resource.network.main", Change: entity.Replace},
+	}
+
+	change, err := host.Changed(
+		context.Background(),
+		"resource",
+		"test",
+		[]byte(`{"name":"web","count":1}`),
+		[]byte(`{"name":"web","count":1}`),
+		dependencies,
+	)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+	require.Equal(t, dependencies, provider.changedDependencies)
 }

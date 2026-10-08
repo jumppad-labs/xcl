@@ -16,13 +16,21 @@ resource "network" "one" {
 }
 `
 
-// logEvents returns every log event the recorder has received
+// logEvents returns every log event the recorder has received, other than
+// the debug log events the decide pass writes from the core logger, which name
+// no resource: these tests are about the logs written for a resource
 func logEvents(recorder *eventRecorder) []Event {
 	found := []Event{}
 	for _, e := range recorder.Events() {
-		if e.Phase == events.PhaseLog {
-			found = append(found, e)
+		if e.Phase != events.PhaseLog {
+			continue
 		}
+
+		if e.Source == events.SourceCore && e.ResourceID == "" && e.Meta[events.KeyLevel] == events.LevelDebug {
+			continue
+		}
+
+		found = append(found, e)
 	}
 
 	return found

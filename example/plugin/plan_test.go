@@ -86,6 +86,29 @@ func TestPlanLeavesTheSavedStateUnchanged(t *testing.T) {
 	require.Equal(t, "Diff: no changes, 3 unchanged.\n", out.String())
 }
 
+func TestPlanOfSubnetChangeReplacesNetworkAndContainer(t *testing.T) {
+	stateDir := t.TempDir()
+	applyExampleWithState(t, stateDir)
+
+	c, err := newConfig(nil, dockerPlugin, stateDir)
+	require.NoError(t, err)
+
+	out := &bytes.Buffer{}
+	err = plan(out, c, "./config-subnet")
+	require.NoError(t, err)
+
+	// out is not a terminal, so the diff is plain
+	printed := out.String()
+	require.Contains(t, printed, "# docker.network.app will be replaced, it cannot be updated in place")
+	require.Contains(t, printed, `-/+ docker "network" "app" {`)
+	require.Contains(t, printed, `~ subnet = "10.42.0.0/24" -> "10.42.0.0/23"`)
+	require.Contains(t, printed, "# docker.container.web will be replaced because docker.network.app is replaced")
+	require.Contains(t, printed, `-/+ docker "container" "web"`)
+	require.Contains(t, printed, "# template.welcome will be updated")
+	require.Contains(t, printed, `~ template "welcome" {`)
+	require.Contains(t, printed, "Diff: 0 to create, 1 to update, 2 to replace, 0 to delete, 0 unchanged.")
+}
+
 func TestRunPlanWithoutAPathFails(t *testing.T) {
 	stderr := &bytes.Buffer{}
 

@@ -1,0 +1,9 @@
+# A network and an output publishing its name.
+
+resource "network" "inner" {
+  subnet = "10.1.0.0/16"
+}
+
+output "network_name" {
+  value = resource.network.inner.meta.name
+}

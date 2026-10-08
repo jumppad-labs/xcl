@@ -6,8 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/entity"
+	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
+	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -598,4 +601,24 @@ func TestStateWithoutReferencesStillLoads(t *testing.T) {
 
 	applied := encodeEntityByID(t, second, encodeDatabaseID)
 	require.Equal(t, "us-east", applied.(*registered.Database).Location)
+}
+
+// TestApplyPerformsProviderDecidedReplacement changes the api container's
+// PORT, which the TestPlugin's container provider is set to answer with
+// replace, so the apply destroys the saved container and then creates it
+// again, and leaves every other resource alone
+func TestApplyPerformsProviderDecidedReplacement(t *testing.T) {
+	f := setupDiffConfig(t)
+	applyDiffConfiguration(t, f, "base")
+
+	useDiffConfiguration(t, f, "changed_attribute")
+	f.plugin.SetChangedResult("resource.container.api", entity.Replace)
+
+	err := f.config.Apply(f.configDir)
+	require.NoError(t, err)
+
+	expected := map[string][]string{
+		"resource.container.api": {events.OperationDestroy, events.OperationCreate},
+	}
+	require.Equal(t, expected, testutil.ResourceOperations(f.recorder.Events()))
 }

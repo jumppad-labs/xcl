@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -239,8 +240,31 @@ func (p *containerProvider) Read(ctx context.Context, old *Container, new *Conta
 	return new, nil
 }
 
-// Update returns the container unchanged, the example does not change
-// containers in place
+// Changed answers replace when a resource the container depends on is
+// replaced, such as the network it is attached to, since the container would
+// be left attached to a network that no longer exists. It also answers replace
+// when the image, command, environment or networks change: Docker fixes them
+// when it creates a container. Any other change is left to DefaultChanged.
+func (p *containerProvider) Changed(ctx context.Context, old *Container, new *Container, dependencies []entity.DependencyChange) (entity.Change, error) {
+	for _, dependency := range dependencies {
+		if dependency.Change == entity.Replace {
+			return entity.Replace, nil
+		}
+	}
+
+	if old.Image != new.Image ||
+		!equalStrings(old.Command, new.Command) ||
+		!equalEnvironment(old.Environment, new.Environment) ||
+		!equalAttachments(old.Networks, new.Networks) {
+		return entity.Replace, nil
+	}
+
+	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+}
+
+// Update returns the container unchanged. Every setting Docker can not change
+// in place answers replace in Changed, so Update is only reached for changes
+// that need no Docker call, such as xcl's own metadata.
 func (p *containerProvider) Update(ctx context.Context, c *Container) (*Container, error) {
 	return c, nil
 }
@@ -248,4 +272,53 @@ func (p *containerProvider) Update(ctx context.Context, c *Container) (*Containe
 // Functions returns nil, the provider offers no functions
 func (p *containerProvider) Functions() plugins.ProviderFunctions {
 	return nil
+}
+
+// equalStrings reports whether two lists hold the same strings in the same
+// order, a nil list equals an empty one
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// equalEnvironment reports whether two environments hold the same variables, a
+// nil environment equals an empty one
+func equalEnvironment(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for key, value := range a {
+		other, ok := b[key]
+		if !ok || other != value {
+			return false
+		}
+	}
+
+	return true
+}
+
+// equalAttachments reports whether two lists of network blocks attach to the
+// same networks, in the same order, with the same aliases
+func equalAttachments(a, b []NetworkAttachment) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i].Name != b[i].Name || !equalStrings(a[i].Aliases, b[i].Aliases) {
+			return false
+		}
+	}
+
+	return true
 }

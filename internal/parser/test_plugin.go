@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/logger"
@@ -90,7 +91,11 @@ type TestPlugin struct {
 	// MutateConfigured maps resource ID to a subnet that Create, Read and Update
 	// write over the network's configured subnet
 	MutateConfigured map[string]string
-	ChangedResults   map[string]bool // Maps resource ID to a Changed result that overrides the default
+	ChangedResults   map[string]entity.Change // Maps resource ID to a Changed result that overrides the default
+
+	// ChangedDependencies maps resource ID to the dependencies its last
+	// Changed call was told about
+	ChangedDependencies map[string][]entity.DependencyChange
 
 	// CreateSetsID sets the network's ProviderID to "id-<name>" on Create, it is
 	// enabled by Init
@@ -133,6 +138,21 @@ func (p *TestPlugin) GetChangedCalls() []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return append([]string{}, p.ChangedCalls...)
+}
+
+// GetChangedDependencies returns the dependencies the last Changed call for
+// the resource with the given ID was told about, nil when it was told none or
+// was never asked
+func (p *TestPlugin) GetChangedDependencies(resourceID string) []entity.DependencyChange {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	dependencies, ok := p.ChangedDependencies[resourceID]
+	if !ok {
+		return nil
+	}
+
+	return append([]entity.DependencyChange(nil), dependencies...)
 }
 
 // GetCalls returns every provider call in order, formatted "<operation> <id>"
@@ -228,6 +248,7 @@ func (p *TestPlugin) ResetCalls() {
 	p.DestroyedResources = []string{}
 	p.UpdatedResources = []string{}
 	p.ChangedCalls = []string{}
+	p.ChangedDependencies = map[string][]entity.DependencyChange{}
 	p.Calls = []string{}
 	p.ReadCalls = []ReadCall{}
 	p.CallTimes = []CallTime{}
@@ -306,13 +327,13 @@ func (p *TestPlugin) SetReadObserved(resourceID string, observed string) {
 
 // SetChangedResult configures Changed to return the given result for the
 // resource with the given ID instead of the default change detection
-func (p *TestPlugin) SetChangedResult(resourceID string, changed bool) {
+func (p *TestPlugin) SetChangedResult(resourceID string, change entity.Change) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.ChangedResults == nil {
-		p.ChangedResults = make(map[string]bool)
+		p.ChangedResults = make(map[string]entity.Change)
 	}
-	p.ChangedResults[resourceID] = changed
+	p.ChangedResults[resourceID] = change
 }
 
 // SetMutateConfigured configures Create, Read and Update to write the given
@@ -377,7 +398,7 @@ func (p *TestPlugin) Init(logger logger.Logger, state plugins.State) error {
 		p.ReadObserved = make(map[string]string)
 	}
 	if p.ChangedResults == nil {
-		p.ChangedResults = make(map[string]bool)
+		p.ChangedResults = make(map[string]entity.Change)
 	}
 	if p.MutateConfigured == nil {
 		p.MutateConfigured = make(map[string]string)
@@ -641,33 +662,37 @@ func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T) (resul
 
 // Changed tracks the comparison, returns a configured error or result, and
 // otherwise uses the default change detection
-func (p *TestResourceProvider[T]) Changed(ctx context.Context, old T, new T) (bool, error) {
+func (p *TestResourceProvider[T]) Changed(ctx context.Context, old T, new T, dependencies []entity.DependencyChange) (entity.Change, error) {
 	oldMeta, err := types.GetMeta(old)
 	if err != nil {
-		return false, err
+		return entity.NoChange, err
 	}
 
 	newMeta, err := types.GetMeta(new)
 	if err != nil {
-		return false, err
+		return entity.NoChange, err
 	}
 
 	p.plugin.mu.Lock()
 	p.plugin.ChangedCalls = append(p.plugin.ChangedCalls, fmt.Sprintf("%s->%s", oldMeta.ID, newMeta.ID))
 	p.plugin.Calls = append(p.plugin.Calls, "changed "+newMeta.ID)
+	if p.plugin.ChangedDependencies == nil {
+		p.plugin.ChangedDependencies = map[string][]entity.DependencyChange{}
+	}
+	p.plugin.ChangedDependencies[newMeta.ID] = append([]entity.DependencyChange(nil), dependencies...)
 	changedErr, hasError := p.plugin.ChangedErrors[newMeta.ID]
 	changedResult, hasResult := p.plugin.ChangedResults[newMeta.ID]
 	p.plugin.mu.Unlock()
 
 	if hasError && changedErr != nil {
-		return false, changedErr
+		return entity.NoChange, changedErr
 	}
 
 	if hasResult {
 		return changedResult, nil
 	}
 
-	return p.DefaultChanged.Changed(ctx, old, new)
+	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
 }
 
 // Functions returns no functions

@@ -84,20 +84,24 @@ touches a real provider or disk — useful for testing.
 
 Before anything is created or changed, `p.Apply` rejects a configuration
 with no blocks (`xcl.ErrEmptyConfiguration`: use `Destroy` to remove
-everything), then destroys the resources in the previous state that are no
-longer in the configuration, children first, saving the state after each one.
+everything), then decides what happens to every resource without changing
+anything: each provider-backed resource is created, left alone, updated or
+replaced, as its provider's `Changed` answers. Only then does it destroy the
+resources being replaced and those in the previous state that are no longer
+in the configuration, children first, saving the state after each one, and
+then create and update in dependency order.
 
 State is saved even when the apply failed. When a provider call fails,
 `p.Apply` returns the state the walk reached along with the error: reached
-resources with their new status, the failing resource as `failed` (or
-`destroy_failed`), and the previous entry of resources that were not reached.
-When destroying a removed resource fails, nothing is created or changed, and
+resources with their new status, the failing resource as `failed`, and the
+previous entry of resources that were not reached.
+When destroying a replaced or removed resource fails, nothing is created or changed, and
 the state returned is the previous state minus what was destroyed, with the
 failures as `destroy_failed`; the next apply retries them first.
 `Config.Apply` saves that state and then returns the error. Only when
 `p.Apply` returns no state at all (the configuration didn't parse or
-validate, declared no blocks, or the dependency graph couldn't be built) is
-nothing saved. See
+validate, declared no blocks, the dependency graph couldn't be built, or
+deciding failed) is nothing saved. See
 [State & Persistence](state.md#state-saved-after-a-failed-apply).
 
 `Config.Validate` ([`config.go:77`](../config.go#L77)) answers only whether a
@@ -160,8 +164,9 @@ type Meta struct {
 `updated`, `failed`, `destroyed` or `destroy_failed`
 ([`types/status.go`](../types/status.go)). The status saved by the last apply
 decides what the next apply does with the resource: `created` and `updated`
-resources are read and updated if they changed, `failed` and
-`destroy_failed` resources are destroyed and created again. `destroyed` is
+resources are read and then left alone, updated or replaced as their
+provider's `Changed` answers, `failed` and `destroy_failed` resources are
+replaced: destroyed and created again. `destroyed` is
 never saved: a destroyed resource leaves the state. See
 [State & Persistence](state.md#resource-statuses).
 

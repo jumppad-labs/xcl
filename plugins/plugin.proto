@@ -96,16 +96,34 @@ message UpdateResponse {
   bytes updated_entity_data = 2;
 }
 
+// Change is what applying a new configuration needs for one entity, see
+// entity.Change
+enum Change {
+  CHANGE_NO_CHANGE = 0;
+  CHANGE_UPDATE = 1;
+  CHANGE_REPLACE = 2;
+}
+
+// DependencyChange is a resource the entity depends on that the same apply
+// will update or replace, see entity.DependencyChange
+message DependencyChange {
+  string address = 1;
+  Change change = 2;
+}
+
 message ChangedRequest {
   string entity_type = 1;
   string entity_sub_type = 2;
   bytes old_entity_data = 3;
   bytes new_entity_data = 4;
+  repeated DependencyChange dependencies = 5;
 }
 
 message ChangedResponse {
-  bool changed = 1;
+  // was: bool changed
+  reserved 1;
   string error = 2;
+  Change change = 3;
 }
 
 // Logger service messages

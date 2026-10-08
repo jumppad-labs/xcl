@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
@@ -402,11 +403,14 @@ func TestReadFailureFailsApply(t *testing.T) {
 	p := h.newParser(t, nil)
 	st, err := p.Apply(context.Background(), lifecycleOriginalConfig)
 
+	// a read failure now fails the decide pass, before any resource is
+	// changed, so Apply returns no state to save
 	require.Error(t, err)
-	require.NotNil(t, st)
+	require.Nil(t, st)
 	require.Contains(t, err.Error(), "read failed for "+lifecycleNetworkID)
 	require.Empty(t, h.plugin.GetUpdatedResources())
 	require.Empty(t, h.plugin.GetCreatedResources())
+	require.Empty(t, h.plugin.GetDestroyedResources())
 }
 
 func TestDefaultChangeDetectionNoUpdateWhenNothingDiffers(t *testing.T) {
@@ -463,7 +467,7 @@ func TestOverriddenChangeDetectionIsUsed(t *testing.T) {
 
 	h.applyAndSave(t, lifecycleOriginalConfig)
 	h.plugin.ResetCalls()
-	h.plugin.SetChangedResult(lifecycleNetworkID, false)
+	h.plugin.SetChangedResult(lifecycleNetworkID, entity.NoChange)
 
 	h.applyAndSave(t, lifecycleEditedConfig)
 
@@ -480,12 +484,32 @@ func TestOverriddenChangeDetectionCanReportAChange(t *testing.T) {
 
 	h.applyAndSave(t, lifecycleOriginalConfig)
 	h.plugin.ResetCalls()
-	h.plugin.SetChangedResult(lifecycleNetworkID, true)
+	h.plugin.SetChangedResult(lifecycleNetworkID, entity.Update)
 
 	st := h.applyAndSave(t, lifecycleOriginalConfig)
 
 	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetUpdatedResources())
 	require.Equal(t, types.StatusUpdated, networkStatus(t, st.GetResources()))
+}
+
+func TestOverriddenChangeDetectionCanReportAReplace(t *testing.T) {
+	h := setupLifecycle(t)
+
+	h.applyAndSave(t, lifecycleOriginalConfig)
+	h.plugin.ResetCalls()
+	h.plugin.SetChangedResult(lifecycleNetworkID, entity.Replace)
+
+	st := h.applyAndSave(t, lifecycleOriginalConfig)
+
+	// a replace destroys the resource then creates it again, it is never updated
+	require.Equal(t, []string{
+		"read " + lifecycleNetworkID,
+		"changed " + lifecycleNetworkID,
+		"destroy " + lifecycleNetworkID,
+		"create " + lifecycleNetworkID,
+	}, callsFor(h.plugin.GetCalls(), lifecycleNetworkID))
+	require.Empty(t, h.plugin.GetUpdatedResources())
+	require.Equal(t, types.StatusCreated, networkStatus(t, st.GetResources()))
 }
 
 func TestUnchangedResourceSavesWhatWasRead(t *testing.T) {
@@ -494,7 +518,7 @@ func TestUnchangedResourceSavesWhatWasRead(t *testing.T) {
 	h.applyAndSave(t, lifecycleOriginalConfig)
 	h.plugin.ResetCalls()
 	h.plugin.SetReadObserved(lifecycleNetworkID, "running")
-	h.plugin.SetChangedResult(lifecycleNetworkID, false)
+	h.plugin.SetChangedResult(lifecycleNetworkID, entity.NoChange)
 
 	st := h.applyAndSave(t, lifecycleOriginalConfig)
 
@@ -641,7 +665,9 @@ func TestNextApplyAfterFailureDoesNotRecreateSucceededResource(t *testing.T) {
 	}, callsFor(calls, dependentFirstID))
 }
 
-func TestReadFailureIsSavedAsFailed(t *testing.T) {
+// A read failure used to be saved as failed. It now fails the decide pass,
+// which saves nothing, so the saved status is left as it was.
+func TestReadFailureLeavesSavedStatusUnchanged(t *testing.T) {
 	h := setupLifecycle(t)
 
 	h.applyAndSave(t, lifecycleOriginalConfig)
@@ -651,7 +677,7 @@ func TestReadFailureIsSavedAsFailed(t *testing.T) {
 	h.applyAndSaveExpectingFailure(t, lifecycleOriginalConfig)
 
 	saved := h.loadSaved(t)
-	require.Equal(t, types.StatusFailed, networkStatus(t, saved))
+	require.Equal(t, types.StatusCreated, networkStatus(t, saved))
 }
 
 func TestUnreachedPreviousResourceIsSavedUnchanged(t *testing.T) {
@@ -748,7 +774,7 @@ func TestOnlyAgreedStatusesAreSaved(t *testing.T) {
 
 	// apply 4: first is updated, independent is created again
 	h.plugin.ClearErrors()
-	h.plugin.SetChangedResult(dependentFirstID, true)
+	h.plugin.SetChangedResult(dependentFirstID, entity.Update)
 	h.applyAndSave(t, lifecycleDependentConfig)
 	requireOnlyAgreedStatuses(t, h)
 
@@ -1216,6 +1242,12 @@ func TestApplyNamesTheVarietyOfEachResourceInItsEvents(t *testing.T) {
 			continue
 		}
 
+		// the decide pass writes core debug log events, which name no
+		// resource
+		if event.ResourceID == "" {
+			continue
+		}
+
 		named[event.ResourceID] = event.ResourceType
 	}
 
@@ -1329,7 +1361,7 @@ func (s *refreshScenario) refresh(t *testing.T, h *lifecycleHarness) (refreshOut
 	adapter := h.registry.GetProviderForResource(s.configured)
 	require.NotNil(t, adapter)
 
-	return s.lifecycle.refresh(s.configured, s.saved, adapter)
+	return s.lifecycle.refresh(s.configured, s.saved, adapter, nil)
 }
 
 func TestRefreshReportsNotFoundWhenProviderCannotFindResource(t *testing.T) {
@@ -1438,7 +1470,9 @@ func TestRefreshUnchangedDoesNotCreateOrUpdate(t *testing.T) {
 	require.Empty(t, h.plugin.GetUpdatedResources())
 }
 
-func TestRefreshReadErrorFailsResource(t *testing.T) {
+// refresh runs only in the decide pass now, a read failure fails the decide
+// pass and saves nothing, so refresh no longer marks the resource failed
+func TestRefreshReadErrorReturnsErrorAndLeavesStatusAlone(t *testing.T) {
 	h := setupLifecycle(t)
 	scenario := setupRefresh(t, h)
 	h.plugin.SetReadError(lifecycleNetworkID, fmt.Errorf("network API unavailable"))
@@ -1447,7 +1481,7 @@ func TestRefreshReadErrorFailsResource(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "read failed for "+lifecycleNetworkID)
-	require.Equal(t, types.StatusFailed, networkValues(t, scenario.configured).Meta.Status)
+	require.Empty(t, networkValues(t, scenario.configured).Meta.Status)
 	require.Empty(t, h.plugin.GetCreatedResources())
 	require.Empty(t, h.plugin.GetUpdatedResources())
 }

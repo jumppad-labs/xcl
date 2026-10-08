@@ -74,8 +74,20 @@ func applyExample(t *testing.T) *xcl.Config {
 func applyExampleWithState(t *testing.T, stateDir string) *xcl.Config {
 	t.Helper()
 
-	requireDocker(t)
 	t.Setenv("HCL_VAR_output_dir", t.TempDir())
+
+	return applyExampleDir(t, "./config", stateDir)
+}
+
+// applyExampleDir applies the configuration in configDir in a new Config
+// keeping its state in stateDir, as a separate run of the program would. The
+// rendered template goes wherever HCL_VAR_output_dir already points, so a test
+// applying two configurations to the same state sets it once. What was
+// applied is destroyed when the test ends.
+func applyExampleDir(t *testing.T, configDir, stateDir string) *xcl.Config {
+	t.Helper()
+
+	requireDocker(t)
 
 	c, err := newConfig(nil, dockerPlugin, stateDir)
 	require.NoError(t, err)
@@ -87,10 +99,22 @@ func applyExampleWithState(t *testing.T, stateDir string) *xcl.Config {
 		}
 	})
 
-	err = apply(c, "./config")
+	err = apply(c, configDir)
 	require.NoError(t, err)
 
 	return c
+}
+
+// applySubnetChange applies the example's main configuration, then the
+// address range change in config-subnet to the same state, and returns the
+// Config of each apply
+func applySubnetChange(t *testing.T, stateDir string) (*xcl.Config, *xcl.Config) {
+	t.Helper()
+
+	first := applyExampleWithState(t, stateDir)
+	changed := applyExampleDir(t, "./config-subnet", stateDir)
+
+	return first, changed
 }
 
 // loadExample returns a Config holding the state saved in stateDir, built as
@@ -379,4 +403,84 @@ func TestRunApplyWithoutAPathFails(t *testing.T) {
 
 	require.Equal(t, 2, code)
 	require.Contains(t, stderr.String(), "apply needs the path of the configuration to apply")
+}
+
+func TestSubnetChangeReplacesTheNetworkWithTheNewRange(t *testing.T) {
+	_, changed := applySubnetChange(t, t.TempDir())
+
+	app, err := xcl.Find[resources.Network](changed, "docker.network.app")
+	require.NoError(t, err)
+	require.Equal(t, "10.42.0.0/23", app.Subnet)
+
+	inspect, err := newDockerClient(t).NetworkInspect(context.Background(), app.DockerID, network.InspectOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, inspect.IPAM.Config)
+	require.Equal(t, "10.42.0.0/23", inspect.IPAM.Config[0].Subnet)
+}
+
+func TestSubnetChangeRemovesTheOldNetwork(t *testing.T) {
+	first, _ := applySubnetChange(t, t.TempDir())
+
+	old, err := xcl.Find[resources.Network](first, "docker.network.app")
+	require.NoError(t, err)
+
+	_, err = newDockerClient(t).NetworkInspect(context.Background(), old.DockerID, network.InspectOptions{})
+	require.Error(t, err)
+	require.True(t, dockerclient.IsErrNotFound(err), "expected the old network to be gone, got: %s", err)
+}
+
+func TestSubnetChangeAttachesANewContainer(t *testing.T) {
+	first, changed := applySubnetChange(t, t.TempDir())
+
+	old, err := xcl.Find[resources.Container](first, "docker.container.web")
+	require.NoError(t, err)
+
+	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	require.NoError(t, err)
+	require.NotEmpty(t, web.DockerID)
+	require.NotEqual(t, old.DockerID, web.DockerID)
+
+	app, err := xcl.Find[resources.Network](changed, "docker.network.app")
+	require.NoError(t, err)
+
+	inspect, err := newDockerClient(t).ContainerInspect(context.Background(), web.DockerID)
+	require.NoError(t, err)
+	require.NotNil(t, inspect.State)
+	require.True(t, inspect.State.Running)
+	require.NotNil(t, inspect.NetworkSettings)
+	require.Contains(t, inspect.NetworkSettings.Networks, "app")
+	require.Equal(t, app.DockerID, inspect.NetworkSettings.Networks["app"].NetworkID)
+	require.Equal(t, web.IPAddress, inspect.NetworkSettings.Networks["app"].IPAddress)
+}
+
+func TestSubnetChangeRendersTemplateWithNewAddress(t *testing.T) {
+	_, changed := applySubnetChange(t, t.TempDir())
+
+	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	require.NoError(t, err)
+	require.NotEmpty(t, web.IPAddress)
+
+	welcome, err := xcl.Find[template.Template](changed, "template.welcome")
+	require.NoError(t, err)
+
+	rendered, err := os.ReadFile(welcome.Destination)
+	require.NoError(t, err)
+
+	expected := "Welcome to the app network.\n" +
+		"The web container answers at http://" + web.IPAddress + "/\n"
+	require.Equal(t, expected, string(rendered))
+}
+
+func TestPlanAfterSubnetChangeReportsNoChanges(t *testing.T) {
+	stateDir := t.TempDir()
+	applySubnetChange(t, stateDir)
+
+	c, err := newConfig(nil, dockerPlugin, stateDir)
+	require.NoError(t, err)
+
+	out := &bytes.Buffer{}
+	err = plan(out, c, "./config-subnet")
+	require.NoError(t, err)
+
+	require.Equal(t, "Diff: no changes, 3 unchanged.\n", out.String())
 }

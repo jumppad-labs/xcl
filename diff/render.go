@@ -80,7 +80,13 @@ func Highlight(renderer highlight.Renderer) RenderOption {
 //
 // The header is marked + for a resource that would be created, - for one
 // that would be deleted, ~ for one that would be updated and -/+ for one that
-// would be replaced. A change line is marked + for an added value, - for a
+// would be replaced. The comment line above a replacement says why:
+//
+//	# resource.container.web will be replaced because resource.network.app is replaced
+//	-/+ resource "container" "web" {
+//
+// or "its last apply failed", or "it cannot be updated in place" when its
+// provider decided it alone. A change line is marked + for an added value, - for a
 // removed one and ~ for a changed one, written as before -> after. A value
 // only known once an apply has run is written as (known after apply). A
 // resource with no changes is written as a header with an empty body, and an
@@ -229,12 +235,36 @@ func actionPhrase(resource Resource) string {
 		}
 		return "will be updated"
 	case ActionReplace:
-		return "will be replaced, its last apply failed"
+		return replacePhrase(resource)
 	case ActionDelete:
 		return "will be deleted"
 	}
 
 	return "will be changed"
+}
+
+// replacePhrase returns what the comment line says about a replacement, by
+// its reason
+func replacePhrase(resource Resource) string {
+	switch resource.Reason {
+	case ReplaceFailed:
+		return "will be replaced, its last apply failed"
+	case ReplaceProvider:
+		return "will be replaced, it cannot be updated in place"
+	case ReplaceDependency:
+		if len(resource.ReplacedDeps) == 0 {
+			return "will be replaced because a dependency is replaced"
+		}
+
+		verb := "is"
+		if len(resource.ReplacedDeps) > 1 {
+			verb = "are"
+		}
+
+		return "will be replaced because " + strings.Join(resource.ReplacedDeps, ", ") + " " + verb + " replaced"
+	}
+
+	return "will be replaced"
 }
 
 // headerMarker returns the marker of a block header for action and the kind

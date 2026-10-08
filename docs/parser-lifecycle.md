@@ -21,28 +21,42 @@ in order:
    [`ErrEmptyConfiguration`](../internal/parser/errors.go) ("the configuration
    declares no blocks, use Destroy to remove everything"). Applying it would
    remove everything, so nothing is destroyed, created, changed or saved.
-3. Destroy the resources that are in the previous state but no longer in the
-   configuration ([`removedResources`](../internal/parser/parser.go#L332)),
+3. **Decide** what happens to every resource, without creating, updating or
+   destroying anything (`Parser.decide`). The resources that are in the
+   previous state but no longer in the configuration
+   ([`removedResources`](../internal/parser/parser.go)) are recorded as
+   deleted. Then the configuration is walked in dependency order, as below,
+   in decide mode: each provider-backed resource is decided create, update,
+   replace or unchanged, its provider's `Read` and `Changed` being called for
+   a resource saved as `created` or `updated`
+   ([decision tree](#walkcallback-and-resourcelifecycle)). `Parser.Diff`
+   runs exactly this pass and reports the record as a plan. If any decision
+   fails, `Apply` returns a nil state: nothing has changed, and nothing is
+   saved.
+4. Parse and validate the configuration again (`reparse`, emitting no
+   events), so the values the decide pass read and the placeholders it held
+   for values only known after the apply never reach a provider.
+5. **Destroy** every resource decided replace and every removed resource
+   ([`diffRecorder.toDestroy`](../internal/parser/diff_recorder.go)),
    children first, before anything is created or changed. This uses the same
-   destroyer as `Destroy`, see [Destroy](#destroy).
-4. Build a DAG from resource dependencies (`internal/parser/dag.go`). Every
-   edge comes from `Meta.Links`, which hold both the cross-resource
-   references discovered during parsing and each written `depends_on` entry
-   in its canonical form. `DependsOn` itself keeps only what was written and
-   is never altered.
-5. Walk the DAG in dependency order.
-6. Decode each resource body (`gohcl.DecodeBody`) once its dependencies'
-   values are available.
-7. Look up the resource in the previous state and call
-   `Create`, or `Read`+`Changed`+`Update`, or `Destroy`+`Create`, on the
-   resource's provider.
+   destroyer as `Destroy`, see [Destroy](#destroy), and saves the state after
+   each one.
+6. **Create and update**: build a DAG from resource dependencies
+   (`internal/parser/dag.go`) and walk it in dependency order. Every edge
+   comes from `Meta.Links`, which hold both the cross-resource references
+   discovered during parsing and each written `depends_on` entry in its
+   canonical form. `DependsOn` itself keeps only what was written and is
+   never altered. Each resource body is decoded (`gohcl.DecodeBody`) once
+   its dependencies' values are available, with real values, and its
+   decision is followed: `Create` for a new or replaced resource, `Update`
+   for an updated one, nothing for an unchanged one.
 
-If a removal in step 3 fails, `Apply` stops there; if a provider call fails
-in the walk, `Apply` returns the state the walk reached. Either way the error
-comes back with a state to save, see
+If deciding fails, nothing is saved. If a destroy in step 5 fails, `Apply`
+stops there; if a provider call fails in step 6, `Apply` returns the state
+the walk reached. Either way the error comes back with a state to save, see
 [State saved after a failed apply](#state-saved-after-a-failed-apply). An
-apply that removes nothing skips step 3 entirely. `ctx` is the operation's
-context; once it is cancelled no new provider call starts, see
+apply that replaces and removes nothing skips step 5 entirely. `ctx` is the
+operation's context; once it is cancelled no new provider call starts, see
 [The operation context](#the-operation-context).
 
 ```go
@@ -50,7 +64,7 @@ func (p *Parser) Validate(ctx context.Context, paths ...string) error
 ```
 
 is the checking half on its own: it runs `parseAndValidate` and stops there,
-so it never reaches steps 2-7. This is what `Config.Validate` calls. It
+so it never reaches steps 2-6. This is what `Config.Validate` calls. It
 reaches no provider, so it takes `ctx` only for symmetry with `Apply` and
 `Destroy`.
 
@@ -83,37 +97,75 @@ every `Apply`/`Validate`/`Destroy` (see [Overview](overview.md)).
 ## `walkCallback` and `resourceLifecycle`
 
 The DAG walker (`internal/dag`, a copy of `github.com/silas/dag`) invokes one callback per vertex.
-[`walkCallback`](../internal/parser/callbacks.go#L37) is that callback: it
+[`walkCallback`](../internal/parser/callbacks.go) is that callback: it
 decodes the resource's HCL body, handles module-specific evaluation-context
-setup, and then hands the resource to `resourceLifecycle.apply`
-([`internal/parser/lifecycle.go`](../internal/parser/lifecycle.go)).
+setup, and then hands the resource to `resourceLifecycle`
+([`internal/parser/lifecycle.go`](../internal/parser/lifecycle.go)): to
+`decide` in the decide walk, to `apply` in the create and update walk.
 
-`resourceLifecycle` picks the provider calls from the resource's entry in the
-previous state, the state saved by the last apply:
+`resourceLifecycle.decide` chooses each resource's action from its entry in
+the previous state, the state saved by the last apply, and records it. It
+calls no `Create`, `Update` or `Destroy`:
 
 ```
 not in previous state
-    -> Create                                  status created
+    -> create
+
+saved as failed, destroy_failed, or anything else
+    -> replace (reason "failed")               no provider call
 
 saved as created or updated
+    -> dependencies = dependencyChanges(...)
     -> carry computed values from the saved copy onto the configured copy
     -> Read(saved, configured)
-         ErrNotFound -> reset to the configured copy, Create   status created
-         other error -> status failed, the apply fails
-    -> Changed(saved, read result)
-         true  -> Update(read result)          status updated
-         false -> keep the read result and the previous status
-
-saved as failed, destroy_failed, or anything else (rebuild)
-    -> Destroy(saved copy)
-         error -> keep the saved copy          status destroy_failed
-    -> Create(configured copy)                 status created
+         ErrNotFound -> reset to the configured copy  -> create
+         other error -> the decision fails, the apply fails
+    -> Changed(saved, read result, dependencies)
+         error           -> the decision fails, the apply fails
+         entity.NoChange -> unchanged
+         entity.Update   -> update
+         entity.Replace  -> replace (reason "dependency" when any of
+                            dependencies is replaced, "provider" otherwise)
 ```
 
-A rebuild happens whether or not the resource's configuration changed. When
-the rebuild's `Destroy` fails, `Create` is not called; the saved copy is kept
-because it holds the identity needed to try the destroy again on the next
-apply.
+`dependencyChanges`
+([`dependencies.go`](../internal/parser/dependencies.go)) builds the list a
+provider is given from the resource's `Meta.Links`: the provider-backed
+resources it depends on that the record already says are updated or
+replaced, sorted by address, each an `entity.DependencyChange`. The walk
+decides a parent before its dependents, so every dependency's decision is
+recorded by then. Unchanged dependencies and dependencies decided create are
+left out. Outputs, variables, modules and registered (config-only) types are
+looked through to the provider-backed resources behind them; a
+provider-backed dependency is not, so the list is direct dependencies only.
+
+A resource whose configuration uses a value only known after the apply, a
+computed value of a dependency decided create, update or replace, is read
+with its saved values in place of the unknown ones, and is decided at least
+update even when `Changed` answers `entity.NoChange`; `Changed` can still
+answer `entity.Replace`. A `Read` or `Changed` error does not mark the
+resource failed, since nothing has been attempted: the decide pass fails and
+`Apply` returns a nil state. The decide pass logs, at debug level, how many
+resources it decided for each action and why each replaced one is replaced.
+
+`resourceLifecycle.apply` then follows the recorded decision:
+
+```
+create or replace
+    -> Create(configured copy)                 status created
+update
+    -> carry computed values read while deciding onto the configured copy
+    -> Update(configured copy)                 status updated
+unchanged
+    -> keep the read result and the previous status, no provider call
+```
+
+A replaced resource was destroyed before the walk started, with its saved
+copy, so it is created like a new one. A replacement happens whether or not
+the resource's configuration changed when its last apply failed. When its
+`Destroy` fails, the apply stops before the walk and `Create` is not called;
+the saved copy is kept, marked `destroy_failed`, because it holds the
+identity needed to try the destroy again on the next apply.
 
 After `Create`, `Read` and `Update`, the lifecycle compares the resource it
 sent with what the provider returned and emits a warn log event for every
@@ -143,8 +195,8 @@ parser and writes nothing. A load failure is returned as
 `failed to load state: ...`.
 
 The work is done by the
-[`destroyer`](../internal/parser/destroy.go#L22), which the removal phase of
-`Apply` uses too:
+[`destroyer`](../internal/parser/destroy.go), which the destroy phase of
+`Apply` uses too, for its replaced and removed resources:
 
 - [`buildDestroyDAG`](../internal/parser/dag.go) builds the create graph with
   the same builder, over the working state: each target's `Meta.Links` and
@@ -281,23 +333,31 @@ Every failure the parser returns is also emitted as an error event.
 
 ### Event sequences per resource
 
-Which operations fire depends on the resource's entry in the previous state
+An apply decides before it acts, so every `read` and `changed` event of an
+apply comes before its first `destroy`, `create` or `update` event. Which
+operations fire for a resource depends on its decision
 ([`lifecycle.go`](../internal/parser/lifecycle.go)):
 
 - **New resource** — `create` start, then `create` success or error.
-- **Existing resource** (saved as `created` or `updated`) — `read`
-  start/success-or-error, then `changed` start/success-or-error, then, only
-  if `Changed` reported a change, `update` start/success-or-error. When
-  `Read` returns `ErrNotFound`, the `read` error event is followed by
-  `create` start/success-or-error instead.
-- **Rebuilt resource** (saved as `failed` or `destroy_failed`) — `destroy`
-  start/success-or-error, then, if the destroy succeeded, `create`
-  start/success-or-error.
+- **Existing resource** (saved as `created` or `updated`) — while deciding,
+  `read` start/success-or-error, then `changed` start/success-or-error. Then,
+  when acting: nothing more if it is unchanged; `update`
+  start/success-or-error if it is updated; or the replacement sequence below
+  if it is replaced. When `Read` returns `ErrNotFound`, the `read` error event
+  is followed, when acting, by `create` start/success-or-error instead.
+- **Replaced resource** — `destroy` start/success-or-error in the destroy
+  phase, then, if the destroy succeeded, `create` start/success-or-error in
+  the walk. There is no `replace` operation: a replacement is a `destroy`
+  then a `create` for the same `ResourceID`. A resource saved as `failed` or
+  `destroy_failed` is replaced without a `read` or `changed` event.
 - **Removed resource** (in the previous state, no longer configured) —
-  `destroy` start, then `destroy` success or error, before any other
-  resource is processed.
+  `destroy` start, then `destroy` success or error, in the destroy phase.
 - **Destroyed resource** (`Config.Destroy`) — `destroy` start, then
   `destroy` success or error.
+
+The destroy phase runs replaced and removed resources together, children
+first, so the container attached to a replaced network fires its `destroy`
+events before the network's.
 
 ### Builtin types
 
@@ -313,13 +373,17 @@ reconstruct processing order.
 Events never affect control flow. Every provider error is handled the same
 way, whichever operation it came from:
 
-- An error from `create`, `read`, `changed`, `update` or `destroy` marks the
-  resource `failed` (`destroy_failed` for any `destroy`), stops the
-  walk from reaching the resources that depend on it (on a destroy walk, the
-  resources it depends on), and is returned from `Apply` or `Destroy`.
-  Resources that don't depend on it still complete.
+- An error from `read` or `changed` comes while deciding: it marks nothing,
+  fails the decide pass, and `Apply` returns it with a nil state before any
+  `destroy`, `create` or `update` is called.
+- An error from `create`, `update` or `destroy` marks the resource `failed`
+  (`destroy_failed` for any `destroy`), stops the walk from reaching the
+  resources that depend on it (on a destroy walk, the resources it depends
+  on), and is returned from `Apply` or `Destroy`. Resources that don't
+  depend on it still complete; a failed `destroy` in an apply's destroy
+  phase stops the apply before anything is created or updated.
 - The one exception is `plugins.ErrNotFound` from `read`: the `error` event
-  fires, but the lifecycle creates the resource again instead of failing.
+  fires, but the resource is decided create instead of failing.
 
 ## The operation context
 
@@ -332,9 +396,11 @@ below), but the parser treats any cancellation the same way:
   callback ([`callbacks.go`](../internal/parser/callbacks.go)) check
   `ctx.Err()` before starting a call. Once it is cancelled no new call
   starts and no event is fired for it; the resource is treated as not
-  reached, so it keeps its previous entry in the state. `Apply` returns the
-  partial state with `apply stopped before every resource was reached`
-  wrapping `ctx`'s error, and `Destroy` returns what is left with
+  reached, so it keeps its previous entry in the state. Cancelled while
+  deciding, `Apply` returns a nil state, so nothing is saved, with
+  `apply stopped before every resource was reached` wrapping `ctx`'s error;
+  cancelled while acting, it returns the partial state with the same error;
+  and `Destroy` returns what is left with
   `destroy stopped before every resource was reached`.
 - **A provider context that is never cancelled.** Each call is made with
   `providerContext(...)` ([`events.go`](../internal/parser/events.go)),
@@ -387,12 +453,15 @@ provider calls and DAG-walk order.
 
 ## State saved after a failed apply
 
-When destroying a removed resource fails, nothing is created or changed.
+When destroying a replaced or removed resource fails, nothing is created or
+changed.
 `Parser.Apply` returns the previous state minus the resources that were
 destroyed, with the failed ones (and, as with `Destroy`, everything they
 depend on) still in it, the failures marked `destroy_failed`. The removal has
 already saved this after each resource, and `Config.Apply` saves it again
-before returning the error. The next apply retries the removal first.
+before returning the error. The next apply decides a failed replacement
+replace again and retries the destroy first, and retries a failed removal
+first.
 
 When the walk fails, `Parser.Apply` still returns a state, built by
 `applyProgress.buildState`
@@ -401,8 +470,7 @@ with the error:
 
 - resources the walk reached are included as they are now, with their new
   values and status;
-- the failing resource is included as `failed`, or `destroy_failed` if the
-  rebuild's destroy failed;
+- the failing resource is included as `failed`; the next apply replaces it;
 - resources that existed in the previous state but were not reached keep
   their previous entry;
 - new resources that were not reached are left out.
@@ -412,6 +480,6 @@ provider for its type) is treated as not reached.
 
 `Config.Apply` ([`config.go`](../config.go#L110)) saves this state and then
 returns the error, so the next apply picks up where this one stopped. When
-parsing or validation fails, the configuration declares no blocks, or the
-dependency graph can't be built, `Parser.Apply` returns a nil state and
-nothing is saved.
+parsing or validation fails, the configuration declares no blocks, the
+dependency graph can't be built, or deciding fails or is cancelled,
+`Parser.Apply` returns a nil state and nothing is saved.

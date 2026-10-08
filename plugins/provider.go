@@ -3,6 +3,8 @@ package plugins
 
 import (
 	"context"
+
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 )
 
@@ -74,8 +76,8 @@ type ResourceProvider[T any] interface {
 	Read(ctx context.Context, old T, new T) (T, error)
 
 	// Update updates an existing resource to match the desired configuration.
-	// This method is called after Changed() returns true, indicating the resource
-	// needs to be updated.
+	// This method is called only when Changed answers entity.Update, indicating
+	// the resource can be changed in place.
 	//
 	// The ctx parameter provides cancellation and timeout control.
 	// The resource parameter contains the desired resource configuration.
@@ -84,19 +86,27 @@ type ResourceProvider[T any] interface {
 	// The implementation should periodically check the context for cancellation.
 	Update(ctx context.Context, resource T) (T, error)
 
-	// Changed determines if a resource has changed by comparing the current state
-	// with the desired configuration.
+	// Changed decides what applying the desired configuration needs for a
+	// resource, by comparing the current state with the desired configuration.
 	//
 	// The ctx parameter provides cancellation and timeout control.
 	// The old parameter contains the resource as saved by the last apply.
 	// The new parameter contains the current configuration after it has been
 	// through Read, so it holds both configuration edits and observed drift.
+	// The dependencies parameter lists the resources this one directly depends
+	// on that the same apply will update or replace, each with its outcome.
+	// Dependencies that will not change are not listed.
+	//
+	// The answer decides what the apply does with the resource:
+	//   - entity.NoChange leaves it as it is;
+	//   - entity.Update calls Update to change it in place;
+	//   - entity.Replace destroys it, then creates it again.
 	//
 	// Embed DefaultChanged in the provider to get a default comparison;
 	// defining Changed on the provider overrides it.
-	// Returns true if the resource has changed and needs updating, false otherwise,
-	// and any error encountered while checking for changes.
-	Changed(ctx context.Context, old T, new T) (bool, error)
+	// Returns the change the resource needs and any error encountered while
+	// deciding it.
+	Changed(ctx context.Context, old T, new T, dependencies []entity.DependencyChange) (entity.Change, error)
 
 	// Functions returns the functions exposed by the provider that can be called
 	// by other providers.

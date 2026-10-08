@@ -43,3 +43,31 @@ func EventsWithPhase(recorded []events.Event, phase string) []events.Event {
 
 	return found
 }
+
+// ResourceOperations returns, for each resource a provider was called for, the
+// operations of its create, update and destroy steps that succeeded, in the
+// order they were reported. A provider call reports a start event, so a
+// resource that never reported one, such as a variable, an output or a
+// registered type, is left out. A replaced resource shows destroy then create.
+func ResourceOperations(recorded []events.Event) map[string][]string {
+	provided := map[string]bool{}
+	for _, e := range recorded {
+		if e.ResourceID != "" && e.Phase == events.PhaseStart {
+			provided[e.ResourceID] = true
+		}
+	}
+
+	operations := map[string][]string{}
+	for _, e := range recorded {
+		if !provided[e.ResourceID] || e.Phase != events.PhaseSuccess {
+			continue
+		}
+
+		switch e.Operation {
+		case events.OperationCreate, events.OperationUpdate, events.OperationDestroy:
+			operations[e.ResourceID] = append(operations[e.ResourceID], e.Operation)
+		}
+	}
+
+	return operations
+}

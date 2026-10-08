@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -97,8 +98,20 @@ func (p *networkProvider) Read(ctx context.Context, old *Network, new *Network) 
 	return new, nil
 }
 
-// Update returns the network unchanged, the example does not change networks
-// in place
+// Changed answers replace when the subnet changes: Docker can not move a
+// network to a new address range, the network has to be removed and created
+// again. Any other change is left to DefaultChanged.
+func (p *networkProvider) Changed(ctx context.Context, old *Network, new *Network, dependencies []entity.DependencyChange) (entity.Change, error) {
+	if old.Subnet != new.Subnet {
+		return entity.Replace, nil
+	}
+
+	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+}
+
+// Update returns the network unchanged. Every setting Docker can not change in
+// place answers replace in Changed, so Update is only reached for changes that
+// need no Docker call, such as xcl's own metadata.
 func (p *networkProvider) Update(ctx context.Context, n *Network) (*Network, error) {
 	return n, nil
 }

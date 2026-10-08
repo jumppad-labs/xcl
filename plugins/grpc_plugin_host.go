@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/proto"
@@ -289,25 +290,31 @@ func (w *grpcPluginWrapper) Update(ctx context.Context, entityType, entitySubTyp
 	return resp.UpdatedEntityData, nil
 }
 
-func (w *grpcPluginWrapper) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error) {
+func (w *grpcPluginWrapper) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
 	ctx, done := w.callContext(ctx)
 	defer done()
+
+	protoDependencies, err := toProtoDependencies(dependencies)
+	if err != nil {
+		return entity.NoChange, err
+	}
 
 	resp, err := w.client.Changed(ctx, &proto.ChangedRequest{
 		EntityType:    entityType,
 		EntitySubType: entitySubType,
 		OldEntityData: oldEntityData,
 		NewEntityData: newEntityData,
+		Dependencies:  protoDependencies,
 	})
 	if err != nil {
-		return false, err
+		return entity.NoChange, err
 	}
 
 	if resp.Error != "" {
-		return false, errors.New(resp.Error)
+		return entity.NoChange, errors.New(resp.Error)
 	}
 
-	return resp.Changed, nil
+	return fromProtoChange(resp.Change)
 }
 
 // Ensure GRPCPluginHost implements PluginHost interface
@@ -390,10 +397,11 @@ func (h *GRPCPluginHost) Update(ctx context.Context, entityType, entitySubType s
 	return h.plugin.(*grpcPluginWrapper).Update(ctx, entityType, entitySubType, entityData)
 }
 
-// Changed checks if the entity has changed by comparing old and new
-func (h *GRPCPluginHost) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error) {
+// Changed decides what applying new needs for the entity saved as old,
+// given the dependencies the same apply will update or replace
+func (h *GRPCPluginHost) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
 	if h.plugin == nil {
-		return false, fmt.Errorf("plugin not initialized")
+		return entity.NoChange, fmt.Errorf("plugin not initialized")
 	}
-	return h.plugin.Changed(ctx, entityType, entitySubType, oldEntityData, newEntityData)
+	return h.plugin.Changed(ctx, entityType, entitySubType, oldEntityData, newEntityData, dependencies)
 }

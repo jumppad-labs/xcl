@@ -26,13 +26,30 @@ const (
 	// depends on a value only known once an apply has run.
 	ActionUpdate Action = "update"
 
-	// ActionReplace is a resource saved as failed or destroy_failed, which an
-	// apply always destroys and creates again.
+	// ActionReplace is a resource an apply destroys and creates again: one
+	// whose last apply failed, one its provider cannot update in place, or
+	// one whose provider answers replace because a resource it depends on is
+	// replaced. Resource.Reason says which.
 	ActionReplace Action = "replace"
 
 	// ActionDelete is a resource in the saved state that is no longer in the
 	// configuration.
 	ActionDelete Action = "delete"
+)
+
+// ReplaceReason says why a resource will be replaced.
+type ReplaceReason string
+
+const (
+	// ReplaceFailed is a resource whose last apply failed.
+	ReplaceFailed ReplaceReason = "failed"
+
+	// ReplaceProvider is a resource its provider cannot update in place.
+	ReplaceProvider ReplaceReason = "provider"
+
+	// ReplaceDependency is a resource that depends on a resource that is
+	// replaced.
+	ReplaceDependency ReplaceReason = "dependency"
 )
 
 // Diff is what an apply of a configuration would do.
@@ -72,6 +89,15 @@ type Resource struct {
 
 	// Action is what an apply would do with the resource.
 	Action Action `json:"action"`
+
+	// Reason says why a resource with ActionReplace is replaced. It is
+	// empty for every other action.
+	Reason ReplaceReason `json:"reason,omitempty"`
+
+	// ReplacedDeps are the addresses of the replaced resources behind a
+	// replacement with ReplaceDependency, sorted. It is empty for every
+	// other reason and action.
+	ReplacedDeps []string `json:"replaced_dependencies,omitempty"`
 
 	// Changes lists the configured values that would change, one per
 	// changed field in field declaration order. An update may have none,

@@ -242,3 +242,93 @@ func placeholder(t cty.Type) cty.Value {
 
 	return cty.NullVal(t)
 }
+
+// withSavedValues sets every value of entity at the given unknown paths to the
+// value saved holds at the same path. A resource whose configured values are
+// only known once an apply has run is still read and asked whether it
+// changed: its provider sees what it had at those paths rather than
+// placeholders. A path saved does not reach, such as a list element that did
+// not exist before, keeps its placeholder. saved is a resource of the same Go
+// type as entity.
+func withSavedValues(entity any, saved any, paths []diff.Path) {
+	for _, path := range paths {
+		setSavedValue(reflect.ValueOf(entity), reflect.ValueOf(saved), path)
+	}
+}
+
+// setSavedValue sets the value at path inside target to the value at the same
+// path inside saved. target must be settable once dereferenced.
+func setSavedValue(target, saved reflect.Value, path diff.Path) {
+	for target.Kind() == reflect.Pointer {
+		if target.IsNil() {
+			return
+		}
+		target = target.Elem()
+	}
+
+	for saved.Kind() == reflect.Pointer {
+		if saved.IsNil() {
+			return
+		}
+		saved = saved.Elem()
+	}
+
+	if !saved.IsValid() || !target.CanSet() {
+		return
+	}
+
+	if len(path) == 0 {
+		if saved.Type().AssignableTo(target.Type()) {
+			target.Set(saved)
+		}
+		return
+	}
+
+	step := path[0]
+	switch step.Kind {
+	case diff.StepAttribute:
+		if target.Kind() != reflect.Struct || saved.Type() != target.Type() {
+			return
+		}
+
+		for _, f := range structFields(target.Type()) {
+			if f.name == step.Attribute {
+				setSavedValue(target.FieldByIndex(f.index), saved.FieldByIndex(f.index), path[1:])
+				return
+			}
+		}
+
+	case diff.StepIndex:
+		if target.Kind() != reflect.Slice && target.Kind() != reflect.Array {
+			return
+		}
+
+		if step.Index >= target.Len() || step.Index >= saved.Len() {
+			return
+		}
+
+		setSavedValue(target.Index(step.Index), saved.Index(step.Index), path[1:])
+
+	case diff.StepKey:
+		if target.Kind() != reflect.Map || target.IsNil() || target.Type().Key().Kind() != reflect.String {
+			return
+		}
+
+		key := reflect.ValueOf(step.Key).Convert(target.Type().Key())
+
+		savedElement := saved.MapIndex(key)
+		if !savedElement.IsValid() {
+			return
+		}
+
+		// map elements can not be set in place, the element is copied, set
+		// and stored back
+		element := reflect.New(target.Type().Elem()).Elem()
+		if current := target.MapIndex(key); current.IsValid() {
+			element.Set(current)
+		}
+
+		setSavedValue(element, savedElement, path[1:])
+		target.SetMapIndex(key, element)
+	}
+}

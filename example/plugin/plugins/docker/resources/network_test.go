@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client/mocks"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -189,4 +190,30 @@ func TestNetworkReadKeepsTheDockerIDFromTheSavedNetwork(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "net-123", got.DockerID)
+}
+
+func TestNetworkChangedReplacesOnSubnetChange(t *testing.T) {
+	p := NewNetworkProvider(mocks.NewMockDocker(t))
+
+	old := testNetwork()
+	old.Subnet = "10.42.0.0/24"
+	new := testNetwork()
+	new.Subnet = "10.43.0.0/24"
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestNetworkChangedReportsNoChangeForIdenticalNetwork(t *testing.T) {
+	p := NewNetworkProvider(mocks.NewMockDocker(t))
+
+	old := testNetwork()
+	old.Subnet = "10.42.0.0/24"
+	new := testNetwork()
+	new.Subnet = "10.42.0.0/24"
+
+	change, err := p.Changed(context.Background(), old, new, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.NoChange, change)
 }

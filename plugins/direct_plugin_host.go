@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/logger"
 )
@@ -130,8 +131,8 @@ func (a *sourcedAdapter) Update(ctx context.Context, entityData []byte) ([]byte,
 	return a.next.Update(a.withSource(ctx), entityData)
 }
 
-func (a *sourcedAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte) (bool, error) {
-	return a.next.Changed(a.withSource(ctx), oldEntityData, newEntityData)
+func (a *sourcedAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
+	return a.next.Changed(a.withSource(ctx), oldEntityData, newEntityData, dependencies)
 }
 
 // GetTypes returns the types handled by the plugin
@@ -164,9 +165,10 @@ func (h *DirectPluginHost) Update(ctx context.Context, entityType, entitySubType
 	return h.plugin.Update(h.withSource(ctx), entityType, entitySubType, entityData)
 }
 
-// Changed checks if the entity has changed by comparing old and new
-func (h *DirectPluginHost) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error) {
-	return h.plugin.Changed(h.withSource(ctx), entityType, entitySubType, oldEntityData, newEntityData)
+// Changed decides what applying new needs for the entity saved as old,
+// given the dependencies the same apply will update or replace
+func (h *DirectPluginHost) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
+	return h.plugin.Changed(h.withSource(ctx), entityType, entitySubType, oldEntityData, newEntityData, dependencies)
 }
 
 // withSource returns ctx with its logger naming the plugin as the source

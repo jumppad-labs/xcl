@@ -1,0 +1,11 @@
+# A container whose network block is named after the supplied variable.
+
+variable "network_name" {
+  default = "unset"
+}
+
+resource "container" "from_variable" {
+  network {
+    name = variable.network_name
+  }
+}

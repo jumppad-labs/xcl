@@ -86,6 +86,50 @@ func TestResourceMarshalJSONOmitsAbsentChanges(t *testing.T) {
 	require.JSONEq(t, `{ "address": "resource.postgres.old", "action": "delete" }`, string(encoded))
 }
 
+func TestReplaceResourceJSONIncludesReasonAndDependencies(t *testing.T) {
+	encoded, err := json.Marshal(diff.Resource{
+		Address:      "resource.container.web",
+		Action:       diff.ActionReplace,
+		Reason:       diff.ReplaceDependency,
+		ReplacedDeps: []string{"resource.network.app", "resource.volume.data"},
+	})
+	require.NoError(t, err)
+
+	require.JSONEq(t, `{ "address": "resource.container.web", "action": "replace", "reason": "dependency",
+	  "replaced_dependencies": [ "resource.network.app", "resource.volume.data" ] }`, string(encoded))
+}
+
+func TestReplaceResourceJSONOmitsDependenciesWhenTheProviderDecided(t *testing.T) {
+	encoded, err := json.Marshal(diff.Resource{
+		Address: "resource.container.web",
+		Action:  diff.ActionReplace,
+		Reason:  diff.ReplaceProvider,
+	})
+	require.NoError(t, err)
+
+	require.JSONEq(t, `{ "address": "resource.container.web", "action": "replace", "reason": "provider" }`, string(encoded))
+}
+
+func TestUpdateResourceJSONOmitsReason(t *testing.T) {
+	encoded, err := json.Marshal(diff.Resource{
+		Address: "resource.container.api",
+		Action:  diff.ActionUpdate,
+		Changes: []diff.Change{
+			{Path: diff.Path{}.Attribute("image"), Before: "old", After: "new"},
+		},
+	})
+	require.NoError(t, err)
+
+	require.JSONEq(t, `{ "address": "resource.container.api", "action": "update",
+	  "changes": [ { "path": "image", "before": "old", "after": "new" } ] }`, string(encoded))
+}
+
+func TestReplaceReasonsHaveDesignNames(t *testing.T) {
+	require.Equal(t, "failed", string(diff.ReplaceFailed))
+	require.Equal(t, "provider", string(diff.ReplaceProvider))
+	require.Equal(t, "dependency", string(diff.ReplaceDependency))
+}
+
 func TestApplicationReadsSummaryFromDiff(t *testing.T) {
 	result := designExample()
 

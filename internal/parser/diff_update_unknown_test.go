@@ -69,14 +69,15 @@ func TestDiffReportsResourceReferencingComputedValueOfDriftedResourceAsUpdate(t 
 	}, user.Changes)
 }
 
-func TestDiffNeverReadsResourceReferencingComputedValueOfDriftedResource(t *testing.T) {
+func TestDiffReadsResourceReferencingComputedValueOfDriftedResourceWithSavedValues(t *testing.T) {
 	h := applyUpdateRefBeforeWithDrift(t)
 
-	h.runDiff(t, diffUpdateRefBeforeConfig)
+	result := h.runDiff(t, diffUpdateRefBeforeConfig)
 
-	require.Empty(t, callsFor(h.plugin.GetCalls(), diffUpdateRefUserID))
-	require.NotContains(t, h.plugin.GetReadResources(), diffUpdateRefUserID)
-	require.NotContains(t, h.plugin.GetChangedCalls(), diffUpdateRefUserID+"->"+diffUpdateRefUserID)
+	// decide pass reads every saved resource; unknowns carry saved values
+	read := readCallFor(t, h.plugin, diffUpdateRefUserID)
+	require.Equal(t, []string{"id-app"}, containerNetworkNames(t, read.New))
+	require.Equal(t, diff.ActionUpdate, diffActionFor(t, result, diffUpdateRefUserID))
 }
 
 func TestDiffDoesNotListResourceReferencingConfiguredValueOfDriftedResource(t *testing.T) {
@@ -136,12 +137,15 @@ func TestDiffPropagatesUnknownOfUpdatedResourceToItsDependents(t *testing.T) {
 	}, chained.Changes)
 }
 
-func TestDiffNeverReadsResourceReceivingPropagatedUnknown(t *testing.T) {
+func TestDiffReadsResourceReceivingPropagatedUnknownWithSavedValues(t *testing.T) {
 	h := applyUpdateRefBeforeWithDrift(t)
 
-	h.runDiff(t, diffUpdateRefBeforeConfig)
+	result := h.runDiff(t, diffUpdateRefBeforeConfig)
 
-	require.Empty(t, callsFor(h.plugin.GetCalls(), diffUpdateRefChainedID))
+	// decide pass reads every saved resource; unknowns carry saved values
+	read := readCallFor(t, h.plugin, diffUpdateRefChainedID)
+	require.Equal(t, []string{"assigned-id-app"}, containerNetworkNames(t, read.New))
+	require.Equal(t, diff.ActionUpdate, diffActionFor(t, result, diffUpdateRefChainedID))
 }
 
 func TestDiffOfDriftedResourceListsEveryAffectedResource(t *testing.T) {
@@ -186,12 +190,15 @@ func TestDiffReportsResourceReferencingComputedValueOfEditedResourceAsUpdate(t *
 	}, user.Changes)
 }
 
-func TestDiffNeverReadsResourceReferencingComputedValueOfEditedResource(t *testing.T) {
+func TestDiffReadsResourceReferencingComputedValueOfEditedResourceWithSavedValues(t *testing.T) {
 	h := applyUpdateRefBefore(t)
 
-	h.runDiff(t, diffUpdateRefEditedConfig)
+	result := h.runDiff(t, diffUpdateRefEditedConfig)
 
-	require.Empty(t, callsFor(h.plugin.GetCalls(), diffUpdateRefUserID))
+	// decide pass reads every saved resource; unknowns carry saved values
+	read := readCallFor(t, h.plugin, diffUpdateRefUserID)
+	require.Equal(t, []string{"id-app"}, containerNetworkNames(t, read.New))
+	require.Equal(t, diff.ActionUpdate, diffActionFor(t, result, diffUpdateRefUserID))
 }
 
 func TestDiffPassesEditedConfiguredValueAsKnown(t *testing.T) {
@@ -235,26 +242,33 @@ func TestDiffOfUnchangedResourceReadsEveryDependent(t *testing.T) {
 	), sortedCopy(h.plugin.GetReadResources()))
 }
 
-func TestApplyAfterDiffOfDriftedResourceUpdatesOnlyTheDriftedResource(t *testing.T) {
+// The decide pass floors a dependent whose inputs reference a computed value
+// of an updated resource to an update, so the apply now updates exactly what
+// the diff listed, where it used to update only the drifted resource
+func TestApplyAfterDiffOfDriftedResourceUpdatesWhatTheDiffListed(t *testing.T) {
 	h := applyUpdateRefBeforeWithDrift(t)
 
-	h.runDiff(t, diffUpdateRefBeforeConfig)
+	result := h.runDiff(t, diffUpdateRefBeforeConfig)
 	h.plugin.ResetCalls()
+
+	listedForUpdate := []string{}
+	for _, resource := range result.Resources {
+		if resource.Action == diff.ActionUpdate {
+			listedForUpdate = append(listedForUpdate, resource.Address)
+		}
+	}
+	require.Equal(t, sorted(diffUpdateRefAppID, diffUpdateRefChainedID, diffUpdateRefUserID), sortedCopy(listedForUpdate))
 
 	st := h.applyAndSave(t, diffUpdateRefBeforeConfig)
 
-	// apply re-reads user and asks Changed, the diff's unknown does not force
-	// an update: the provider id is unchanged by the update
-	require.Equal(t, []string{diffUpdateRefAppID}, h.plugin.GetUpdatedResources())
+	require.Equal(t, sortedCopy(listedForUpdate), sortedCopy(h.plugin.GetUpdatedResources()))
 	require.Empty(t, h.plugin.GetCreatedResources())
 	require.Empty(t, h.plugin.GetDestroyedResources())
-	require.Equal(t, []string{
-		"read " + diffUpdateRefUserID,
-		"changed " + diffUpdateRefUserID,
-	}, callsFor(h.plugin.GetCalls(), diffUpdateRefUserID))
 
+	// the update of app left its provider id as it was, so user still
+	// resolves to it
 	user := findResource[structs.Container](t, st.GetResources(), diffUpdateRefUserID)
 	require.Len(t, user.Networks, 1)
 	require.Equal(t, "id-app", user.Networks[0].Name)
-	require.Equal(t, types.StatusCreated, user.Meta.Status)
+	require.Equal(t, types.StatusUpdated, user.Meta.Status)
 }

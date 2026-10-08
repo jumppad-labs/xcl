@@ -34,7 +34,7 @@ type ResourceProvider[T any] interface {
     Destroy(ctx context.Context, resource T, force bool) error
     Read(ctx context.Context, old T, new T) (T, error)
     Update(ctx context.Context, resource T) (T, error)
-    Changed(ctx context.Context, old T, new T) (bool, error)
+    Changed(ctx context.Context, old T, new T, dependencies []entity.DependencyChange) (entity.Change, error)
     Functions() ProviderFunctions
 }
 ```
@@ -53,11 +53,18 @@ it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
   ([`plugins/errors.go`](../plugins/errors.go)) when the real resource no
   longer exists, and xcl creates it again. xcl checks for it with
   `errors.Is`, so it can be wrapped.
-- `Changed(ctx, old, new)` compares the saved copy with what `Read` returned.
-  Embed `plugins.DefaultChanged[T]`
-  ([`plugins/changed.go`](../plugins/changed.go)) to get a comparison of the
-  JSON form of both copies that ignores `meta`, `depends_on` and `disabled`;
-  define `Changed` on the provider to override it.
+- `Changed(ctx, old, new, dependencies)` compares the saved copy with what
+  `Read` returned and answers what the apply does with the resource, an
+  `entity.Change` ([`entity/change.go`](../entity/change.go)):
+  `entity.NoChange` leaves it alone, `entity.Update` calls `Update`, and
+  `entity.Replace` destroys it, then creates it again. `dependencies` lists
+  the resources it directly depends on that the same apply will update or
+  replace, each an `entity.DependencyChange{Address, Change}`. Embed
+  `plugins.DefaultChanged[T]` ([`plugins/changed.go`](../plugins/changed.go))
+  to get a comparison of the JSON form of both copies that ignores `meta`,
+  `depends_on` and `disabled`, answering update or no change; define
+  `Changed` on the provider to override it, for example to answer replace
+  (see [Overriding `Changed`](plugin-developer-guide.md#overriding-changed)).
 
 ### 2. `ProviderAdapter` — the uniform contract
 
@@ -74,7 +81,7 @@ type ProviderAdapter interface {
     Destroy(ctx context.Context, entityData []byte, force bool) error
     Read(ctx context.Context, oldEntityData []byte, newEntityData []byte) ([]byte, error)
     Update(ctx context.Context, entityData []byte) ([]byte, error)
-    Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte) (bool, error)
+    Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
 }
 ```
 
@@ -108,7 +115,7 @@ type PluginHost interface {
     Destroy(ctx context.Context, entityType, entitySubType string, entityData []byte) error
     Read(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) ([]byte, error)
     Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
-    Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) (bool, error)
+    Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
     Stop()
 }
 ```
@@ -145,6 +152,43 @@ adapter's error `errors.Is` `ErrNotFound`, and the host side
 (`grpcPluginWrapper.Read`) turns it back into an error wrapping
 `ErrNotFound`. Every other error arrives at the host as a plain error with
 the provider's message.
+
+`Changed` crosses the process boundary with its own messages:
+
+```protobuf
+enum Change {
+  CHANGE_NO_CHANGE = 0;
+  CHANGE_UPDATE = 1;
+  CHANGE_REPLACE = 2;
+}
+
+message DependencyChange {
+  string address = 1;
+  Change change = 2;
+}
+
+message ChangedRequest {
+  string entity_type = 1;
+  string entity_sub_type = 2;
+  bytes old_entity_data = 3;
+  bytes new_entity_data = 4;
+  repeated DependencyChange dependencies = 5;
+}
+
+message ChangedResponse {
+  // was: bool changed
+  reserved 1;
+  string error = 2;
+  Change change = 3;
+}
+```
+
+`plugins/change_proto.go` converts between `entity.Change` and the `Change`
+enum. A value either side does not know is an error, never a silent
+`entity.NoChange`. A plugin built against the earlier protocol, which
+answered with the `bool changed` field now reserved, sends no `change`, which
+reads as `CHANGE_NO_CHANGE`: it would never be updated, so external plugins
+must be rebuilt against this version of xcl.
 
 ## Registering a provider
 

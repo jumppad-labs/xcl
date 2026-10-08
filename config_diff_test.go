@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/diff"
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/registry"
@@ -536,6 +537,23 @@ func TestDiffListsExactlyTheOneChangedAttribute(t *testing.T) {
 	require.False(t, port.Unknown)
 }
 
+// TestDiffReportsProviderDecidedReplacement changes the api container's PORT,
+// which the TestPlugin's container provider is set to answer with replace, so
+// the diff lists the container as a replacement rather than an update
+func TestDiffReportsProviderDecidedReplacement(t *testing.T) {
+	f := setupDiffConfig(t)
+	applyDiffConfiguration(t, f, "base")
+
+	useDiffConfiguration(t, f, "changed_attribute")
+	f.plugin.SetChangedResult("resource.container.api", entity.Replace)
+
+	result, err := f.config.Diff([]string{f.configDir})
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"resource.container.api " + string(diff.ActionReplace)}, resourceActions(result))
+	require.Equal(t, 1, result.Summary.Replace)
+}
+
 func TestDiffReportsDriftOnlyAsUpdateWithNoChanges(t *testing.T) {
 	f := setupDiffConfig(t)
 	applyDiffConfiguration(t, f, "base")
@@ -662,7 +680,7 @@ func TestDiffRevealsBothValuesOfAChangedSensitiveValueWhenAsked(t *testing.T) {
 	require.Equal(t, diffCredentialAfterPassword, password.After)
 }
 
-func TestDiffMarksUnknownValuesAndDoesNotReadTheirResource(t *testing.T) {
+func TestDiffMarksUnknownValues(t *testing.T) {
 	f := setupDiffConfig(t)
 	applyDiffConfiguration(t, f, "unknown_ref/before")
 
@@ -686,9 +704,28 @@ func TestDiffMarksUnknownValuesAndDoesNotReadTheirResource(t *testing.T) {
 			Unknown: true,
 		},
 	}, user.Changes)
+}
 
-	require.NotContains(t, f.plugin.GetReadResources(), "resource.container.user")
-	require.Equal(t, []string{"resource.network.one"}, f.plugin.GetReadResources())
+func TestDiffReadsResourceHoldingUnknownValueWithSavedValues(t *testing.T) {
+	f := setupDiffConfig(t)
+	applyDiffConfiguration(t, f, "unknown_ref/before")
+	useDiffConfiguration(t, f, "unknown_ref/after")
+	f.plugin.ResetCalls()
+
+	_, err := f.config.Diff([]string{f.configDir})
+	require.NoError(t, err)
+
+	// decide pass reads every saved resource; unknowns carry saved values.
+	// user's network name is unknown, so it is read with the saved "fixed"
+	readCalls := []parser.ReadCall{}
+	for _, call := range f.plugin.GetReadCalls() {
+		if call.ID == "resource.container.user" {
+			readCalls = append(readCalls, call)
+		}
+	}
+
+	require.Len(t, readCalls, 1)
+	require.Contains(t, string(readCalls[0].New), `"name":"fixed"`)
 }
 
 func TestDiffMarshalledToJSONMarksUnknownValueWithoutAnAfter(t *testing.T) {

@@ -8,12 +8,13 @@ BUILD_DIR := build
 XCL_DOCKER := $(BUILD_DIR)/xcl-docker
 DOCKER_PLUGIN := $(BUILD_DIR)/docker-plugin
 CONFIG_DIR := ./config
+SUBNET_DIR := ./config-subnet
 
 # MOCKERY is the pinned Mockery release that generates the Docker client mock,
 # run through go run so it needs no install
 MOCKERY := go run github.com/vektra/mockery/v3@v3.8.0
 
-.PHONY: build run test generate clean
+.PHONY: build run replace test generate clean
 
 # Build xcl-docker and the Docker plugin side by side, where xcl-docker
 # finds the plugin
@@ -25,6 +26,16 @@ build:
 # destroy it again, each a separate run of xcl-docker
 run: build
 	$(XCL_DOCKER) apply $(CONFIG_DIR)
+	$(XCL_DOCKER) status
+	$(XCL_DOCKER) destroy
+
+# Build, apply the example configuration, then show and apply the address
+# range change in config-subnet, which replaces the network and the container
+# attached to it and updates the template, then destroy everything again
+replace: build
+	$(XCL_DOCKER) apply $(CONFIG_DIR)
+	$(XCL_DOCKER) plan $(SUBNET_DIR)
+	$(XCL_DOCKER) apply $(SUBNET_DIR)
 	$(XCL_DOCKER) status
 	$(XCL_DOCKER) destroy
 
