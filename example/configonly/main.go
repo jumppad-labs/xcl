@@ -23,37 +23,29 @@
 package main
 
 import (
-	"crypto/rand"
 	"fmt"
 	"os"
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
-	"github.com/jumppad-labs/xcl/example/prettylog"
-	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
-// newStateKey returns a random 32 byte key to encrypt the sensitive values in
-// state with. The state only lives as long as one run of the example, so a
-// fresh key each run is enough. A real application keeps its state, so it
-// loads a stable key from a secret store instead, a key it loses is state it
-// can no longer read.
-func newStateKey() ([]byte, error) {
-	key := make([]byte, 32)
-	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("unable to generate the state key: %w", err)
-	}
-
-	return key, nil
+type appConfig struct {
+	Deployments []*resources.Deployment
+	Services    []*resources.Service
+	Ingresses   []*resources.Ingress
 }
 
 func main() {
 	dir := "./config"
-	if len(os.Args) > 1 {
-		dir = os.Args[1]
-	}
 
+	// the registry is built here so that the event receiver can share it: it
+	// is what types the entity an event carries, which is how the receiver
+	// shows each resource's configuration as it is created
+	r := registry.NewPluginRegistry()
+
+	cfg, err := loadConfig(dir, r)
 	if err := run(dir); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
@@ -64,55 +56,6 @@ func main() {
 // one line per route. It is separate from main only so the temporary state
 // directory is removed before main exits, os.Exit skips deferred calls.
 func run(dir string) error {
-	// Encrypt the sensitive values in state, see newStateKey
-	stateKey, err := newStateKey()
-	if err != nil {
-		return err
-	}
-
-	masker, err := mask.EncryptAES256GCM(stateKey)
-	if err != nil {
-		return fmt.Errorf("invalid state key: %w", err)
-	}
-
-	// Keep the state in a temporary directory, removed when the example ends
-	stateDir, err := os.MkdirTemp("", "xcl-example")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(stateDir)
-
-	// the registry is built here so that the event receiver can share it: it
-	// is what types the entity an event carries, which is how the receiver
-	// shows each resource's configuration as it is created
-	r := registry.NewPluginRegistry()
-
-	cfg, err := loadConfig(dir, r,
-		// Keep the state in a file
-		xcl.WithStatePath(stateDir),
-		// Encrypt sensitive values in the state, without a mask they are
-		// written in plain text and xcl warns about it
-		xcl.WithStateMask(masker),
-		// Every event xcl produces goes to the pretty receiver on stderr, so
-		// stdout holds only the routes
-		xcl.WithEventHandler(prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), r)),
-		// events carry nothing by default, this asks for each resource as
-		// state records it, which is what the receiver turns back into
-		// configuration text. Sensitive fields are redacted in events.
-		xcl.WithEventData(xcl.EventDataProcessed),
-	)
-	if err != nil {
-		return err
-	}
-
-	routes, err := ingressRoutes(cfg)
-	if err != nil {
-		return err
-	}
-
-	for _, route := range routes {
-		fmt.Println(route)
-	}
 
 	return nil
 }
@@ -122,11 +65,6 @@ func run(dir string) error {
 // the order the blocks were written, so the configuration can declare as many
 // of each as it needs. It holds only what the program reads, reading a new
 // block type needs only a new field.
-type appConfig struct {
-	Deployments []*resources.Deployment
-	Services    []*resources.Service
-	Ingresses   []*resources.Ingress
-}
 
 // loadConfig registers the example's block types on r, applies the
 // configuration in dir with options added to the registry, and gathers it into
@@ -148,7 +86,7 @@ func loadConfig(dir string, r *registry.PluginRegistry, options ...xcl.ConfigOpt
 		return nil, err
 	}
 
-	if err := r.RegisterType(&resources.Service{}, "service"); err != nil {
+	if err := r.RegisterType(&resources.Service{}, "service"); err != nil 
 		return nil, err
 	}
 
