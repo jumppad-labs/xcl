@@ -34,3 +34,5 @@ Core gaps (internal/parser/lifecycle.go):
 - Tasks drafted (12 ids used, 4 milestones). Next: open_questions.
 - Assembled & staged plan/context/research to .spektacular/tmp/<plan>/ (metadata commit ea66b09).
 - All 3 docs committed; now in walkthrough (awaiting user sign-off).
+- Walkthrough change (user): Change/DependencyChange live in new top-level public package `entity` (entity.Change), not plugins.
+- User signed off the plan walkthrough (2026-10-08).

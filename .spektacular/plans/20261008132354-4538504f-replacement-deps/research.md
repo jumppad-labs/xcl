@@ -1,6 +1,7 @@
 ---
 created_date: "2026-10-08"
-document_status: draft
+document_status: final
+closed_date: "2026-10-08"
 ---
 
 # Research: 20261008132354-4538504f-replacement-deps
@@ -10,7 +11,7 @@ document_status: draft
 - **Keep apply as one interleaved walk and add a `refreshReplace` outcome that routes to `rebuild`** — `rebuild` (`internal/parser/lifecycle.go:494-528`) destroys and recreates inside the resource's own DAG callback, i.e. in *create* order: a replaced network would be destroyed while its still-attached container exists, and a replaced container would only be destroyed after its network was. Violates the design's "destroy every replaced and removed resource, dependents first" and the spec's "nothing changes until every decision is made". Rejected.
 - **Separate decision pass that re-implements read/changed outside the walk** — the existing diff walk (`walkDiff`, `diffResource` `lifecycle.go:159-246`, `refresh` `:355-438`, `decodeForDiff` `diff_decode.go:23`, `diffRecorder` `diff_recorder.go`) already is a decide-only pass sharing DAG, decode and refresh with apply. A second path would let plan and apply disagree (spec Technical Approach: "Plans and applies share one decision pass"). Rejected.
 - **Infer replacement from struct tags (`xcl:",replace"`, ForceNew-style) or "any reference cascades" rules** — rejected by the user during spec work; spec Constraint "The plugin decides".
-- **Reuse `diff.Action` as the provider's answer** — `diff.Action` (`diff/diff.go:17-36`) is a JSON string vocabulary with create/delete and no "none"; `plugins` does not import `diff` (go list). Coupling the provider API to the renderer's vocabulary is wrong; keep `plugins.Change` and map in the lifecycle. Rejected.
+- **Reuse `diff.Action` as the provider's answer** — `diff.Action` (`diff/diff.go:17-36`) is a JSON string vocabulary with create/delete and no "none"; `plugins` does not import `diff` (go list). Coupling the provider API to the renderer's vocabulary is wrong; keep `entity.Change` and map in the lifecycle. Rejected.
 - **Pass placeholder values (from `decodeForDiff`) to Read/Changed for a resource whose inputs are unknown** — placeholders are type-zero values, so a provider would see bogus configuration and DefaultChanged would always report a change for meaningless reasons. Rejected in favour of substituting the saved value at unknown paths and flooring the outcome at Update (see assumptions).
 - **Render the dependency reason as a trailing comment on the header line (design sketch)** — the user chose to keep the existing layout: the reason goes in the comment line above the header (`# docker.container.web will be replaced because docker.network.app is replaced`). Rejected by the user.
 - **Tell a resource only about provider-backed resources it references literally** — a reference through a module output, variable or registered config-only type would hide a replaced resource behind the module boundary. The user chose to look through provider-less entities to the provider-backed resources behind them. Rejected by the user.
@@ -27,7 +28,7 @@ document_status: draft
 - Walker semantics (`internal/dag/walk.go`): independent vertices run concurrently; a vertex whose dependency errored is skipped ("upstream dependencies failed"). Decide pass therefore guarantees parents decided before children.
 - Events: rebuild already emits `destroy start/success` then `create start/success` for one ID (`TestRebuildEventsUseDestroyThenCreate`, `lifecycle_test.go:866`); there is no `replace` operation. `TestPlugin.Calls` is globally ordered under its mutex — usable for the linked network/container order assertion (convention `assert-ordering-on-graph-parents`: allowed because they are linked).
 - Status semantics: create failure → `StatusFailed` (`lifecycle.go:300`); destroy failure → `StatusDestroyFailed`; both are replaced on the next apply (`run` `:104-144`, `diffResource` `:211`). Reusing these satisfies "a failed replacement is recorded honestly".
-- Provider surface: `plugins` imports only `events, internal/schema, internal/wire, logger, plugins/proto, types` — new `plugins.Change`/`DependencyChange` create no cycle; no package-level `Update`/`Replace`/`NoChange` identifiers exist in `plugins` today.
+- Provider surface: `plugins` imports only `events, internal/schema, internal/wire, logger, plugins/proto, types` — a new standard-library-only `entity` package holding `Change`/`DependencyChange` can be imported by `plugins` and `internal/parser` with no cycle; no package-level `Update`/`Replace`/`NoChange` identifiers exist in `plugins` today.
 - All in-repo providers except `internal/parser/test_plugin.go` embed `plugins.DefaultChanged[T]`, so changing `DefaultChanged` migrates them; only `TestResourceProvider.Changed` (`test_plugin.go:644-671`) and the generated `plugins/mocks/mock_provider_adapter.go` need hand edits, plus direct callers (`plugins/testing/helpers.go:153,202`, `plugins/example/e2e_test.go:230,296,486-568`, `plugins/changed_test.go`, `plugins/changed_sensitive_test.go`).
 - Person plugin runs both in-process and external in `plugins/example/e2e_test.go` (`TestInProcessPlugin*`, `TestExternalPlugin*`) — the fixture for "external and built-in plugins behave the same".
 - Render: `renderer.resource` writes `# <address> <actionPhrase>` then the marker+header (`diff/render.go:136`); `actionPhrase` (`:222-238`) hardcodes the failed-apply phrase for replace; `headerMarker` returns `-/+` for replace (`:242`). Adding a reason to `diff.Resource` and branching `actionPhrase` on it is the whole render change.
@@ -207,6 +208,11 @@ document_status: draft
 - **Decision**: Add a new page `src/pages/replacement.mdx`, linked from the Guides menu.
 - **Rationale**: The site has no plugin-authoring page. The spec requires a section reachable from the guides.
 - **Rejected**: Burying the explanation inside the plugin example page (not reachable as a guide).
+
+### Change vocabulary lives in a new `entity` package (walkthrough, user decision)
+- **Decision**: `Change`, `NoChange`/`Update`/`Replace` and `DependencyChange` live in a new public top-level package `github.com/jumppad-labs/xcl/entity`, not in `plugins`.
+- **Rationale**: The user asked for `entity.Change`. It matches the project's glossary term "entity", and a standard-library-only package can be shared by `plugins`, `internal/parser` and others without a cycle.
+- **Rejected**: `plugins.Change` (ties the vocabulary to the plugin package).
 
 ## Rehydration cues
 

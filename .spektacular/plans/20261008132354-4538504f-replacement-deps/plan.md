@@ -1,6 +1,7 @@
 ---
 created_date: "2026-10-08"
-document_status: draft
+document_status: final
+closed_date: "2026-10-08"
 ---
 
 # Plan: 20261008132354-4538504f-replacement-deps
@@ -23,8 +24,8 @@ Plugin authors get a way to express changes their resources can't take in place,
 
 ## Conventions
 
-- **Go code style (gofmt, vet, `any`, descriptive names)** — applies to all new and changed Go code: `plugins.Change`, the decision record, and the provider migrations.
-- **Public library packages live at the module's top level** — `Change` and `DependencyChange` go in the public `plugins` package, and the replacement reason goes in the public `diff` package. Nothing goes under `/pkg` or the root package.
+- **Go code style (gofmt, vet, `any`, descriptive names)** — applies to all new and changed Go code: `entity.Change`, the decision record, and the provider migrations.
+- **Public library packages live at the module's top level** — `Change` and `DependencyChange` go in a new public top-level `entity` package, and the replacement reason goes in the public `diff` package. Nothing goes under `/pkg` or the root package.
 - **Testing & mocking: testify `require`, Mockery, no table-driven tests, positive and negative cases in separate functions, tests next to their source, no tests that inspect repository files** — every task's tests. The provider replace tests live beside each provider. Documentation changes are reviewed by hand, never asserted by tests.
 - **Generate test state with a real apply** — replacement, failed-replacement and retry tests produce their saved state by applying with `parser.TestPlugin` (using `SetCreateError`/`SetDestroyError` for failures), never from a hand-written state file.
 - **Assert ordering on graph parents, not provider call order** — the destroy-before-create test asserts call order only between the linked network and container. Any other ordering checks assert on graph parents.
@@ -40,14 +41,15 @@ Plugin authors get a way to express changes their resources can't take in place,
 
 The change is built on the design `replacement-and-dependency-changes.md` (source `design`), which settles the shape of the provider answer, the dependency list and the order of work. Spread across the work's two repositories, it looks like this.
 
-**The contract (xclconfig, `plugins/`).** The public `plugins` package gains:
+**The contract (xclconfig, `entity/` and `plugins/`).** A new public top-level package `entity` holds the change vocabulary, named after the project's term for anything a configuration declares:
 - `type Change int` with `NoChange`, `Update` and `Replace`, and a `String` method;
-- `DependencyChange{Address, Change}`;
-- the new `ResourceProvider[T].Changed(ctx, old, new T, dependencies []DependencyChange) (Change, error)`.
+- `DependencyChange{Address, Change}`.
+
+The `plugins` package's provider contract uses it: `ResourceProvider[T].Changed(ctx, old, new T, dependencies []entity.DependencyChange) (entity.Change, error)`.
 
 Every layer that carries the call passes `dependencies` in and `Change` out: `ProviderAdapter`, `TypedProviderAdapter`, the `Plugin` and `PluginHost` interfaces, `PluginBase`, the direct host and `sourcedAdapter`, the gRPC wrapper, server and resource adapter, and `plugins/plugin.proto`. The proto gains a `Change` enum, a `DependencyChange` message and `repeated DependencyChange dependencies = 5` on `ChangedRequest`. `ChangedResponse`'s `bool changed = 1` becomes `Change change = 3`, with field 1 reserved.
 
-`DefaultChanged` keeps its comparison and now returns `Update` or `NoChange`, ignoring dependencies. Because nearly every provider in the repository embeds it, the signature change moves them all at once. The types live in `plugins` rather than reusing `diff.Action`, because the provider vocabulary has no create or delete and `plugins` must not depend on the renderer (see `research.md#alternatives-considered-and-rejected`). Breaking the interface and the protocol is allowed by the spec, so there is no compatibility shim.
+`DefaultChanged` keeps its comparison and now returns `Update` or `NoChange`, ignoring dependencies. Because nearly every provider in the repository embeds it, the signature change moves them all at once. The types live in their own `entity` package, which imports only the standard library, so `plugins`, `internal/parser` and future packages can all share them without a cycle. They do not reuse `diff.Action`, because the provider vocabulary has no create or delete and `plugins` must not depend on the renderer (see `research.md#alternatives-considered-and-rejected`). Breaking the interface and the protocol is allowed by the spec, so there is no compatibility shim.
 
 **Apply becomes decide-then-act, and the decide pass is the existing diff walk (xclconfig, `internal/parser`).**
 - **Decide.** `Parser.Diff` already walks the graph without acting. It reads and runs `Changed` through the shared `refresh`, and marks pending entities so their computed values become unknown to dependents. It is promoted into the single decide pass that both `Parser.Diff` and `Parser.Apply` run. This is what keeps a plan from disagreeing with the apply that follows.
@@ -103,7 +105,7 @@ Rejected directions are recorded in `research.md#alternatives-considered-and-rej
 
 ## Component Breakdown
 
-- **Change vocabulary (new, public `plugins` package).** Owns `Change` (`NoChange`, `Update`, `Replace`, with a `String` method) and `DependencyChange`. It is the shared language of the provider contract, the adapters, the gRPC protocol and the core's decision record. It has no dependencies beyond the standard library.
+- **Change vocabulary (new, public `entity` package).** Owns `Change` (`NoChange`, `Update`, `Replace`, with a `String` method) and `DependencyChange`. It is the shared language of the provider contract, the adapters, the gRPC protocol and the core's decision record. It has no dependencies beyond the standard library.
 - **Provider contract (changed, `plugins`).** `ResourceProvider[T].Changed` takes the dependency list and returns a `Change`. The doc comments on `Changed` and `Update` describe what the core does with each answer.
 - **`DefaultChanged` (changed, `plugins`).** Keeps its comparison of configured values (ignoring meta, `depends_on` and `disabled`) and answers `Update` or `NoChange`. It ignores dependencies, so a provider that has to react to a replaced dependency overrides `Changed` itself. Every in-repo provider that embeds it migrates with it.
 - **Adapter and host chain (changed, `plugins`).** `ProviderAdapter`, `TypedProviderAdapter`, the `Plugin` and `PluginHost` interfaces, `PluginBase`, the direct host and its sourced adapter, and the gRPC resource adapter pass `dependencies` in and the `Change` out, unchanged. The plugin-testing helpers and the generated adapter mock follow suit.
@@ -116,7 +118,7 @@ Rejected directions are recorded in `research.md#alternatives-considered-and-rej
   - the pending and unknown-path information the diff recorder already keeps.
 
   It answers "what are this entity's changing dependencies", produces the `diff.Diff` for a plan, and gives the act pass the lists of entities to destroy and how to treat each one.
-- **Dependency resolver (new, `internal/parser`).** For one entity, resolves its links to the provider-backed resources it reaches, looking through outputs, variables, modules and registered config-only types. Using the decision record, it returns the `[]plugins.DependencyChange` for those that will update or replace.
+- **Dependency resolver (new, `internal/parser`).** For one entity, resolves its links to the provider-backed resources it reaches, looking through outputs, variables, modules and registered config-only types. Using the decision record, it returns the `[]entity.DependencyChange` for those that will update or replace.
 - **Decide pass (changed: today's diff walk and the lifecycle's diff step).** Runs in dependency order for both plan and apply and never acts. For each entity it:
   - assigns create or replace from saved status as today;
   - otherwise calls Read, then `Changed` with the resolved dependencies, through the shared refresh;
@@ -146,9 +148,11 @@ Rejected directions are recorded in `research.md#alternatives-considered-and-rej
 
 ## Data Structures & Interfaces
 
-**Public, package `github.com/jumppad-labs/xcl/plugins`.** These are the design's shapes, unchanged.
+**Public, package `github.com/jumppad-labs/xcl/entity` (new).** These are the design's shapes, unchanged, in their own package.
 
 ```go
+package entity
+
 // Change is what applying a new configuration needs for one resource
 type Change int
 
@@ -166,23 +170,27 @@ type DependencyChange struct {
 	Address string // e.g. "docker.network.app"
 	Change  Change // Update or Replace, never NoChange
 }
+```
 
+**Public, package `github.com/jumppad-labs/xcl/plugins`.** The provider contract uses the `entity` types.
+
+```go
 type ResourceProvider[T any] interface {
 	// ... Create, Destroy, Read, Update unchanged
-	Changed(ctx context.Context, old, new T, dependencies []DependencyChange) (Change, error)
+	Changed(ctx context.Context, old, new T, dependencies []entity.DependencyChange) (entity.Change, error)
 }
 
-func (DefaultChanged[T]) Changed(ctx context.Context, old, new T, dependencies []DependencyChange) (Change, error)
+func (DefaultChanged[T]) Changed(ctx context.Context, old, new T, dependencies []entity.DependencyChange) (entity.Change, error)
 ```
 
 Every byte-level layer changes the same way, gaining `dependencies` and returning `Change`:
 
 ```go
 // ProviderAdapter
-Changed(ctx context.Context, oldEntityData, newEntityData []byte, dependencies []DependencyChange) (Change, error)
+Changed(ctx context.Context, oldEntityData, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
 
 // Plugin / PluginHost
-Changed(ctx context.Context, entityType, entitySubType string, oldEntityData, newEntityData []byte, dependencies []DependencyChange) (Change, error)
+Changed(ctx context.Context, entityType, entitySubType string, oldEntityData, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
 ```
 
 **gRPC protocol (`plugins/plugin.proto`).** This is a serialization boundary, and the change breaks compatibility (allowed by the spec).
@@ -248,7 +256,7 @@ type decision struct {
 	action       diff.Action               // create, update, replace, delete; "" = unchanged
 	reason       diff.ReplaceReason
 	replacedDeps []string
-	dependencies []plugins.DependencyChange // what Changed was told
+	dependencies []entity.DependencyChange // what Changed was told
 	read         []byte                     // decide-pass read copy (wire JSON)
 }
 
@@ -263,16 +271,16 @@ func (d *decisions) result() *diff.Diff              // plan; sorted, with summa
 // dependencyChanges resolves an entity's links to provider-backed resources
 // (looking through outputs, variables, modules, config-only types) and
 // returns those the record says will update or replace
-func dependencyChanges(entity any, state *State, record *decisions) []plugins.DependencyChange
+func dependencyChanges(entity any, state *State, record *decisions) []entity.DependencyChange
 
 // refreshOutcome gains the provider's answer
 type refreshOutcome int // refreshNotFound, refreshChanged(update), refreshReplace, refreshUnchanged
-func (l *resourceLifecycle) refresh(r, old any, adapter plugins.ProviderAdapter, deps []plugins.DependencyChange) (refreshOutcome, refreshed, error)
+func (l *resourceLifecycle) refresh(r, old any, adapter plugins.ProviderAdapter, deps []entity.DependencyChange) (refreshOutcome, refreshed, error)
 ```
 
 The walk keeps its two modes, but the meaning changes. `walkDecide` (formerly `walkDiff`) records decisions and never acts. `walkApply` is now the act walk, and it requires a completed decision record.
 
-**Test plugin (`internal/parser` `TestPlugin`).** `ChangedResults` becomes `map[string]plugins.Change`, and `SetChangedResult(id string, change plugins.Change)`. A new `ChangedDependencies map[string][]plugins.DependencyChange` is read with `GetChangedDependencies(id)` and holds the list from the last `Changed` call for each ID.
+**Test plugin (`internal/parser` `TestPlugin`).** `ChangedResults` becomes `map[string]entity.Change`, and `SetChangedResult(id string, change entity.Change)`. A new `ChangedDependencies map[string][]entity.DependencyChange` is read with `GetChangedDependencies(id)` and holds the list from the last `Changed` call for each ID.
 
 **Unchanged.** The saved-state format (statuses, `Meta.Links`), event payloads and operations (a replace is still `destroy` followed by `create` for one ID), and the `Create`, `Read`, `Update` and `Destroy` signatures.
 
@@ -329,6 +337,7 @@ Each rule gets its own unit test next to the provider, with no table-driven test
 - **`internal/parser` destroyer and destroy graph builder.** Reused as the act pass's destroy phase with a wider target list. No change to their mechanics.
 - **`internal/parser` apply walk, lifecycle and progress.** The lifecycle's apply step follows decisions instead of reading and comparing, and the in-walk rebuild is removed. Progress and partial-state building are unchanged.
 - **`internal/dag` walker.** Its dependency-order guarantee, concurrency and upstream-failure skipping are relied on as they are. No change.
+- **`entity` package (new).** Holds `Change` and `DependencyChange`; imports only the standard library. It must land with the contract change.
 - **`plugins` package: provider contract, `DefaultChanged`, adapters, direct host and gRPC host/server.** Changed to carry `Change` and the dependency list. This change must land first, in one step, so the repository builds.
 - **`plugins/plugin.proto` and the generated `plugins/proto`.** Gain an enum, a message and new fields, and are regenerated with the generator versions already recorded in the generated files (protoc-gen-go v1.36.11, protoc-gen-go-grpc v1.5.1).
 - **`diff` package.** `Resource` gains the reason fields, and `Render` phrases the reason. Everything else is unchanged.
@@ -434,7 +443,7 @@ Deliberate gaps:
 
 **Validation point**: The full test suite, every example's tests and the external test plugins build and pass. A provider answering "replace" through both an in-process and an external plugin causes a destroy followed by a create.
 
-#### - [ ] Task: Change contract through every plugin layer
+#### - [x] Task: Change contract through every plugin layer
 **Id:** 3b2fa7e8-6be3-41ba-a40f-21932ead4eb7
 **Repo:** xclconfig
 **Depends on:** none
@@ -445,11 +454,11 @@ Introduces the `Change` answer (unchanged, update, replace) and the dependency l
 *Technical detail:* [context.md#task-change-contract-through-every-plugin-layer](./context.md#task-change-contract-through-every-plugin-layer)
 
 **Acceptance criteria**:
-- [ ] A provider can answer unchanged, update or replace, and the answer arrives unchanged at the core through both in-process and external plugins
-- [ ] A dependency list given to an external plugin's change check arrives at the provider with the same addresses and outcomes
-- [ ] `DefaultChanged` answers update when configured values differ and unchanged otherwise
-- [ ] A "replace" answer during apply destroys the resource and creates it again
-- [ ] The root module, every example module and the external test plugins build, and all their tests pass
+- [x] A provider can answer unchanged, update or replace, and the answer arrives unchanged at the core through both in-process and external plugins
+- [x] A dependency list given to an external plugin's change check arrives at the provider with the same addresses and outcomes
+- [x] `DefaultChanged` answers update when configured values differ and unchanged otherwise
+- [x] A "replace" answer during apply destroys the resource and creates it again
+- [x] The root module, every example module and the external test plugins build, and all their tests pass
 
 ### Milestone 2: Applies decide everything first, tell dependents, and replace in a safe order
 **What changes**: Applying now decides the outcome of every resource before it touches any of them. Each resource's plugin is told which of the resources it references will be updated or replaced, and decides its own outcome from that. Applying then destroys everything being replaced or removed, dependents first, and only then creates and updates in dependency order. A failure while deciding changes nothing. A failed replacement is recorded as failed and is retried next time. Plans use the same decision pass, so a plan lists exactly what the apply then does.
@@ -462,7 +471,7 @@ Introduces the `Change` answer (unchanged, update, replace) and the dependency l
 - a failed replacement is planned as a replacement again;
 - plan and apply agree in the e2e scenarios.
 
-#### - [ ] Task: Decision record and dependency resolver
+#### - [x] Task: Decision record and dependency resolver
 **Id:** 56c89a24-1d35-469b-ac6f-f429f2de1ddb
 **Repo:** xclconfig
 **Depends on:**
@@ -474,12 +483,12 @@ Grows the diff recorder into a decision record that holds each entity's decided 
 *Technical detail:* [context.md#task-decision-record-and-dependency-resolver](./context.md#task-decision-record-and-dependency-resolver)
 
 **Acceptance criteria**:
-- [ ] A resource's dependency list contains only the provider-backed resources it references that will update or replace, each with its outcome
-- [ ] A dependency reached through a module output or variable is listed as the provider-backed resource behind it
-- [ ] The record lists every replaced and removed resource as the set to destroy
-- [ ] Existing diff results are unchanged
+- [x] A resource's dependency list contains only the provider-backed resources it references that will update or replace, each with its outcome
+- [x] A dependency reached through a module output or variable is listed as the provider-backed resource behind it
+- [x] The record lists every replaced and removed resource as the set to destroy
+- [x] Existing diff results are unchanged
 
-#### - [ ] Task: Decide pass tells each resource about its dependencies
+#### - [x] Task: Decide pass tells each resource about its dependencies
 **Id:** a4febb1d-d732-4579-b6fd-651d403d21e0
 **Repo:** xclconfig
 **Depends on:**
@@ -491,13 +500,13 @@ Turns the diff walk into the single decide pass shared by plans and applies. Eve
 *Technical detail:* [context.md#task-decide-pass-tells-each-resource-about-its-dependencies](./context.md#task-decide-pass-tells-each-resource-about-its-dependencies)
 
 **Acceptance criteria**:
-- [ ] A resource referencing a replaced dependency and an updated dependency is told about exactly those two, with their outcomes, and not about an unchanged one
-- [ ] A plugin's replace answer is planned as a replacement and its update answer as an update
-- [ ] A dependent whose plugin answers unchanged to a replaced dependency is planned as unchanged
-- [ ] A resource whose inputs will only be known after the apply is planned as at least an update
-- [ ] A failing change check fails the plan or apply without any create, update or destroy
+- [x] A resource referencing a replaced dependency and an updated dependency is told about exactly those two, with their outcomes, and not about an unchanged one
+- [x] A plugin's replace answer is planned as a replacement and its update answer as an update
+- [x] A dependent whose plugin answers unchanged to a replaced dependency is planned as unchanged
+- [x] A resource whose inputs will only be known after the apply is planned as at least an update
+- [x] A failing change check fails the plan or apply without any create, update or destroy
 
-#### - [ ] Task: Act pass destroys first, then creates and updates
+#### - [x] Task: Act pass destroys first, then creates and updates
 **Id:** ad317131-f5a2-4b3b-a5eb-e3bbd5230d0c
 **Repo:** xclconfig
 **Depends on:**
@@ -509,14 +518,14 @@ Makes apply run the decide pass first and then act on it. Every resource being r
 *Technical detail:* [context.md#task-act-pass-destroys-first-then-creates-and-updates](./context.md#task-act-pass-destroys-first-then-creates-and-updates)
 
 **Acceptance criteria**:
-- [ ] With a network and the container on it both replaced, the container is destroyed, then the network, then the network is created, then the container
-- [ ] Every read and change check in an apply happens before its first destroy, create or update
-- [ ] An update answer updates the resource in place without destroying it
-- [ ] When creating a replaced resource fails, it is saved as failed and the next plan lists it as a replacement again
-- [ ] When destroying a replaced resource fails, it is saved as failed to destroy and the apply stops
-- [ ] Resources whose last apply failed are still replaced on the next apply
+- [x] With a network and the container on it both replaced, the container is destroyed, then the network, then the network is created, then the container
+- [x] Every read and change check in an apply happens before its first destroy, create or update
+- [x] An update answer updates the resource in place without destroying it
+- [x] When creating a replaced resource fails, it is saved as failed and the next plan lists it as a replacement again
+- [x] When destroying a replaced resource fails, it is saved as failed to destroy and the apply stops
+- [x] Resources whose last apply failed are still replaced on the next apply
 
-#### - [ ] Task: Person plugin replaces on a name change
+#### - [x] Task: Person plugin replaces on a name change
 **Id:** d6ddcc23-ebee-4c18-afbe-4c2723905f5b
 **Repo:** xclconfig
 **Depends on:**
@@ -528,10 +537,10 @@ The person provider in the plugin SDK example derives its ID from the first and 
 *Technical detail:* [context.md#task-person-plugin-replaces-on-a-name-change](./context.md#task-person-plugin-replaces-on-a-name-change)
 
 **Acceptance criteria**:
-- [ ] Changing a person's first or last name is answered as replace, through both the in-process and external plugin
-- [ ] Changing any other field is answered as update, and an identical person as unchanged
+- [x] Changing a person's first or last name is answered as replace, through both the in-process and external plugin
+- [x] Changing any other field is answered as update, and an identical person as unchanged
 
-#### - [ ] Task: Plans agree with applies for built-in and external plugins
+#### - [x] Task: Plans agree with applies for built-in and external plugins
 **Id:** 960a7608-e9ce-4fdc-bcc6-c33a389a2d85
 **Repo:** xclconfig
 **Depends on:**
@@ -544,16 +553,16 @@ Proves end to end, through public packages only, that a plan lists exactly what 
 *Technical detail:* [context.md#task-plans-agree-with-applies-for-built-in-and-external-plugins](./context.md#task-plans-agree-with-applies-for-built-in-and-external-plugins)
 
 **Acceptance criteria**:
-- [ ] For every e2e scenario, the resources a plan lists per action are exactly those the following apply acts on, with nothing extra and nothing missing
-- [ ] The same change through an in-process and an external plugin produces the same plan and the same apply outcome
-- [ ] The public diff reports a plugin-decided replacement, and the public apply performs it
+- [x] For every e2e scenario, the resources a plan lists per action are exactly those the following apply acts on, with nothing extra and nothing missing
+- [x] The same change through an in-process and an external plugin produces the same plan and the same apply outcome
+- [x] The public diff reports a plugin-decided replacement, and the public apply performs it
 
 ### Milestone 3: Plans say why a resource is replaced
 **What changes**: A plan or diff now says why each replacement happens: its last apply failed, its plugin cannot update it in place, or a resource it depends on is being replaced, naming that resource. For example: `# docker.container.web will be replaced because docker.network.app is replaced`. The same reason is in the diff's Go types and JSON, so tools built on xcl can show or act on it. Values that a replaced or updated dependency only learns after the apply are shown as "(known after apply)".
 
 **Validation point**: Render and JSON tests pass for each reason, and a parser diff of a dependent replacement names the dependency.
 
-#### - [ ] Task: Diff carries and renders the replacement reason
+#### - [x] Task: Diff carries and renders the replacement reason
 **Id:** 6fa14271-8711-4d1d-8d7d-801eec77c80a
 **Repo:** xclconfig
 **Depends on:**
@@ -565,11 +574,11 @@ Adds the reason for a replacement to the diff result, along with the replaced de
 *Technical detail:* [context.md#task-diff-carries-and-renders-the-replacement-reason](./context.md#task-diff-carries-and-renders-the-replacement-reason)
 
 **Acceptance criteria**:
-- [ ] A replacement caused by a replaced dependency renders "will be replaced because <dependency> is replaced", naming every replaced dependency
-- [ ] A replacement decided by the plugin itself renders "will be replaced, it cannot be updated in place"
-- [ ] A replacement of a resource whose last apply failed still renders "will be replaced, its last apply failed"
-- [ ] The JSON form of a replacement includes its reason and replaced dependencies, and other actions include neither
-- [ ] Values a replaced or updated dependency only learns after the apply render as "(known after apply)"
+- [x] A replacement caused by a replaced dependency renders "will be replaced because <dependency> is replaced", naming every replaced dependency
+- [x] A replacement decided by the plugin itself renders "will be replaced, it cannot be updated in place"
+- [x] A replacement of a resource whose last apply failed still renders "will be replaced, its last apply failed"
+- [x] The JSON form of a replacement includes its reason and replaced dependencies, and other actions include neither
+- [x] Values a replaced or updated dependency only learns after the apply render as "(known after apply)"
 
 ### Milestone 4: The plugin example rebuilds its network, and the docs explain replacement
 **What changes**: In the plugin example:
@@ -584,7 +593,7 @@ The project guides and the documentation site explain how plugin authors decide 
 - Without Docker, the provider rule tests pass.
 - The website builds with the new guide reachable from the Guides menu.
 
-#### - [ ] Task: Docker and template providers decide replacements
+#### - [x] Task: Docker and template providers decide replacements
 **Id:** be24536e-59ff-4655-8b6a-6c1be1a5261b
 **Repo:** xclconfig
 **Depends on:**
@@ -601,12 +610,12 @@ Each rule has its own test, so every setting a provider cannot change in place i
 *Technical detail:* [context.md#task-docker-and-template-providers-decide-replacements](./context.md#task-docker-and-template-providers-decide-replacements)
 
 **Acceptance criteria**:
-- [ ] A network with a different address range is answered as replace
-- [ ] A container with a different image, command, environment or network is answered as replace, as is a container whose network is replaced
-- [ ] A container whose dependencies are only updated, with an identical configuration, is answered as unchanged
-- [ ] A template with a different destination is answered as replace, and one with different source or variables as update
+- [x] A network with a different address range is answered as replace
+- [x] A container with a different image, command, environment or network is answered as replace, as is a container whose network is replaced
+- [x] A container whose dependencies are only updated, with an identical configuration, is answered as unchanged
+- [x] A template with a different destination is answered as replace, and one with different source or variables as update
 
-#### - [ ] Task: Plugin example ships its address-range change configuration
+#### - [x] Task: Plugin example ships its address-range change configuration
 **Id:** 863d7ec9-41fe-4245-8ef7-a3f40e2004a3
 **Repo:** xclconfig
 **Depends on:**
@@ -620,12 +629,12 @@ Moves the second configuration, which changes the network's address range, out o
 *Technical detail:* [context.md#task-plugin-example-ships-its-address-range-change-configuration](./context.md#task-plugin-example-ships-its-address-range-change-configuration)
 
 **Acceptance criteria**:
-- [ ] Applying the main configuration on its own creates the network, container and template, and the example's existing tests pass
-- [ ] The plan for the address-range configuration shows the network replaced, the container replaced because of the network, and the template updated
-- [ ] After applying the address-range configuration, the Docker network has the new range, a new container is attached to it, and the template contains the new container's address
-- [ ] A plan straight after that apply reports no changes
+- [x] Applying the main configuration on its own creates the network, container and template, and the example's existing tests pass
+- [x] The plan for the address-range configuration shows the network replaced, the container replaced because of the network, and the template updated
+- [x] After applying the address-range configuration, the Docker network has the new range, a new container is attached to it, and the template contains the new container's address
+- [x] A plan straight after that apply reports no changes
 
-#### - [ ] Task: Core guides, README and changelog explain replacement
+#### - [x] Task: Core guides, README and changelog explain replacement
 **Id:** cdd6c390-c856-443e-8257-f3354a8358ef
 **Repo:** xclconfig
 **Depends on:**
@@ -637,12 +646,12 @@ Updates the project's own guides for plugin authors and maintainers to the new c
 *Technical detail:* [context.md#task-core-guides-readme-and-changelog-explain-replacement](./context.md#task-core-guides-readme-and-changelog-explain-replacement)
 
 **Acceptance criteria**:
-- [ ] The plugin developer guide explains how to decide unchanged, update or replace using the dependency list, with an example override
-- [ ] The lifecycle and state guides describe decide-then-act and the destroy-first order
-- [ ] The README's plugin example section shows the address-range plan with its replacements
-- [ ] The changelog has an entry for this change naming every breaking change
+- [x] The plugin developer guide explains how to decide unchanged, update or replace using the dependency list, with an example override
+- [x] The lifecycle and state guides describe decide-then-act and the destroy-first order
+- [x] The README's plugin example section shows the address-range plan with its replacements
+- [x] The changelog has an entry for this change naming every breaking change
 
-#### - [ ] Task: Website guide on unchanged, update or replace
+#### - [x] Task: Website guide on unchanged, update or replace
 **Id:** bc5085bc-0568-4d88-8d95-eb23ae9d3971
 **Repo:** xcl-website
 **Depends on:**
@@ -654,11 +663,11 @@ Adds a guide page to the documentation site for plugin authors. It explains how 
 *Technical detail:* [context.md#task-website-guide-on-unchanged-update-or-replace](./context.md#task-website-guide-on-unchanged-update-or-replace)
 
 **Acceptance criteria**:
-- [ ] The site has a guide page explaining unchanged, update and replace for plugin authors, reachable from the Guides menu
-- [ ] The page shows a provider override that reads its dependency list
-- [ ] The site builds
+- [x] The site has a guide page explaining unchanged, update and replace for plugin authors, reachable from the Guides menu
+- [x] The page shows a provider override that reads its dependency list
+- [x] The site builds
 
-#### - [ ] Task: Website diff and plugin example pages show replacements
+#### - [x] Task: Website diff and plugin example pages show replacements
 **Id:** fee32990-a561-4ded-b71e-6f69966adab9
 **Repo:** xcl-website
 **Depends on:**
@@ -670,10 +679,10 @@ Updates the diff guide so that "replace" covers all three reasons, with a render
 *Technical detail:* [context.md#task-website-diff-and-plugin-example-pages-show-replacements](./context.md#task-website-diff-and-plugin-example-pages-show-replacements)
 
 **Acceptance criteria**:
-- [ ] The diff page explains each reason a resource is replaced and shows a rendered replacement naming its dependency
-- [ ] The plugin example page shows the address-range plan and apply with the network and container replaced
-- [ ] No page still shows a container image change as an in-place update
-- [ ] The site builds
+- [x] The diff page explains each reason a resource is replaced and shows a rendered replacement naming its dependency
+- [x] The plugin example page shows the address-range plan and apply with the network and container replaced
+- [x] No page still shows a container image change as an in-place update
+- [x] The site builds
 
 ## Open Questions
 
@@ -693,3 +702,249 @@ No other questions remain open. Every other decision is recorded in the assumpti
 - **The editor extension (xcl-vscode).** No configuration syntax changes, so the extension is untouched. Spec Non-Goal.
 - **Drift detection in the Docker example's `Read`.** The network and container `Read` still copy only computed IDs and do not inspect Docker for out-of-band changes. The success metric's no-drift check compares state and configuration after an apply, which this plan covers; detecting manual Docker edits is not part of it.
 - **Replacing the remaining no-op Docker `Update`s with real in-place updates.** Every container and network setting the example models is now a replacement. Any genuinely in-place Docker change (for example labels) is left as future example work.
+
+## Changelog
+
+### 2026-10-08 — Task: Change contract through every plugin layer
+
+**What was done**: Added the public `entity` package (`Change` with `NoChange`/`Update`/`Replace`, and `DependencyChange`) and carried the new `Changed(ctx, old, new, dependencies) (entity.Change, error)` signature through the provider contract, `DefaultChanged`, every adapter and host, the gRPC protocol (regenerated) and the testing helpers. The core passes no dependencies yet and maps a Replace answer onto the existing rebuild path (apply) or `ActionReplace` (diff).
+
+**Deviations**: Also added a gRPC server test file (`plugins/grpc_server_test.go`) covering answer, error and dependency mapping, since no server test existed. The `Makefile` `install-mockery` target now installs mockery v3.8.0.
+
+**Files changed**:
+- `xclconfig: entity/doc.go`
+- `xclconfig: entity/change.go`
+- `xclconfig: entity/change_test.go`
+- `xclconfig: plugins/provider.go`
+- `xclconfig: plugins/changed.go`
+- `xclconfig: plugins/adapter.go`
+- `xclconfig: plugins/plugin.go`
+- `xclconfig: plugins/plugin_host.go`
+- `xclconfig: plugins/direct_plugin_host.go`
+- `xclconfig: plugins/grpc_resource_adapter.go`
+- `xclconfig: plugins/grpc_plugin_host.go`
+- `xclconfig: plugins/grpc_server.go`
+- `xclconfig: plugins/change_proto.go`
+- `xclconfig: plugins/plugin.proto`
+- `xclconfig: plugins/proto/plugin.pb.go`
+- `xclconfig: plugins/proto/plugin_grpc.pb.go`
+- `xclconfig: plugins/mocks/mock_provider_adapter.go`
+- `xclconfig: plugins/testing/helpers.go`
+- `xclconfig: plugins/changed_test.go`
+- `xclconfig: plugins/changed_sensitive_test.go`
+- `xclconfig: plugins/adapter_test.go`
+- `xclconfig: plugins/grpc_plugin_host_test.go`
+- `xclconfig: plugins/grpc_server_test.go`
+- `xclconfig: plugins/example/e2e_test.go`
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/test_plugin.go`
+- `xclconfig: internal/parser/lifecycle_test.go`
+- `xclconfig: internal/parser/diff_test.go`
+- `xclconfig: Makefile`
+
+**Discoveries**:
+- An unknown `proto.Change` value is an error on both sides of the wire rather than NoChange, so a mismatched plugin fails loudly instead of silently skipping updates.
+- The two proto generator plugins live in different modules, so `go install` must be run once per plugin; the regenerated header now records protoc v7.36.1.
+- The temporary apply mapping restores the configured values before calling `rebuild`, so a replacement is created from configuration rather than from what Read returned. The act-pass task removes this path.
+- The Docker-gated e2e test `TestPluginExampleTestsPass` fails with "network already exists app" if an earlier example run left the `app` network or `web` container behind.
+
+### 2026-10-08 — Task: Decision record and dependency resolver
+
+**What was done**: The diff recorder became the decision record: it now holds one decision per entity (action, replacement reason, replaced dependencies, the dependencies its provider was told and the decide-pass read copy), with `decide`, `lookup` and `toDestroy` (saved entities decided replace or delete). A new resolver, `dependencyChanges`, lists the provider-backed resources an entity depends on that will update or replace, looking through outputs, variables, modules and config-only types. `diff.ReplaceReason` and its constants were added ahead of the diff task.
+
+**Deviations**: The recorder keeps its name `diffRecorder` rather than being renamed `decisions` (the plan allowed either). `diff.ReplaceReason` landed here rather than in the diff task, as the plan allowed. A resource inside a module is told about every changing resource the module block's `variables` reference, not only the ones it reads: variable entities carry no links, so the look-through goes via the parent module.
+
+**Files changed**:
+- `xclconfig: diff/diff.go`
+- `xclconfig: internal/parser/diff_recorder.go`
+- `xclconfig: internal/parser/dependencies.go`
+- `xclconfig: internal/parser/dependencies_test.go`
+- `xclconfig: internal/parser/diff_recorder_test.go`
+- `xclconfig: internal/test_fixtures/config/lifecycle/two_dependencies/main.xcl`
+- `xclconfig: internal/test_fixtures/config/lifecycle/through_module/main.xcl`
+- `xclconfig: internal/test_fixtures/config/lifecycle/through_module/net/main.xcl`
+- `xclconfig: internal/test_fixtures/config/lifecycle/through_module/app/main.xcl`
+
+**Discoveries**:
+- Links are set at parse time, so a parsed configuration (`parseAndValidate`) is enough to resolve dependencies; no walk is needed.
+- `getResourceDependencies` always adds a module resource's parent module as a dependency, even with `requireParentModule=false`; module variables only reach outside resources through the module entity's links.
+
+### 2026-10-08 — Task: Decide pass tells each resource about its dependencies
+
+**What was done**: The diff walk became the decide pass (`walkDecide`, `decide`/`decideResource`, `Parser.decide`). Every saved resource is read and asked `Changed` with the dependencies the record says will update or replace, and every outcome is recorded as a decision with its reason. A resource whose inputs are only known after the apply is read with its saved values at the unknown paths and is planned as at least an update. A Read or `Changed` error fails the plan without marking the resource failed. `TestPlugin` records the dependencies each `Changed` call is told.
+
+**Deviations**: Only `Parser.Diff` runs the decide pass in this task; `Apply` still uses the old interleaved walk until the act-pass task, so the "failing change check" criterion is proven for plans here and for applies in the next task. The decide pass also logs its counts and each replacement's reason at debug level (`logDecisions`). The root-package test `TestDiffMarksUnknownValuesAndDoesNotReadTheirResource` was split into `TestDiffMarksUnknownValues` and `TestDiffReadsResourceHoldingUnknownValueWithSavedValues`, and five parser "never reads" tests were renamed to assert reads with saved values, as the plan anticipated.
+
+**Files changed**:
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/parser/callbacks.go`
+- `xclconfig: internal/parser/diff_recorder.go`
+- `xclconfig: internal/parser/diff_decode.go`
+- `xclconfig: internal/parser/test_plugin.go`
+- `xclconfig: internal/parser/decide_test.go`
+- `xclconfig: internal/parser/diff_unknown_test.go`
+- `xclconfig: internal/parser/diff_update_unknown_test.go`
+- `xclconfig: internal/parser/lifecycle_test.go`
+- `xclconfig: config_diff_test.go`
+
+**Discoveries**:
+- A reference to a pending dependency's `meta.name` is not unknown (it is not a computed field), so a dependent that only uses `meta.name` can stay unchanged when its dependency is replaced.
+- The lifecycle's operation name is now carried explicitly (`operationName`) rather than derived from the walk mode, since the decide walk runs for both plans and applies.
+
+### 2026-10-08 — Task: Act pass destroys first, then creates and updates
+
+**What was done**: `Parser.Apply` now runs the decide pass first and only then acts. A failed decision returns no state, so nothing is saved. It then parses the configuration again, destroys every replaced and removed resource through the existing destroyer (dependents first, state saved after each), and walks in dependency order following each decision: create new and replaced resources, `update` updated ones with fresh configuration plus the computed values the decide pass read, and `keep` unchanged ones as read. The in-walk `read` and `rebuild` are gone, so resources whose last apply failed are replaced by the same destroy phase.
+
+**Deviations**: Apply parses the configuration twice, once for the decide pass and once for the act walk, so decide-pass placeholders and read values never reach a provider; the second parse (`reparse`) emits no events, so receivers still see each resource parsed once. A decide failure, including a cancelled context, returns a nil State rather than the previous state, so the saved state is untouched. Root and e2e event tests now ignore the core debug log events the decide pass emits, and one delivery count grew by one for the "decided every entity" log.
+
+**Files changed**:
+- `xclconfig: internal/parser/parser.go`
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/callbacks.go`
+- `xclconfig: internal/parser/replace_test.go`
+- `xclconfig: internal/parser/cancellation_test.go`
+- `xclconfig: internal/parser/diff_update_unknown_test.go`
+- `xclconfig: internal/parser/lifecycle_test.go`
+- `xclconfig: config_plugin_logging_test.go`
+- `xclconfig: config_delivery_test.go`
+- `xclconfig: e2e/events_test.go`
+- `xclconfig: e2e/plugin_logging_test.go`
+
+**Discoveries**:
+- The walk's unknown-value hook must key on the walk mode, not on whether a recorder is set: the act walk now carries the decision record and must decode real values.
+- A dependent whose inputs reference an updated resource's computed values is now updated by apply, where it used to be read and left alone; plan and apply now agree on it.
+- Parsing twice in one operation duplicates parse events unless the second parse is silenced.
+
+### 2026-10-08 — Task: Person plugin replaces on a name change
+
+**What was done**: The plugin SDK example's person provider overrides `Changed`: a change to `first_name` or `last_name` answers `entity.Replace`, because the person's ID derives from the name, and every other change defers to `DefaultChanged`. The example README describes the override.
+
+**Deviations**: None
+
+**Files changed**:
+- `xclconfig: plugins/example/pkg/person/provider.go`
+- `xclconfig: plugins/example/pkg/person/provider_test.go`
+- `xclconfig: plugins/example/e2e_test.go`
+- `xclconfig: plugins/example/README.md`
+
+**Discoveries**: None
+
+### 2026-10-08 — Task: Plans agree with applies for built-in and external plugins
+
+**What was done**: The e2e fixtures gained two replace rules (in-process PostgreSQL `location`, external Ingress `hostname`). The e2e plan-versus-apply check is now exact: for every scenario, the addresses the diff lists per action equal those the apply's lifecycle events act on (destroy+create = replace). New scenarios cover a provider replace, a dependency-driven change, and a removal plus replace. The person plugin is run both in-process and as an external binary and must give the same plan JSON, the same per-resource operations and the same final values. Root-package tests show the public `Diff` and `Apply` report and perform a provider-decided replacement.
+
+**Deviations**: The old subset helper `requireDiffPredictsApply` was removed because exact equality now holds for every scenario. No e2e fixture provider replaces because a dependency is replaced, so `TestDiffOfDependentReplacePredictsApply` covers a replaced dependency's dependents being planned and applied as updates (the unknown-input floor); dependency-driven replacement is covered in the parser tests and, against Docker, in the plugin example. e2e uses the public `plugins/example/pkg/person` package through a test-local in-process plugin, since `plugins/example` is `package main`.
+
+**Files changed**:
+- `xclconfig: e2e/fixtures/inprocess/plugin.go`
+- `xclconfig: e2e/fixtures/externalplugin/main.go`
+- `xclconfig: e2e/diff_test.go`
+- `xclconfig: e2e/fixtures_test.go`
+- `xclconfig: e2e/main_test.go`
+- `xclconfig: e2e/plugin_replace_test.go`
+- `xclconfig: internal/testutil/events.go`
+- `xclconfig: config_diff_test.go`
+- `xclconfig: config_test.go`
+
+**Discoveries**:
+- With decide-then-act and the unknown-input floor, every e2e scenario's plan now matches its apply exactly; the earlier subset comparison existed only because unknown-driven updates used to be skipped by apply.
+- `internal/testutil.ResourceOperations` classifies recorded lifecycle events into per-resource create/update/destroy sequences and is shared by e2e and root tests.
+
+### 2026-10-08 — Task: Diff carries and renders the replacement reason
+
+**What was done**: `diff.Resource` gained `Reason` (`failed`, `provider`, `dependency`) and `ReplacedDeps`, both in the JSON form and omitted for other actions. `Render`'s comment line above a `-/+` header now names the cause: "its last apply failed", "it cannot be updated in place", or "because <a>, <b> are replaced". The decide pass records the reason on every replacement.
+
+**Deviations**: A replacement with no reason renders "will be replaced", and a dependency reason with no named dependencies renders "because a dependency is replaced"; neither is produced by xcl itself, but both keep hand-built `diff.Resource` values readable. The design example in `diff_test.go` keeps its replace entry without a reason so the design JSON still matches.
+
+**Files changed**:
+- `xclconfig: diff/diff.go`
+- `xclconfig: diff/render.go`
+- `xclconfig: diff/render_test.go`
+- `xclconfig: diff/example_test.go`
+- `xclconfig: diff/diff_test.go`
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/diff_test.go`
+- `xclconfig: internal/parser/decide_test.go`
+- `xclconfig: internal/parser/diff_unknown_test.go`
+
+**Discoveries**: None
+
+### 2026-10-08 — Task: Docker and template providers decide replacements
+
+**What was done**: The plugin example's providers override `Changed`. The Docker network answers replace when its subnet changes. The container answers replace when a dependency is replaced or when its image, command, environment or network blocks change, with nil and empty treated as equal. The template answers replace when its destination changes and leaves source and variable changes to `DefaultChanged` (update). The no-op `Update`s are kept, documented as reached only for changes that need no Docker call.
+
+**Deviations**: None
+
+**Files changed**:
+- `xclconfig: example/plugin/plugins/docker/resources/network.go`
+- `xclconfig: example/plugin/plugins/docker/resources/container.go`
+- `xclconfig: example/plugin/plugins/template/template.go`
+- `xclconfig: example/plugin/plugins/docker/resources/network_test.go`
+- `xclconfig: example/plugin/plugins/docker/resources/container_test.go`
+- `xclconfig: example/plugin/plugins/template/template_test.go`
+
+**Discoveries**:
+- The example's top-level Docker-gated tests currently pass with `config/alt.xcl` still beside `config/main.xcl`; the next task moves it regardless, as the spec requires.
+
+### 2026-10-08 — Task: Plugin example ships its address-range change configuration
+
+**What was done**: `example/plugin/config/alt.xcl` moved to `example/plugin/config-subnet/main.xcl` with a header explaining it is the main configuration with the network's range changed to `10.42.0.0/23`, so `./config` applies on its own again. The Makefile gained a `replace` target (apply `./config`, plan and apply `./config-subnet`, status, destroy). Docker-gated tests apply both configurations in turn and check the real network's subnet, that the old network is gone, that a new container is attached, that the template has the new address, and that a following plan reports no changes. A plan test checks the rendered replacements and their reasons.
+
+**Deviations**: The move was done with `mv`, not `git mv`, so nothing is staged; git shows `config/alt.xcl` deleted and `config-subnet/` untracked. `TestSubnetChangeRemovesTheOldNetwork` was added beyond the plan's list. `HCL_VAR_output_dir` is now set by `applyExampleWithState` rather than the shared `applyExampleDir`, so two applies in one test render to the same destination.
+
+**Files changed**:
+- `xclconfig: example/plugin/config/alt.xcl`
+- `xclconfig: example/plugin/config-subnet/main.xcl`
+- `xclconfig: example/plugin/Makefile`
+- `xclconfig: example/plugin/main_test.go`
+- `xclconfig: example/plugin/plan_test.go`
+
+**Discoveries**:
+- Run against real Docker, `make replace` destroys the container, then the network, then creates the network on the new range and a new container, then updates the template. Docker removes the old network without a lingering endpoint, which settles the plan's second open question.
+- The real plan output is "# docker.container.web will be replaced because docker.network.app is replaced" / "# docker.network.app will be replaced, it cannot be updated in place" / "# template.welcome will be updated" with `variables["address"] = "10.42.0.2" -> (known after apply)`, summary "0 to create, 1 to update, 2 to replace, 0 to delete, 0 unchanged."; the plan after the apply is "Diff: no changes, 3 unchanged."
+
+### 2026-10-08 — Task: Core guides, README and changelog explain replacement
+
+**What was done**: The plugin developer guide, plugins guide, parser lifecycle and state guides now describe the `entity.Change` answer, the dependency list, decide-then-act with the destroy-first order, and how failed replacements are recorded and retried, with the real Docker container and network `Changed` overrides as the worked example. The README shows `./config` standing alone and the `config-subnet` / `make replace` walkthrough with the real plan output. `CHANGELOG.md` has a top entry for this spec with a breaking-changes list.
+
+**Deviations**: `docs/overview.md` was also corrected, since it still described the old read-then-update apply. Existing `#L<line>` source links in `docs/parser-lifecycle.md` and `docs/state.md` were left as they were and may point at the wrong lines.
+
+**Files changed**:
+- `xclconfig: docs/plugin-developer-guide.md`
+- `xclconfig: docs/plugins.md`
+- `xclconfig: docs/parser-lifecycle.md`
+- `xclconfig: docs/state.md`
+- `xclconfig: docs/README.md`
+- `xclconfig: docs/overview.md`
+- `xclconfig: README.md`
+- `xclconfig: CHANGELOG.md`
+
+**Discoveries**:
+- The developer guide previously said the person example defines no `Changed`; it now describes its name rule.
+
+### 2026-10-08 — Task: Website guide on unchanged, update or replace
+
+**What was done**: A new guide page, `src/pages/replacement.mdx` ("Unchanged, update or replace"), explains for plugin authors what `Changed` answers and what an apply does with each answer, `DefaultChanged`, what a resource is told about its dependencies, decide-then-act with the destroy-first order, and the protocol for external plugins. The worked example is the real Docker network and container `Changed` overrides, the container one reading its dependency list, followed by the real plan output. The page is linked from the Guides menu, and the home page's plugins card now points at it.
+
+**Deviations**: None
+
+**Files changed**:
+- `xcl-website: src/pages/replacement.mdx`
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: src/pages/index.mdx`
+
+**Discoveries**: None
+
+### 2026-10-08 — Task: Website diff and plugin example pages show replacements
+
+**What was done**: The diff page now explains the three reasons a resource is replaced, shows a rendered sample with one replacement per reason (including "will be replaced because resource.network.app is replaced"), and shows `reason` and `replaced_dependencies` in the JSON form. The plugin example page quotes the network, container and template `Changed` rules, describes the subnet tests, and replaces the misleading image-bump "update" walkthrough with the `./config-subnet` plan and apply (destroy container, destroy network, create network, create container, update template), followed by a plan reporting no changes.
+
+**Deviations**: The diff page's rendered sample uses `resource.*` addresses to match the rest of that sample, so its dependency line reads `resource.container.worker ... because resource.network.app is replaced`; the exact `docker.container.web` line appears in the plugin example page's real output. The plugin page's existing load-event samples do not show the `registry=local` field that load events now carry (from earlier registry work); they were left as they were.
+
+**Files changed**:
+- `xcl-website: src/pages/diff.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+
+**Discoveries**:
+- The plugin page output was captured from a real run against a Podman engine behind `DOCKER_HOST`, and matched the Docker run exactly.

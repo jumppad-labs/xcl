@@ -1,6 +1,7 @@
 ---
 created_date: "2026-10-08"
-document_status: draft
+document_status: final
+closed_date: "2026-10-08"
 ---
 
 # Context: 20261008132354-4538504f-replacement-deps
@@ -27,7 +28,7 @@ document_status: draft
 
 | Requirement | Repo | Files |
 |---|---|---|
-| Plugins can say a change needs a rebuild | xclconfig | `plugins/change.go`, `plugins/provider.go`, `plugins/changed.go`, `plugins/adapter.go` |
+| Plugins can say a change needs a rebuild | xclconfig | `entity/change.go`, `entity/doc.go`, `plugins/provider.go`, `plugins/changed.go`, `plugins/adapter.go` |
 | Resources learn what will happen to what they depend on | xclconfig | `internal/parser/dependencies.go`, `internal/parser/diff_recorder.go`, `internal/parser/lifecycle.go` |
 | Each resource decides its own outcome | xclconfig | `internal/parser/lifecycle.go` (decide step) |
 | Decisions follow dependency order | xclconfig | `internal/parser/parser.go` (`decide`), `internal/dag` (unchanged) |
@@ -48,10 +49,10 @@ document_status: draft
 **Requirements covered:** Plugins can say a change needs a rebuild; External plugins can decide replacements; Every plugin in the repository uses the new decisions (mechanical part). Repo: xclconfig.
 
 **File changes**
-- `plugins/change.go` (new) — `type Change int`, `NoChange`/`Update`/`Replace`, `String()`; `type DependencyChange struct{ Address string; Change Change }`. Doc comments follow the design text.
-- `plugins/provider.go:76-99` — `Changed(ctx, old, new T, dependencies []DependencyChange) (Change, error)`. Reword Update's doc ("called when Changed answers Update") and Changed's doc (what each answer causes; dependencies only list direct Update/Replace deps).
-- `plugins/changed.go:23-39` — `DefaultChanged[T].Changed(ctx, old, new T, dependencies []DependencyChange) (Change, error)`: `Update` if comparable JSON differs, else `NoChange`. Ignore dependencies, and document that.
-- `plugins/adapter.go:32` — `ProviderAdapter.Changed(ctx, old, new []byte, dependencies []DependencyChange) (Change, error)`.
+- `entity/change.go` (new, package `entity`, a new top-level public package with a `doc.go` describing it as the shared vocabulary for what happens to an entity) — `type Change int`, `NoChange`/`Update`/`Replace`, `String()`; `type DependencyChange struct{ Address string; Change Change }`. Doc comments follow the design text.
+- `plugins/provider.go:76-99` — `Changed(ctx, old, new T, dependencies []entity.DependencyChange) (entity.Change, error)`. Reword Update's doc ("called when Changed answers Update") and Changed's doc (what each answer causes; dependencies only list direct Update/Replace deps).
+- `plugins/changed.go:23-39` — `DefaultChanged[T].Changed(ctx, old, new T, dependencies []entity.DependencyChange) (entity.Change, error)`: `Update` if comparable JSON differs, else `NoChange`. Ignore dependencies, and document that.
+- `plugins/adapter.go:32` — `ProviderAdapter.Changed(ctx, old, new []byte, dependencies []entity.DependencyChange) (entity.Change, error)`.
 - `plugins/adapter.go:207-223` — `TypedProviderAdapter.Changed` passes dependencies through.
 - `plugins/plugin.go:57` and `:202-210` — `PluginEntityProvider.Changed` / `PluginBase.Changed` gain dependencies and return `Change`.
 - `plugins/plugin_host.go:28` — `PluginHost.Changed` same.
@@ -59,21 +60,21 @@ document_status: draft
 - `plugins/grpc_resource_adapter.go:52-54` — pass-through.
 - `plugins/plugin.proto:99-109` — add `enum Change { CHANGE_NO_CHANGE=0; CHANGE_UPDATE=1; CHANGE_REPLACE=2; }` and `message DependencyChange { string address=1; Change change=2; }`. `ChangedRequest` gains `repeated DependencyChange dependencies = 5`. `ChangedResponse`: `reserved 1; string error = 2; Change change = 3;`.
 - `plugins/proto/plugin.pb.go`, `plugins/proto/plugin_grpc.pb.go` — regenerate. From the repo root, run the protoc command in `Makefile` (`protos` target) with `--plugin=protoc-gen-go=$(go run ... )`. Simplest is `GOBIN=$(mktemp -d) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11 google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1`, then put that dir first on PATH. Never hand-edit the generated files.
-- `plugins/grpc_plugin_host.go:292-312` — `grpcPluginWrapper.Changed` converts `[]DependencyChange` to `[]*proto.DependencyChange`, returns `fromProtoChange(resp.Change)`.
+- `plugins/grpc_plugin_host.go:292-312` — `grpcPluginWrapper.Changed` converts `[]entity.DependencyChange` to `[]*proto.DependencyChange`, returns `fromProtoChange(resp.Change)`.
 - `plugins/grpc_plugin_host.go:393-399` — `GRPCPluginHost.Changed` same signature.
 - `plugins/grpc_server.go:144-155` — `GRPCServer.Changed` converts `req.Dependencies` to Go and the answer to proto.
 - `plugins/change_proto.go` (new, unexported helpers) — `toProtoChange`, `fromProtoChange`, `toProtoDependencies`, `fromProtoDependencies`. An unknown enum value maps to an error, not to NoChange.
-- `plugins/testing/helpers.go:139-157`, `:200-203` — call with nil dependencies and `require.Equal(t, plugins.NoChange, change)`.
+- `plugins/testing/helpers.go:139-157`, `:200-203` — call with nil dependencies and `require.Equal(t, entity.NoChange, change)`.
 - `plugins/mocks/mock_provider_adapter.go` — regenerate with `go run github.com/vektra/mockery/v3@v3.8.0` from the repo root (`.mockery.yml`). Also fix the `Makefile` `install-mockery` target to v3 if trivial.
-- `internal/parser/test_plugin.go:93,309,379` — `ChangedResults map[string]plugins.Change`, `SetChangedResult(id string, change plugins.Change)`.
+- `internal/parser/test_plugin.go:93,309,379` — `ChangedResults map[string]entity.Change`, `SetChangedResult(id string, change entity.Change)`.
 - `internal/parser/test_plugin.go:644-671` — new signature, returning the configured `Change` or the DefaultChanged answer.
 - `internal/parser/lifecycle.go:317-329` — add `refreshReplace` outcome.
 - `internal/parser/lifecycle.go:416-436` — call `adapter.Changed(ctx, copies.old, copies.read, nil)` and map `Update`→`refreshChanged`, `Replace`→`refreshReplace`, `NoChange`→`refreshUnchanged`.
 - `internal/parser/lifecycle.go:443-487` (`read`) — on `refreshReplace`, call `l.rebuild(r, old, adapter)` (temporary; removed by the act-pass task).
 - `internal/parser/lifecycle.go:228-243` (`diffResource`) — `refreshReplace` → `recordPending(meta, diff.ActionReplace, old, r)`.
-- `internal/parser/lifecycle_test.go:412-490` — `SetChangedResult(..., true)` → `plugins.Update`, `false` → `plugins.NoChange`. Add `TestOverriddenChangeDetectionCanReportAReplace` (destroy then create calls).
+- `internal/parser/lifecycle_test.go:412-490` — `SetChangedResult(..., true)` → `entity.Update`, `false` → `entity.NoChange`. Add `TestOverriddenChangeDetectionCanReportAReplace` (destroy then create calls).
 - `internal/parser/diff_test.go`, `diff_update_unknown_test.go` — same knob migration.
-- `plugins/changed_test.go:60-117`, `plugins/changed_sensitive_test.go:26,35,58` — assert `plugins.Update`/`plugins.NoChange`. Add `TestDefaultChangedIgnoresDependencies`.
+- `plugins/changed_test.go:60-117`, `plugins/changed_sensitive_test.go:26,35,58` — assert `entity.Update`/`entity.NoChange`. Add `TestDefaultChangedIgnoresDependencies`.
 - `plugins/example/e2e_test.go:230,296,486-568` — assert `Change` values; pass nil dependencies.
 - `plugins/grpc_plugin_host_test.go` — add `fakeChangedServiceClient` (embeds `proto.PluginServiceClient`, captures `*proto.ChangedRequest`). New tests:
   - `TestGRPCPluginWrapperChangedSendsDependencies`
@@ -81,7 +82,7 @@ document_status: draft
   - `TestGRPCPluginWrapperChangedReturnsError`
   - `TestGRPCPluginWrapperChangedRejectsUnknownChange`
 - `plugins/adapter_test.go` — add `TestTypedProviderAdapterChangedPassesDependenciesToProvider` and `TestDirectPluginHostChangedReturnsProviderAnswer` (recording fake provider).
-- `plugins/change_test.go` (new) — `Change.String` tests, one per value.
+- `entity/change_test.go` (new) — `Change.String` tests, one per value. (Tests live with the `entity` package.)
 - Every DefaultChanged embedder compiles unchanged:
   - `example/plugin/plugins/docker/resources/{network,container}.go`
   - `example/plugin/plugins/template/template.go`
@@ -108,13 +109,13 @@ The build must be green at the end of the task, not in between.
 
 **File changes**
 - `internal/parser/diff_recorder.go` — rename the type to `decisions` (or keep `diffRecorder` and add the fields; either is fine as long as it is one type). Add:
-  - `decision{action diff.Action; reason diff.ReplaceReason (string until the diff task lands — use a local unexported type and swap later, or add the diff fields here first); replacedDeps []string; dependencies []plugins.DependencyChange; read []byte}`
+  - `decision{action diff.Action; reason diff.ReplaceReason (string until the diff task lands — use a local unexported type and swap later, or add the diff fields here first); replacedDeps []string; dependencies []entity.DependencyChange; read []byte}`
   - `map[string]decision`, plus `decide`, `lookup`, `toDestroy(previous *State) []any` (saved entities whose decision is replace or delete) and `result()`, which is unchanged in output.
 
   Keep `markPending`/`unknownPaths`/`contextValue` as they are.
 
   Note: if the diff task has not landed, keep the reason as an unexported `replaceReason` in the parser and map it when the diff task adds `diff.ReplaceReason`. Adding the diff fields first is also fine; the dependency chain allows either.
-- `internal/parser/dependencies.go` (new) — `dependencyChanges(entity any, state *State, record *decisions) []plugins.DependencyChange`:
+- `internal/parser/dependencies.go` (new) — `dependencyChanges(entity any, state *State, record *decisions) []entity.DependencyChange`:
   - Start from `types.Meta.Links` (via `getResourceDependencies`, `internal/parser/util.go:513`, which expands module refs).
   - For each linked entity: if provider-backed (not `handledWithoutProvider` `lifecycle.go:667` and not a builtin output/variable/module/local), look up its decision. Otherwise recurse into that entity's own links (look-through), keeping a visited set.
   - Emit `{Address: meta.ID, Change: Update}` for a dependency decided update, and `{Address, Change: Replace}` for one decided replace. A dependency decided create is not listed: the design's vocabulary is Update/Replace only. A newly referenced resource already changes the dependent's configuration (DefaultChanged sees it), and its computed values are unknown, so the Update floor applies. Explain this in the code comment.
@@ -153,7 +154,7 @@ The build must be green at the end of the task, not in between.
 - `internal/parser/lifecycle.go:355-438` (`refresh`) — add the `deps` parameter and pass it to `adapter.Changed`. On a Read/Changed error, **do not** set `meta.Status = StatusFailed` in decide mode. The error propagates, and the whole operation fails.
 - `internal/parser/callbacks.go:136-139,190-194` — walk dispatch uses `walkDecide`. Diff decode is used for decide in both plan and apply.
 - `internal/parser/parser.go:365-414` (`Diff`) — calls a new `p.decide(ctx, operation, current, previous) (*decisions, error)` that builds the removed deletes and runs `walkWith(... walkDecide)`. `Diff` returns `record.result()`.
-- `internal/parser/test_plugin.go` — add `ChangedDependencies map[string][]plugins.DependencyChange` (set in `TestResourceProvider.Changed`, `:644`), `GetChangedDependencies(id string) []plugins.DependencyChange`, and include it in `ResetCalls`.
+- `internal/parser/test_plugin.go` — add `ChangedDependencies map[string][]entity.DependencyChange` (set in `TestResourceProvider.Changed`, `:644`), `GetChangedDependencies(id string) []entity.DependencyChange`, and include it in `ResetCalls`.
 - Tests (new `internal/parser/decide_test.go`, harness `setupLifecycle` from `lifecycle_test.go:69`, state via `applyAndSave`):
   - `TestDecideTellsResourceAboutReplacedAndUpdatedDependencies` (fixture `two_dependencies`; `SetChangedResult(replaced, Replace)`, `SetChangedResult(updated, Update)`; `GetChangedDependencies(user)` equals exactly those two)
   - `TestDecideDoesNotTellResourceAboutUnchangedDependency`
@@ -209,7 +210,7 @@ The build must be green at the end of the task, not in between.
 **Requirements covered:** Every plugin in the repository uses the new decisions; External plugins can decide replacements (fixture). Repo: xclconfig.
 
 **File changes**
-- `plugins/example/pkg/person/provider.go:16` — add `Changed(ctx, old, new *Person, deps []plugins.DependencyChange) (plugins.Change, error)`: `Replace` if `FirstName` or `LastName` differ, otherwise `p.DefaultChanged.Changed(...)`.
+- `plugins/example/pkg/person/provider.go:16` — add `Changed(ctx, old, new *Person, deps []entity.DependencyChange) (entity.Change, error)`: `Replace` if `FirstName` or `LastName` differ, otherwise `p.DefaultChanged.Changed(...)`.
 - `plugins/example/pkg/person/provider_test.go` (new):
   - `TestPersonChangedReplacesOnFirstNameChange`
   - `TestPersonChangedReplacesOnLastNameChange`
@@ -277,7 +278,7 @@ The build must be green at the end of the task, not in between.
 
 **File changes**
 - `example/plugin/plugins/docker/resources/network.go:33-37,100-104` — add `Changed`: `Replace` if `old.Subnet != new.Subnet`, else defer to `DefaultChanged`. The `Update` doc says it is only reached for changes that need no Docker call (labels/meta); keep the no-op.
-- `example/plugin/plugins/docker/resources/container.go:60-64,242-246` — add `Changed`: `Replace` if any dependency has `Change == plugins.Replace`; `Replace` if `Image`, `Command`, `Environment` or `Networks` differ (`reflect.DeepEqual` on the slices/maps, treating nil and empty as equal); else `DefaultChanged`. Fix the `Update` doc to match.
+- `example/plugin/plugins/docker/resources/container.go:60-64,242-246` — add `Changed`: `Replace` if any dependency has `Change == entity.Replace`; `Replace` if `Image`, `Command`, `Environment` or `Networks` differ (`reflect.DeepEqual` on the slices/maps, treating nil and empty as equal); else `DefaultChanged`. Fix the `Update` doc to match.
 - `example/plugin/plugins/template/template.go:44-46` — add `Changed`: `Replace` if `Destination` differs, else `DefaultChanged` (Update for source/variables).
 - `example/plugin/plugins/docker/resources/network_test.go` — `TestNetworkChangedReplacesOnSubnetChange` and `TestNetworkChangedReportsNoChangeForIdenticalNetwork`.
 - `example/plugin/plugins/docker/resources/container_test.go`:
