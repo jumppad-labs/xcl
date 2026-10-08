@@ -1,38 +1,57 @@
-# Working context: 20261008132354-4538504f-replacement-deps
+# Working context: plan 20261008194959-b128e508-update-property-changes
+
+## Plan workflow status
+- Spec read (overview step). Spec decisions below carry into planning.
+
 
 ## Problem
-Found while testing the new `plan` command in example/plugin: changing the Docker network's `subnet` is planned and applied as an in-place **update**. `networkProvider.Update` (example/plugin/plugins/docker/resources/network.go:102) is a no-op, so state records the new subnet while Docker keeps the old network, and the container `web` (attached to it) is never touched. User: "we concentrated on a computed property changing but what we did not handle is when a property changes and that property is consumed by a linked resource which also needs to change ... if we change the ip then the docker container also needs to be destroyed and re-created."
+When a provider's `Changed` answers `entity.Update` (for example plain `DefaultChanged`), the core calls `Update(ctx, resource T)` with only the new configuration (plus computed values carried from the decide-pass Read). The provider cannot tell which properties changed or what their old values were, so it cannot write targeted in-place update code.
 
-Core gaps (internal/parser/lifecycle.go):
-- Provider `Changed(ctx, old, new) (bool, error)` can only say changed/not; changed always means Update. Replace exists only for resources whose last apply failed (diff.ActionReplace).
-- Dependents are only marked updated when they read a *computed* value of a pending resource (unknownPaths). The container reads `docker.network.app.meta.name`, never computed, so nothing cascades.
+Motivating use case: the Docker example's container network block changes from `app` to `backend`, and the provider can hot swap networks. Assume `Changed` is just `DefaultChanged`, so it answers Update. The plan already shows `~ network[0].name = "app" -> "backend"`, but `Update` sees only `backend` and has no way to know to disconnect `app`.
 
-## Direction chosen by the user
-- User: "the changed property for network would return Replace or something signaling to other resources that something they depend on is going to be completely replaced. They then have to decide if this means they will be replaced. Again this could be handled by Changed plugin function."
-- Dependents are told about dependencies that will **update or replace** (user chose this over replace-only). Delete never cascades: a removed resource can't still be referenced (validation fails).
-- Rejected: struct tag `xcl:",replace"` (ForceNew-style) — user preferred provider-decided via Changed; "any reference cascades" and Terraform value-based cascade rules — superseded by dependents deciding themselves.
-- Design stored: design/replacement-and-dependency-changes.md (source "design"), authored and agreed. It is binding: Change enum NoChange/Update/Replace, DependencyChange{Address, Change}, Changed(ctx, old, new, dependencies) (Change, error); apply = decide pass then act pass (destroy replaced+removed dependents-first, then create/update in dependency order); diff/plan = decide pass only, `-/+ ... # replaced because <dep> is replaced`; out of scope: create-before-destroy, Replace from failed Update.
-- Breaking API is acceptable (previous spec set that precedent; this design lists the Changed signature break).
+User's words: "you call update with the new values. But what has changed, I don't know, so how could I write some code which would modify the network settings?"; "This is a lot of work to update a single property, I have to make api calls to fetch data when I already have this information in the type. I just need to know which properties have changed, and what the old value is."
 
-## Side notes
-- example/plugin/config/alt.xcl (user's file) sits next to main.xcl; `apply ./config` reads both and declares app/web/welcome twice — breaks example tests/smoke/make run. Needs moving (e.g. config-alt/).
-- Plugin SDK registration (PluginBase.RegisterType / RegisterResourceProvider return errors) is a separate open question, not this spec.
-- Spec name: replacement-deps (user). No epic (user didn't pick one).
-- Merges: user wants work merged back into the branch they are on (currently f-diff).
+## Decisions
+- `Update` receives the list of changed properties: path, old value, new value. Sketch: `Update(ctx context.Context, resource T, changes []entity.<PropertyChange>) (T, error)`. The type name is a placeholder.
+- The change type lives in the public `entity` package, beside `entity.Change` and `entity.DependencyChange`, and not in `diff`. User: "I think you are right about having the change on the entity package too."
+- Breaking changes to the Go contract and the plugin protocol are fine. User: "I am all good with breaking changes right now, we are so close to release".
+- Scope is the Update change list only. The plugin scaffold is a separate GitHub issue, #8, probably a GitHub template.
 
-## Interview answers
-- Website: document both the plugin-author Changed contract and plan/diff -/+ output.
-- alt.xcl becomes a demo config in its own directory (e.g. example/plugin/config-subnet/), used by example tests and docs.
+## Details raised (to settle in the spec)
+- Compute the list at act time, from the saved copy against the configuration decoded with real values, so it never holds unknowns.
+- Sensitive values: carry the real before and after values to the provider. It already sees real values; masking is a rendering concern.
+- Path matching: `diff.Path` is structured (attribute, index and key steps). A friendlier match helper beats comparing strings like "network[0].name".
+- External plugins need the change list on the gRPC `UpdateRequest`.
 
-## Plan workflow (started 2026-10-08)
-- Planning spec 20261008132354-4538504f-replacement-deps (user chose it; only spec without a plan).
-- Success metrics must flow into Testing Approach (no-drift after subnet apply; per-plugin replace tests; plan == apply actions).
-- Plan user answers: replace reason rendered in the comment line ABOVE the header (`# <addr> will be replaced because <dep> is replaced`), not trailing; dependencies look THROUGH provider-less entities (outputs/variables/modules/config-only types) to provider-backed resources.
-- Target repos: xclconfig (core, root) + xcl-website (docs). Not xcl-vscode.
-- Key learning: the diff walk (walkDiff/diffResource/refresh/diffRecorder) is the decide pass; destroyer (reverse DAG over targets) is the destroy phase for replaced+removed; rebuild() in-walk must go.
-- Architecture locked: contract → decide/act → reason/render → example plugins → docs. Replace settings: network subnet; container image/command/env/networks + replaced dep; template destination; person first/last name.
-- Tasks drafted (12 ids used, 4 milestones). Next: open_questions.
-- Assembled & staged plan/context/research to .spektacular/tmp/<plan>/ (metadata commit ea66b09).
-- All 3 docs committed; now in walkthrough (awaiting user sign-off).
-- Walkthrough change (user): Change/DependencyChange live in new top-level public package `entity` (entity.Change), not plugins.
-- User signed off the plan walkthrough (2026-10-08).
+## Alternatives rejected
+- **Reconcile in `Update` against the real resource** (inspect Docker): extra API calls, and each provider redoes a comparison the core already did.
+- **Read the previous copy through `plugins.State`**: it is a back door around the contract, and `GRPCState.Get` returns "resource deserialization not implemented" for external plugins.
+- **`Update(ctx, old, new)`**: smaller, but every provider still has to write its own comparison. The user wants to be told which properties changed and their old values.
+- **A shared default `Changed` that replaces on replaced dependencies**: dropped by the user in favour of the scaffold issue.
+
+## Context
+This builds on the shipped spec 20261008132354-4538504f-replacement-deps (unchanged/update/replace, decide-then-act, `entity` package), merged into `f-diff`.
+
+## Interview answers (spec workflow)
+- Changed AND Update both receive the property change list; Update also receives the dependency list.
+- Example: container network hot swap is an in-place update (no replace on network blocks or on a replaced network); new `init_script` fed by a second template ("init"), init template replaced → container replaced; network Destroy force-detaches containers.
+- No cascade delete: dangling reference stays a validation error (user corrected themselves).
+- Website docs updated too. Scaffold = issue #8 (out of scope).
+- User said 'just run to the end' after constraints: draft remaining spec sections without per-section confirmation.
+- Spec verified by fresh reviewer; applied fixes (logs in sensitive rule, not-yet-known values requirement, init-script producer wording, trimmed duplicates, no-syntax-change constraint). Spec committed to store.
+- Split check: not offered (tightly coupled; example + docs are supporting work).
+
+## Plan learnings (discovery done)
+- Target repos: xclconfig (core, plugins, examples, docs) and xcl-website (replacement.mdx, examples/plugins.mdx, maybe diff.mdx). No formal design refs on the spec; the governing design `replacement-and-dependency-changes.md` was read.
+- Changes are computed with the plan's `resourceChanges` (saved vs configured), before `adapter.Changed` in refresh, and recomputed at act time in `update` from the real decode plus `l.previous`. Dependencies for Update come from `dec.dependencies`.
+- `diff.Path` moves to `entity`, with diff aliases. New `entity.PropertyChange` has real values, a Sensitive flag, and self-masking print/log/JSON forms. Values are JSON-normalised on both the in-process and external paths.
+- Docker example gaps: no NetworkDisconnect in the client interface, the Update methods are no-ops, network Destroy doesn't detach, the template has no mode. Existing tests assert replace-on-network semantics and must be rewritten.
+- Website pages replacement.mdx:195 and examples/plugins.mdx:433 claim the Docker Update is a no-op, so they must be rewritten.
+- Architecture chosen: Option A (one shared comparison per pass; contract first with empty lists; then core; then example; then docs). Signatures: Changed(ctx, old, new, changes, deps), Update(ctx, resource, changes, deps). Proto: ChangedRequest.changes=6; UpdateRequest.changes=4, dependencies=5.
+- Components drafted. A new e2e recording provider (in-process plus external) proves parity. The template gains an optional mode for the executable init script.
+- Testing approach drafted; all 4 success metrics are behavioural; 2 manual reviews (Makefile walkthroughs, docs review).
+- Tasks drafted (12 ids, in tasks_plan.md). Example variants live in config dirs. The recorder parity fixture is a shared package in e2e/fixtures/recorder.
+- Assembled and staged the three docs to .spektacular/tmp/<plan>/ (assembly script in the session scratchpad).
+- Verification passed: sections present, 12 unique task ids, context anchors match, commands removed from plan.md.
+- All three docs committed to the plan store; work dir removed. Next: walkthrough (read the docs back with plan file read).
+- Walkthrough done; user signed off on the plan with no changes.
