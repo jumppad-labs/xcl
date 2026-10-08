@@ -48,3 +48,6 @@ User wants to "do a diff between state and config". The diff "should show the re
 - Started rendering-and-docs (worktree created). Same merge procedure applies when it finishes.
 - rendering child QUESTION: implement new refused dependencies_unmet (diff spec's records uncommitted in project, worktree store stale). User chose: override_dependencies. repo list fails in worktree (no xcl-vscode worktree) — child uses given roots.
 - rendering-and-docs DONE; records copied to project via CLI (verified identical), code committed (xclconfig 9a4a22f, xcl-website 30c69e9), merged. Epic implement complete. Next (user): create ComputedChanges override spec in this epic.
+
+# Orchestrator — spek-implement-epic re-run (2026-10-08)
+- Epic 20261007105731-2388b579-diff (open in IDE): status shows 2/2 implemented, nothing ready/in progress/awaiting merge, no worktrees. Other two epics also fully implemented. Nothing started. ComputedChanges override spec still not created.
