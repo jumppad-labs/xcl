@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/creasty/defaults"
+	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/cty"
@@ -19,15 +20,15 @@ import (
 )
 
 // ProviderResolver resolves the provider adapter responsible for a given resource.
-// Satisfied by *registry.PluginRegistry; exists so the walk callbacks can be tested
-// against a mock instead of a real plugin registry.
+// Satisfied by *catalog.Catalog; exists so the walk callbacks can be tested
+// against a mock instead of a real catalog.
 type ProviderResolver interface {
 	GetProviderForResource(resource any) plugins.ProviderAdapter
 }
 
 // TypeRegistry reports which resource types are plain Go types registered
 // without a plugin. Resources of these types are handled like builtins, no
-// provider is ever called for them. Satisfied by *registry.PluginRegistry.
+// provider is ever called for them. Satisfied by *catalog.Catalog.
 type TypeRegistry interface {
 	IsRegisteredType(entityType, subtype string) bool
 }
@@ -77,13 +78,20 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		}
 
 		// Build a fresh context for this resource dynamically
-		ctx, err := buildContextForResource(parsedData, r, addresses, options, functions)
+		// a diff reads values only known once an apply has run as unknown,
+		// apply has no recorder
+		var unknown unknownValues
+		if lifecycle.recorder != nil {
+			unknown = lifecycle.recorder
+		}
+
+		ctx, err := buildContextForResource(parsedData, r, addresses, options, functions, unknown)
 		if err != nil {
 			pe := errors.NewParserErrorFromResource(
 				r,
 				fmt.Sprintf("failed to build resource context: %s", err),
 			)
-			emitWalkError(options, rMeta, pe)
+			emitWalkError(options, lifecycle.operation(), rMeta, pe)
 			return diags.Append(pe)
 		}
 
@@ -93,7 +101,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		// resource that does not exist, or is disabled.
 		isDisabled, err := processDisabled(bdy, ctx, r)
 		if err != nil {
-			emitWalkError(options, rMeta, err)
+			emitWalkError(options, lifecycle.operation(), rMeta, err)
 			return diags.Append(err)
 		}
 
@@ -120,15 +128,25 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		// If there are defaults defined on the resource set them
 		defaults.Set(r)
 
-		// Decode the body into the resource
-		diag := gohcl.DecodeBody(bdy, ctx, r)
+		// Decode the body into the resource. A diff decodes provider and
+		// registered entities through decodeForDiff, which records the values
+		// only known once an apply has run; builtins hold cty values, which
+		// keep unknowns as they are
+		var diag hcl.Diagnostics
+		if lifecycle.mode == walkDiff && !isBuiltinType(rMeta.Type) {
+			var unknownPaths []diff.Path
+			unknownPaths, diag = decodeForDiff(bdy, ctx, r)
+			lifecycle.recorder.recordUnknown(rMeta.ID, unknownPaths)
+		} else {
+			diag = gohcl.DecodeBody(bdy, ctx, r)
+		}
 		if diag.HasErrors() {
 			pe := errors.NewParserErrorFromResource(
 				r,
 				fmt.Sprintf(`unable to decode body: %s`, diag.Error()),
 			)
 
-			emitWalkError(options, rMeta, pe)
+			emitWalkError(options, lifecycle.operation(), rMeta, pe)
 			return diags.Append(pe)
 		}
 
@@ -153,7 +171,7 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 						r,
 						fmt.Sprintf(`unable to evaluate 'variables' for module: %s`, valDiags.Error()),
 					)
-					emitWalkError(options, rMeta, pe)
+					emitWalkError(options, lifecycle.operation(), rMeta, pe)
 					return diags.Append(pe)
 				}
 				suppliedVars = val
@@ -169,7 +187,11 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 
 		// Call provider lifecycle methods, a step skipped because the operation
 		// was cancelled leaves the resource as never reached
-		err = lifecycle.apply(r)
+		if lifecycle.mode == walkDiff {
+			err = lifecycle.diff(r)
+		} else {
+			err = lifecycle.apply(r)
+		}
 		if goerrors.Is(err, errNotReached) {
 			return nil
 		}
@@ -189,7 +211,9 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		switch rMeta.Type {
 		case resources.TypeOutput:
 			out := r.(*types.Output)
-			if !out.CtyValue.IsNull() {
+			// a value only known once an apply has run has no Go form, it
+			// stays a cty value for the entities that use it
+			if !out.CtyValue.IsNull() && out.CtyValue.IsWhollyKnown() {
 				out.Value, out.SensitivePaths = convertOutputValue(out.CtyValue)
 			}
 		}
@@ -319,9 +343,19 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 	}
 }
 
+// isBuiltinType returns true for the builtin entity types, which xcl handles
+// itself and whose values are held as cty values
+func isBuiltinType(entityType string) bool {
+	return entityType == resources.TypeVariable ||
+		entityType == resources.TypeOutput ||
+		entityType == resources.TypeModule ||
+		entityType == resources.TypeRoot
+}
+
 // emitWalkError emits an error event for a resource that failed in the walk
 // before any provider call, such as a body that does not decode. The event's
-// operation is apply, the step being worked towards.
-func emitWalkError(options *ParserOptions, meta *types.Meta, err error) {
-	emitLifecycle(options, meta, events.OperationApply, events.PhaseError, 0, err, nil, nil)
+// operation is the walk's operation, apply or diff, the step being worked
+// towards.
+func emitWalkError(options *ParserOptions, operation string, meta *types.Meta, err error) {
+	emitLifecycle(options, meta, operation, events.PhaseError, 0, err, nil, nil)
 }

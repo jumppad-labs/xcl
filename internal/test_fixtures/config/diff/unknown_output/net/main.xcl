@@ -1,0 +1,9 @@
+# Creates a network and returns its computed provider id.
+
+resource "network" "inner" {
+  subnet = "10.1.0.0/16"
+}
+
+output "network_id" {
+  value = resource.network.inner.provider_id
+}

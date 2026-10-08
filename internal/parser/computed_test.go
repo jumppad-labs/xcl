@@ -6,23 +6,25 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/stretchr/testify/require"
 )
 
 // newTestRegistry returns a plugin registry with the test plugin registered, so
 // resources it creates have the schema-rebuilt types the parser works with
-func newTestRegistry(t *testing.T) *registry.PluginRegistry {
+func newTestRegistry(t *testing.T) *catalog.Catalog {
 	t.Helper()
 
-	r := registry.NewPluginRegistry()
+	r := catalog.New()
 
-	err := r.RegisterPlugin(&TestPlugin{})
-	require.NoError(t, err)
+	local := registry.NewLocal()
+	local.RegisterPlugin(&TestPlugin{})
+	r.AddRegistry(local)
 
 	// the plugin's types are known once plugins have loaded
-	err = r.Load(nil)
+	err := r.Load(nil)
 	require.NoError(t, err)
 
 	return r

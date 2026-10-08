@@ -11,10 +11,11 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -41,29 +42,37 @@ var testAppliedIDs = []string{
 // testRegistry returns a registry holding the types appliedConfig declares,
 // and points HOME at the test's temp directory so an apply never writes to the
 // user's home folder.
-func testRegistry(t *testing.T) *registry.PluginRegistry {
+func testRegistry(t *testing.T) *catalog.Catalog {
 	t.Helper()
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
-	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
-
-	err = reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
-	require.NoError(t, err)
-
-	err = reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
+	reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
 
 	return reg
+}
+
+// testTypeOptions returns the options that declare the types appliedConfig
+// declares, so a Config resolves the same types testRegistry holds
+func testTypeOptions() []xcl.ConfigOption {
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	declared.RegisterType(&registered.App{}, "resource", registered.TypeApp)
+	declared.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
+
+	return []xcl.ConfigOption{
+		xcl.WithRegistry(declared),
+	}
 }
 
 // testApplyToStateFile registers the fixture types, applies appliedConfig with
 // a file state store and returns the path the state was written to along with
 // the registry it was written with, so a fresh store can read it back.
-func testApplyToStateFile(t *testing.T) (string, *registry.PluginRegistry) {
+func testApplyToStateFile(t *testing.T) (string, *catalog.Catalog) {
 	t.Helper()
 
 	reg := testRegistry(t)
@@ -73,10 +82,7 @@ func testApplyToStateFile(t *testing.T) (string, *registry.PluginRegistry) {
 
 	statePath := store.Path()
 
-	c, err := xcl.NewConfig(
-		xcl.WithPluginRegistry(reg),
-		xcl.WithStateStore(store),
-	)
+	c, err := xcl.NewConfig(append(testTypeOptions(), xcl.WithStateStore(store))...)
 	require.NoError(t, err)
 
 	err = c.Apply(appliedConfig)
@@ -87,7 +93,7 @@ func testApplyToStateFile(t *testing.T) (string, *registry.PluginRegistry) {
 
 // testLoadSavedState opens a fresh store at path, as a later run would, and
 // loads the saved entities from it, typed with reg
-func testLoadSavedState(t *testing.T, path string, reg *registry.PluginRegistry) []any {
+func testLoadSavedState(t *testing.T, path string, reg *catalog.Catalog) []any {
 	t.Helper()
 
 	store, err := state.NewFileStateStore(filepath.Dir(path))

@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
 // TestPluginLifecycleWithoutEventHandlerWritesNothingToStandardStreams
@@ -14,7 +13,7 @@ import (
 // their own to stdout or stderr across an apply and destroy when no event
 // handler is given
 func TestPluginLifecycleWithoutEventHandlerWritesNothingToStandardStreams(t *testing.T) {
-	c := newPluginConfig(t, registry.NewPluginRegistry(), nil, t.TempDir(), testStateKey)
+	c := newPluginConfig(t, nil, t.TempDir(), testStateKey)
 
 	var applyErr, destroyErr error
 	captured := testutil.CaptureStandardStreams(t, func() {
@@ -34,7 +33,7 @@ func TestPluginLifecycleWithoutEventHandlerWritesNothingToStandardStreams(t *tes
 // an apply and destroy
 func TestPluginStandardStreamsHoldNoSecret(t *testing.T) {
 	recorder := &testutil.EventRecorder{}
-	c := newPluginConfig(t, registry.NewPluginRegistry(), recorder.Record, t.TempDir(), testStateKey)
+	c := newPluginConfig(t, recorder.Record, t.TempDir(), testStateKey)
 
 	var applyErr, destroyErr error
 	captured := testutil.CaptureStandardStreams(t, func() {

@@ -13,7 +13,7 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -76,11 +76,10 @@ func setupDeliveryConfig(t *testing.T, contents string, opts ...ConfigOption) *d
 		os.Setenv("HOME", home)
 	})
 
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 
 	testPlugin := &parser.TestPlugin{}
-	err := pr.RegisterPlugin(testPlugin)
-	require.NoError(t, err)
+	local.RegisterPlugin(testPlugin)
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
@@ -90,7 +89,7 @@ func setupDeliveryConfig(t *testing.T, contents string, opts ...ConfigOption) *d
 	require.NoError(t, err)
 
 	options := append([]ConfigOption{
-		WithPluginRegistry(pr),
+		WithRegistry(local),
 		WithStateStore(store),
 	}, opts...)
 

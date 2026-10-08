@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/errwrap"
+	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/cty/function"
 	"github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/functions"
@@ -22,7 +24,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -85,19 +86,19 @@ type ParserOptions struct {
 	// when downloading modules.
 	ModuleRegistry *modules.ModuleRegistry
 
-	// PluginRegistry is the registry of plugins to use for this parser.
-	// This should be provided by Config when using the Config.Apply/Validate API.
-	// For standalone Parser usage, create and configure the PluginRegistry yourself.
-	PluginRegistry *registry.PluginRegistry
+	// Catalog resolves block types and loads plugins for this parser. It is
+	// provided by Config when using the Config.Apply/Validate API. For
+	// standalone Parser usage, create and configure the Catalog yourself.
+	Catalog *catalog.Catalog
 
 	// ProviderResolver overrides how provider adapters are looked up during the resource
-	// lifecycle walk (Create/Read/Changed/Update/Destroy). Defaults to PluginRegistry.
+	// lifecycle walk (Create/Read/Changed/Update/Destroy). Defaults to Catalog.
 	// Primarily useful for testing lifecycle/ordering behavior without a real plugin registry.
 	ProviderResolver ProviderResolver
 
 	// TypeRegistry overrides how the lifecycle walk recognises plain Go types registered
 	// without a plugin, which like builtins are never passed to a provider. Defaults to
-	// PluginRegistry. Primarily useful for testing lifecycle behavior without a real registry.
+	// Catalog. Primarily useful for testing lifecycle behavior without a real registry.
 	TypeRegistry TypeRegistry
 
 	// StateStore is the state store to use for loading previous state.
@@ -139,8 +140,8 @@ const ConfigDirectory = ".xclconfig"
 // VariableEnvPrefix is set to 'HCL_VAR_', should a variable be defined
 // called 'foo' setting the environment variable 'HCL_VAR_foo' will override
 // any default value
-// PluginRegistry is set to a registry containing only the builtin resource
-// types, add plugins to it or replace it to use custom resource types
+// Catalog is set to a catalog containing only the builtin resource types,
+// register types on it or replace it to use custom resource types
 func DefaultOptions() *ParserOptions {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -152,7 +153,7 @@ func DefaultOptions() *ParserOptions {
 	return &ParserOptions{
 		ModuleCache:       cacheDir,
 		VariableEnvPrefix: "HCL_VAR_",
-		PluginRegistry:    registry.NewPluginRegistry(),
+		Catalog:           catalog.New(),
 		// event data is redacted by default, as Config does
 		EventMask: mask.Redact(),
 	}
@@ -163,7 +164,7 @@ type Parser struct {
 	options          ParserOptions
 	customFunctions  map[string]function.Function
 	stateStore       state.StateStore
-	pluginRegistry   *registry.PluginRegistry
+	catalog          *catalog.Catalog
 	providerResolver ProviderResolver
 	typeRegistry     TypeRegistry
 	addresses        *resources.AddressParser // resolves addresses against the known types
@@ -177,8 +178,8 @@ type Parser struct {
 func (p *Parser) addressParser() *resources.AddressParser {
 	if p.addresses == nil {
 		var known []types.TypeInfo
-		if p.pluginRegistry != nil {
-			known = p.pluginRegistry.Types()
+		if p.catalog != nil {
+			known = p.catalog.Types()
 		}
 
 		p.addresses = resources.NewAddressParser(known)
@@ -203,17 +204,17 @@ func NewParser(options *ParserOptions) *Parser {
 	// Parser should never create plugin registry or state store - these are owned by Config
 	// and passed in via options. If not provided, they will be nil and operations will skip
 	// plugin/state functionality.
-	p.pluginRegistry = o.PluginRegistry
+	p.catalog = o.Catalog
 	p.stateStore = o.StateStore
 
 	p.providerResolver = o.ProviderResolver
 	if p.providerResolver == nil {
-		p.providerResolver = p.pluginRegistry
+		p.providerResolver = p.catalog
 	}
 
 	p.typeRegistry = o.TypeRegistry
-	if p.typeRegistry == nil && p.pluginRegistry != nil {
-		p.typeRegistry = p.pluginRegistry
+	if p.typeRegistry == nil && p.catalog != nil {
+		p.typeRegistry = p.catalog
 	}
 
 	if o.CustomFunctions != nil {
@@ -343,6 +344,75 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
 	return currentState, nil
 }
 
+// Diff reports what an apply of the configuration discovered from paths would
+// do, without doing any of it. It parses and validates exactly as Apply does,
+// against the same previous state, and fails in the same cases.
+//
+// Resources in the previous state that are no longer configured would be
+// deleted. The rest of the configuration is walked in dependency order as
+// Apply walks it: a resource not in the previous state would be created, one
+// saved as failed or destroy_failed would be replaced, and one saved as
+// created or updated is read and compared through its provider, exactly as
+// Apply does, and would be updated when it changed or created again when its
+// provider no longer finds it. Only resources an apply hands to a provider
+// take part.
+//
+// Diff never calls a provider's Create, Update or Destroy and never writes to
+// the state store. A provider error while reading or comparing a resource
+// fails the diff with an error naming the resource, there is no partial
+// result. Once ctx is cancelled no new provider call starts and Diff returns
+// ctx's error.
+func (p *Parser) Diff(ctx context.Context, options diff.Options, paths ...string) (*diff.Diff, error) {
+	currentState, previousState, err := p.parseAndValidate(paths...)
+	if err != nil {
+		return nil, err
+	}
+
+	// an empty configuration fails as it does for Apply
+	if currentState.ResourceCount() == 0 {
+		return nil, ErrEmptyConfiguration
+	}
+
+	recorder := newDiffRecorder()
+
+	// the resources Apply's removal phase would destroy through a provider
+	for _, r := range removedResources(currentState, previousState) {
+		meta, err := types.GetMeta(r)
+		if err != nil {
+			continue
+		}
+
+		if disabled, _ := types.GetDisabled(r); disabled || handledWithoutProvider(p.typeRegistry, meta) {
+			continue
+		}
+
+		recorder.record(diff.Resource{Address: meta.ID, Action: diff.ActionDelete})
+	}
+
+	lifecycle := &resourceLifecycle{
+		mode:        walkDiff,
+		recorder:    recorder,
+		diffOptions: options,
+	}
+
+	_, errs := p.walkWith(ctx, currentState, previousState, p.getFunctions, lifecycle)
+
+	if len(errs) == 0 && ctx.Err() != nil {
+		errs = append(errs, fmt.Errorf("diff stopped before every resource was reached: %w", ctx.Err()))
+	}
+
+	if len(errs) > 0 {
+		ce := errors.NewConfigError()
+		for _, e := range errs {
+			ce.AppendError(e)
+		}
+
+		return nil, ce
+	}
+
+	return recorder.result(), nil
+}
+
 // Destroy destroys every resource in saved, working only from the saved state:
 // it needs no configuration. Resources are destroyed children first, in the
 // reverse of their create order, built from the links each resource saved. Builtin, registered and disabled resources never reach
@@ -371,7 +441,7 @@ func (p *Parser) Destroy(ctx context.Context, saved []any) (*State, error) {
 	}
 
 	// saved is what a store loaded, the records it holds are typed here
-	saved, err := savedentity.DecodeAll(p.pluginRegistry, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
+	saved, err := savedentity.DecodeAll(p.catalog, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
 	if err != nil {
 		return working, err
 	}
@@ -471,7 +541,7 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 
 		// the store only reads and writes records, typing them needs the
 		// registry
-		saved, err = savedentity.DecodeAll(p.pluginRegistry, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
+		saved, err = savedentity.DecodeAll(p.catalog, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load previous state: %w", err)
 		}
@@ -678,11 +748,11 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 // carry a subtype as their first label, and whether the keyword is known.
 // "resource" always takes one, even with no registry
 func (p *Parser) takesSubtype(entityType string) (bool, bool) {
-	if p.pluginRegistry == nil {
+	if p.catalog == nil {
 		return entityType == types.TypeResource, entityType == types.TypeResource
 	}
 
-	return p.pluginRegistry.TakesSubtype(entityType)
+	return p.catalog.TakesSubtype(entityType)
 }
 
 // isReferenceRoot reports whether name, the first segment of a traversal in an
@@ -843,7 +913,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 			return de
 		}
 
-		rt, err = p.pluginRegistry.CreateEntity(b.Type, subtype, name)
+		rt, err = p.catalog.CreateEntity(b.Type, subtype, name)
 		if err != nil {
 			typeName := b.Type
 			if subtype != "" {
@@ -1318,10 +1388,17 @@ func processDisabled(bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (b
 //
 // It returns the progress of the walk, which is nil when the walk did not start.
 func (p *Parser) walk(ctx context.Context, currentState, previousState *State, functions functionsForFile) (*applyProgress, []error) {
+	return p.walkWith(ctx, currentState, previousState, functions, &resourceLifecycle{mode: walkApply})
+}
+
+// walkWith walks the configuration with a lifecycle prepared for the walk's
+// mode: the walk fills in what every walk shares, the context, the previous
+// state, the provider resolver and the bodies
+func (p *Parser) walkWith(ctx context.Context, currentState, previousState *State, functions functionsForFile, lifecycle *resourceLifecycle) (*applyProgress, []error) {
 	// Build the DAG using currentState (implements ResourceProvider)
 	d, err := DoYouLikeDags(currentState, p.addressParser(), false)
 	if err != nil {
-		p.emitOperationError(events.OperationApply, err)
+		p.emitOperationError(lifecycle.operation(), err)
 		return nil, []error{err}
 	}
 
@@ -1332,7 +1409,7 @@ func (p *Parser) walk(ctx context.Context, currentState, previousState *State, f
 	err = d.Validate()
 	if err != nil {
 		err = fmt.Errorf("unable to validate dependency graph: %w", err)
-		p.emitOperationError(events.OperationApply, err)
+		p.emitOperationError(lifecycle.operation(), err)
 		return nil, []error{err}
 	}
 
@@ -1341,15 +1418,13 @@ func (p *Parser) walk(ctx context.Context, currentState, previousState *State, f
 
 	// The lifecycle decides the provider calls for each resource from the
 	// state saved by the last apply
-	lifecycle := &resourceLifecycle{
-		ctx:      ctx,
-		previous: previousState,
-		resolver: p.providerResolver,
-		options:  &p.options,
-		types:    p.typeRegistry,
-		bodies:   p.parsedResources.bodies,
-		progress: newApplyProgress(),
-	}
+	lifecycle.ctx = ctx
+	lifecycle.previous = previousState
+	lifecycle.resolver = p.providerResolver
+	lifecycle.options = &p.options
+	lifecycle.types = p.typeRegistry
+	lifecycle.bodies = p.parsedResources.bodies
+	lifecycle.progress = newApplyProgress()
 
 	w.Callback = walkCallback(p.parsedResources, currentState, p.addressParser(), lifecycle, &p.options, functions)
 	w.Reverse = false
@@ -1436,9 +1511,9 @@ func (p *Parser) emitOperationError(operation string, err error) {
 // loadPlugins loads the plugin registry's plugins, which happens once per
 // registry, so it is cheap when a Config has already loaded them
 func (p *Parser) loadPlugins() error {
-	if p.pluginRegistry == nil {
+	if p.catalog == nil {
 		return nil
 	}
 
-	return p.pluginRegistry.Load(p.options.Emit)
+	return p.catalog.Load(p.options.Emit)
 }

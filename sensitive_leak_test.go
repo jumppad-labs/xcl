@@ -6,16 +6,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -28,7 +31,6 @@ const knownSecret = "s3cr3t-leak-check-7f1d"
 // leakFixture is an applied sensitive_leak configuration
 type leakFixture struct {
 	config   *Config
-	registry *registry.PluginRegistry
 	plugin   *parser.TestPlugin
 	store    *state.FileStateStore
 	stateDir string
@@ -67,13 +69,11 @@ func applyLeakFixtureWithOptions(t *testing.T, name string, level EventDataLevel
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
-	require.NoError(t, reg.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret))
-	require.NoError(t, reg.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer))
+	local := registry.NewLocal()
 
 	plugin := &parser.TestPlugin{}
 	plugin.SetLogOnCreate(messages...)
-	require.NoError(t, reg.RegisterPlugin(plugin))
+	local.RegisterPlugin(plugin)
 
 	stateDir := t.TempDir()
 	store, err := state.NewFileStateStore(stateDir)
@@ -84,8 +84,11 @@ func applyLeakFixtureWithOptions(t *testing.T, name string, level EventDataLevel
 
 	recorder := &eventRecorder{}
 
+	local.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
+	local.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer)
+
 	all := []ConfigOption{
-		WithPluginRegistry(reg),
+		WithRegistry(local),
 		WithStateStore(store),
 		WithStateMask(stateMasker),
 		WithEventHandler(recorder.Record),
@@ -98,7 +101,6 @@ func applyLeakFixtureWithOptions(t *testing.T, name string, level EventDataLevel
 
 	return &leakFixture{
 		config:   c,
-		registry: reg,
 		plugin:   plugin,
 		store:    store,
 		stateDir: stateDir,
@@ -383,7 +385,7 @@ func TestLeakEncodeSavedEntityOfRegisteredSecret(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, f.store.Path(), "resource.secret.a")
 
-	out, err := EncodeSavedEntity(f.registry, record)
+	out, err := f.config.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.NotContains(t, string(out), knownSecret)
@@ -395,7 +397,7 @@ func TestLeakEncodeSavedEntityOfPluginCredential(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, f.store.Path(), "resource.credential.b")
 
-	out, err := EncodeSavedEntity(f.registry, record)
+	out, err := f.config.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.NotContains(t, string(out), knownSecret)
@@ -407,7 +409,7 @@ func TestLeakEncodeSavedEntityOfInterpolatedConsumer(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, f.store.Path(), "resource.secret_consumer.interpolated")
 
-	out, err := EncodeSavedEntity(f.registry, record)
+	out, err := f.config.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.NotContains(t, string(out), knownSecret)
@@ -539,4 +541,136 @@ func TestLeakSuiteStateFileHoldsNoSecret(t *testing.T) {
 	require.NotContains(t, contents, knownSecret)
 	require.Contains(t, contents, mask.EnvelopeKey)
 	require.Contains(t, contents, mask.AES256GCMName)
+}
+
+// leakDiffSecret replaces knownSecret in the main leak fixture for the diff
+// leak tests, so the diff compares two different secrets. Neither may appear
+// in a diff that was not asked to reveal them.
+const leakDiffSecret = "n3w-s3cr3t-diff-check-2b6e"
+
+// diffLeakMainWithNewSecret applies the main leak fixture with every event
+// recorded at the raw data level, then diffs a copy of it in which every
+// knownSecret is replaced by leakDiffSecret. The recorder is cleared before
+// the diff so it holds only the diff's events. The diff must report the
+// plugin credential's password as a changed sensitive value.
+func diffLeakMainWithNewSecret(t *testing.T) (*leakFixture, *diff.Diff) {
+	t.Helper()
+
+	f := applyLeakMain(t, EventDataRaw)
+
+	contents, err := os.ReadFile(leakPath(t, "main.xcl"))
+	require.NoError(t, err)
+
+	changed := strings.ReplaceAll(string(contents), knownSecret, leakDiffSecret)
+
+	dir := t.TempDir()
+	err = os.WriteFile(filepath.Join(dir, "main.xcl"), []byte(changed), 0o600)
+	require.NoError(t, err)
+
+	f.recorder.reset()
+
+	result, err := f.config.Diff([]string{dir})
+	require.NoError(t, err)
+
+	// the leak checks mean nothing unless the diff reports the secret change
+	require.Len(t, result.Resources, 1)
+	require.Equal(t, "resource.credential.b", result.Resources[0].Address)
+	require.Equal(t, diff.ActionUpdate, result.Resources[0].Action)
+	require.Len(t, result.Resources[0].Changes, 1)
+	require.Equal(t, "password", result.Resources[0].Changes[0].Path.String())
+	require.True(t, result.Resources[0].Changes[0].Sensitive)
+
+	return f, result
+}
+
+func TestLeakDiffMarshalledToJSON(t *testing.T) {
+	_, result := diffLeakMainWithNewSecret(t)
+
+	encoded, err := json.Marshal(result)
+	require.NoError(t, err)
+
+	require.NotContains(t, string(encoded), knownSecret)
+	require.NotContains(t, string(encoded), leakDiffSecret)
+}
+
+func TestLeakDiffFormattedWithPercentV(t *testing.T) {
+	_, result := diffLeakMainWithNewSecret(t)
+
+	text := fmt.Sprintf("%v", result)
+
+	require.NotContains(t, text, knownSecret)
+	require.NotContains(t, text, leakDiffSecret)
+}
+
+func TestLeakDiffFormattedWithPercentPlusV(t *testing.T) {
+	_, result := diffLeakMainWithNewSecret(t)
+
+	text := fmt.Sprintf("%+v", result)
+
+	require.NotContains(t, text, knownSecret)
+	require.NotContains(t, text, leakDiffSecret)
+}
+
+func TestLeakDiffEvents(t *testing.T) {
+	f, _ := diffLeakMainWithNewSecret(t)
+
+	recorded := f.recorder.Events()
+	require.NotEmpty(t, recorded)
+	require.Equal(t, events.OperationDiff, recorded[0].Operation, "the recorder must hold only the diff's events")
+
+	// the diff reads the credential through its provider, so its events
+	// carry the credential's data
+	require.NotEmpty(t, f.recorder.find("resource.credential.b", events.OperationRead, events.PhaseSuccess))
+
+	text := eventText(recorded)
+
+	require.NotContains(t, text, knownSecret)
+	require.NotContains(t, text, leakDiffSecret)
+}
+
+func TestLeakDiffRenderingOfChangedCredential(t *testing.T) {
+	result := diffChangedCredential(t)
+	require.Equal(t, 1, result.Summary.Update)
+
+	text := string(diff.Render(result))
+
+	require.NotContains(t, text, diffCredentialBeforePassword)
+	require.NotContains(t, text, diffCredentialAfterPassword)
+	require.Contains(t, text, "      ~ password = (sensitive value)\n")
+}
+
+func TestLeakDiffRenderingOfChangedCredentialRevealed(t *testing.T) {
+	result := diffChangedCredential(t, diff.RevealSensitive())
+	require.Equal(t, 1, result.Summary.Update)
+
+	text := string(diff.Render(result))
+
+	require.Contains(t, text, `"`+diffCredentialBeforePassword+`" -> "`+diffCredentialAfterPassword+`"`)
+}
+
+func TestLeakDiffHighlightedRenderingOfChangedCredential(t *testing.T) {
+	result := diffChangedCredential(t)
+	require.Equal(t, 1, result.Summary.Update)
+
+	renderer, err := highlight.NewANSIRenderer()
+	require.NoError(t, err)
+
+	text := string(diff.Render(result, diff.Highlight(renderer)))
+
+	require.NotContains(t, text, diffCredentialBeforePassword)
+	require.NotContains(t, text, diffCredentialAfterPassword)
+	require.Contains(t, text, "(sensitive value)")
+}
+
+func TestLeakDiffHighlightedRenderingOfChangedCredentialRevealed(t *testing.T) {
+	result := diffChangedCredential(t, diff.RevealSensitive())
+	require.Equal(t, 1, result.Summary.Update)
+
+	renderer, err := highlight.NewANSIRenderer()
+	require.NoError(t, err)
+
+	text := string(diff.Render(result, diff.Highlight(renderer)))
+
+	require.Contains(t, text, diffCredentialBeforePassword)
+	require.Contains(t, text, diffCredentialAfterPassword)
 }

@@ -6,17 +6,17 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
-func testCreateState(t *testing.T) (StateStore, string, *registry.PluginRegistry) {
+func testCreateState(t *testing.T) (StateStore, string, *catalog.Catalog) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, StateFileName)
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
 	ss, err := NewFileStateStore(dir)
 
@@ -27,7 +27,7 @@ func testCreateState(t *testing.T) (StateStore, string, *registry.PluginRegistry
 	return ss, p, reg
 }
 
-func testSaveState(t *testing.T) (StateStore, string, *registry.PluginRegistry) {
+func testSaveState(t *testing.T) (StateStore, string, *catalog.Catalog) {
 	ss, p, reg := testCreateState(t)
 
 	// Create a variable resource using the registry
@@ -47,7 +47,7 @@ func testSaveState(t *testing.T) (StateStore, string, *registry.PluginRegistry) 
 	return ss, p, reg
 }
 
-func testNewStateAtExistingPath(t *testing.T) (StateStore, string, *registry.PluginRegistry) {
+func testNewStateAtExistingPath(t *testing.T) (StateStore, string, *catalog.Catalog) {
 	_, p, reg := testSaveState(t)
 
 	// create the file first
@@ -131,8 +131,7 @@ func TestLoadFailsWhenStateFileIsNotAnArray(t *testing.T) {
 func TestSaveRecordsBothAxesOfEachEntity(t *testing.T) {
 	ss, _, reg := testCreateState(t)
 
-	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 
 	database, err := reg.CreateEntity("resource", registered.TypeDatabase, "main")
 	require.NoError(t, err)

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -21,22 +21,16 @@ func setupSubtypedConfig(t *testing.T) *Config {
 
 	t.Setenv("HOME", t.TempDir())
 
-	reg := registry.NewPluginRegistry()
-
-	err := reg.RegisterType(&registered.Server{}, registered.TypeServer, registered.SubtypeBig)
-	require.NoError(t, err)
-
-	err = reg.RegisterType(&registered.Cache{}, registered.TypeCache)
-	require.NoError(t, err)
-
-	err = reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
-	require.NoError(t, err)
-
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Server{}, registered.TypeServer, registered.SubtypeBig)
+	declared.RegisterType(&registered.Cache{}, registered.TypeCache)
+	declared.RegisterType(&registered.App{}, "resource", registered.TypeApp)
+
 	c, err := NewConfig(
-		WithPluginRegistry(reg),
+		WithRegistry(declared),
 		WithStateStore(store),
 	)
 	require.NoError(t, err)

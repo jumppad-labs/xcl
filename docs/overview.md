@@ -10,7 +10,7 @@ persisted in between runs.
 
 ```
 Config            (repo root, package xcl)
-  owns: PluginRegistry, StateStore, the entities currently declared
+  owns: Catalog, StateStore, the entities currently declared
   entry point: NewConfig(opts...) (*Config, error), then Apply()/Validate()/Destroy()
 
 Parser            (internal/parser)
@@ -20,23 +20,33 @@ Parser            (internal/parser)
   or one Destroy() call: walk the saved state children first, calling
   each resource's provider
 
-PluginRegistry    (plugins/registry)
-  aggregates PluginHosts, answers "what Go type is resource X" and
-  "what ProviderAdapter handles resource X"
+Catalog           (internal/catalog)
+  built by NewConfig from the registries added with WithRegistry,
+  reading the Go types each declares; loads the registries' plugins on
+  the first operation, aggregates PluginHosts, answers "what Go type is
+  resource X" and "what ProviderAdapter handles resource X"
 ```
 
 `Config` is the only piece meant to be constructed directly by a library
 user. `Parser` is constructed fresh, internally, on every
 `Apply`/`Validate`/`Destroy` call — it is not held onto between calls.
-`PluginRegistry` and `StateStore` are the two pieces of long-lived state
-`Config` owns and passes into each new `Parser` via `ParserOptions`.
+The `Catalog` and the `StateStore` are the two pieces of long-lived state
+`Config` owns and passes into each new `Parser` via `ParserOptions`. The
+catalog is private; applications reach it only through `WithRegistry`. The
+public [`registry`](../registry) package defines where Go types and plugins
+come from: the `Registry` (`Name()`, `Types()`, `Plugins(ctx, emit)`), `Type`
+and `Plugin` types, and the local registry, `registry.NewLocal()`.
 
 ## Entry point
 
 ```go
+local := registry.NewLocal()
+local.RegisterType(&Server{}, "server")   // a plain Go type, no plugin
+local.RegisterPlugin(&MyPlugin{})         // an in-process plugin
+
 cfg, err := xcl.NewConfig(
-    xcl.WithPluginRegistry(pluginRegistry),
-    xcl.WithStateStore(stateStore),       // or xcl.WithStatePath("./.xcl")
+    xcl.WithRegistry(local),              // Go types and plugins
+    xcl.WithStateStore(stateStore),       // or xcl.WithStatePath("./.xcl"), or neither to persist nothing
     xcl.WithVariables(vars),
 )
 
@@ -49,6 +59,14 @@ err := cfg.Destroy()                   // destroys everything in the saved state
 ([`options.go`](../options.go)) onto a `Config` holding no entities yet. An
 option can fail, `WithStatePath` does when it cannot create the state
 directory, and the first failure is returned from `NewConfig`.
+Registration returns no error. A mistake in a single call, such as an empty
+type name or a nil registry, panics. Declared Go types that clash, the same
+block type declared twice in one registry or across two, or a builtin name,
+are a `*xcl.TypeNameClashError` returned by `NewConfig`, and a keyword used in
+both forms a `*xcl.TypeFormError`. A plugin that fails to load
+(`*xcl.PluginLoadError`) or a block type a plugin provides that something else
+already provides (`*xcl.TypeNameClashError`) is returned by the first
+operation.
 With no options, you get a config that parses and validates HCL but never
 touches a real provider or disk — useful for testing.
 
@@ -57,7 +75,7 @@ touches a real provider or disk — useful for testing.
 [`config.go:110`](../config.go#L110):
 
 1. Construct a `parser.Parser` for this call only, handing it `Config`'s
-   `StateStore`, `PluginRegistry`, and variables via `ParserOptions`.
+   `StateStore`, `Catalog`, and variables via `ParserOptions`.
 2. Call `p.Apply(paths...)`, see
    [Parser & Resource Lifecycle](parser-lifecycle.md).
 3. Adopt the entities the parse produced as the configuration's own.
@@ -152,7 +170,7 @@ is the canonical way engine code reads this off an arbitrary resource value —
 it walks embedded fields by reflection, so it works uniformly whether the
 resource is a compiled-in Go struct or one dynamically built by
 `schema.CreateInstanceFromSchema` (see [Plugin Architecture](plugins.md)).
-This is what lets `internal/parser` and `plugins/registry` operate on
+This is what lets `internal/parser` and `internal/catalog` operate on
 resources as `any` without knowing their concrete type.
 
 ## Where to go next

@@ -5,25 +5,35 @@ import (
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 )
 
 // ConfigOption is a functional option for configuring Config
 type ConfigOption func(*Config) error
 
-// WithPluginRegistry sets the plugin registry to use
-// If not provided, only the builtin resource types will be available
-func WithPluginRegistry(pr *registry.PluginRegistry) ConfigOption {
+// WithRegistry adds a registry the Config gets its Go types and plugins from.
+// It may be given any number of times: registries are read, and their plugins
+// load, in the order they were given, and within a registry its plugins load
+// in the order they were registered. NewConfig reads every registry's types
+// and returns an error when they clash. Nothing is loaded until the first
+// operation that needs plugins. A nil registry is a programmer error and
+// panics.
+func WithRegistry(r registry.Registry) ConfigOption {
+	if r == nil {
+		panic("xcl: registry must not be nil")
+	}
+
 	return func(c *Config) error {
-		c.pluginRegistry = pr
+		c.registries = append(c.registries, r)
 		return nil
 	}
 }
 
 // WithStateStore sets the state store for persistence
 // Uses the existing state.StateStore interface from state/state_store.go
-// If not provided, state will not be persisted
+// Without WithStateStore or WithStatePath nothing is persisted; this is the
+// supported mode for configuration-only use.
 func WithStateStore(ss state.StateStore) ConfigOption {
 	return func(c *Config) error {
 		c.stateStore = ss
@@ -35,6 +45,8 @@ func WithStateStore(ss state.StateStore) ConfigOption {
 // in the directory dir, creating the directory when it does not exist.
 // NewConfig returns an error when the store cannot be created. When both
 // WithStatePath and WithStateStore are given, the one given last is used.
+// Without either, nothing is persisted; this is the supported mode for
+// configuration-only use.
 func WithStatePath(dir string) ConfigOption {
 	return func(c *Config) error {
 		store, err := state.NewFileStateStore(dir)

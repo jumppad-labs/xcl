@@ -11,8 +11,11 @@ import (
 )
 
 // buildContextForResource creates a fresh context for a specific resource
-// by building variables dynamically from config and module sources
-func buildContextForResource(res *parsed, r any, addresses *resources.AddressParser, options *ParserOptions, functions functionsForFile) (*hcl.EvalContext, error) {
+// by building variables dynamically from config and module sources. unknown,
+// when not nil, replaces the value each linked entity other than a variable
+// or output is reached through, so a diff can make values only known once an
+// apply has run unknown; apply passes nil.
+func buildContextForResource(res *parsed, r any, addresses *resources.AddressParser, options *ParserOptions, functions functionsForFile, unknown unknownValues) (*hcl.EvalContext, error) {
 	rMeta, err := types.GetMeta(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resource metadata: %w", err)
@@ -94,6 +97,10 @@ func buildContextForResource(res *parsed, r any, addresses *resources.AddressPar
 				if err != nil {
 					// If conversion fails, skip this resource
 					continue
+				}
+
+				if unknown != nil {
+					ctyRes = unknown.contextValue(resource, ctyRes)
 				}
 			}
 

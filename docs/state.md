@@ -7,7 +7,7 @@ The `state` package **stores and retrieves entities**. That is all it does.
 It does not search a configuration, and it does not parse addresses. Asking a
 configuration what it declares is the job of `Config` — see
 [the querying section of the README](../README.md#querying-a-configuration) —
-and resolving an address is done there, against the types the registry knows.
+and resolving an address is done there, against the types the `Config`'s catalog knows.
 The `state` package imports nothing address-related, which a test in
 `state/dependencies_test.go` guards.
 
@@ -35,7 +35,7 @@ of resources) but worth knowing if you're tempted to call these in a hot loop.
 That applies to the public lookup surface too. `xcl.Find`, `xcl.FindByType`,
 `xcl.FindOne` and `xcl.All` scan `Config.Entities()`, so an address lookup is
 O(n) over the entities the configuration holds. `xcl.All[T]` additionally
-resolves `T` to its address segments through the type registry before it
+resolves `T` to its address segments through the `Config`'s catalog before it
 scans. None of this is indexed or cached, deliberately.
 
 Key operations:
@@ -119,13 +119,18 @@ writes nothing.
 ## Reading a saved record back as configuration
 
 A saved record can be turned back into configuration text with
-`xcl.EncodeSavedEntity(registry, data)`. The registry is what types the record,
-including the types a plugin provides, so it is passed explicitly and loaded if
-it has not been loaded already.
+`c.EncodeSavedEntity(data)`, a method on the `Config`. The `Config`'s catalog,
+its declared types and its registries' plugins, is what types the record,
+including the types a plugin provides, so the plugins are loaded if they have
+not been loaded already.
 
 ```go
-text, err := xcl.EncodeSavedEntity(registry, record)
+text, err := c.EncodeSavedEntity(record)
 ```
+
+An event handler can also read the record an event carries as its entity with
+`event.Entity()`, which returns it as the registered Go type with every
+sensitive value masked, or `nil, nil` when the event carries no data.
 
 The same record reaches an event receiver when a configuration asks for
 `xcl.EventDataProcessed`, so the same call works on either. The one difference
@@ -139,13 +144,13 @@ even with `xcl.RevealSensitive()`, since it does not open masked values.
 
 Each saved record also carries `meta.references`, the text the user wrote for
 each field that referred to another entity, so
-`xcl.EncodeSavedEntity(registry, record, xcl.ShowReferences())` shows those
+`c.EncodeSavedEntity(record, xcl.ShowReferences())` shows those
 references exactly as `EncodeEntity` does for the live entity. A record saved
 by an earlier version has none, and shows resolved values.
 
 The stored format has one reader. Both the file state store's `Load` and
 `EncodeSavedEntity` go through it, so there is a single place that knows how a
-record names its type. A record naming a type the registry does not know fails
+record names its type. A record naming a type the `Config` does not know fails
 with `xcl.ErrUnregisteredType`, and one that cannot be read at all with
 `xcl.ErrInvalidSavedData`.
 
@@ -197,7 +202,7 @@ type StateStore interface {
 The contract exchanges plain values deliberately. Storing them is all it
 does: how they are typed and searched is the configuration's concern, not a
 store's. `Load` may hand back the entities it was given, or the raw records it
-saved them as; the parser types raw records with its own registry, so a store
+saved them as; the parser types raw records with the `Config`'s catalog, so a store
 never needs one. Writing one needs no library type — `state/custom_store_test.go` has a
 twenty-line in-memory implementation that round-trips a real apply, written
 against the public API alone.
@@ -238,7 +243,7 @@ bare mock with no expectation set panics on the first call.
 `StateStore` implementation in this repo. Four things worth knowing:
 
 **The store only reads and writes records.** It knows nothing about types and
-needs no registry. `Load()` ([`file_state_store.go`](../state/file_state_store.go))
+needs no catalog. `Load()` ([`file_state_store.go`](../state/file_state_store.go))
 unmarshals the top-level array and returns each record as the
 `json.RawMessage` it was saved as. A record whose type nobody registered
 loads like any other; a file that is not a JSON array fails the load.
@@ -246,18 +251,18 @@ loads like any other; a file that is not a JSON array fails the load.
 **Typing happens where state is consumed.** The parser, when it reads the
 previous state for `Apply`/`Validate` and at the start of `Destroy`, passes
 what the store loaded through
-[`savedentity.DecodeAll`](../internal/savedentity/savedentity.go) with its
-plugin registry. A `json.RawMessage`, `[]byte` or `map[string]any` is a saved
+[`savedentity.DecodeAll`](../internal/savedentity/savedentity.go) with the
+catalog ([`internal/catalog/catalog.go`](../internal/catalog/catalog.go)). A `json.RawMessage`, `[]byte` or `map[string]any` is a saved
 record and is decoded: read `meta.type`, `meta.subtype` (empty for an entity
-without one) and `meta.name`, call `registry.CreateEntity(type, subtype,
+without one) and `meta.name`, call `catalog.CreateEntity(type, subtype,
 name)` to get a correctly-typed *empty* instance, then unmarshal the record
 into it. Anything else is taken to be an
 entity already and passes through unchanged, which is why a store that keeps
 entities in memory needs no decoding.
 
 **A type that is not registered fails the load.** When a saved record's type
-can't be created by the registry (e.g. a plugin that's no longer loaded, or
-a type that hasn't been registered yet), decoding returns
+can't be created by the catalog (e.g. a plugin that's no longer loaded, or
+a type no registry given to the `Config` declares with `RegisterType`), decoding returns
 [`state.UnknownTypesError`](../state/errors.go) naming every such type,
 sorted and unique, instead of dropping the records — a state returned
 without them would be saved without them, erasing resources that still

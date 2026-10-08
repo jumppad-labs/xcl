@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -15,18 +15,18 @@ func TestNewConfigWithNoOptions(t *testing.T) {
 	cfg, err := NewConfig()
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
-	require.NotNil(t, cfg.pluginRegistry)
+	require.NotNil(t, cfg.catalog)
 	require.Nil(t, cfg.stateStore)
 	require.NotNil(t, cfg.variables)
 	require.Equal(t, 0, len(cfg.variables))
 }
 
-func TestNewConfigWithPluginRegistry(t *testing.T) {
-	pr := registry.NewPluginRegistry()
-	cfg, err := NewConfig(WithPluginRegistry(pr))
+func TestNewConfigWithRegistry(t *testing.T) {
+	local := registry.NewLocal()
+	cfg, err := NewConfig(WithRegistry(local))
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
-	require.Equal(t, pr, cfg.pluginRegistry)
+	require.Equal(t, []registry.Registry{local}, cfg.registries)
 }
 
 func TestNewConfigWithVariables(t *testing.T) {
@@ -40,26 +40,26 @@ func TestNewConfigWithVariables(t *testing.T) {
 }
 
 func TestNewConfigWithMultipleOptions(t *testing.T) {
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 	vars := map[string]any{"env": "test"}
 
 	cfg, err := NewConfig(
-		WithPluginRegistry(pr),
+		WithRegistry(local),
 		WithVariables(vars),
 	)
 	require.NoError(t, err)
 
 	require.NotNil(t, cfg)
-	require.Equal(t, pr, cfg.pluginRegistry)
+	require.Equal(t, []registry.Registry{local}, cfg.registries)
 	require.Equal(t, vars, cfg.variables)
 }
 
 func TestNewConfigOptionsAreComposable(t *testing.T) {
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 	vars := map[string]any{"env": "test"}
 
 	opts := []ConfigOption{
-		WithPluginRegistry(pr),
+		WithRegistry(local),
 		WithVariables(vars),
 	}
 
@@ -67,7 +67,7 @@ func TestNewConfigOptionsAreComposable(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotNil(t, cfg)
-	require.Equal(t, pr, cfg.pluginRegistry)
+	require.Equal(t, []registry.Registry{local}, cfg.registries)
 	require.Equal(t, vars, cfg.variables)
 }
 

@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
 // loadTestConfig loads one of the test configurations under testdata through
@@ -15,7 +13,7 @@ import (
 func loadTestConfig(t *testing.T, name string) *appConfig {
 	t.Helper()
 
-	cfg, err := loadConfig(filepath.Join("testdata", name), registry.NewPluginRegistry())
+	cfg, err := loadConfig(filepath.Join("testdata", name))
 	require.NoError(t, err)
 
 	return cfg

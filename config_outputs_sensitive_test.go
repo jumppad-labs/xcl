@@ -24,7 +24,7 @@ func applySensitiveOutputs(t *testing.T, name string) (*Config, *state.FileState
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
-	c, err := NewConfig(WithPluginRegistry(newSecretRegistry(t)), WithStateStore(store))
+	c, err := NewConfig(withSecretTypes(), WithStateStore(store))
 	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/sensitive_outputs/" + name + "/main.xcl")
@@ -43,7 +43,11 @@ func reloadOutput(t *testing.T, store *state.FileStateStore, id string) *types.O
 	records, err := store.Load()
 	require.NoError(t, err)
 
-	loaded, err := savedentity.DecodeAll(newSecretRegistry(t), records, savedentity.ReadOptions{})
+	// a fresh Config with the same types reads the state, as a later run would
+	fresh, err := NewConfig(withSecretTypes())
+	require.NoError(t, err)
+
+	loaded, err := savedentity.DecodeAll(fresh.catalog, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	for _, entity := range loaded {

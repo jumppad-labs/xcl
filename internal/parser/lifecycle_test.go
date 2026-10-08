@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -51,7 +54,7 @@ const (
 // plugin registry, one TestPlugin registered into it and one file state store.
 // Each apply builds a fresh Parser from these, just as separate runs would.
 type lifecycleHarness struct {
-	registry  *registry.PluginRegistry
+	registry  *catalog.Catalog
 	plugin    *TestPlugin
 	store     *state.FileStateStore
 	statePath string
@@ -72,11 +75,12 @@ func setupLifecycle(t *testing.T) *lifecycleHarness {
 		os.Setenv("HOME", home)
 	})
 
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
 	testPlugin := &TestPlugin{}
-	err := reg.RegisterPlugin(testPlugin)
-	require.NoError(t, err)
+	local := registry.NewLocal()
+	local.RegisterPlugin(testPlugin)
+	reg.AddRegistry(local)
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
@@ -99,7 +103,7 @@ func (h *lifecycleHarness) newParserWithEventData(t *testing.T, emit events.Emit
 	t.Helper()
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 	options.EventData = level
 
@@ -115,7 +119,7 @@ func (h *lifecycleHarness) newParser(t *testing.T, emit events.Emit) *Parser {
 	t.Helper()
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 
 	options.Emit = emit
@@ -180,7 +184,7 @@ func (h *lifecycleHarness) loadSaved(t *testing.T) []any {
 
 // loadTyped loads what store saved and types each record with reg, the way
 // the parser reads previous state
-func loadTyped(t *testing.T, store state.StateStore, reg *registry.PluginRegistry) []any {
+func loadTyped(t *testing.T, store state.StateStore, reg *catalog.Catalog) []any {
 	t.Helper()
 
 	loaded, err := store.Load()
@@ -1233,4 +1237,217 @@ func TestApplyCreatesReferencedResourceBeforeTheOneThatReferencesIt(t *testing.T
 	created := h.plugin.GetCreatedResources()
 	requireBefore(t, dependentFirstID, dependentSecondID, created)
 	requireBefore(t, dependentSecondID, dependentThirdID, created)
+}
+
+// refreshScenario holds what a test needs to run refresh on its own for the
+// network: a lifecycle built the way Parser.walk builds one, the copy saved by
+// the last apply and a freshly configured copy of the same network. Both
+// copies have the schema built type the parser decodes resources into.
+type refreshScenario struct {
+	lifecycle  *resourceLifecycle
+	saved      any
+	configured any
+}
+
+// setupRefresh applies the original config once, so the network exists in
+// saved state, then builds a lifecycle over that state. The configured network
+// is the saved copy with its computed values and status cleared, as decoding
+// the config would leave it.
+func setupRefresh(t *testing.T, h *lifecycleHarness) *refreshScenario {
+	t.Helper()
+
+	previous := h.applyAndSave(t, lifecycleOriginalConfig)
+	h.plugin.ResetCalls()
+
+	saved, err := findByID(h.loadSaved(t), lifecycleNetworkID)
+	require.NoError(t, err)
+	require.Equal(t, "id-one", networkValues(t, saved).ProviderID)
+
+	options := testOptions(t)
+	options.Catalog = h.registry
+	options.StateStore = h.store
+
+	lifecycle := &resourceLifecycle{
+		ctx:      context.Background(),
+		previous: previous,
+		resolver: h.registry,
+		options:  options,
+		types:    h.registry,
+		bodies:   map[string]*hclsyntax.Body{},
+		progress: newApplyProgress(),
+	}
+
+	return &refreshScenario{
+		lifecycle:  lifecycle,
+		saved:      saved,
+		configured: configuredCopy(t, saved),
+	}
+}
+
+// configuredCopy returns a new resource of the same type as saved holding only
+// its configured values: the computed provider id and observed value and the
+// saved status are left out
+func configuredCopy(t *testing.T, saved any) any {
+	t.Helper()
+
+	data, err := json.Marshal(saved)
+	require.NoError(t, err)
+
+	values := map[string]any{}
+	err = json.Unmarshal(data, &values)
+	require.NoError(t, err)
+
+	delete(values, "provider_id")
+	delete(values, "observed")
+
+	meta, ok := values["meta"].(map[string]any)
+	require.True(t, ok, "saved network has no meta: %s", string(data))
+	delete(meta, "status")
+
+	data, err = json.Marshal(values)
+	require.NoError(t, err)
+
+	configured := reflect.New(reflect.TypeOf(saved).Elem()).Interface()
+	err = json.Unmarshal(data, configured)
+	require.NoError(t, err)
+
+	return configured
+}
+
+// networkValues returns the values of a network resource as a structs.Network
+func networkValues(t *testing.T, network any) *structs.Network {
+	t.Helper()
+
+	return findResource[structs.Network](t, []any{network}, lifecycleNetworkID)
+}
+
+// refresh runs refresh for the scenario's configured network against its
+// saved copy, through the network's real provider adapter
+func (s *refreshScenario) refresh(t *testing.T, h *lifecycleHarness) (refreshOutcome, refreshed, error) {
+	t.Helper()
+
+	adapter := h.registry.GetProviderForResource(s.configured)
+	require.NotNil(t, adapter)
+
+	return s.lifecycle.refresh(s.configured, s.saved, adapter)
+}
+
+func TestRefreshReportsNotFoundWhenProviderCannotFindResource(t *testing.T) {
+	h := setupLifecycle(t)
+	scenario := setupRefresh(t, h)
+	h.plugin.SetReadNotFound(lifecycleNetworkID)
+
+	outcome, copies, err := scenario.refresh(t, h)
+
+	require.NoError(t, err)
+	require.Equal(t, refreshNotFound, outcome)
+	require.Empty(t, copies.read)
+	require.Equal(t, []string{"read " + lifecycleNetworkID}, h.plugin.GetCalls())
+}
+
+func TestRefreshNotFoundRestoresConfiguredValues(t *testing.T) {
+	h := setupLifecycle(t)
+	scenario := setupRefresh(t, h)
+	h.plugin.SetReadNotFound(lifecycleNetworkID)
+
+	_, _, err := scenario.refresh(t, h)
+	require.NoError(t, err)
+
+	// the provider id carried from the saved copy before the read went with
+	// the real resource, only the configured values remain
+	require.Equal(t, "", networkValues(t, scenario.configured).ProviderID)
+	require.Equal(t, "", networkValues(t, scenario.configured).Observed)
+	require.Equal(t, "10.0.0.0/16", networkValues(t, scenario.configured).Subnet)
+	require.Equal(t, lifecycleNetworkID, networkValues(t, scenario.configured).Meta.ID)
+}
+
+func TestRefreshNotFoundDoesNotCreateOrUpdate(t *testing.T) {
+	h := setupLifecycle(t)
+	scenario := setupRefresh(t, h)
+	h.plugin.SetReadNotFound(lifecycleNetworkID)
+
+	_, _, err := scenario.refresh(t, h)
+	require.NoError(t, err)
+
+	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetReadResources())
+	require.Empty(t, h.plugin.GetCreatedResources())
+	require.Empty(t, h.plugin.GetUpdatedResources())
+}
+
+func TestRefreshReportsChangedWhenProviderObservesDrift(t *testing.T) {
+	h := setupLifecycle(t)
+	scenario := setupRefresh(t, h)
+	h.plugin.SetReadObserved(lifecycleNetworkID, "stopped")
+
+	outcome, copies, err := scenario.refresh(t, h)
+
+	require.NoError(t, err)
+	require.Equal(t, refreshChanged, outcome)
+	require.NotEmpty(t, copies.read)
+	require.Equal(t, []string{
+		"read " + lifecycleNetworkID,
+		"changed " + lifecycleNetworkID,
+	}, h.plugin.GetCalls())
+
+	// the resource holds what was read, with the saved computed values
+	require.Equal(t, "stopped", networkValues(t, scenario.configured).Observed)
+	require.Equal(t, "id-one", networkValues(t, scenario.configured).ProviderID)
+}
+
+func TestRefreshChangedDoesNotCreateOrUpdate(t *testing.T) {
+	h := setupLifecycle(t)
+	scenario := setupRefresh(t, h)
+	h.plugin.SetReadObserved(lifecycleNetworkID, "stopped")
+
+	_, _, err := scenario.refresh(t, h)
+	require.NoError(t, err)
+
+	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetReadResources())
+	require.Empty(t, h.plugin.GetCreatedResources())
+	require.Empty(t, h.plugin.GetUpdatedResources())
+}
+
+func TestRefreshReportsUnchangedWhenNothingDiffers(t *testing.T) {
+	h := setupLifecycle(t)
+	scenario := setupRefresh(t, h)
+
+	outcome, copies, err := scenario.refresh(t, h)
+
+	require.NoError(t, err)
+	require.Equal(t, refreshUnchanged, outcome)
+	require.NotEmpty(t, copies.read)
+	require.Equal(t, []string{
+		"read " + lifecycleNetworkID,
+		"changed " + lifecycleNetworkID,
+	}, h.plugin.GetCalls())
+
+	// the computed provider id saved last time was carried onto the resource
+	require.Equal(t, "id-one", networkValues(t, scenario.configured).ProviderID)
+	require.Equal(t, "10.0.0.0/16", networkValues(t, scenario.configured).Subnet)
+}
+
+func TestRefreshUnchangedDoesNotCreateOrUpdate(t *testing.T) {
+	h := setupLifecycle(t)
+	scenario := setupRefresh(t, h)
+
+	_, _, err := scenario.refresh(t, h)
+	require.NoError(t, err)
+
+	require.Equal(t, []string{lifecycleNetworkID}, h.plugin.GetReadResources())
+	require.Empty(t, h.plugin.GetCreatedResources())
+	require.Empty(t, h.plugin.GetUpdatedResources())
+}
+
+func TestRefreshReadErrorFailsResource(t *testing.T) {
+	h := setupLifecycle(t)
+	scenario := setupRefresh(t, h)
+	h.plugin.SetReadError(lifecycleNetworkID, fmt.Errorf("network API unavailable"))
+
+	_, _, err := scenario.refresh(t, h)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "read failed for "+lifecycleNetworkID)
+	require.Equal(t, types.StatusFailed, networkValues(t, scenario.configured).Meta.Status)
+	require.Empty(t, h.plugin.GetCreatedResources())
+	require.Empty(t, h.plugin.GetUpdatedResources())
 }

@@ -6,7 +6,7 @@ command: spektacular
 agent: claude
 spec_trigger_threshold: moderate
 epic_split_threshold: moderate
-auto_commit: workflow
+auto_commit: "off"
 debug:
     enabled: false
 spec:
@@ -30,6 +30,8 @@ epic:
     strict_dependencies: false
     config:
         directory: epics
+implement:
+    worktrees: true
 design:
     sources:
         - name: design

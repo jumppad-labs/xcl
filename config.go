@@ -8,13 +8,14 @@ import (
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/eventstream"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -126,6 +127,17 @@ type (
 	NotUniqueError     = xclerrors.NotUniqueError
 	PluginLoadError    = xclerrors.PluginLoadError
 
+	// TypeNameClashError is returned when a block type is provided twice, it
+	// names both providers and their registries. NewConfig returns it for two
+	// declared Go types or a declared type with a builtin name, and the first
+	// operation that loads plugins for a clash involving a plugin
+	TypeNameClashError = xclerrors.TypeNameClashError
+
+	// TypeFormError is returned when a type uses a keyword in the other form
+	// from the one it already has: by NewConfig for a declared Go type, and
+	// when plugins load for a plugin's type
+	TypeFormError = xclerrors.TypeFormError
+
 	InvalidDecodeTargetError = xclerrors.InvalidDecodeTargetError
 
 	UnregisteredTypeError = xclerrors.UnregisteredTypeError
@@ -138,19 +150,20 @@ type (
 )
 
 // Config defines the stack config
-// It orchestrates high-level operations (Apply, Validate, Destroy)
+// It orchestrates high-level operations (Apply, Validate, Diff, Destroy)
 // and manages the current state
 type Config struct {
-	entities        []any                    // what the configuration declares (private)
-	pluginRegistry  *registry.PluginRegistry // Config owns plugins
-	stateStore      state.StateStore         // Persistence for state
-	variables       map[string]any           // Variables for HCL parsing
-	eventHandler    EventHandler             // Receives every event of Validate, Apply and Destroy
-	eventBufferSize int                      // Undelivered events held before emitting waits, 0 is the default
-	eventData       events.DataLevel         // What resource data events carry, none by default
-	stateMask       mask.Masker              // Masks sensitive values written to state, nil writes them plainly
-	eventMask       mask.Masker              // Masks sensitive values in event data, mask.Redact() by default
-	eventMaskOff    bool                     // Event data carries real sensitive values, set by WithNoEventMask
+	entities        []any               // what the configuration declares (private)
+	catalog         *catalog.Catalog    // the Config's own block types and plugins, built by NewConfig
+	registries      []registry.Registry // registries added with WithRegistry, in order
+	stateStore      state.StateStore    // Persistence for state
+	variables       map[string]any      // Variables for HCL parsing
+	eventHandler    EventHandler        // Receives every event of Validate, Apply and Destroy
+	eventBufferSize int                 // Undelivered events held before emitting waits, 0 is the default
+	eventData       events.DataLevel    // What resource data events carry, none by default
+	stateMask       mask.Masker         // Masks sensitive values written to state, nil writes them plainly
+	eventMask       mask.Masker         // Masks sensitive values in event data, mask.Redact() by default
+	eventMaskOff    bool                // Event data carries real sensitive values, set by WithNoEventMask
 
 	addresses *resources.AddressParser // resolves addresses against the known types
 }
@@ -167,12 +180,12 @@ func (c *Config) addressParser() *resources.AddressParser {
 	}
 
 	var known []types.TypeInfo
-	if c.pluginRegistry != nil {
-		known = c.pluginRegistry.Types()
+	if c.catalog != nil {
+		known = c.catalog.Types()
 	}
 
 	addresses := resources.NewAddressParser(known)
-	if c.pluginRegistry == nil || c.pluginRegistry.Loaded() {
+	if c.catalog == nil || c.catalog.Loaded() {
 		c.addresses = addresses
 	}
 
@@ -183,6 +196,16 @@ func (c *Config) addressParser() *resources.AddressParser {
 // If no options are provided, creates a minimal config with only the builtin
 // resource types and no state. The options are applied in order, and the
 // first one to fail stops NewConfig and its error is returned.
+//
+// Options may be given in any order: NewConfig collects every option first,
+// then builds the Config's own catalog from the registries added with
+// WithRegistry, reading each registry's Types in the order the registries
+// were given. A declared Go type that duplicates another, in one registry or
+// across two, is returned as a *TypeNameClashError naming both and their
+// registries, one with a builtin name as a *TypeNameClashError naming
+// "builtin", and one that uses its type keyword in both forms as a
+// *TypeFormError. Plugins are not loaded here, they load on the first
+// operation that needs them.
 func NewConfig(opts ...ConfigOption) (*Config, error) {
 	c := &Config{
 		entities:  []any{},
@@ -196,8 +219,16 @@ func NewConfig(opts ...ConfigOption) (*Config, error) {
 		}
 	}
 
-	if c.pluginRegistry == nil {
-		c.pluginRegistry = registry.NewPluginRegistry()
+	c.catalog = catalog.New()
+
+	for _, r := range c.registries {
+		for _, declared := range r.Types() {
+			if err := c.catalog.DeclareType(declared, r.Name()); err != nil {
+				return nil, err
+			}
+		}
+
+		c.catalog.AddRegistry(r)
 	}
 
 	// event data is redacted unless the application chose another masker
@@ -293,13 +324,13 @@ func (c *Config) Validate(paths ...string) error {
 
 		// Create parser with StateStore
 		p := parser.NewParser(&parser.ParserOptions{
-			EventData:      c.eventData,
-			StateStore:     c.stateStore,
-			StateMask:      c.stateMask,
-			EventMask:      c.eventMask,
-			PluginRegistry: c.pluginRegistry,
-			Variables:      convertVariablesToStringMap(c.variables),
-			Emit:           emit,
+			EventData:  c.eventData,
+			StateStore: c.stateStore,
+			StateMask:  c.stateMask,
+			EventMask:  c.eventMask,
+			Catalog:    c.catalog,
+			Variables:  convertVariablesToStringMap(c.variables),
+			Emit:       emit,
 		})
 
 		// Validate without resolving: no decode, no DAG walk, no plugins
@@ -327,13 +358,13 @@ func (c *Config) Apply(paths ...string) error {
 
 		// Create parser with StateStore
 		p := parser.NewParser(&parser.ParserOptions{
-			EventData:      c.eventData,
-			StateStore:     c.stateStore,
-			StateMask:      c.stateMask,
-			EventMask:      c.eventMask,
-			PluginRegistry: c.pluginRegistry,
-			Variables:      convertVariablesToStringMap(c.variables),
-			Emit:           emit,
+			EventData:  c.eventData,
+			StateStore: c.stateStore,
+			StateMask:  c.stateMask,
+			EventMask:  c.eventMask,
+			Catalog:    c.catalog,
+			Variables:  convertVariablesToStringMap(c.variables),
+			Emit:       emit,
 		})
 
 		// Parser manages State independently (loads from store, parses,
@@ -410,12 +441,12 @@ func (c *Config) Destroy() error {
 		// Create parser with StateStore, destroy saves through it after
 		// every resource
 		p := parser.NewParser(&parser.ParserOptions{
-			EventData:      c.eventData,
-			StateStore:     c.stateStore,
-			StateMask:      c.stateMask,
-			EventMask:      c.eventMask,
-			PluginRegistry: c.pluginRegistry,
-			Emit:           emit,
+			EventData:  c.eventData,
+			StateStore: c.stateStore,
+			StateMask:  c.stateMask,
+			EventMask:  c.eventMask,
+			Catalog:    c.catalog,
+			Emit:       emit,
 		})
 
 		remaining, err := p.Destroy(ctx, saved)
@@ -453,7 +484,7 @@ func (c *Config) Load() error {
 			return fmt.Errorf("failed to load state: %w", err)
 		}
 
-		saved, err := savedentity.DecodeAll(c.pluginRegistry, loaded, savedentity.ReadOptions{Mask: c.stateMask})
+		saved, err := savedentity.DecodeAll(c.catalog, loaded, savedentity.ReadOptions{Mask: c.stateMask})
 		if err != nil {
 			return fmt.Errorf("failed to load state: %w", err)
 		}
@@ -474,7 +505,8 @@ func convertVariablesToStringMap(vars map[string]any) map[string]string {
 	return result
 }
 
-// run runs the work of one Validate, Apply or Destroy and delivers its events.
+// run runs the work of one Validate, Apply, Diff or Destroy and delivers its
+// events.
 //
 // Without an event handler the work runs directly with a nil emit, so xcl is
 // silent and nothing extra is started. With one, the work runs on a worker
@@ -508,11 +540,17 @@ func (c *Config) run(operation string, work func(ctx context.Context, emit event
 
 	stream := eventstream.New(size)
 
+	// every event delivered carries the decoder, so a handler can read the
+	// entity an event's data holds without holding the types itself
+	emit := func(e events.Event) {
+		stream.Emit(e.WithEntityDecoder(c.decodeEventEntity))
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	started := time.Now()
-	stream.Emit(Event{Operation: operation, Phase: events.PhaseStart})
+	emit(Event{Operation: operation, Phase: events.PhaseStart})
 
 	var err error
 	done := make(chan struct{})
@@ -520,7 +558,7 @@ func (c *Config) run(operation string, work func(ctx context.Context, emit event
 	go func() {
 		defer close(done)
 
-		err = work(ctx, stream.Emit)
+		err = work(ctx, emit)
 
 		finished := Event{Operation: operation, Phase: events.PhaseSuccess, Duration: time.Since(started)}
 		if err != nil {
@@ -528,7 +566,7 @@ func (c *Config) run(operation string, work func(ctx context.Context, emit event
 			finished.Error = err
 		}
 
-		stream.Emit(finished)
+		emit(finished)
 	}()
 
 	drained := false
@@ -550,6 +588,13 @@ func (c *Config) run(operation string, work func(ctx context.Context, emit event
 	return err
 }
 
+// decodeEventEntity returns the entity an event's data holds, resolved
+// through the Config's own types and plugins, with every sensitive value shown
+// as the mask marker. It is the decoder attached to every event run delivers.
+func (c *Config) decodeEventEntity(data []byte) (any, error) {
+	return savedentity.Decode(c.catalog, data, savedentity.ReadOptions{ForDisplay: true})
+}
+
 // withPlugins returns work preceded by making the registry's plugins ready,
 // so a plugin is loaded by the first operation that needs it and a plugin that
 // fails to load fails that operation. External plugin processes run while work
@@ -558,12 +603,12 @@ func (c *Config) run(operation string, work func(ctx context.Context, emit event
 // emit.
 func (c *Config) withPlugins(work func(ctx context.Context, emit events.Emit) error) func(ctx context.Context, emit events.Emit) error {
 	return func(ctx context.Context, emit events.Emit) error {
-		deactivate := c.pluginRegistry.Activate(emit)
+		deactivate := c.catalog.Activate(emit)
 		defer deactivate()
 
 		// the external plugins run only while the operation uses them, done
 		// stops them once no operation is using the registry
-		done, err := c.pluginRegistry.Use(emit)
+		done, err := c.catalog.Use(emit)
 		if err != nil {
 			return err
 		}

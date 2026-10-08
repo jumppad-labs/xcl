@@ -10,7 +10,6 @@ import (
 
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
 // TestParseEventCarriesFile asserts each resource's parse is reported as a
@@ -106,7 +105,7 @@ func TestParseErrorEventNamesBlockAndFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(file, []byte(`resource "nosuchtype" "broken" {}`), 0644))
 
 	recorder := &testutil.EventRecorder{}
-	c := newKubeConfig(t, registry.NewPluginRegistry(), recorder.Record, t.TempDir(), testStateKey)
+	c := newKubeConfig(t, recorder.Record, t.TempDir(), testStateKey)
 
 	require.Error(t, c.Apply(dir))
 

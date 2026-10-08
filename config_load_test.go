@@ -8,7 +8,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/logger"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 )
 
@@ -17,13 +17,12 @@ import (
 func newLoadingConfig(t *testing.T, store state.StateStore, opts ...ConfigOption) (*Config, *parser.TestPlugin) {
 	t.Helper()
 
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 
 	testPlugin := &parser.TestPlugin{}
-	err := pr.RegisterPlugin(testPlugin)
-	require.NoError(t, err)
+	local.RegisterPlugin(testPlugin)
 
-	opts = append([]ConfigOption{WithPluginRegistry(pr), WithStateStore(store)}, opts...)
+	opts = append([]ConfigOption{WithRegistry(local), WithStateStore(store)}, opts...)
 
 	c, err := NewConfig(opts...)
 	require.NoError(t, err)

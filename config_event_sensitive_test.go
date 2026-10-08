@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -14,27 +14,23 @@ const eventSensitiveSecretID = "resource.secret.literal"
 
 // applySensitiveFixtureWithEventData applies the sensitive fixture with an
 // event handler recording every event at the given event data level, and
-// returns the recorder and the registry the configuration was applied with
-func applySensitiveFixtureWithEventData(t *testing.T, level EventDataLevel) (*eventRecorder, *registry.PluginRegistry) {
+// returns the recorder and the configuration that was applied
+func applySensitiveFixtureWithEventData(t *testing.T, level EventDataLevel) (*eventRecorder, *Config) {
 	t.Helper()
 
 	t.Setenv("HOME", t.TempDir())
-
-	reg := registry.NewPluginRegistry()
-
-	err := reg.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
-	require.NoError(t, err)
-
-	err = reg.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer)
-	require.NoError(t, err)
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	recorder := &eventRecorder{}
 
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
+	declared.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer)
+
 	c, err := NewConfig(
-		WithPluginRegistry(reg),
+		WithRegistry(declared),
 		WithStateStore(store),
 		WithEventHandler(recorder.Record),
 		WithEventData(level),
@@ -47,7 +43,7 @@ func applySensitiveFixtureWithEventData(t *testing.T, level EventDataLevel) (*ev
 	err = c.Apply(path)
 	require.NoError(t, err)
 
-	return recorder, reg
+	return recorder, c
 }
 
 func TestRawEventDataShowsOnlyTheSensitiveMarker(t *testing.T) {
@@ -81,12 +77,12 @@ func TestProcessedEventDataShowsOnlyTheMarkerForAReferencedSensitiveValue(t *tes
 }
 
 func TestEncodeSavedEntityOfProcessedEventDataWritesTheMarker(t *testing.T) {
-	recorder, reg := applySensitiveFixtureWithEventData(t, EventDataProcessed)
+	recorder, c := applySensitiveFixtureWithEventData(t, EventDataProcessed)
 
 	succeeded := eventDataSingleEvent(t, recorder, eventSensitiveSecretID, "create", "success")
 	require.NotEmpty(t, succeeded.Data)
 
-	out, err := EncodeSavedEntity(reg, succeeded.Data)
+	out, err := c.EncodeSavedEntity(succeeded.Data)
 	require.NoError(t, err)
 
 	require.Contains(t, string(out), `password = "(sensitive)"`)
@@ -94,12 +90,12 @@ func TestEncodeSavedEntityOfProcessedEventDataWritesTheMarker(t *testing.T) {
 }
 
 func TestEncodeSavedEntityOfProcessedEventDataWritesTheMarkerWhenRevealing(t *testing.T) {
-	recorder, reg := applySensitiveFixtureWithEventData(t, EventDataProcessed)
+	recorder, c := applySensitiveFixtureWithEventData(t, EventDataProcessed)
 
 	succeeded := eventDataSingleEvent(t, recorder, eventSensitiveSecretID, "create", "success")
 	require.NotEmpty(t, succeeded.Data)
 
-	out, err := EncodeSavedEntity(reg, succeeded.Data, RevealSensitive())
+	out, err := c.EncodeSavedEntity(succeeded.Data, RevealSensitive())
 	require.NoError(t, err)
 
 	require.Contains(t, string(out), `password = "(sensitive)"`)

@@ -27,7 +27,6 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/highlight"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
 // LevelEnv is the environment variable LevelFromEnv reads the level from
@@ -53,15 +52,15 @@ const LevelEnv = "XCL_LOG_LEVEL"
 //	    destination = "/tmp/welcome.txt"
 //	  }
 //
-// That needs two things from the application: the registry, which is what
-// types a saved entity, and event data at xcl.EventDataProcessed, which is
-// what puts the entity on the event in the first place. Pass a nil registry
-// to leave the configuration out.
+// That needs one thing from the application: event data at
+// xcl.EventDataProcessed, which is what puts the entity on the event in the
+// first place. The event itself returns the entity, typed by the
+// configuration that delivered it, so the handler needs nothing else.
 //
 // Every example sets it up in one line:
 //
-//	xcl.WithEventHandler(prettylog.Handler(os.Stderr, prettylog.LevelFromEnv(), registry))
-func Handler(w io.Writer, level slog.Level, reg *registry.PluginRegistry) xcl.EventHandler {
+//	xcl.WithEventHandler(prettylog.Handler(os.Stderr, prettylog.LevelFromEnv()))
+func Handler(w io.Writer, level slog.Level) xcl.EventHandler {
 	logger := charmlog.NewWithOptions(w, charmlog.Options{
 		Level:           charmlog.Level(level),
 		ReportTimestamp: true,
@@ -74,7 +73,7 @@ func Handler(w io.Writer, level slog.Level, reg *registry.PluginRegistry) xcl.Ev
 
 	// the configuration is written at the default level and below, so a run
 	// asking only for warnings and errors stays terse
-	if reg == nil || level > slog.LevelInfo {
+	if level > slog.LevelInfo {
 		return delegate
 	}
 
@@ -96,7 +95,7 @@ func Handler(w io.Writer, level slog.Level, reg *registry.PluginRegistry) xcl.Ev
 
 	return func(e xcl.Event) {
 		delegate(e)
-		writeConfiguration(w, logger, reg, options, e)
+		writeConfiguration(w, logger, options, e)
 	}
 }
 
@@ -104,12 +103,23 @@ func Handler(w io.Writer, level slog.Level, reg *registry.PluginRegistry) xcl.Ev
 // created, beneath the line reporting it. An event carries the entity only
 // when the application asked for xcl.EventDataProcessed, so this does nothing
 // by default.
-func writeConfiguration(w io.Writer, logger *charmlog.Logger, reg *registry.PluginRegistry, options []xcl.EncodeOption, e xcl.Event) {
-	if e.Operation != events.OperationCreate || e.Phase != events.PhaseSuccess || len(e.Data) == 0 {
+func writeConfiguration(w io.Writer, logger *charmlog.Logger, options []xcl.EncodeOption, e xcl.Event) {
+	if e.Operation != events.OperationCreate || e.Phase != events.PhaseSuccess {
 		return
 	}
 
-	text, err := xcl.EncodeSavedEntity(reg, e.Data, options...)
+	entity, err := e.Entity()
+	if err != nil {
+		logger.Warn("unable to show configuration", "resource", e.ResourceID, "error", err)
+		return
+	}
+
+	// an event without data has no entity, so there is nothing to show
+	if entity == nil {
+		return
+	}
+
+	text, err := xcl.EncodeEntity(entity, options...)
 	if err != nil {
 		// a variable, output or module is never written as configuration, so
 		// there is simply nothing to show and nothing to report

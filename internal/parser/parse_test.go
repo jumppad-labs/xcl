@@ -12,13 +12,14 @@ import (
 
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	pluginmocks "github.com/jumppad-labs/xcl/plugins/mocks"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/mock"
@@ -72,18 +73,17 @@ func setupParser(t *testing.T, options ...*ParserOptions) (*Parser, *TestPlugin)
 	}
 
 	// Create a plugin registry for the parser (Config normally owns this, but for standalone parser tests we create one)
-	if o.PluginRegistry == nil {
-		o.PluginRegistry = registry.NewPluginRegistry()
+	if o.Catalog == nil {
+		o.Catalog = catalog.New()
 	}
 
 	p := NewParser(o)
 
 	// Create and register the test plugin
 	testPlugin := &TestPlugin{}
-	err := o.PluginRegistry.RegisterPlugin(testPlugin)
-	if err != nil {
-		panic("Failed to register test plugin: " + err.Error())
-	}
+	local := registry.NewLocal()
+	local.RegisterPlugin(testPlugin)
+	o.Catalog.AddRegistry(local)
 
 	return p, testPlugin
 }

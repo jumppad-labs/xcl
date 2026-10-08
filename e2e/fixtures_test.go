@@ -6,14 +6,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
 func TestKubeFixtureApplies(t *testing.T) {
 	t.Setenv("DB_PASSWORD", testPassword)
 
-	r := registry.NewPluginRegistry()
-	c := newKubeConfig(t, r, nil, t.TempDir(), testStateKey)
+	c := newKubeConfig(t, nil, t.TempDir(), testStateKey)
 
 	require.NoError(t, c.Apply(kubeConfigDir))
 
@@ -22,8 +20,7 @@ func TestKubeFixtureApplies(t *testing.T) {
 }
 
 func TestPluginFixtureApplies(t *testing.T) {
-	r := registry.NewPluginRegistry()
-	c := newPluginConfig(t, r, nil, t.TempDir(), testStateKey)
+	c := newPluginConfig(t, nil, t.TempDir(), testStateKey)
 
 	require.NoError(t, c.Apply(pluginConfigDir))
 

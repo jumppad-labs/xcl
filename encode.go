@@ -17,7 +17,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclwrite"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -156,37 +155,35 @@ func EncodeEntity(entity any, options ...EncodeOption) ([]byte, error) {
 // ciphertext or a hash; a receiver that needs the real value opens it with
 // mask.Unmask.
 //
-// registry resolves the record's type. A plugin's types resolve only once the
-// registry has loaded, so this loads it if it has not been loaded already.
-// Loading happens once per registry and is cached, so passing a registry no
-// configuration has used yet works, and passing one that has costs nothing.
+// The record's type is resolved through the Config's own types and plugins.
+// A plugin's types resolve only once the plugins have loaded, so this loads
+// them if no operation has yet. Loading happens once per Config and is
+// cached, so calling this before any operation works, and calling it after
+// costs nothing.
 //
-// It fails with ErrUnregisteredType when the registry does not know the type
+// It fails with ErrUnregisteredType when the Config does not know the type
 // the record names, with ErrInvalidSavedData when the data is not one saved
-// entity record, and with ErrNotEncodable on the same terms as EncodeEntity. A
-// failure returns no text.
-func EncodeSavedEntity(registry *registry.PluginRegistry, data []byte, options ...EncodeOption) ([]byte, error) {
-	if registry == nil {
-		return nil, &xclerrors.NotEncodableError{
-			What:   "saved data",
-			Reason: "no registry was given to resolve its type",
-		}
-	}
-
+// entity record, with ErrPluginLoad when a plugin fails to load, and with
+// ErrNotEncodable on the same terms as EncodeEntity. A failure returns no
+// text.
+func (c *Config) EncodeSavedEntity(data []byte, options ...EncodeOption) ([]byte, error) {
 	opts := encodeOptions{}
 	for _, option := range options {
 		option(&opts)
 	}
 
-	// a plugin's types are resolvable only after the registry has loaded, and
-	// loading is once only and cached, so this is safe whether or not a
-	// configuration has already used this registry
-	if err := registry.Load(nil); err != nil {
+	// a plugin's types are resolvable only after the plugins have loaded,
+	// and loading is once only and cached, so this is safe whether or not an
+	// operation has already run. External plugin processes are stopped again
+	// once the record is typed, unless an operation is still using them.
+	done, err := c.catalog.Use(nil)
+	if err != nil {
 		return nil, err
 	}
+	defer done()
 
 	// masked values are shown as the marker, never as ciphertext or a hash
-	entity, err := savedentity.Decode(registry, data, savedentity.ReadOptions{ForDisplay: true})
+	entity, err := savedentity.Decode(c.catalog, data, savedentity.ReadOptions{ForDisplay: true})
 	if err != nil {
 		return nil, err
 	}

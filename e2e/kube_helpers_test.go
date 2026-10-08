@@ -9,7 +9,6 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/e2e/fixtures/kube"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -42,7 +41,7 @@ func applyKube(t *testing.T, handler xcl.EventHandler) *xcl.Config {
 
 	t.Setenv("DB_PASSWORD", testPassword)
 
-	c := newKubeConfig(t, registry.NewPluginRegistry(), handler, t.TempDir(), testStateKey)
+	c := newKubeConfig(t, handler, t.TempDir(), testStateKey)
 	require.NoError(t, c.Apply(kubeConfigDir))
 
 	return c

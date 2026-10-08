@@ -6,9 +6,10 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/mock"
@@ -689,14 +690,15 @@ func TestValidateRejectsNonOptionalComputedField(t *testing.T) {
 
 	o := testOptions(t)
 	o.StateStore = ms
-	o.PluginRegistry = registry.NewPluginRegistry()
+	o.Catalog = catalog.New()
 
-	err := o.PluginRegistry.RegisterPlugin(&badComputedPlugin{})
-	require.NoError(t, err)
+	local := registry.NewLocal()
+	local.RegisterPlugin(&badComputedPlugin{})
+	o.Catalog.AddRegistry(local)
 
 	p, _ := setupParser(t, o)
 
-	err = p.Validate(context.Background(), f)
+	err := p.Validate(context.Background(), f)
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)

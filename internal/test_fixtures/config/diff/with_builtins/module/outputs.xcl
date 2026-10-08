@@ -1,0 +1,5 @@
+# A module holding only an output, no provider resource.
+
+output "greeting" {
+  value = "hello"
+}

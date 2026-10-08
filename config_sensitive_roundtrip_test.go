@@ -11,7 +11,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -37,22 +37,22 @@ func writeCredentialConfig(t *testing.T) string {
 
 // newCredentialConfig builds a Config with its own registry and TestPlugin on
 // the state directory, so two of them on one directory share only the state
-func newCredentialConfig(t *testing.T, dir string, options ...ConfigOption) (*Config, *registry.PluginRegistry, *parser.TestPlugin) {
+func newCredentialConfig(t *testing.T, dir string, options ...ConfigOption) (*Config, *parser.TestPlugin) {
 	t.Helper()
 
-	reg := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 	testPlugin := &parser.TestPlugin{}
-	require.NoError(t, reg.RegisterPlugin(testPlugin))
+	local.RegisterPlugin(testPlugin)
 
 	store, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
 
-	options = append(options, WithPluginRegistry(reg), WithStateStore(store))
+	options = append(options, WithRegistry(local), WithStateStore(store))
 
 	c, err := NewConfig(options...)
 	require.NoError(t, err)
 
-	return c, reg, testPlugin
+	return c, testPlugin
 }
 
 // A second Config on the state the first one wrote applies the same
@@ -61,19 +61,18 @@ func TestRegisteredSensitiveFieldRevealsAfterSecondConfigApply(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	firstStore, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
 
-	first, err := NewConfig(WithPluginRegistry(reg), WithStateStore(firstStore))
+	first, err := NewConfig(withSecretTypes(), WithStateStore(firstStore))
 	require.NoError(t, err)
 	require.NoError(t, first.Apply(sensitiveBasicPath(t)))
 
 	secondStore, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
 
-	second, err := NewConfig(WithPluginRegistry(reg), WithStateStore(secondStore))
+	second, err := NewConfig(withSecretTypes(), WithStateStore(secondStore))
 	require.NoError(t, err)
 	require.NoError(t, second.Apply(sensitiveBasicPath(t)))
 
@@ -90,19 +89,18 @@ func TestRegisteredSensitiveFieldStaysRealInStateAfterSecondApply(t *testing.T) 
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	firstStore, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
 
-	first, err := NewConfig(WithPluginRegistry(reg), WithStateStore(firstStore))
+	first, err := NewConfig(withSecretTypes(), WithStateStore(firstStore))
 	require.NoError(t, err)
 	require.NoError(t, first.Apply(sensitiveBasicPath(t)))
 
 	secondStore, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
 
-	second, err := NewConfig(WithPluginRegistry(reg), WithStateStore(secondStore))
+	second, err := NewConfig(withSecretTypes(), WithStateStore(secondStore))
 	require.NoError(t, err)
 	require.NoError(t, second.Apply(sensitiveBasicPath(t)))
 
@@ -117,7 +115,7 @@ func TestRegisteredSensitiveFieldStaysRealInStateAfterSecondApply(t *testing.T) 
 func TestPluginSensitiveFieldRevealsAfterApplyToFileStateStore(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	c, _, _ := newCredentialConfig(t, t.TempDir())
+	c, _ := newCredentialConfig(t, t.TempDir())
 	require.NoError(t, c.Apply(writeCredentialConfig(t)))
 
 	credential, err := Find[structs.Credential](c, "resource.credential.db")
@@ -132,7 +130,7 @@ func TestPluginSensitiveFieldIsRealInStateFile(t *testing.T) {
 
 	dir := t.TempDir()
 
-	c, _, _ := newCredentialConfig(t, dir)
+	c, _ := newCredentialConfig(t, dir)
 	require.NoError(t, c.Apply(writeCredentialConfig(t)))
 
 	store, err := state.NewFileStateStore(dir)
@@ -151,7 +149,7 @@ func TestPluginSensitiveFieldRevealsInDecodedState(t *testing.T) {
 
 	dir := t.TempDir()
 
-	c, reg, _ := newCredentialConfig(t, dir)
+	c, _ := newCredentialConfig(t, dir)
 	require.NoError(t, c.Apply(writeCredentialConfig(t)))
 
 	store, err := state.NewFileStateStore(dir)
@@ -160,7 +158,7 @@ func TestPluginSensitiveFieldRevealsInDecodedState(t *testing.T) {
 	records, err := store.Load()
 	require.NoError(t, err)
 
-	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
+	loaded, err := savedentity.DecodeAll(c.catalog, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	// plugin types decode to a type built from the plugin's schema, so the
@@ -190,10 +188,10 @@ func TestPluginProviderReceivesRealSavedValueAfterReload(t *testing.T) {
 	dir := t.TempDir()
 	path := writeCredentialConfig(t)
 
-	first, _, _ := newCredentialConfig(t, dir)
+	first, _ := newCredentialConfig(t, dir)
 	require.NoError(t, first.Apply(path))
 
-	second, _, secondPlugin := newCredentialConfig(t, dir)
+	second, secondPlugin := newCredentialConfig(t, dir)
 	require.NoError(t, second.Apply(path))
 
 	readCalls := secondPlugin.GetReadCalls()
@@ -210,10 +208,10 @@ func TestPluginProviderReceivesRealConfiguredValueOnRead(t *testing.T) {
 	dir := t.TempDir()
 	path := writeCredentialConfig(t)
 
-	first, _, _ := newCredentialConfig(t, dir)
+	first, _ := newCredentialConfig(t, dir)
 	require.NoError(t, first.Apply(path))
 
-	second, _, secondPlugin := newCredentialConfig(t, dir)
+	second, secondPlugin := newCredentialConfig(t, dir)
 	require.NoError(t, second.Apply(path))
 
 	readCalls := secondPlugin.GetReadCalls()
@@ -229,10 +227,10 @@ func TestPluginSensitiveFieldRevealsAfterSecondConfigApply(t *testing.T) {
 	dir := t.TempDir()
 	path := writeCredentialConfig(t)
 
-	first, _, _ := newCredentialConfig(t, dir)
+	first, _ := newCredentialConfig(t, dir)
 	require.NoError(t, first.Apply(path))
 
-	second, _, _ := newCredentialConfig(t, dir)
+	second, _ := newCredentialConfig(t, dir)
 	require.NoError(t, second.Apply(path))
 
 	credential, err := Find[structs.Credential](second, "resource.credential.db")
@@ -249,10 +247,10 @@ func TestPluginSensitiveFieldStaysRealInStateAfterSecondApply(t *testing.T) {
 	dir := t.TempDir()
 	path := writeCredentialConfig(t)
 
-	first, _, _ := newCredentialConfig(t, dir)
+	first, _ := newCredentialConfig(t, dir)
 	require.NoError(t, first.Apply(path))
 
-	second, _, _ := newCredentialConfig(t, dir)
+	second, _ := newCredentialConfig(t, dir)
 	require.NoError(t, second.Apply(path))
 
 	store, err := state.NewFileStateStore(dir)
@@ -274,7 +272,7 @@ func applyCredentialWithEventData(t *testing.T, level EventDataLevel) *eventReco
 
 	recorder := &eventRecorder{}
 
-	c, _, _ := newCredentialConfig(t, t.TempDir(), WithEventHandler(recorder.Record), WithEventData(level))
+	c, _ := newCredentialConfig(t, t.TempDir(), WithEventHandler(recorder.Record), WithEventData(level))
 	require.NoError(t, c.Apply(writeCredentialConfig(t)))
 
 	return recorder

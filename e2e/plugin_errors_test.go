@@ -7,30 +7,25 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/e2e/fixtures/inprocess"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 )
 
 // TestMissingExternalPluginFailsApply asserts a missing external plugin
 // binary fails the first Apply. Registering the path only records it, the
 // plugin is started by the Apply, which fails with ErrPluginLoad naming the
-// path
+// path and the local registry it came from
 func TestMissingExternalPluginFailsApply(t *testing.T) {
 	missing := "./does-not-exist"
 
-	r := registry.NewPluginRegistry()
-	t.Cleanup(func() {
-		for _, host := range r.GetPluginHosts() {
-			host.Stop()
-		}
-	})
+	local := registry.NewLocal()
+	local.RegisterPlugin(&inprocess.Plugin{})
+	local.RegisterExternalPlugin(missing)
 
-	require.NoError(t, r.RegisterPlugin(&inprocess.Plugin{}))
-	require.NoError(t, r.RegisterPluginWithPath(missing))
-
-	c := newConfig(t, r, nil, t.TempDir(), testStateKey)
+	c := newConfig(t, nil, t.TempDir(), testStateKey, xcl.WithRegistry(local))
 
 	err := c.Apply(pluginConfigDir)
 	require.Error(t, err)
 	require.ErrorIs(t, err, xcl.ErrPluginLoad)
 	require.Contains(t, err.Error(), missing)
+	require.Contains(t, err.Error(), "from registry local")
 }

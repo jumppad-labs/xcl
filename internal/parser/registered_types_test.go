@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -44,7 +44,7 @@ const (
 // plugins, and one file state store. Each apply builds a fresh Parser from
 // these, just as separate runs would.
 type registeredHarness struct {
-	registry *registry.PluginRegistry
+	registry *catalog.Catalog
 	store    *state.FileStateStore
 }
 
@@ -60,26 +60,21 @@ func setupRegisteredTypes(t *testing.T) *registeredHarness {
 		os.Setenv("HOME", home)
 	})
 
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
-	err := reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 
-	err = reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.App{}, "resource", registered.TypeApp)
 
-	err = reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.Consumer{}, "resource", registered.TypeConsumer)
 
 	// cache is registered without a subtype, it is declared with a single
 	// label rather than under the resource type
-	err = reg.RegisterType(&registered.Cache{}, registered.TypeCache)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.Cache{}, registered.TypeCache)
 
 	// server is a type other than resource that takes a subtype, it is
 	// declared server "big" "<name>"
-	err = reg.RegisterType(&registered.Server{}, registered.TypeServer, registered.SubtypeBig)
-	require.NoError(t, err)
+	reg.RegisterType(&registered.Server{}, registered.TypeServer, registered.SubtypeBig)
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
@@ -96,7 +91,7 @@ func (h *registeredHarness) newParser(t *testing.T, emit events.Emit) *Parser {
 	t.Helper()
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 	options.Emit = emit
 
@@ -321,7 +316,7 @@ func TestApplyAfterRemovingRegisteredBlockNeverCallsProvider(t *testing.T) {
 	h.applyAndSave(t, registeredRemovedBeforeConfig)
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 	// no expectations, any provider lookup fails the test
 	options.ProviderResolver = mocks.NewMockProviderResolver(t)
@@ -622,7 +617,7 @@ func TestApplyNeverLooksUpAProviderForRegisteredOrBuiltinBlocks(t *testing.T) {
 	h := setupRegisteredTypes(t)
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 	// no expectations, any provider lookup fails the test
 	options.ProviderResolver = mocks.NewMockProviderResolver(t)

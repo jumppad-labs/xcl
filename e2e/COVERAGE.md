@@ -25,6 +25,48 @@ checked both library behaviour and what the example or prettylog printed, the
 library half moved here and the printing half stayed with the example or
 prettylog.
 
+## diff
+
+`diff_test.go` proves that `Config.Diff` predicts `Config.Apply`. Each test
+copies `testdata/plugin` or `testdata/kube` to a temporary directory, so it can
+edit the files, and keeps its state in a temporary directory of its own. Every
+diff is checked to leave the state file byte for byte unchanged and to report
+no create, update or destroy event. The prediction tests then apply and check
+the diff against what the apply's lifecycle events show it did.
+
+The diff never under-reports and may over-report. A resource the diff reports
+as an update has every computed value unknown, so each resource referencing one
+is reported as an update with that value unknown and gets no provider call; the
+apply may then find the value unchanged and leave that resource alone. The
+prediction tests therefore check a contract rather than equality:
+
+- an apply never changes a resource the diff did not list: every resource the
+  apply creates, updates, replaces or deletes is in the diff with that same
+  action
+- every resource the diff lists that the apply leaves alone was listed with at
+  least one change that is unknown
+
+Each prediction test also pins the exact create, update, replace and delete
+addresses its diff reports.
+
+| Test | Behaviour |
+|---|---|
+| `TestDiffOfUnappliedPluginConfigurationPredictsApply` | with no state every provider resource is created |
+| `TestDiffOfUnappliedPluginConfigurationReportsComputedValuesUnknown` | values computed by a provider during the apply are reported unknown |
+| `TestDiffOfUnchangedPluginConfigurationReportsNoChanges` | an applied, unchanged configuration reports no changes |
+| `TestDiffOfEditedRedisPortPredictsApply` | an edited attribute is an update, and what references a computed value of an updated resource is an update with that value unknown, whether or not the apply changes it |
+| `TestDiffOfEditedReplicaLocationPredictsApply` | an edited attribute nothing references is an update of that resource only |
+| `TestDiffOfRemovedIngressPredictsApply` | a removed block is a delete |
+| `TestDiffOfFailedReplicaPredictsReplaceByApply` | a resource saved as failed is replaced |
+| `TestDiffOfChangedPasswordPredictsApply` | a changed sensitive value is an update, and what references a computed value of the updated databases is an update with that value unknown although the apply leaves it alone |
+| `TestDiffOfChangedPasswordReportsSensitivePasswordChange` | the change is marked sensitive and carries neither value |
+| `TestDiffOfKubeConfigurationReportsNothing` | declared types only (`RegisterType` on a local registry): no resources, every count zero |
+| `TestApplyOfKubeConfigurationHandsNothingToAProvider` | declared types only (`RegisterType` on a local registry): no provider call |
+| `TestDiffOfUnappliedPluginConfigurationMarshalsNoPassword`, `TestDiffOfChangedPasswordMarshalsNoPassword` | no password in the diff's JSON |
+| `TestDiffOfUnappliedPluginConfigurationFormatsNoPasswordWithV`, `TestDiffOfChangedPasswordFormatsNoPasswordWithV` | no password in the diff formatted with `%v` |
+| `TestDiffOfUnappliedPluginConfigurationFormatsNoPasswordWithPlusV`, `TestDiffOfChangedPasswordFormatsNoPasswordWithPlusV` | no password in the diff formatted with `%+v` |
+| `TestDiffOfUnappliedPluginConfigurationReportsNoPasswordInEvents`, `TestDiffOfChangedPasswordReportsNoPasswordInEvents` | no password in the events the diff reports |
+
 ## configonly
 
 Removed from `example/configonly/main_test.go`.

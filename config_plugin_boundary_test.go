@@ -19,7 +19,7 @@ import (
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -111,45 +111,47 @@ type personFixture struct {
 	statePath  string
 }
 
-// stopPluginHosts stops every plugin process the registry started when the
+// stopPluginHosts stops every plugin process the Config started when the
 // test ends
-func stopPluginHosts(t *testing.T, pr *registry.PluginRegistry) {
+func stopPluginHosts(t *testing.T, c *Config) {
 	t.Helper()
 
 	t.Cleanup(func() {
-		for _, host := range pr.GetPluginHosts() {
+		for _, host := range c.catalog.GetPluginHosts() {
 			host.Stop()
 		}
 	})
 }
 
 // setupPersonConfig writes contents to main.xcl in dir, creates a file state
-// store in dir and builds a Config using pr and opts
-func setupPersonConfig(t *testing.T, pr *registry.PluginRegistry, dir, contents string, opts ...ConfigOption) *personFixture {
+// store in dir and builds a Config using r and opts
+func setupPersonConfig(t *testing.T, r registry.Registry, dir, contents string, opts ...ConfigOption) *personFixture {
 	t.Helper()
 
 	configFile := filepath.Join(dir, "main.xcl")
 	err := os.WriteFile(configFile, []byte(contents), 0644)
 	require.NoError(t, err)
 
-	return newPersonConfig(t, pr, configFile, dir, opts...)
+	return newPersonConfig(t, r, configFile, dir, opts...)
 }
 
 // newPersonConfig creates a file state store in stateDir and builds a
-// Config using pr and opts that applies configFile
-func newPersonConfig(t *testing.T, pr *registry.PluginRegistry, configFile, stateDir string, opts ...ConfigOption) *personFixture {
+// Config using r and opts that applies configFile. The plugin processes the
+// Config starts are stopped when the test ends.
+func newPersonConfig(t *testing.T, r registry.Registry, configFile, stateDir string, opts ...ConfigOption) *personFixture {
 	t.Helper()
 
 	store, err := state.NewFileStateStore(stateDir)
 	require.NoError(t, err)
 
 	options := append([]ConfigOption{
-		WithPluginRegistry(pr),
+		WithRegistry(r),
 		WithStateStore(store),
 	}, opts...)
 
 	c, err := NewConfig(options...)
 	require.NoError(t, err)
+	stopPluginHosts(t, c)
 
 	return &personFixture{
 		config:     c,
@@ -160,29 +162,20 @@ func newPersonConfig(t *testing.T, pr *registry.PluginRegistry, configFile, stat
 
 // inProcessPersonRegistry returns a registry holding the in-process
 // PersonPlugin
-func inProcessPersonRegistry(t *testing.T) *registry.PluginRegistry {
-	t.Helper()
+func inProcessPersonRegistry() *registry.Local {
+	local := registry.NewLocal()
+	local.RegisterPlugin(&PersonPlugin{})
 
-	pr := registry.NewPluginRegistry()
-
-	err := pr.RegisterPlugin(&PersonPlugin{})
-	require.NoError(t, err)
-
-	return pr
+	return local
 }
 
 // externalPersonRegistry returns a registry holding the external person
-// plugin binary, whose processes are stopped when the test ends
-func externalPersonRegistry(t *testing.T, binary string) *registry.PluginRegistry {
-	t.Helper()
+// plugin binary
+func externalPersonRegistry(binary string) *registry.Local {
+	local := registry.NewLocal()
+	local.RegisterExternalPlugin(binary)
 
-	pr := registry.NewPluginRegistry()
-	stopPluginHosts(t, pr)
-
-	err := pr.RegisterPluginWithPath(binary)
-	require.NoError(t, err)
-
-	return pr
+	return local
 }
 
 // pluginLogsWithMessage returns the log events the recorder received with
@@ -343,7 +336,7 @@ func TestExternalPluginLogCarriesResourceAndStep(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	recorder := &eventRecorder{}
-	f := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), onePersonConfig, WithEventHandler(recorder.Record))
+	f := setupPersonConfig(t, externalPersonRegistry(binary), t.TempDir(), onePersonConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -377,13 +370,13 @@ func TestInProcessAndExternalPluginLogsMatchExceptSource(t *testing.T) {
 	configFile := writeConfigFile(t, onePersonConfig)
 
 	inProcessRecorder := &eventRecorder{}
-	inProcess := newPersonConfig(t, inProcessPersonRegistry(t), configFile, t.TempDir(), WithEventHandler(inProcessRecorder.Record))
+	inProcess := newPersonConfig(t, inProcessPersonRegistry(), configFile, t.TempDir(), WithEventHandler(inProcessRecorder.Record))
 
 	err := inProcess.config.Apply(inProcess.configFile)
 	require.NoError(t, err)
 
 	externalRecorder := &eventRecorder{}
-	external := newPersonConfig(t, externalPersonRegistry(t, binary), configFile, t.TempDir(), WithEventHandler(externalRecorder.Record))
+	external := newPersonConfig(t, externalPersonRegistry(binary), configFile, t.TempDir(), WithEventHandler(externalRecorder.Record))
 
 	err = external.config.Apply(external.configFile)
 	require.NoError(t, err)
@@ -415,7 +408,7 @@ func TestExternalPluginLogNamesPluginAsSource(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	recorder := &eventRecorder{}
-	f := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), onePersonConfig, WithEventHandler(recorder.Record))
+	f := setupPersonConfig(t, externalPersonRegistry(binary), t.TempDir(), onePersonConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -430,13 +423,15 @@ func TestEachConfigReceivesOnlyItsOwnPluginLogs(t *testing.T) {
 	binary := buildExamplePlugin(t)
 	t.Setenv("HOME", t.TempDir())
 
-	pr := externalPersonRegistry(t, binary)
+	// both Configs get the plugin from one registry, each starts its own
+	// process of it
+	local := externalPersonRegistry(binary)
 
 	firstRecorder := &eventRecorder{}
-	first := setupPersonConfig(t, pr, t.TempDir(), firstTeamConfig, WithEventHandler(firstRecorder.Record))
+	first := setupPersonConfig(t, local, t.TempDir(), firstTeamConfig, WithEventHandler(firstRecorder.Record))
 
 	secondRecorder := &eventRecorder{}
-	second := setupPersonConfig(t, pr, t.TempDir(), secondTeamConfig, WithEventHandler(secondRecorder.Record))
+	second := setupPersonConfig(t, local, t.TempDir(), secondTeamConfig, WithEventHandler(secondRecorder.Record))
 
 	err := first.config.Apply(first.configFile)
 	require.NoError(t, err)
@@ -465,13 +460,15 @@ func TestEachConfigReceivesOnlyItsOwnPluginLogsWhenApplyingConcurrently(t *testi
 	binary := buildExamplePlugin(t)
 	t.Setenv("HOME", t.TempDir())
 
-	pr := externalPersonRegistry(t, binary)
+	// both Configs get the plugin from one registry, each starts its own
+	// process of it
+	local := externalPersonRegistry(binary)
 
 	firstRecorder := &eventRecorder{}
-	first := setupPersonConfig(t, pr, t.TempDir(), firstTeamConfig, WithEventHandler(firstRecorder.Record))
+	first := setupPersonConfig(t, local, t.TempDir(), firstTeamConfig, WithEventHandler(firstRecorder.Record))
 
 	secondRecorder := &eventRecorder{}
-	second := setupPersonConfig(t, pr, t.TempDir(), secondTeamConfig, WithEventHandler(secondRecorder.Record))
+	second := setupPersonConfig(t, local, t.TempDir(), secondTeamConfig, WithEventHandler(secondRecorder.Record))
 
 	var wg sync.WaitGroup
 	var firstErr, secondErr error
@@ -504,8 +501,8 @@ func TestNoReceiverWritesNothingWithBothPluginKinds(t *testing.T) {
 	require.NoError(t, os.Mkdir(inProcessDir, 0755))
 	require.NoError(t, os.Mkdir(externalDir, 0755))
 
-	inProcess := setupPersonConfig(t, inProcessPersonRegistry(t), inProcessDir, threePeopleConfig)
-	external := setupPersonConfig(t, externalPersonRegistry(t, binary), externalDir, threePeopleConfig)
+	inProcess := setupPersonConfig(t, inProcessPersonRegistry(), inProcessDir, threePeopleConfig)
+	external := setupPersonConfig(t, externalPersonRegistry(binary), externalDir, threePeopleConfig)
 
 	filesBefore := filesUnder(t, workDir)
 	require.Equal(t, []string{
@@ -548,7 +545,7 @@ func TestEveryExternalPluginLogReachesReceiver(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	recorder := &eventRecorder{}
-	f := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), threePeopleConfig, WithEventHandler(recorder.Record))
+	f := setupPersonConfig(t, externalPersonRegistry(binary), t.TempDir(), threePeopleConfig, WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -585,10 +582,10 @@ func TestReceiverSeesNothingOutsideItWithReceiverSet(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	inProcessRecorder := &eventRecorder{}
-	inProcess := setupPersonConfig(t, inProcessPersonRegistry(t), t.TempDir(), threePeopleConfig, WithEventHandler(inProcessRecorder.Record))
+	inProcess := setupPersonConfig(t, inProcessPersonRegistry(), t.TempDir(), threePeopleConfig, WithEventHandler(inProcessRecorder.Record))
 
 	externalRecorder := &eventRecorder{}
-	external := setupPersonConfig(t, externalPersonRegistry(t, binary), t.TempDir(), threePeopleConfig, WithEventHandler(externalRecorder.Record))
+	external := setupPersonConfig(t, externalPersonRegistry(binary), t.TempDir(), threePeopleConfig, WithEventHandler(externalRecorder.Record))
 
 	finish := captureAllOutput(t)
 
@@ -629,12 +626,7 @@ func TestStoppingUnusedExternalPluginWritesNothing(t *testing.T) {
 	binary := buildExamplePlugin(t)
 	t.Setenv("HOME", t.TempDir())
 
-	pr := registry.NewPluginRegistry()
-
-	err := pr.RegisterPluginWithPath(binary)
-	require.NoError(t, err)
-
-	c, err := NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(WithRegistry(externalPersonRegistry(binary)))
 	require.NoError(t, err)
 
 	finish := captureAllOutput(t)
@@ -642,7 +634,7 @@ func TestStoppingUnusedExternalPluginWritesNothing(t *testing.T) {
 	// the configuration uses no person, so no provider of the plugin is called
 	validateErr := c.Validate(writeConfigFile(t, variableOnlyConfig))
 
-	for _, host := range pr.GetPluginHosts() {
+	for _, host := range c.catalog.GetPluginHosts() {
 		host.Stop()
 	}
 
@@ -662,15 +654,13 @@ func TestExternalPluginRejectedForTypeClashWritesNothing(t *testing.T) {
 	binary := buildExamplePlugin(t)
 	t.Setenv("HOME", t.TempDir())
 
-	pr := registry.NewPluginRegistry()
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Database{}, "resource", "person")
 
-	err := pr.RegisterType(&registered.Database{}, "resource", "person")
-	require.NoError(t, err)
-
-	err = pr.RegisterPluginWithPath(binary)
-	require.NoError(t, err)
-
-	c, err := NewConfig(WithPluginRegistry(pr))
+	c, err := NewConfig(
+		WithRegistry(declared),
+		WithRegistry(externalPersonRegistry(binary)),
+	)
 	require.NoError(t, err)
 
 	finish := captureAllOutput(t)
@@ -681,8 +671,11 @@ func TestExternalPluginRejectedForTypeClashWritesNothing(t *testing.T) {
 
 	stdout, stderr := finish()
 
-	var clash *registry.TypeNameClashError
+	var clash *TypeNameClashError
 	require.True(t, errors.As(validateErr, &clash))
+	require.Equal(t, "resource.person", clash.Name)
+	require.Equal(t, externalPersonPluginName, clash.Provider)
+	require.Equal(t, "local", clash.Registry)
 	require.Empty(t, stdout)
 	require.Empty(t, stderr)
 }

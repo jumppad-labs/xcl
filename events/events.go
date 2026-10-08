@@ -4,7 +4,10 @@
 // own, every diagnostic is an Event delivered to the application's Handler.
 package events
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 // Reserved Meta keys. A log event carries its severity under KeyLevel and
 // its text under KeyMessage. Details supplied by the caller of a log method
@@ -47,10 +50,12 @@ const (
 
 // Operations are the core operation names an event can carry.
 const (
-	OperationParse     = "parse"
-	OperationValidate  = "validate"
-	OperationApply     = "apply"
-	OperationDestroy   = "destroy"
+	OperationParse    = "parse"
+	OperationValidate = "validate"
+	OperationApply    = "apply"
+	OperationDestroy  = "destroy"
+	// OperationDiff reports what an apply would do without doing any of it
+	OperationDiff      = "diff"
 	OperationLoadState = "load_state"
 	OperationCreate    = "create"
 	OperationRead      = "read"
@@ -110,6 +115,46 @@ type Event struct {
 	// KeyLevel and its text under KeyMessage, alongside the key/value details
 	// given with the message, which keep their names.
 	Meta map[string]any
+
+	// decode turns Data into the entity it holds. It is attached by the
+	// configuration that delivers the event and, being unexported, is never
+	// serialised.
+	decode EntityDecoder
+}
+
+// EntityDecoder turns an event's Data into the entity it holds, as the Go
+// type registered for the entity's block type.
+type EntityDecoder func(data []byte) (any, error)
+
+// errNoEntityDecoder is returned by Entity for an event that carries data but
+// was built by hand instead of being delivered by a configuration.
+var errNoEntityDecoder = errors.New("event carries data but was not delivered by a Config")
+
+// WithEntityDecoder returns a copy of the event that decodes its Data with
+// decode. A configuration attaches its decoder to every event it delivers, so
+// a handler can read an event's entity without holding the types itself.
+func (e Event) WithEntityDecoder(decode EntityDecoder) Event {
+	e.decode = decode
+	return e
+}
+
+// Entity returns the entity the event's Data holds, as the Go type registered
+// for its block type, with every sensitive value shown as the mask marker. It
+// decodes Data on every call, so each caller gets its own copy, and a handler
+// that never calls it pays nothing.
+//
+// It returns nil and no error when the event carries no data, and an error
+// when the event carries data but was not delivered by a configuration.
+func (e Event) Entity() (any, error) {
+	if len(e.Data) == 0 {
+		return nil, nil
+	}
+
+	if e.decode == nil {
+		return nil, errNoEntityDecoder
+	}
+
+	return e.decode(e.Data)
 }
 
 // Handler is the application's receiver for events. It is called one event

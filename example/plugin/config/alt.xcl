@@ -1,0 +1,47 @@
+# The configuration the plugin example applies. The docker blocks come from
+# the external Docker plugin, the template block from the in-process template
+# plugin.
+#
+# Variables can be overridden with environment variables prefixed HCL_VAR_,
+# i.e. HCL_VAR_output_dir.
+
+# output_dir is where the rendered template is written
+variable "output_dir" {
+  default = "./build/rendered"
+}
+
+# A Docker bridge network named app. The Docker plugin sets the computed
+# docker_id when it creates it.
+docker "network" "app" {
+  subnet = "10.42.0.0/23"
+}
+
+# An nginx container named web on the app network. Referring to the network
+# orders the blocks, web is always created after app and destroyed before it.
+docker "container" "web" {
+  image = "nginx:1.27-alpine"
+
+  # a nested block, repeated once per network the container joins
+  network {
+    name    = docker.network.app.meta.name
+    aliases = ["web"]
+  }
+}
+
+# template has no subtype, so it takes just a name. Its variables read the
+# container's ip_address, which the Docker plugin computes when it creates the
+# container, so a value crosses from the external plugin to the in-process
+# one.
+template "welcome" {
+  source = <<-EOF
+  Welcome to the {{network}} network.
+  The web container answers at http://{{address}}/
+  EOF
+
+  destination = "${variable.output_dir}/welcome.txt"
+
+  variables = {
+    network = docker.network.app.meta.name
+    address = docker.container.web.ip_address
+  }
+}

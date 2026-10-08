@@ -13,7 +13,6 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -77,9 +76,8 @@ func TestEncodeSavedEntityWritesExternalPluginTypes(t *testing.T) {
 // output or module is never written as configuration, so those records are
 // skipped
 func TestPluginSavedEntityEncodesAsAppliedEntity(t *testing.T) {
-	r := registry.NewPluginRegistry()
 	stateDir := t.TempDir()
-	c := newPluginConfig(t, r, nil, stateDir, testStateKey)
+	c := newPluginConfig(t, nil, stateDir, testStateKey)
 
 	require.NoError(t, c.Apply(pluginConfigDir))
 
@@ -89,7 +87,7 @@ func TestPluginSavedEntityEncodesAsAppliedEntity(t *testing.T) {
 	compared := 0
 
 	for _, record := range records {
-		fromState, err := xcl.EncodeSavedEntity(r, record)
+		fromState, err := c.EncodeSavedEntity(record)
 		if errors.Is(err, xcl.ErrNotEncodable) {
 			continue
 		}
@@ -116,7 +114,7 @@ func TestPluginSavedEntityEncodesAsAppliedEntity(t *testing.T) {
 // refused as not encodable, which is what a variable, output or module is. No
 // other failure is allowed
 func TestPluginEntitiesEncodeOrAreRefusedAsNotEncodable(t *testing.T) {
-	c := newPluginConfig(t, registry.NewPluginRegistry(), nil, t.TempDir(), testStateKey)
+	c := newPluginConfig(t, nil, t.TempDir(), testStateKey)
 
 	require.NoError(t, c.Apply(pluginConfigDir))
 
@@ -149,7 +147,7 @@ func TestPluginEntitiesEncodeOrAreRefusedAsNotEncodable(t *testing.T) {
 // it, the sensitive values written as masked envelopes
 func TestPluginStateHoldsNoSecretWithKey(t *testing.T) {
 	stateDir := t.TempDir()
-	c := newPluginConfig(t, registry.NewPluginRegistry(), nil, stateDir, testStateKey)
+	c := newPluginConfig(t, nil, stateDir, testStateKey)
 
 	require.NoError(t, c.Apply(pluginConfigDir))
 
@@ -196,7 +194,7 @@ func TestPluginEventsHoldNoSecret(t *testing.T) {
 // the apply and once for the destroy
 func TestPluginPlainStateWarningWithoutKey(t *testing.T) {
 	recorder := &testutil.EventRecorder{}
-	c := newPluginConfig(t, registry.NewPluginRegistry(), recorder.Record, t.TempDir(), nil)
+	c := newPluginConfig(t, recorder.Record, t.TempDir(), nil)
 
 	require.NoError(t, c.Apply(pluginConfigDir))
 	require.NoError(t, c.Destroy())

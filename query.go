@@ -296,11 +296,11 @@ func (c *Config) typeable(path []string) error {
 		return nil
 	}
 
-	if c.pluginRegistry == nil {
+	if c.catalog == nil {
 		return &xclerrors.UnknownTypeError{Segments: path, Name: entityType}
 	}
 
-	takes, known := c.pluginRegistry.TakesSubtype(entityType)
+	takes, known := c.catalog.TakesSubtype(entityType)
 	if !known {
 		return &xclerrors.UnknownTypeError{Segments: path, Name: entityType}
 	}
@@ -315,7 +315,7 @@ func (c *Config) typeable(path []string) error {
 
 	// the subtype must be one that can actually be declared under the type,
 	// naming any other asks a question no configuration could answer
-	if !c.pluginRegistry.KnownType(entityType, path[1]) {
+	if !c.catalog.KnownType(entityType, path[1]) {
 		return &xclerrors.UnknownTypeError{Segments: path, Name: path[1]}
 	}
 
@@ -371,11 +371,11 @@ func (c *Config) typePath(want reflect.Type) ([]string, error) {
 		return nil, err
 	}
 
-	if c.pluginRegistry == nil {
+	if c.catalog == nil {
 		return nil, &xclerrors.NotRegisteredError{Type: want, Use: "FindByType with the type and subtype"}
 	}
 
-	path, ok := c.pluginRegistry.TypePath(want)
+	path, ok := c.catalog.TypePath(want)
 	if !ok {
 		return nil, &xclerrors.NotRegisteredError{Type: want, Use: "FindByType with the type and subtype"}
 	}

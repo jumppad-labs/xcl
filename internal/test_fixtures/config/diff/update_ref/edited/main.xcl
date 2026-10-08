@@ -1,0 +1,30 @@
+# update_ref/before with network app's subnet edited, so an apply would
+# update app.
+
+resource "network" "app" {
+  subnet = "10.9.0.0/16"
+}
+
+resource "container" "user" {
+  network {
+    name = resource.network.app.provider_id
+  }
+}
+
+resource "container" "plain" {
+  network {
+    name = resource.network.app.subnet
+  }
+}
+
+resource "container" "named" {
+  network {
+    name = resource.network.app.meta.name
+  }
+}
+
+resource "container" "chained" {
+  network {
+    name = resource.container.user.network[0].assigned_address
+  }
+}

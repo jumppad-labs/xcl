@@ -1,0 +1,43 @@
+# replace_base with every kind of change at once: a backend network and a
+# worker container are added, the api container's PORT is changed, the legacy
+# network (saved as failed) is kept so it would be replaced, and the old
+# container is removed. The app network and the web container are left as
+# they are.
+
+resource "network" "app" {
+  subnet = "10.0.0.0/16"
+}
+
+resource "network" "legacy" {
+  subnet = "10.8.0.0/16"
+}
+
+resource "container" "api" {
+  network {
+    name = resource.network.app.meta.name
+  }
+
+  env = {
+    PORT = "9090"
+  }
+}
+
+resource "container" "web" {
+  network {
+    name = resource.network.app.meta.name
+  }
+
+  env = {
+    PORT = "80"
+  }
+}
+
+resource "network" "backend" {
+  subnet = "10.1.0.0/16"
+}
+
+resource "container" "worker" {
+  network {
+    name = resource.network.backend.meta.name
+  }
+}
