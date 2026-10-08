@@ -56,8 +56,7 @@ func (h *lifecycleHarness) runDiff(t *testing.T, path string) *diff.Diff {
 func (h *lifecycleHarness) registerDatabaseType(t *testing.T) {
 	t.Helper()
 
-	err := h.registry.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
+	h.registry.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
 }
 
 // diffAddresses returns the address of every resource the diff lists, in the

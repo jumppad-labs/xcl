@@ -11,6 +11,7 @@ import (
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/cty/function"
 	"github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/functions"
@@ -23,7 +24,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -86,19 +86,19 @@ type ParserOptions struct {
 	// when downloading modules.
 	ModuleRegistry *modules.ModuleRegistry
 
-	// PluginRegistry is the registry of plugins to use for this parser.
-	// This should be provided by Config when using the Config.Apply/Validate API.
-	// For standalone Parser usage, create and configure the PluginRegistry yourself.
-	PluginRegistry *registry.PluginRegistry
+	// Catalog resolves block types and loads plugins for this parser. It is
+	// provided by Config when using the Config.Apply/Validate API. For
+	// standalone Parser usage, create and configure the Catalog yourself.
+	Catalog *catalog.Catalog
 
 	// ProviderResolver overrides how provider adapters are looked up during the resource
-	// lifecycle walk (Create/Read/Changed/Update/Destroy). Defaults to PluginRegistry.
+	// lifecycle walk (Create/Read/Changed/Update/Destroy). Defaults to Catalog.
 	// Primarily useful for testing lifecycle/ordering behavior without a real plugin registry.
 	ProviderResolver ProviderResolver
 
 	// TypeRegistry overrides how the lifecycle walk recognises plain Go types registered
 	// without a plugin, which like builtins are never passed to a provider. Defaults to
-	// PluginRegistry. Primarily useful for testing lifecycle behavior without a real registry.
+	// Catalog. Primarily useful for testing lifecycle behavior without a real registry.
 	TypeRegistry TypeRegistry
 
 	// StateStore is the state store to use for loading previous state.
@@ -140,8 +140,8 @@ const ConfigDirectory = ".xclconfig"
 // VariableEnvPrefix is set to 'HCL_VAR_', should a variable be defined
 // called 'foo' setting the environment variable 'HCL_VAR_foo' will override
 // any default value
-// PluginRegistry is set to a registry containing only the builtin resource
-// types, add plugins to it or replace it to use custom resource types
+// Catalog is set to a catalog containing only the builtin resource types,
+// register types on it or replace it to use custom resource types
 func DefaultOptions() *ParserOptions {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -153,7 +153,7 @@ func DefaultOptions() *ParserOptions {
 	return &ParserOptions{
 		ModuleCache:       cacheDir,
 		VariableEnvPrefix: "HCL_VAR_",
-		PluginRegistry:    registry.NewPluginRegistry(),
+		Catalog:           catalog.New(),
 		// event data is redacted by default, as Config does
 		EventMask: mask.Redact(),
 	}
@@ -164,7 +164,7 @@ type Parser struct {
 	options          ParserOptions
 	customFunctions  map[string]function.Function
 	stateStore       state.StateStore
-	pluginRegistry   *registry.PluginRegistry
+	catalog          *catalog.Catalog
 	providerResolver ProviderResolver
 	typeRegistry     TypeRegistry
 	addresses        *resources.AddressParser // resolves addresses against the known types
@@ -178,8 +178,8 @@ type Parser struct {
 func (p *Parser) addressParser() *resources.AddressParser {
 	if p.addresses == nil {
 		var known []types.TypeInfo
-		if p.pluginRegistry != nil {
-			known = p.pluginRegistry.Types()
+		if p.catalog != nil {
+			known = p.catalog.Types()
 		}
 
 		p.addresses = resources.NewAddressParser(known)
@@ -204,17 +204,17 @@ func NewParser(options *ParserOptions) *Parser {
 	// Parser should never create plugin registry or state store - these are owned by Config
 	// and passed in via options. If not provided, they will be nil and operations will skip
 	// plugin/state functionality.
-	p.pluginRegistry = o.PluginRegistry
+	p.catalog = o.Catalog
 	p.stateStore = o.StateStore
 
 	p.providerResolver = o.ProviderResolver
 	if p.providerResolver == nil {
-		p.providerResolver = p.pluginRegistry
+		p.providerResolver = p.catalog
 	}
 
 	p.typeRegistry = o.TypeRegistry
-	if p.typeRegistry == nil && p.pluginRegistry != nil {
-		p.typeRegistry = p.pluginRegistry
+	if p.typeRegistry == nil && p.catalog != nil {
+		p.typeRegistry = p.catalog
 	}
 
 	if o.CustomFunctions != nil {
@@ -441,7 +441,7 @@ func (p *Parser) Destroy(ctx context.Context, saved []any) (*State, error) {
 	}
 
 	// saved is what a store loaded, the records it holds are typed here
-	saved, err := savedentity.DecodeAll(p.pluginRegistry, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
+	saved, err := savedentity.DecodeAll(p.catalog, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
 	if err != nil {
 		return working, err
 	}
@@ -541,7 +541,7 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 
 		// the store only reads and writes records, typing them needs the
 		// registry
-		saved, err = savedentity.DecodeAll(p.pluginRegistry, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
+		saved, err = savedentity.DecodeAll(p.catalog, saved, savedentity.ReadOptions{Mask: p.options.StateMask})
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load previous state: %w", err)
 		}
@@ -748,11 +748,11 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 // carry a subtype as their first label, and whether the keyword is known.
 // "resource" always takes one, even with no registry
 func (p *Parser) takesSubtype(entityType string) (bool, bool) {
-	if p.pluginRegistry == nil {
+	if p.catalog == nil {
 		return entityType == types.TypeResource, entityType == types.TypeResource
 	}
 
-	return p.pluginRegistry.TakesSubtype(entityType)
+	return p.catalog.TakesSubtype(entityType)
 }
 
 // isReferenceRoot reports whether name, the first segment of a traversal in an
@@ -913,7 +913,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 			return de
 		}
 
-		rt, err = p.pluginRegistry.CreateEntity(b.Type, subtype, name)
+		rt, err = p.catalog.CreateEntity(b.Type, subtype, name)
 		if err != nil {
 			typeName := b.Type
 			if subtype != "" {
@@ -1511,9 +1511,9 @@ func (p *Parser) emitOperationError(operation string, err error) {
 // loadPlugins loads the plugin registry's plugins, which happens once per
 // registry, so it is cheap when a Config has already loaded them
 func (p *Parser) loadPlugins() error {
-	if p.pluginRegistry == nil {
+	if p.catalog == nil {
 		return nil
 	}
 
-	return p.pluginRegistry.Load(p.options.Emit)
+	return p.catalog.Load(p.options.Emit)
 }

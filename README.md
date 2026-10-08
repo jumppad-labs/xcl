@@ -60,6 +60,82 @@ user can implement these computations in `Process` as this will make their value
 node in graph.
 
 
+## Quick start
+
+### Configuration only
+
+An application that only reads its configuration declares each Go type, on a
+local registry, under the block type name it is written with, applies the
+configuration and reads it back. No plugin and no provider is needed:
+
+```go
+local := registry.NewLocal()
+local.RegisterType(&resources.Deployment{}, "deployment") // deployment "api" {}
+local.RegisterType(&resources.Service{}, "service")       // service "api" {}
+local.RegisterType(&PostgreSQL{}, "resource", "postgres") // resource "postgres" "main" {}
+
+c, err := xcl.NewConfig(xcl.WithRegistry(local))
+if err != nil {
+	return err
+}
+
+if err := c.Apply("./config"); err != nil {
+	return err
+}
+
+var cfg appConfig
+err = c.Decode(&cfg)
+```
+
+**No state.** Without `WithStatePath` or `WithStateStore` nothing is
+persisted: the applied configuration is held in memory only. This is the
+supported mode for configuration-only use, see
+[State and Destroy](#state-and-destroy) to keep state between runs.
+
+### With plugins
+
+Plugins come from registries, the same place Go types are declared. The local
+registry holds plugins compiled into the program, plugin binaries named by path, and directories searched for
+plugin binaries. Registering only records a plugin, nothing is started until
+the first operation needs it:
+
+```go
+local := registry.NewLocal()
+local.RegisterPlugin(&template.TemplatePlugin{})        // an in-process plugin
+local.RegisterExternalPlugin("./bin/xcl-plugin-docker") // an external plugin binary
+local.RegisterPluginDirectory("~/.xcl/plugins")         // a directory to search
+
+c, err := xcl.NewConfig(
+	xcl.WithRegistry(local),
+	xcl.WithStatePath("./.xcl"),
+)
+```
+
+`WithRegistry` may be given more than once. Registries load in the order they
+were given, and the plugins of each in the order they were registered.
+One registry can hold Go types and plugins together. `WithRegistry` is the
+one way a `Config` gets anything beyond the builtins, and the registry the one
+place types and plugins are registered.
+
+**Registration problems.** Registration returns no errors. Problems are
+reported in one of three places:
+
+- A mistake in a single call, wrong on every run, panics straight away
+  naming the type: an empty name, more than one subtype or an empty subtype,
+  a prototype that is not a pointer to a struct embedding
+  `types.ResourceBase`, or a nil plugin or registry.
+- Declared Go types that do not fit together are an error returned by
+  `NewConfig`: the same block type declared twice, in one registry or across
+  two, or with a builtin name, is a `*xcl.TypeNameClashError` naming both Go
+  types and their registries, and a type keyword used both with and without a
+  subtype is a `*xcl.TypeFormError`.
+- A problem with the environment is returned by the first `Validate`,
+  `Apply`, `Destroy`, `Diff` or `Load`: any missing or failing plugin,
+  including one found in a plugin directory, as a `*xcl.PluginLoadError`
+  (matching `xcl.ErrPluginLoad`), and a block type a plugin provides that a
+  declared type or another plugin already provides as a
+  `*xcl.TypeNameClashError` naming both providers and their registries.
+
 ## Example
 
 The [`example`](./example) directory holds two self-contained programs, each
@@ -71,7 +147,8 @@ a Go module of its own with its own configuration and Go types.
 often needed for: an application reading its configuration into its own Go
 types and acting on it. The block types
 ([`configonly/resources`](./example/configonly/resources)) are plain Go types
-registered on the plugin registry, with no plugin and no provider.
+declared on a local registry with `RegisterType`, with no plugin and no
+provider.
 
 Its configuration ([`configonly/config`](./example/configonly/config)) is a
 small Kubernetes-like deployment split across three files, `deployment.xcl`,
@@ -108,7 +185,7 @@ deployment "api" {
     }
 ```
 
-The program loads the configuration with `loadConfig`, which registers the
+The program loads the configuration with `loadConfig`, which declares the
 block types, applies the configuration and gathers every block it reads into
 one struct of its own with a single call, rather than looking each type up
 separately (see [Filling a struct of your own](#filling-a-struct-of-your-own)):
@@ -142,7 +219,8 @@ Its tests are the ones an application author writes for configuration-driven
 code: `ingressRoutes` is checked against test configurations under
 [`configonly/testdata`](./example/configonly/testdata), loaded through the same
 `loadConfig`, and a smoke test builds and runs the program. The program keeps
-its state, with the secret encrypted, in a temporary directory.
+no state: without a state option xcl holds the applied configuration in
+memory only, which is all a program that only reads its configuration needs.
 
 ### Plugins
 
@@ -187,11 +265,13 @@ directory, and the tests that need a real engine skip when none answers.
 
 ### Running them
 
-Every example keeps its state in a file, applies the configuration and prints
-what it read. The plugin example is a command line tool, `xcl-docker`, with
-`apply <path>`, `status`, `inspect <address>` and `destroy` commands, each a
-separate run sharing the state saved in `./.xcl-docker`. `apply` and
-`destroy` print nothing of their own. `status` reads the state back with
+Every example applies the configuration and prints what it read. The
+configuration-only example keeps no state; the plugin example is a command line tool, `xcl-docker`, with
+`apply <path>`, `plan <path>`, `status`, `inspect <address>` and `destroy`
+commands, each a separate run sharing the state saved in `./.xcl-docker`.
+`apply` and `destroy` print nothing of their own. `plan` compares the saved
+state with the configuration at path using `Diff`, changes nothing, and prints
+what an apply would do with `diff.Render`, highlighted on a terminal. `status` reads the state back with
 `Load` and prints it as a tree drawn with
 [Lip Gloss](https://github.com/charmbracelet/lipgloss), and `inspect` prints
 one resource as highlighted configuration text with `EncodeEntity`. Each
@@ -200,8 +280,8 @@ and errors, to the shared [`example/prettylog`](./example/prettylog)
 receiver, set up in one line, which writes styled lines to standard error. It
 shows info and above; set `XCL_LOG_LEVEL=debug` to see plugin loading and
 `Init` messages too. The program's own output goes to standard output. The
-plugin example's `status` and `inspect` are the exception: they print only
-their output, so they give xcl no receiver.
+plugin example's `plan`, `status` and `inspect` are the exception: they
+print only their output, so they give xcl no receiver.
 
 Run any of them from its directory with `make run`. For `plugin` this builds
 `xcl-docker` and the Docker plugin side by side into `build/`, then runs
@@ -243,68 +323,93 @@ type PostgreSQL struct {
 ### Configuration only types
 
 When a block only holds configuration and nothing needs to be created, read or
-destroyed, register its Go type on the plugin registry with `RegisterType`.
-No plugin or provider is needed.
+destroyed, declare its Go type on a registry with `RegisterType` and give the
+registry to the `Config`. No plugin or provider is needed.
 
 Everything a configuration declares is an entity, and an entity has a type
 and an optional subtype. The type is the keyword a block leads with, and the
 subtype, when there is one, is its first label:
 
 ```go
-r := registry.NewPluginRegistry()
+local := registry.NewLocal()
 
 // a type with a subtype, declared: server "big" "web" {}, addressed server.big.web
-err := r.RegisterType(&Server{}, "server", "big")
+local.RegisterType(&Server{}, "server", "big")
 
 // a type without one, declared: cache "main" {}, addressed cache.main
-err = r.RegisterType(&Cache{}, "cache")
+local.RegisterType(&Cache{}, "cache")
 
 // resource is a type like any other: resource "postgres" "main" {}
-err = r.RegisterType(&PostgreSQL{}, "resource", "postgres")
+local.RegisterType(&PostgreSQL{}, "resource", "postgres")
 
-c, err := xcl.NewConfig(xcl.WithPluginRegistry(r))
+c, err := xcl.NewConfig(xcl.WithRegistry(local))
+if err != nil {
+	return err
+}
 err = c.Apply("./config")
 ```
 
-Registered blocks are decoded into your own Go type, take part in references
+Declared blocks are decoded into your own Go type, take part in references
 (`server.big.web.location`, `cache.main.location`) and dependency ordering,
-work in modules and when disabled, and are saved to state. They are never
-passed to a provider. `RegisterType` takes a pointer to a struct that embeds
-`types.ResourceBase`.
+work in modules and when disabled, and are saved to state when there is a
+state store. They are never passed to a provider. `RegisterType` takes a
+pointer to a struct that embeds `types.ResourceBase`.
 
-A type keyword takes a subtype for every registration or for none, so an
+A type keyword takes a subtype for every declaration or for none, so an
 address can always be read by position. `resource` always takes one.
-Registering `server` without a subtype after registering it with one, or the
-other way round, fails with a `*registry.TypeFormError`.
+Declaring `server` without a subtype after declaring it with one, or the
+other way round, is a `*xcl.TypeFormError` returned by `NewConfig`; a plugin
+type that does so fails the first operation with a `*xcl.TypeFormError`.
 
 Every type and subtype must be unique across builtin blocks (`variable`,
-`output`, `module`, `root`), registered types and plugin types.
+`output`, `module`, `root`), declared types and plugin types.
 `server` and `resource "server"` are different types and do not clash.
-Registering a type and subtype a builtin or another registered type already
-has fails straight away with a `*registry.TypeNameClashError` that names it,
-i.e. `resource.postgres`. A clash with a type a plugin provides is reported
-when the plugins load, see below.
+Declaring a type and subtype a builtin or another declared type already has,
+in the same registry or another, is a `*xcl.TypeNameClashError` returned by
+`NewConfig`, naming it, i.e. `resource.postgres`, and both Go types and their
+registries. A clash with a type a plugin provides is reported when the plugins
+load, see below.
 
 ### Registering plugins
 
-The registry needs no logger. Registering a plugin only records it:
+Plugins come only from registries, added with `xcl.WithRegistry`. The local
+registry, from the [`registry`](./registry) package, needs no logger, and
+registering a plugin only records it:
 
 ```go
-r := registry.NewPluginRegistry()
+local := registry.NewLocal()
+local.RegisterPlugin(&MyPlugin{})                  // an in-process plugin
+local.RegisterExternalPlugin("./bin/xcl-plugin-x") // an external plugin binary
+local.RegisterPluginDirectory("~/.xcl/plugins")    // a directory to search
 
-err := r.RegisterPlugin(&MyPlugin{})                  // an in-process plugin
-err = r.RegisterPluginWithPath("./bin/xcl-plugin-x") // an external plugin binary
-r.DiscoverPlugins([]string{"~/.xcl/plugins"}, "")    // directories to search
+c, err := xcl.NewConfig(xcl.WithRegistry(local))
 ```
 
+A directory is searched for executables named `xcl-plugin-*`; give another
+pattern when the registry is created, `registry.NewLocal(registry.PluginPattern("acme-plugin-*"))`.
+A directory that does not exist provides no plugins. `WithRegistry` may be
+given more than once: registries load in the order they were given, and each
+registry's plugins in the order they were registered. The `registry` package
+also defines the `Registry` and `Plugin` interfaces, with `registry.InProcess`
+and `registry.Executable` to start a plugin, for writing a registry of your
+own.
+
 Plugins load when they are first needed, at the start of the first
-`Validate`, `Apply`, `Destroy` or `Load`, and only once per registry however
-many Configs share it. Discovery, loading and the rejection of a discovered binary
-that is not a plugin are reported as `discover` and `load` events. A
-registered plugin that fails to load, such as a path that does not exist,
-fails that first operation with an error matching `xcl.ErrPluginLoad`, whose
-`*xcl.PluginLoadError` detail names the plugin. A plugin type whose name
-clashes with a known type fails it with a `*registry.TypeNameClashError`.
+`Validate`, `Apply`, `Destroy`, `Diff` or `Load`, and only once per `Config`.
+Directory searches and loading are reported as `discover` and `load` events;
+a `load` event's `Meta` names the `plugin`, its `registry` and, on success,
+the `block_types` it provides, and a `discover` event's names the `dirs`
+searched, the `registry` and, on success, the `count` found. Any plugin that
+fails to load, a path that does not exist or a discovered binary that is not
+a plugin alike, fails that first operation with a `*xcl.PluginLoadError`
+naming the `Plugin` and its `Registry`, which matches `xcl.ErrPluginLoad`.
+
+A block type provided twice anywhere, by two plugins in one registry, by
+plugins in two registries, or by a plugin and a declared type or a builtin,
+fails the load with a `*xcl.TypeNameClashError`. There is no precedence: the
+error names the `Name`, the `Provider` and its `Registry`, and what already
+provides it, `Existing` and `ExistingRegistry`, whatever order they were
+registered in.
 
 An external plugin's process runs only while an operation is using it: xcl
 starts it for each `Validate`, `Apply`, `Destroy` or `Load` and stops it when
@@ -508,7 +613,9 @@ which is adequate at one configuration's scale; see `docs/state.md`.
 
 ### State and Destroy
 
-Keep state between runs with a `StateStore`. `Apply` loads the saved state,
+Keep state between runs with a `StateStore`. Without `WithStatePath` or
+`WithStateStore` nothing is persisted, which is the supported mode for
+configuration-only use. `Apply` loads the saved state,
 applies the configuration and saves the result. `Destroy` needs no
 configuration: it destroys everything in the saved state, dependents before
 what they depend on. `Load` reads the saved state back without changing
@@ -516,7 +623,7 @@ anything.
 
 ```go
 c, err := xcl.NewConfig(
-	xcl.WithPluginRegistry(r),
+	xcl.WithRegistry(local),
 	// keeps state in ./.xcl/state.json, creating the directory and file if needed
 	xcl.WithStatePath("./.xcl"),
 )
@@ -548,11 +655,10 @@ before anything is created or changed. Applying a configuration with no
 blocks fails with `xcl.ErrEmptyConfiguration` and changes nothing, use
 `Destroy` to remove everything.
 
-Register every type and plugin before the first operation: saved resources
-of a type the registry does not know fail the load with
+Declare every type and register every plugin when the `Config` is created:
+saved resources of a type the `Config` does not know fail the load with
 `state.UnknownTypesError` rather than being dropped. Config loads the plugins
-before it loads state; code that loads a state store directly should call the
-registry's `Load` first.
+before it loads state.
 
 ### Events and logging
 
@@ -568,7 +674,7 @@ by the slog handler's level:
 
 ```go
 c, err := xcl.NewConfig(
-	xcl.WithPluginRegistry(r),
+	xcl.WithRegistry(local),
 	xcl.WithEventHandler(events.SlogHandler(slog.Default())),
 )
 ```
@@ -694,13 +800,19 @@ resource "postgres" "main" {
 ```
 
 `EncodeSavedEntity` does the same from an entity's saved data, in the form
-state stores it and events carry it at `EventDataProcessed`. It needs the
-registry, which is what types the record, and loads its plugins if they are not
-loaded already:
+state stores it and events carry it at `EventDataProcessed`. It is a method on
+the `Config`, whose declared types and plugins are what type the record, and
+loads its plugins if they are not loaded already:
 
 ```go
-text, err := xcl.EncodeSavedEntity(registry, event.Data)
+text, err := c.EncodeSavedEntity(event.Data)
 ```
+
+Inside an event handler, `event.Entity()` returns the event's `Data` as the
+registered Go type, with every sensitive value masked, and `nil, nil` when the
+event carries no data. The shipped receiver in
+[`example/prettylog`](./example/prettylog) uses it to write each resource as
+configuration text, and is set up with `prettylog.Handler(os.Stderr, level)`.
 
 Both write exactly one block, so convert several entities by calling once for
 each.
@@ -759,7 +871,7 @@ resource "app" "web" {
 ```
 
 It works the same from saved data,
-`xcl.EncodeSavedEntity(registry, record, xcl.ShowReferences())`, and the two
+`c.EncodeSavedEntity(record, xcl.ShowReferences())`, and the two
 give byte-identical text, since the references are kept in each entity's saved
 record. It combines with `IncludeComputed`. A sensitive field shows its
 reference only when it was written as a single bare reference, such as
@@ -779,7 +891,7 @@ real value.
 
 | Error | Means |
 |---|---|
-| `ErrUnregisteredType` | the saved data names a type the registry does not know. `UnregisteredTypeError` names it |
+| `ErrUnregisteredType` | the saved data names a type the `Config` does not know. `UnregisteredTypeError` names it |
 | `ErrInvalidSavedData` | the data is not one saved entity record |
 | `ErrNotEncodable` | the value is not an entity, or it is a `variable`, `output` or `module`, which are never written as configuration |
 

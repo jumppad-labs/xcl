@@ -64,7 +64,7 @@ const (
 )
 
 func TestEncodeEntityShowsReferencesWhenAsked(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
@@ -86,7 +86,7 @@ func TestEncodeEntityShowsReferencesWhenAsked(t *testing.T) {
 }
 
 func TestEncodeEntityShowsTemplateAsWritten(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
 
 	database := encodeEntityByID(t, c, encodeReferencesTemplatedDatabaseID)
 
@@ -104,7 +104,7 @@ func TestEncodeEntityShowsTemplateAsWritten(t *testing.T) {
 }
 
 func TestEncodeEntityShowsNestedBlockReferencesAsWritten(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -129,7 +129,7 @@ func TestEncodeEntityShowsNestedBlockReferencesAsWritten(t *testing.T) {
 }
 
 func TestEncodeEntityShowsResolvedValuesByDefault(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
@@ -152,7 +152,7 @@ func TestEncodeEntityShowsResolvedValuesByDefault(t *testing.T) {
 }
 
 func TestEncodeEntityShowsResolvedNestedBlockValuesByDefault(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -166,7 +166,7 @@ func TestEncodeEntityShowsResolvedNestedBlockValuesByDefault(t *testing.T) {
 }
 
 func TestEncodeSavedEntityMatchesEncodeEntityWithReferences(t *testing.T) {
-	c, reg, statePath := applyEncodeFixture(t)
+	c, statePath := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -175,7 +175,7 @@ func TestEncodeSavedEntityMatchesEncodeEntityWithReferences(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, statePath, encodeContainerID)
 
-	fromSaved, err := EncodeSavedEntity(reg, record, ShowReferences())
+	fromSaved, err := c.EncodeSavedEntity(record, ShowReferences())
 	require.NoError(t, err)
 
 	require.Equal(t, fromEntity, fromSaved)
@@ -183,7 +183,7 @@ func TestEncodeSavedEntityMatchesEncodeEntityWithReferences(t *testing.T) {
 }
 
 func TestEncodeSavedEntityMatchesEncodeEntityWithoutReferences(t *testing.T) {
-	c, reg, statePath := applyEncodeFixture(t)
+	c, statePath := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -192,7 +192,7 @@ func TestEncodeSavedEntityMatchesEncodeEntityWithoutReferences(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, statePath, encodeContainerID)
 
-	fromSaved, err := EncodeSavedEntity(reg, record)
+	fromSaved, err := c.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.Equal(t, fromEntity, fromSaved)
@@ -200,7 +200,7 @@ func TestEncodeSavedEntityMatchesEncodeEntityWithoutReferences(t *testing.T) {
 }
 
 func TestEncodeEntityShowsReferencesWithComputed(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
 
 	network := encodeEntityByID(t, c, encodeReferencesNetworkID)
 
@@ -217,7 +217,7 @@ func TestEncodeEntityShowsReferencesWithComputed(t *testing.T) {
 }
 
 func TestEncodeEntityWithReferencesIsDeterministic(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -233,7 +233,7 @@ func TestEncodeEntityWithReferencesIsDeterministic(t *testing.T) {
 }
 
 func TestEncodeEntityWithReferencesIsFormatterStable(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -244,7 +244,7 @@ func TestEncodeEntityWithReferencesIsFormatterStable(t *testing.T) {
 }
 
 func TestEncodeEntityWithTemplateReferenceIsFormatterStable(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
 
 	database := encodeEntityByID(t, c, encodeReferencesTemplatedDatabaseID)
 
@@ -255,7 +255,7 @@ func TestEncodeEntityWithTemplateReferenceIsFormatterStable(t *testing.T) {
 }
 
 func TestEncodeEntityKeepsTrimmedDisabledWithReferences(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
 
 	network := encodeEntityByID(t, c, encodeReferencesNetworkID)
 
@@ -278,7 +278,7 @@ func TestEncodeEntityKeepsTrimmedDisabledWithReferences(t *testing.T) {
 }
 
 func TestEncodeEntityShowsBareReferenceForSensitiveField(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
 
 	secret := encodeEntityByID(t, c, encodeReferencesBareSecretID)
 
@@ -297,7 +297,7 @@ func TestEncodeEntityShowsBareReferenceForSensitiveField(t *testing.T) {
 }
 
 func TestEncodeEntityKeepsMarkerForSensitiveTemplate(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
 
 	secret := encodeEntityByID(t, c, encodeReferencesTemplatedSecretID)
 
@@ -316,11 +316,11 @@ func TestEncodeEntityKeepsMarkerForSensitiveTemplate(t *testing.T) {
 }
 
 func TestEncodeSavedEntityKeepsMarkerForSensitiveTemplate(t *testing.T) {
-	_, reg, statePath := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
+	c, statePath := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
 
 	record := encodeSavedRecordByID(t, statePath, encodeReferencesTemplatedSecretID)
 
-	out, err := EncodeSavedEntity(reg, record, ShowReferences())
+	out, err := c.EncodeSavedEntity(record, ShowReferences())
 	require.NoError(t, err)
 
 	require.Regexp(t, `password\s+= "\(sensitive\)"`, string(out))
@@ -329,7 +329,7 @@ func TestEncodeSavedEntityKeepsMarkerForSensitiveTemplate(t *testing.T) {
 }
 
 func TestEncodeEntityShowsSensitiveTemplateWhenRevealed(t *testing.T) {
-	c, _, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
+	c, _ := applyEncodeSensitiveConfig(t, encodeReferencesConfig)
 
 	secret := encodeEntityByID(t, c, encodeReferencesTemplatedSecretID)
 

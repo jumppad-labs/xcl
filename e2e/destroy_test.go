@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 )
 
@@ -17,7 +16,7 @@ func TestDestroyLeavesSavedStateEmpty(t *testing.T) {
 	t.Setenv("DB_PASSWORD", testPassword)
 
 	stateDir := t.TempDir()
-	c := newKubeConfig(t, registry.NewPluginRegistry(), nil, stateDir, testStateKey)
+	c := newKubeConfig(t, nil, stateDir, testStateKey)
 
 	require.NoError(t, c.Apply(kubeConfigDir))
 	require.NoError(t, c.Destroy())

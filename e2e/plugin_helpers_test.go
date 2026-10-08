@@ -10,7 +10,6 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -45,7 +44,7 @@ var pluginDeclaredIDs = []string{
 func applyPlugin(t *testing.T, handler xcl.EventHandler) *xcl.Config {
 	t.Helper()
 
-	c := newPluginConfig(t, registry.NewPluginRegistry(), handler, t.TempDir(), testStateKey)
+	c := newPluginConfig(t, handler, t.TempDir(), testStateKey)
 	require.NoError(t, c.Apply(pluginConfigDir))
 
 	return c

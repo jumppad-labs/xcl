@@ -176,7 +176,7 @@ func destroyRecordingSaves(t *testing.T, h *lifecycleHarness) [][]byte {
 	recording := &recordingStore{store: h.store}
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = recording
 
 	p := NewParser(options)
@@ -411,7 +411,7 @@ func TestDestroyNeverCallsProviderForBuiltinAndRegisteredBlocks(t *testing.T) {
 	collector := &eventCollector{}
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 	options.Emit = collector.collect
 	// no expectations, any provider lookup fails the test
@@ -452,7 +452,7 @@ func TestDestroyNeverCallsProviderForDisabledRegisteredBlock(t *testing.T) {
 	collector := &eventCollector{}
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 	options.Emit = collector.collect
 	// no expectations, any provider lookup fails the test

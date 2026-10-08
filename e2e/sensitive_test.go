@@ -14,7 +14,6 @@ import (
 	"github.com/jumppad-labs/xcl/e2e/fixtures/kube"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 )
 
@@ -42,7 +41,7 @@ func sensitiveApplyAndDestroy(t *testing.T, stateKey []byte) []xcl.Event {
 	t.Helper()
 
 	recorder := &testutil.EventRecorder{}
-	c := newKubeConfig(t, registry.NewPluginRegistry(), recorder.Record, t.TempDir(), stateKey)
+	c := newKubeConfig(t, recorder.Record, t.TempDir(), stateKey)
 
 	require.NoError(t, c.Apply(kubeConfigDir))
 	require.NoError(t, c.Destroy())
@@ -57,9 +56,8 @@ func sensitiveApplyAndDestroy(t *testing.T, stateKey []byte) []xcl.Event {
 func TestSavedEntityEncodesAsAppliedEntity(t *testing.T) {
 	t.Setenv("DB_PASSWORD", testPassword)
 
-	r := registry.NewPluginRegistry()
 	stateDir := t.TempDir()
-	c := newKubeConfig(t, r, nil, stateDir, testStateKey)
+	c := newKubeConfig(t, nil, stateDir, testStateKey)
 
 	require.NoError(t, c.Apply(kubeConfigDir))
 
@@ -69,7 +67,7 @@ func TestSavedEntityEncodesAsAppliedEntity(t *testing.T) {
 	compared := 0
 
 	for _, record := range records {
-		fromState, err := xcl.EncodeSavedEntity(r, record)
+		fromState, err := c.EncodeSavedEntity(record)
 		if errors.Is(err, xcl.ErrNotEncodable) {
 			continue
 		}
@@ -130,7 +128,7 @@ func TestPlainStateWarningWithoutKey(t *testing.T) {
 func TestEnvFunctionReadsSensitiveValue(t *testing.T) {
 	t.Setenv("DB_PASSWORD", testPassword)
 
-	c := newKubeConfig(t, registry.NewPluginRegistry(), nil, t.TempDir(), testStateKey)
+	c := newKubeConfig(t, nil, t.TempDir(), testStateKey)
 	require.NoError(t, c.Apply(kubeConfigDir))
 
 	entity, err := testutil.EntityByID(c.Entities(), "secret.db")
@@ -148,7 +146,7 @@ func TestEnvFunctionReadsSensitiveValue(t *testing.T) {
 func TestNestedBlockReferencesSecretByNameAndKey(t *testing.T) {
 	t.Setenv("DB_PASSWORD", testPassword)
 
-	c := newKubeConfig(t, registry.NewPluginRegistry(), nil, t.TempDir(), testStateKey)
+	c := newKubeConfig(t, nil, t.TempDir(), testStateKey)
 	require.NoError(t, c.Apply(kubeConfigDir))
 
 	entity, err := testutil.EntityByID(c.Entities(), "deployment.api")
@@ -173,7 +171,7 @@ func TestStateHoldsNoSecretWithKey(t *testing.T) {
 	t.Setenv("DB_PASSWORD", testPassword)
 
 	stateDir := t.TempDir()
-	c := newKubeConfig(t, registry.NewPluginRegistry(), nil, stateDir, testStateKey)
+	c := newKubeConfig(t, nil, stateDir, testStateKey)
 	require.NoError(t, c.Apply(kubeConfigDir))
 
 	records := sensitiveSavedRecords(t, stateDir)
@@ -216,7 +214,7 @@ func TestStandardStreamsHoldNoSecret(t *testing.T) {
 	t.Setenv("DB_PASSWORD", testPassword)
 
 	recorder := &testutil.EventRecorder{}
-	c := newKubeConfig(t, registry.NewPluginRegistry(), recorder.Record, t.TempDir(), testStateKey)
+	c := newKubeConfig(t, recorder.Record, t.TempDir(), testStateKey)
 
 	var applyErr, destroyErr error
 	captured := testutil.CaptureStandardStreams(t, func() {

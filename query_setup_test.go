@@ -7,7 +7,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	statemocks "github.com/jumppad-labs/xcl/state/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -27,21 +27,19 @@ func setupQueryConfig(t *testing.T) *Config {
 		os.Setenv("HOME", home)
 	})
 
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 
-	err := pr.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
-
-	err = pr.RegisterPlugin(&parser.TestPlugin{})
-	require.NoError(t, err)
+	local.RegisterPlugin(&parser.TestPlugin{})
 
 	ss := &statemocks.MockStateStore{}
 	ss.On("Exists").Return(false)
 	ss.On("Load").Return(nil, nil)
 	ss.On("Save", mock.Anything).Return(nil)
 
+	local.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+
 	c, err := NewConfig(
-		WithPluginRegistry(pr),
+		WithRegistry(local),
 		WithStateStore(ss),
 	)
 	require.NoError(t, err)

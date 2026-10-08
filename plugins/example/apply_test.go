@@ -8,12 +8,13 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -45,16 +46,16 @@ func (c *applyEventCollector) successfulResources(operation string) []string {
 }
 
 // applyPeople applies the people config with a fresh parser that shares the
-// registry and state store, saves the returned state and returns the events
+// catalog and state store, saves the returned state and returns the events
 // the apply fired
-func applyPeople(t *testing.T, reg *registry.PluginRegistry, store *state.FileStateStore) ([]any, *applyEventCollector) {
+func applyPeople(t *testing.T, cat *catalog.Catalog, store *state.FileStateStore) ([]any, *applyEventCollector) {
 	t.Helper()
 
 	collector := &applyEventCollector{}
 
 	options := parser.DefaultOptions()
 	options.ModuleCache = filepath.Join(t.TempDir(), parser.ConfigDirectory, "cache")
-	options.PluginRegistry = reg
+	options.Catalog = cat
 	options.StateStore = store
 	options.Emit = collector.Record
 
@@ -107,19 +108,17 @@ func TestExampleProviderSecondApplyMakesNoCreateOrUpdate(t *testing.T) {
 		os.Setenv("HOME", home)
 	})
 
-	reg := registry.NewPluginRegistry()
-	err := reg.RegisterPlugin(&PersonPlugin{})
-	require.NoError(t, err)
+	cat := newPersonCatalog()
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	// apply 1: both people are created and given a person id
-	_, first := applyPeople(t, reg, store)
+	_, first := applyPeople(t, cat, store)
 	require.ElementsMatch(t, []string{testPersonID, otherPersonID}, first.successfulResources("create"))
 
 	// apply 2: nothing changed, so both people are only read
-	st, second := applyPeople(t, reg, store)
+	st, second := applyPeople(t, cat, store)
 
 	require.Empty(t, second.successfulResources("create"))
 	require.Empty(t, second.successfulResources("update"))
@@ -132,9 +131,21 @@ func TestExampleProviderSecondApplyMakesNoCreateOrUpdate(t *testing.T) {
 	loaded, err := store.Load()
 	require.NoError(t, err)
 
-	// the store hands back raw records, typing them needs the registry
-	saved, err := savedentity.DecodeAll(reg, loaded, savedentity.ReadOptions{})
+	// the store hands back raw records, typing them needs the catalog
+	saved, err := savedentity.DecodeAll(cat, loaded, savedentity.ReadOptions{})
 	require.NoError(t, err)
 	require.Equal(t, "person-test-user", findPerson(t, saved, testPersonID).PersonID)
 	require.Equal(t, "person-other-person", findPerson(t, saved, otherPersonID).PersonID)
+}
+
+// newPersonCatalog returns a catalog whose local registry holds the person
+// plugin, compiled in
+func newPersonCatalog() *catalog.Catalog {
+	local := registry.NewLocal()
+	local.RegisterPlugin(&PersonPlugin{})
+
+	cat := catalog.New()
+	cat.AddRegistry(local)
+
+	return cat
 }

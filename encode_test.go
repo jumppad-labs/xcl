@@ -13,7 +13,7 @@ import (
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclwrite"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -31,10 +31,9 @@ const (
 )
 
 // applyEncodeFixture applies the encode fixture with a file state store and
-// returns the applied configuration, the registry it was applied with and the
-// path the state was written to, so a test can reach both a live entity and
-// the saved record for the same thing
-func applyEncodeFixture(t *testing.T) (*Config, *registry.PluginRegistry, string) {
+// returns the applied configuration and the path the state was written to, so
+// a test can reach both a live entity and the saved record for the same thing
+func applyEncodeFixture(t *testing.T) (*Config, string) {
 	t.Helper()
 
 	home := os.Getenv("HOME")
@@ -44,17 +43,14 @@ func applyEncodeFixture(t *testing.T) (*Config, *registry.PluginRegistry, string
 		os.Setenv("HOME", home)
 	})
 
-	pr := encodeRegistry(t)
-
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	statePath := store.Path()
 
-	c, err := NewConfig(
-		WithPluginRegistry(pr),
-		WithStateStore(store),
-	)
+	options := append(encodeFixtureOptions(), WithStateStore(store))
+
+	c, err := NewConfig(options...)
 	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/encode/main.xcl")
@@ -63,28 +59,22 @@ func applyEncodeFixture(t *testing.T) (*Config, *registry.PluginRegistry, string
 	err = c.Apply(path)
 	require.NoError(t, err)
 
-	return c, pr, statePath
+	return c, statePath
 }
 
-// encodeRegistry returns a registry holding every type the encode fixture
-// declares: a type registered under resource, one registered without a
-// subtype and the plugin
-// that provides the network and container types
-func encodeRegistry(t *testing.T) *registry.PluginRegistry {
-	t.Helper()
+// encodeFixtureOptions returns the options declaring every type the encode
+// fixture uses, on one local registry: a type declared under resource, one
+// declared without a subtype and the plugin that provides the network and
+// container types. Each call returns a new registry and plugin.
+func encodeFixtureOptions() []ConfigOption {
+	local := registry.NewLocal()
+	local.RegisterPlugin(&parser.TestPlugin{})
+	local.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
+	local.RegisterType(&registered.Cache{}, registered.TypeCache)
 
-	pr := registry.NewPluginRegistry()
-
-	err := pr.RegisterType(&registered.Database{}, "resource", registered.TypeDatabase)
-	require.NoError(t, err)
-
-	err = pr.RegisterType(&registered.Cache{}, registered.TypeCache)
-	require.NoError(t, err)
-
-	err = pr.RegisterPlugin(&parser.TestPlugin{})
-	require.NoError(t, err)
-
-	return pr
+	return []ConfigOption{
+		WithRegistry(local),
+	}
 }
 
 // encodeEntityByID returns the applied entity the configuration holds under id
@@ -131,7 +121,7 @@ func encodeSavedRecordByID(t *testing.T, statePath, id string) json.RawMessage {
 }
 
 func TestEncodeEntityWritesResourceHeaderAndValues(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
@@ -149,7 +139,7 @@ func TestEncodeEntityWritesResourceHeaderAndValues(t *testing.T) {
 }
 
 func TestEncodeSavedEntityMatchesEncodeEntity(t *testing.T) {
-	c, reg, statePath := applyEncodeFixture(t)
+	c, statePath := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
@@ -158,14 +148,14 @@ func TestEncodeSavedEntityMatchesEncodeEntity(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, statePath, encodeDatabaseID)
 
-	fromSaved, err := EncodeSavedEntity(reg, record)
+	fromSaved, err := c.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.Equal(t, fromEntity, fromSaved)
 }
 
 func TestEncodeEntityUsesConfigurationNames(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -179,7 +169,7 @@ func TestEncodeEntityUsesConfigurationNames(t *testing.T) {
 }
 
 func TestEncodeEntityWritesRepeatedBlocks(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -194,7 +184,7 @@ func TestEncodeEntityWritesRepeatedBlocks(t *testing.T) {
 }
 
 func TestEncodeEntityWritesBareHeader(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	cache := encodeEntityByID(t, c, encodeCacheID)
 
@@ -211,7 +201,7 @@ func TestEncodeEntityWritesBareHeader(t *testing.T) {
 }
 
 func TestEncodeEntityOmitsComputedByDefault(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	network := encodeEntityByID(t, c, encodeNetworkID)
 
@@ -228,7 +218,7 @@ func TestEncodeEntityOmitsComputedByDefault(t *testing.T) {
 }
 
 func TestEncodeEntityIncludesComputedWhenAsked(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	network := encodeEntityByID(t, c, encodeNetworkID)
 
@@ -239,7 +229,7 @@ func TestEncodeEntityIncludesComputedWhenAsked(t *testing.T) {
 }
 
 func TestEncodeEntityWritesWrittenDependsOn(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	api := encodeEntityByID(t, c, encodeDependentContainerID)
 
@@ -257,7 +247,7 @@ func TestEncodeEntityWritesWrittenDependsOn(t *testing.T) {
 }
 
 func TestEncodeEntityOmitsDependsOnWhenNoneWritten(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -273,7 +263,7 @@ func TestEncodeEntityOmitsDependsOnWhenNoneWritten(t *testing.T) {
 }
 
 func TestEncodeSavedEntityMatchesLiveWithDependsOn(t *testing.T) {
-	c, reg, statePath := applyEncodeFixture(t)
+	c, statePath := applyEncodeFixture(t)
 
 	api := encodeEntityByID(t, c, encodeDependentContainerID)
 
@@ -282,7 +272,7 @@ func TestEncodeSavedEntityMatchesLiveWithDependsOn(t *testing.T) {
 
 	record := encodeSavedRecordByID(t, statePath, encodeDependentContainerID)
 
-	fromSaved, err := EncodeSavedEntity(reg, record)
+	fromSaved, err := c.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.Equal(t, string(fromEntity), string(fromSaved))
@@ -306,7 +296,7 @@ func encodeLineContaining(t *testing.T, text, part string) string {
 }
 
 func TestEncodeEntityOmitsBookkeepingInsideObjectAttribute(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -328,7 +318,7 @@ func TestEncodeEntityOmitsBookkeepingInsideObjectAttribute(t *testing.T) {
 }
 
 func TestEncodeEntityMarksComputedValuesWithAComment(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	network := encodeEntityByID(t, c, encodeNetworkID)
 
@@ -344,7 +334,7 @@ func TestEncodeEntityMarksComputedValuesWithAComment(t *testing.T) {
 }
 
 func TestEncodeEntityWritesNoCommentsByDefault(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	network := encodeEntityByID(t, c, encodeNetworkID)
 
@@ -355,7 +345,7 @@ func TestEncodeEntityWritesNoCommentsByDefault(t *testing.T) {
 }
 
 func TestEncodeEntityIsDeterministic(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -369,7 +359,7 @@ func TestEncodeEntityIsDeterministic(t *testing.T) {
 }
 
 func TestEncodeEntityIsFormatterStable(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -380,7 +370,7 @@ func TestEncodeEntityIsFormatterStable(t *testing.T) {
 }
 
 func TestEncodeEntityConvertsInProcessPluginType(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -391,7 +381,7 @@ func TestEncodeEntityConvertsInProcessPluginType(t *testing.T) {
 }
 
 func TestEncodeEntityConvertsKeywordRegisteredType(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
@@ -402,7 +392,7 @@ func TestEncodeEntityConvertsKeywordRegisteredType(t *testing.T) {
 }
 
 func TestEncodeEntityConvertsBareRegisteredType(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	cache := encodeEntityByID(t, c, encodeCacheID)
 
@@ -413,11 +403,11 @@ func TestEncodeEntityConvertsBareRegisteredType(t *testing.T) {
 }
 
 func TestEncodeSavedEntityFailsForUnregisteredType(t *testing.T) {
-	_, reg, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	record := []byte(`{"meta":{"id":"resource.unknown.thing","type":"resource","subtype":"unknown","name":"thing"}}`)
 
-	out, err := EncodeSavedEntity(reg, record)
+	out, err := c.EncodeSavedEntity(record)
 
 	require.Nil(t, out)
 	require.Error(t, err)
@@ -429,9 +419,9 @@ func TestEncodeSavedEntityFailsForUnregisteredType(t *testing.T) {
 }
 
 func TestEncodeSavedEntityFailsForInvalidData(t *testing.T) {
-	_, reg, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
-	out, err := EncodeSavedEntity(reg, []byte("this is not a saved entity record"))
+	out, err := c.EncodeSavedEntity([]byte("this is not a saved entity record"))
 
 	require.Nil(t, out)
 	require.Error(t, err)
@@ -439,7 +429,7 @@ func TestEncodeSavedEntityFailsForInvalidData(t *testing.T) {
 }
 
 func TestEncodeEntityRefusesBuiltin(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	variable := encodeEntityByID(t, c, encodeVariableID)
 
@@ -452,7 +442,7 @@ func TestEncodeEntityRefusesBuiltin(t *testing.T) {
 }
 
 func TestEncodeEntityWritesOneBlockPerCall(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 	cache := encodeEntityByID(t, c, encodeCacheID)
@@ -485,23 +475,24 @@ func encodeTopLevelBlockCount(t *testing.T, text []byte) int {
 	return len(body.Blocks)
 }
 
-func TestEncodeSavedEntityLoadsUnloadedRegistry(t *testing.T) {
-	_, _, statePath := applyEncodeFixture(t)
+func TestConfigEncodeSavedEntityLoadsPluginsFirst(t *testing.T) {
+	_, statePath := applyEncodeFixture(t)
 
 	record := encodeSavedRecordByID(t, statePath, encodeContainerID)
 
-	// a registry no configuration has ever used, so the plugin's types resolve
-	// only because EncodeSavedEntity loads it itself
-	fresh := encodeRegistry(t)
+	// a configuration that has never run an operation, so the plugin's types
+	// resolve only because EncodeSavedEntity loads the plugins itself
+	fresh, err := NewConfig(encodeFixtureOptions()...)
+	require.NoError(t, err)
 
-	out, err := EncodeSavedEntity(fresh, record)
+	out, err := fresh.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.True(t, strings.HasPrefix(string(out), "resource \"container\" \"web\" {"), "expected the container header, got:\n%s", string(out))
 }
 
 func TestEncodeEntityOmitsOptionalZeroAttributes(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -513,7 +504,7 @@ func TestEncodeEntityOmitsOptionalZeroAttributes(t *testing.T) {
 }
 
 func TestEncodeEntityIncludeEmptyWritesOptionalZeroAttributes(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 

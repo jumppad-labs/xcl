@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 )
 
 // TestKubeLifecycleWithoutEventHandlerWritesNothingToStandardStreams asserts
@@ -15,7 +14,7 @@ import (
 func TestKubeLifecycleWithoutEventHandlerWritesNothingToStandardStreams(t *testing.T) {
 	t.Setenv("DB_PASSWORD", testPassword)
 
-	c := newKubeConfig(t, registry.NewPluginRegistry(), nil, t.TempDir(), testStateKey)
+	c := newKubeConfig(t, nil, t.TempDir(), testStateKey)
 
 	var applyErr, decodeErr, destroyErr error
 	captured := testutil.CaptureStandardStreams(t, func() {

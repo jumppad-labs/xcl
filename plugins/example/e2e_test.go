@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	plugintesting "github.com/jumppad-labs/xcl/plugins/testing"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -73,6 +74,22 @@ func (r *eventRecorder) loadEvents() []events.Event {
 	}
 
 	return found
+}
+
+// loadThroughConfig loads the plugins of r through a Config whose events go
+// to recorder
+func loadThroughConfig(t *testing.T, r registry.Registry, recorder *eventRecorder) {
+	t.Helper()
+
+	c, err := xcl.NewConfig(
+		xcl.WithRegistry(r),
+		xcl.WithStatePath(t.TempDir()),
+		xcl.WithEventHandler(recorder.Record),
+	)
+	require.NoError(t, err)
+
+	err = c.Load()
+	require.NoError(t, err)
 }
 
 // createContext returns a context carrying the logger xcl binds for the
@@ -589,18 +606,15 @@ func TestInProcessPluginHostEmitsNoLoadEvent(t *testing.T) {
 // plugin and its block types
 func TestInProcessPluginLoadedByARegistryEmitsALoadEvent(t *testing.T) {
 	recorder := &eventRecorder{}
-	r := registry.NewPluginRegistry()
+	local := registry.NewLocal()
+	local.RegisterPlugin(&PersonPlugin{})
 
-	err := r.RegisterPlugin(&PersonPlugin{})
-	require.NoError(t, err)
-
-	err = r.Load(recorder.Record)
-	require.NoError(t, err)
+	loadThroughConfig(t, local, recorder)
 
 	loaded := recorder.loadEvents()
 	require.Len(t, loaded, 1)
 	require.Equal(t, events.SourceCore, loaded[0].Source)
-	require.Equal(t, map[string]any{"plugin": "PersonPlugin", "block_types": "person"}, loaded[0].Meta)
+	require.Equal(t, map[string]any{"plugin": "PersonPlugin", "registry": "local", "block_types": "person"}, loaded[0].Meta)
 }
 
 // TestInProcessPluginLogsNoCallingProviderMessage tests that xcl no longer
@@ -762,23 +776,15 @@ func TestExternalPluginLoadedByARegistryEmitsALoadEvent(t *testing.T) {
 	require.NoError(t, buildCmd, "Plugin should build successfully")
 
 	recorder := &eventRecorder{}
-	r := registry.NewPluginRegistry()
-	t.Cleanup(func() {
-		for _, host := range r.GetPluginHosts() {
-			host.Stop()
-		}
-	})
+	local := registry.NewLocal()
+	local.RegisterExternalPlugin("./build/example")
 
-	err := r.RegisterPluginWithPath("./build/example")
-	require.NoError(t, err)
-
-	err = r.Load(recorder.Record)
-	require.NoError(t, err)
+	loadThroughConfig(t, local, recorder)
 
 	loaded := recorder.loadEvents()
 	require.Len(t, loaded, 1)
 	require.Equal(t, events.SourceCore, loaded[0].Source)
-	require.Equal(t, map[string]any{"plugin": "example", "block_types": "person"}, loaded[0].Meta)
+	require.Equal(t, map[string]any{"plugin": "example", "registry": "local", "block_types": "person"}, loaded[0].Meta)
 }
 
 // TestExternalPluginLogsNoCallingProviderMessage tests that xcl no longer

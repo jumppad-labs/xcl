@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,11 +64,11 @@ func TestReExportedNotEncodableErrorIsRecoverableThroughAWrap(t *testing.T) {
 // produced by an apply.
 
 func TestUnregisteredTypeRaisedByTheLibraryMatchesTheRootPackageSentinel(t *testing.T) {
-	reg := registry.NewPluginRegistry()
+	builtins := catalog.New()
 
 	record := []byte(`{"meta":{"id":"resource.widget.main","name":"main","type":"resource","subtype":"widget"}}`)
 
-	_, err := savedentity.Decode(reg, record, savedentity.ReadOptions{})
+	_, err := savedentity.Decode(builtins, record, savedentity.ReadOptions{})
 	require.Error(t, err)
 
 	require.ErrorIs(t, err, ErrUnregisteredType)
@@ -79,11 +79,11 @@ func TestUnregisteredTypeRaisedByTheLibraryMatchesTheRootPackageSentinel(t *test
 }
 
 func TestInvalidSavedDataRaisedByTheLibraryMatchesTheRootPackageSentinel(t *testing.T) {
-	reg := registry.NewPluginRegistry()
+	builtins := catalog.New()
 
 	record := []byte("this is not json")
 
-	_, err := savedentity.Decode(reg, record, savedentity.ReadOptions{})
+	_, err := savedentity.Decode(builtins, record, savedentity.ReadOptions{})
 	require.Error(t, err)
 
 	require.ErrorIs(t, err, ErrInvalidSavedData)

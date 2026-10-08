@@ -483,7 +483,7 @@ func savedReferences(t *testing.T, record json.RawMessage) map[string]string {
 }
 
 func TestApplySavesReferencesInState(t *testing.T) {
-	c, _, statePath := applyEncodeFixture(t)
+	c, statePath := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 	databaseMeta, err := types.GetMeta(database)
@@ -543,7 +543,7 @@ func stripSavedReferences(t *testing.T, statePath string) {
 // removed from it, the one change that turns it into state saved before
 // references were recorded
 func TestStateWithoutReferencesStillLoads(t *testing.T) {
-	_, reg, statePath := applyEncodeFixture(t)
+	c, statePath := applyEncodeFixture(t)
 
 	stripSavedReferences(t, statePath)
 
@@ -557,7 +557,7 @@ func TestStateWithoutReferencesStillLoads(t *testing.T) {
 	records, err := store.Load()
 	require.NoError(t, err)
 
-	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
+	loaded, err := savedentity.DecodeAll(c.catalog, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	var database *registered.Database
@@ -574,19 +574,20 @@ func TestStateWithoutReferencesStillLoads(t *testing.T) {
 
 	// the saved record still converts to configuration text showing the
 	// resolved value
-	text, err := EncodeSavedEntity(reg, record)
+	text, err := c.EncodeSavedEntity(record)
 	require.NoError(t, err)
 	require.Regexp(t, `location\s+= "us-east"`, string(text))
 
 	// asking for references still works, the record has none to show so the
 	// resolved value is written
-	withReferences, err := EncodeSavedEntity(reg, record, ShowReferences())
+	withReferences, err := c.EncodeSavedEntity(record, ShowReferences())
 	require.NoError(t, err)
 	require.Regexp(t, `location\s+= "us-east"`, string(withReferences))
 	require.NotContains(t, string(withReferences), "variable.region")
 
 	// a later run reads the stripped state back and applies over it
-	second, err := NewConfig(WithPluginRegistry(reg), WithStateStore(store))
+	options := append(encodeFixtureOptions(), WithStateStore(store))
+	second, err := NewConfig(options...)
 	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/encode/main.xcl")

@@ -15,15 +15,26 @@ import (
 // public package can re-export it alongside the other shared errors.
 var ErrPluginLoad = errors.New("plugin failed to load")
 
-// PluginLoadError reports the plugin that failed to load and why. Plugin is
-// the plugin's name for an in-process plugin, or its path for an external one.
+// PluginLoadError reports the plugin that failed to load, the registry it
+// came from, and why. Plugin is the plugin's name, the Go type name of an
+// in-process plugin or the file name of a plugin binary. Plugin is empty when
+// the registry itself failed to provide its plugins, i.e. when a plugin
+// directory could not be read.
 type PluginLoadError struct {
-	Plugin string
-	Err    error
+	Plugin   string
+	Registry string
+	Err      error
 }
 
 func (e *PluginLoadError) Error() string {
-	return fmt.Sprintf("plugin %s failed to load: %s", e.Plugin, e.Err)
+	switch {
+	case e.Plugin == "":
+		return fmt.Sprintf("registry %s failed to load its plugins: %s", e.Registry, e.Err)
+	case e.Registry == "":
+		return fmt.Sprintf("plugin %s failed to load: %s", e.Plugin, e.Err)
+	default:
+		return fmt.Sprintf("plugin %s from registry %s failed to load: %s", e.Plugin, e.Registry, e.Err)
+	}
 }
 
 // Unwrap returns ErrPluginLoad and the reason the plugin failed, so both

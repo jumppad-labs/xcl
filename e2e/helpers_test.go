@@ -9,7 +9,7 @@ import (
 	"github.com/jumppad-labs/xcl/e2e/fixtures/inprocess"
 	"github.com/jumppad-labs/xcl/e2e/fixtures/kube"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 )
 
 // kubeConfigDir is the Kubernetes-like configuration, decoded into the types
@@ -28,68 +28,58 @@ const testPassword = "e2e-s3cret-password"
 // state with, fixed so every run encrypts the same way
 var testStateKey = []byte("0123456789abcdef0123456789abcdef")
 
-// registerKubeTypes registers the block types the kube configuration uses
-func registerKubeTypes(t testing.TB, r *registry.PluginRegistry) {
-	t.Helper()
+// newKubeRegistry returns a local registry declaring the block types the kube
+// configuration uses
+func newKubeRegistry() *registry.Local {
+	local := registry.NewLocal()
+	local.RegisterType(&kube.ConfigMap{}, "config_map")
+	local.RegisterType(&kube.Secret{}, "secret")
+	local.RegisterType(&kube.Deployment{}, "deployment")
+	local.RegisterType(&kube.Service{}, "service")
+	local.RegisterType(&kube.Ingress{}, "ingress")
 
-	require.NoError(t, r.RegisterType(&kube.ConfigMap{}, "config_map"))
-	require.NoError(t, r.RegisterType(&kube.Secret{}, "secret"))
-	require.NoError(t, r.RegisterType(&kube.Deployment{}, "deployment"))
-	require.NoError(t, r.RegisterType(&kube.Service{}, "service"))
-	require.NoError(t, r.RegisterType(&kube.Ingress{}, "ingress"))
+	return local
 }
 
-// registerPlugins registers the in-process plugin and the external plugin
-// built by TestMain, and stops the external plugin's process when the test
-// ends
-func registerPlugins(t testing.TB, r *registry.PluginRegistry) {
-	t.Helper()
+// newLocalRegistry returns a local registry holding the in-process plugin and
+// the external plugin built by TestMain
+func newLocalRegistry() *registry.Local {
+	local := registry.NewLocal()
+	local.RegisterPlugin(&inprocess.Plugin{})
+	local.RegisterExternalPlugin(externalPlugin)
 
-	t.Cleanup(func() {
-		for _, host := range r.GetPluginHosts() {
-			host.Stop()
-		}
-	})
-
-	require.NoError(t, r.RegisterPlugin(&inprocess.Plugin{}))
-	require.NoError(t, r.RegisterPluginWithPath(externalPlugin))
+	return local
 }
 
 // newKubeConfig returns a Config for the kube configuration, with the kube
-// block types registered on r. See newConfig for handler, stateDir and
-// stateKey.
-func newKubeConfig(t testing.TB, r *registry.PluginRegistry, handler xcl.EventHandler, stateDir string, stateKey []byte) *xcl.Config {
+// block types declared. See newConfig for handler, stateDir and stateKey.
+func newKubeConfig(t testing.TB, handler xcl.EventHandler, stateDir string, stateKey []byte) *xcl.Config {
 	t.Helper()
 
-	registerKubeTypes(t, r)
-
-	return newConfig(t, r, handler, stateDir, stateKey)
+	return newConfig(t, handler, stateDir, stateKey, xcl.WithRegistry(newKubeRegistry()))
 }
 
 // newPluginConfig returns a Config for the plugin configuration, with the
-// in-process and external plugins registered on r. See newConfig for
+// in-process and external plugins in its local registry. See newConfig for
 // handler, stateDir and stateKey.
-func newPluginConfig(t testing.TB, r *registry.PluginRegistry, handler xcl.EventHandler, stateDir string, stateKey []byte) *xcl.Config {
+func newPluginConfig(t testing.TB, handler xcl.EventHandler, stateDir string, stateKey []byte) *xcl.Config {
 	t.Helper()
 
-	registerPlugins(t, r)
-
-	return newConfig(t, r, handler, stateDir, stateKey)
+	return newConfig(t, handler, stateDir, stateKey, xcl.WithRegistry(newLocalRegistry()))
 }
 
-// newConfig returns a Config using r that keeps its state in stateDir, set up
-// as an application would set it up. Events go to handler, a nil handler
-// leaves xcl silent, and each event carries the resource as state records it.
-// The sensitive values in state are encrypted with stateKey, a nil stateKey
-// leaves them unencrypted.
-func newConfig(t testing.TB, r *registry.PluginRegistry, handler xcl.EventHandler, stateDir string, stateKey []byte) *xcl.Config {
+// newConfig returns a Config with options that keeps its state in stateDir,
+// set up as an application would set it up. Events go to handler, a nil
+// handler leaves xcl silent, and each event carries the resource as state
+// records it. The sensitive values in state are encrypted with stateKey, a
+// nil stateKey leaves them unencrypted.
+func newConfig(t testing.TB, handler xcl.EventHandler, stateDir string, stateKey []byte, options ...xcl.ConfigOption) *xcl.Config {
 	t.Helper()
 
-	options := []xcl.ConfigOption{
-		xcl.WithPluginRegistry(r),
+	options = append(options,
 		xcl.WithStatePath(stateDir),
 		xcl.WithEventData(xcl.EventDataProcessed),
-	}
+	)
 
 	if handler != nil {
 		options = append(options, xcl.WithEventHandler(handler))

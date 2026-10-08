@@ -11,7 +11,7 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
@@ -115,15 +115,11 @@ func subtypelessFixture(t *testing.T, name string) string {
 
 // inProcessWidgetRegistry returns a registry holding a
 // SubtypelessWidgetPlugin backed by provider
-func inProcessWidgetRegistry(t *testing.T, provider *subtypelessWidgetProvider) *registry.PluginRegistry {
-	t.Helper()
+func inProcessWidgetRegistry(provider *subtypelessWidgetProvider) *registry.Local {
+	local := registry.NewLocal()
+	local.RegisterPlugin(&SubtypelessWidgetPlugin{provider: provider})
 
-	pr := registry.NewPluginRegistry()
-
-	err := pr.RegisterPlugin(&SubtypelessWidgetPlugin{provider: provider})
-	require.NoError(t, err)
-
-	return pr
+	return local
 }
 
 // buildSubtypelessPlugin builds the external subtypeless fixture plugin into
@@ -141,24 +137,19 @@ func buildSubtypelessPlugin(t *testing.T) string {
 }
 
 // externalWidgetRegistry returns a registry holding the external subtypeless
-// plugin binary, whose processes are stopped when the test ends
-func externalWidgetRegistry(t *testing.T, binary string) *registry.PluginRegistry {
-	t.Helper()
+// plugin binary
+func externalWidgetRegistry(binary string) *registry.Local {
+	local := registry.NewLocal()
+	local.RegisterExternalPlugin(binary)
 
-	pr := registry.NewPluginRegistry()
-	stopPluginHosts(t, pr)
-
-	err := pr.RegisterPluginWithPath(binary)
-	require.NoError(t, err)
-
-	return pr
+	return local
 }
 
 func TestApplyCreatesInProcessPluginTypeWithoutSubtype(t *testing.T) {
 	isolateHome(t)
 
 	provider := &subtypelessWidgetProvider{}
-	f := newPersonConfig(t, inProcessWidgetRegistry(t, provider), subtypelessFixture(t, "subtypeless"), t.TempDir())
+	f := newPersonConfig(t, inProcessWidgetRegistry(provider), subtypelessFixture(t, "subtypeless"), t.TempDir())
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -177,7 +168,7 @@ func TestDestroyRemovesInProcessPluginTypeWithoutSubtype(t *testing.T) {
 	isolateHome(t)
 
 	provider := &subtypelessWidgetProvider{}
-	f := newPersonConfig(t, inProcessWidgetRegistry(t, provider), subtypelessFixture(t, "subtypeless"), t.TempDir())
+	f := newPersonConfig(t, inProcessWidgetRegistry(provider), subtypelessFixture(t, "subtypeless"), t.TempDir())
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -196,7 +187,7 @@ func TestInProcessPluginTypeWithoutSubtypeRejectsSubtypeLabel(t *testing.T) {
 	isolateHome(t)
 
 	provider := &subtypelessWidgetProvider{}
-	f := newPersonConfig(t, inProcessWidgetRegistry(t, provider), subtypelessFixture(t, "subtypeless_with_subtype"), t.TempDir())
+	f := newPersonConfig(t, inProcessWidgetRegistry(provider), subtypelessFixture(t, "subtypeless_with_subtype"), t.TempDir())
 
 	err := f.config.Apply(f.configFile)
 	require.ErrorContains(t, err, "invalid format for 'widget', it is declared with only a name")
@@ -208,7 +199,7 @@ func TestInProcessPluginTypeWithoutSubtypeTagsInitLogsWithType(t *testing.T) {
 
 	recorder := &eventRecorder{}
 	provider := &subtypelessWidgetProvider{}
-	f := newPersonConfig(t, inProcessWidgetRegistry(t, provider), subtypelessFixture(t, "subtypeless"), t.TempDir(), WithEventHandler(recorder.Record))
+	f := newPersonConfig(t, inProcessWidgetRegistry(provider), subtypelessFixture(t, "subtypeless"), t.TempDir(), WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -224,7 +215,7 @@ func TestApplyCreatesExternalPluginTypeWithoutSubtype(t *testing.T) {
 	binary := buildSubtypelessPlugin(t)
 	isolateHome(t)
 
-	f := newPersonConfig(t, externalWidgetRegistry(t, binary), subtypelessFixture(t, "subtypeless"), t.TempDir())
+	f := newPersonConfig(t, externalWidgetRegistry(binary), subtypelessFixture(t, "subtypeless"), t.TempDir())
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)
@@ -247,7 +238,7 @@ func TestDestroyRemovesExternalPluginTypeWithoutSubtype(t *testing.T) {
 	isolateHome(t)
 
 	recorder := &eventRecorder{}
-	f := newPersonConfig(t, externalWidgetRegistry(t, binary), subtypelessFixture(t, "subtypeless"), t.TempDir(), WithEventHandler(recorder.Record))
+	f := newPersonConfig(t, externalWidgetRegistry(binary), subtypelessFixture(t, "subtypeless"), t.TempDir(), WithEventHandler(recorder.Record))
 
 	err := f.config.Apply(f.configFile)
 	require.NoError(t, err)

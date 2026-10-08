@@ -10,7 +10,6 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -23,9 +22,8 @@ import (
 func pluginEventEncodedCreates(t *testing.T) map[string]string {
 	t.Helper()
 
-	r := registry.NewPluginRegistry()
 	recorder := &testutil.EventRecorder{}
-	c := newPluginConfig(t, r, recorder.Record, t.TempDir(), testStateKey)
+	c := newPluginConfig(t, recorder.Record, t.TempDir(), testStateKey)
 
 	require.NoError(t, c.Apply(pluginConfigDir))
 
@@ -35,7 +33,7 @@ func pluginEventEncodedCreates(t *testing.T) map[string]string {
 			continue
 		}
 
-		text, err := xcl.EncodeSavedEntity(r, e.Data, xcl.IncludeComputed())
+		text, err := c.EncodeSavedEntity(e.Data, xcl.IncludeComputed())
 		if errors.Is(err, xcl.ErrNotEncodable) {
 			continue
 		}

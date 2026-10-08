@@ -10,10 +10,11 @@
 //     compiled into this program. It provides template, a block type with no
 //     subtype, and renders a Handlebars template to a file.
 //
-// It has four commands, each a separate run of the program sharing the state
+// It has five commands, each a separate run of the program sharing the state
 // saved in a directory, ./.xcl-docker by default:
 //
 //	xcl-docker apply [flags] <path>       apply the configuration at path
+//	xcl-docker plan [flags] <path>        print what applying path would change
 //	xcl-docker status [flags]             print what the saved state holds as a tree
 //	xcl-docker inspect [flags] <address>  print the resource at address as configuration
 //	xcl-docker destroy [flags]            remove everything in the saved state
@@ -26,7 +27,7 @@
 // container's address, which the Docker plugin computes when it creates the
 // container, so a value crosses from one plugin to the other.
 //
-// apply and destroy need a Docker engine, reached through DOCKER_HOST or the
+// apply, plan and destroy need a Docker engine, reached through DOCKER_HOST or the
 // default socket. `make build` builds xcl-docker and the Docker plugin side by
 // side into ./build, where xcl-docker finds the plugin. `make run` applies the
 // example configuration, prints the status and destroys it again.
@@ -45,7 +46,7 @@ import (
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/template"
 	"github.com/jumppad-labs/xcl/example/prettylog"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 )
 
 // defaultStateDir is where the commands keep the state between runs, unless
@@ -60,6 +61,7 @@ const usage = `usage: xcl-docker <command> [flags]
 
 commands:
   apply [flags] <path>       apply the configuration at path
+  plan [flags] <path>        print what applying the configuration at path would change
   status [flags]             print what the saved state holds as a tree
   inspect [flags] <address>  print the resource at address as configuration
   destroy [flags]            remove everything in the saved state
@@ -104,6 +106,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 
 		err = applyCommand(stderr, flags.Arg(0), *dockerPlugin, *stateDir)
+	case "plan":
+		if flags.NArg() != 1 {
+			fmt.Fprint(stderr, "plan needs the path of the configuration to compare\n\n"+usage)
+			return 2
+		}
+
+		err = planCommand(stdout, flags.Arg(0), *dockerPlugin, *stateDir)
 	case "status":
 		err = statusCommand(stdout, *dockerPlugin, *stateDir)
 	case "inspect":
@@ -149,12 +158,7 @@ func applyCommand(stderr io.Writer, configDir, dockerPlugin, stateDir string) er
 		return err
 	}
 
-	// the registry is built here so that the event receiver can share it: it
-	// is what types the entity an event carries, which is how the receiver
-	// shows each resource's configuration as it is created
-	r := registry.NewPluginRegistry()
-
-	c, err := newConfig(r, eventHandler(stderr, r), dockerPlugin, stateDir)
+	c, err := newConfig(eventHandler(stderr), dockerPlugin, stateDir)
 	if err != nil {
 		return err
 	}
@@ -162,12 +166,30 @@ func applyCommand(stderr io.Writer, configDir, dockerPlugin, stateDir string) er
 	return apply(c, configDir)
 }
 
+// planCommand prints what applying the configuration at configDir would change
+// in the state saved in stateDir, as a diff, without changing anything. Each
+// resource in the state is read through its provider, as apply reads it, so a
+// Docker engine must answer. It prints only the diff, so xcl is given no
+// event handler and stays silent.
+func planCommand(stdout io.Writer, configDir, dockerPlugin, stateDir string) error {
+	if err := client.Ping(context.Background()); err != nil {
+		return err
+	}
+
+	c, err := newConfig(nil, dockerPlugin, stateDir)
+	if err != nil {
+		return err
+	}
+
+	return plan(stdout, c, configDir)
+}
+
 // statusCommand prints what the state saved in stateDir holds as a tree. It
 // reads the state alone, needing neither the configuration nor a Docker
 // engine. It prints only the tree, so xcl is given no event handler and stays
 // silent.
 func statusCommand(stdout io.Writer, dockerPlugin, stateDir string) error {
-	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
+	c, err := newConfig(nil, dockerPlugin, stateDir)
 	if err != nil {
 		return err
 	}
@@ -183,7 +205,7 @@ func statusCommand(stdout io.Writer, dockerPlugin, stateDir string) error {
 // stateDir as configuration text. Like status it reads the state alone and
 // prints only the text, so xcl is given no event handler and stays silent.
 func inspectCommand(stdout io.Writer, address, dockerPlugin, stateDir string) error {
-	c, err := newConfig(registry.NewPluginRegistry(), nil, dockerPlugin, stateDir)
+	c, err := newConfig(nil, dockerPlugin, stateDir)
 	if err != nil {
 		return err
 	}
@@ -203,9 +225,7 @@ func destroyCommand(stderr io.Writer, dockerPlugin, stateDir string) error {
 		return err
 	}
 
-	r := registry.NewPluginRegistry()
-
-	c, err := newConfig(r, eventHandler(stderr, r), dockerPlugin, stateDir)
+	c, err := newConfig(eventHandler(stderr), dockerPlugin, stateDir)
 	if err != nil {
 		return err
 	}
@@ -215,30 +235,26 @@ func destroyCommand(stderr io.Writer, dockerPlugin, stateDir string) error {
 
 // eventHandler returns the receiver every command gives xcl, which writes
 // each event to out at the level XCL_LOG_LEVEL names
-func eventHandler(out io.Writer, r *registry.PluginRegistry) xcl.EventHandler {
-	return prettylog.Handler(out, prettylog.LevelFromEnv(), r)
+func eventHandler(out io.Writer) xcl.EventHandler {
+	return prettylog.Handler(out, prettylog.LevelFromEnv())
 }
 
-// newConfig registers the in-process template plugin and the Docker plugin
-// binary at dockerPlugin with r, and returns a Config keeping its state in
-// stateDir. Every event xcl produces, including the plugins' log messages,
-// goes to handler, a nil handler leaves xcl silent.
-func newConfig(r *registry.PluginRegistry, handler xcl.EventHandler, dockerPlugin, stateDir string) (*xcl.Config, error) {
-	// Register the in-process plugin, which provides every block type it
-	// registers in Init. Registering only records the plugin, it is loaded
-	// by the first operation.
-	if err := r.RegisterPlugin(&template.TemplatePlugin{}); err != nil {
-		return nil, err
-	}
-
-	// Register the external plugin binary, it is started by the first
-	// operation
-	if err := r.RegisterPluginWithPath(dockerPlugin); err != nil {
-		return nil, err
-	}
+// newConfig adds a local registry holding the in-process template plugin and
+// the Docker plugin binary at dockerPlugin, and returns a Config keeping its
+// state in stateDir. Every event xcl produces, including the plugins' log
+// messages, goes to handler, a nil handler leaves xcl silent.
+func newConfig(handler xcl.EventHandler, dockerPlugin, stateDir string) (*xcl.Config, error) {
+	// The local registry holds plugins the application supplies itself: the
+	// in-process plugin, which provides every block type it registers in
+	// Init, and the external plugin binary. Registering only records a
+	// plugin, each is loaded, and the binary started, by the first operation
+	// that needs plugins.
+	local := registry.NewLocal()
+	local.RegisterPlugin(&template.TemplatePlugin{})
+	local.RegisterExternalPlugin(dockerPlugin)
 
 	return xcl.NewConfig(
-		xcl.WithPluginRegistry(r),
+		xcl.WithRegistry(local),
 		// Keep the state in a file, so each command, a separate run of the
 		// program, works from what the last one saved
 		xcl.WithStatePath(stateDir),

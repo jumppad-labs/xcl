@@ -11,10 +11,11 @@ import (
 	"testing"
 
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -53,7 +54,7 @@ const (
 // plugin registry, one TestPlugin registered into it and one file state store.
 // Each apply builds a fresh Parser from these, just as separate runs would.
 type lifecycleHarness struct {
-	registry  *registry.PluginRegistry
+	registry  *catalog.Catalog
 	plugin    *TestPlugin
 	store     *state.FileStateStore
 	statePath string
@@ -74,11 +75,12 @@ func setupLifecycle(t *testing.T) *lifecycleHarness {
 		os.Setenv("HOME", home)
 	})
 
-	reg := registry.NewPluginRegistry()
+	reg := catalog.New()
 
 	testPlugin := &TestPlugin{}
-	err := reg.RegisterPlugin(testPlugin)
-	require.NoError(t, err)
+	local := registry.NewLocal()
+	local.RegisterPlugin(testPlugin)
+	reg.AddRegistry(local)
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
@@ -101,7 +103,7 @@ func (h *lifecycleHarness) newParserWithEventData(t *testing.T, emit events.Emit
 	t.Helper()
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 	options.EventData = level
 
@@ -117,7 +119,7 @@ func (h *lifecycleHarness) newParser(t *testing.T, emit events.Emit) *Parser {
 	t.Helper()
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 
 	options.Emit = emit
@@ -182,7 +184,7 @@ func (h *lifecycleHarness) loadSaved(t *testing.T) []any {
 
 // loadTyped loads what store saved and types each record with reg, the way
 // the parser reads previous state
-func loadTyped(t *testing.T, store state.StateStore, reg *registry.PluginRegistry) []any {
+func loadTyped(t *testing.T, store state.StateStore, reg *catalog.Catalog) []any {
 	t.Helper()
 
 	loaded, err := store.Load()
@@ -1262,7 +1264,7 @@ func setupRefresh(t *testing.T, h *lifecycleHarness) *refreshScenario {
 	require.Equal(t, "id-one", networkValues(t, saved).ProviderID)
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 
 	lifecycle := &resourceLifecycle{

@@ -10,7 +10,6 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/mask"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -40,13 +39,11 @@ const tagEnvelope = `{"xcl_masked":"tag","value":"tagged-by-test"}`
 // applySensitiveFixtureWithEventOptions applies the sensitive fixture with an
 // event handler recording every event at the given event data level, adding
 // the extra options after the defaults, and returns the recorder and the
-// registry the configuration was applied with
-func applySensitiveFixtureWithEventOptions(t *testing.T, level EventDataLevel, options ...ConfigOption) (*eventRecorder, *registry.PluginRegistry) {
+// configuration that was applied
+func applySensitiveFixtureWithEventOptions(t *testing.T, level EventDataLevel, options ...ConfigOption) (*eventRecorder, *Config) {
 	t.Helper()
 
 	t.Setenv("HOME", t.TempDir())
-
-	reg := newSecretRegistry(t)
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
@@ -54,7 +51,7 @@ func applySensitiveFixtureWithEventOptions(t *testing.T, level EventDataLevel, o
 	recorder := &eventRecorder{}
 
 	all := []ConfigOption{
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStateStore(store),
 		WithEventHandler(recorder.Record),
 		WithEventData(level),
@@ -67,7 +64,7 @@ func applySensitiveFixtureWithEventOptions(t *testing.T, level EventDataLevel, o
 	err = c.Apply(sensitiveBasicPath(t))
 	require.NoError(t, err)
 
-	return recorder, reg
+	return recorder, c
 }
 
 // eventsWithDataFor returns every recorded event for the resource id that
@@ -201,7 +198,7 @@ func TestNewConfigWithNilEventMaskFails(t *testing.T) {
 
 func TestEncodeSavedEntityShowsMarkerForMaskedEventData(t *testing.T) {
 	masker := newHMACEventMasker(t)
-	recorder, reg := applySensitiveFixtureWithEventOptions(t, EventDataProcessed, WithEventMask(masker))
+	recorder, c := applySensitiveFixtureWithEventOptions(t, EventDataProcessed, WithEventMask(masker))
 
 	succeeded := eventDataSingleEvent(t, recorder, eventSensitiveSecretID, "create", "success")
 	require.NotEmpty(t, succeeded.Data)
@@ -209,7 +206,7 @@ func TestEncodeSavedEntityShowsMarkerForMaskedEventData(t *testing.T) {
 	hash := hashOf(t, masker, "from-literal")
 	require.Contains(t, string(succeeded.Data), hash, "the event data must hold the hash for this test to mean anything")
 
-	out, err := EncodeSavedEntity(reg, succeeded.Data)
+	out, err := c.EncodeSavedEntity(succeeded.Data)
 	require.NoError(t, err)
 
 	require.Contains(t, string(out), `password = "(sensitive)"`)
@@ -221,13 +218,11 @@ func TestEncodeSavedEntityShowsMarkerForMaskedEventData(t *testing.T) {
 func TestEncodeSavedEntityShowsMarkerForEncryptedState(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	reg := newSecretRegistry(t)
-
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	c, err := NewConfig(
-		WithPluginRegistry(reg),
+		withSecretTypes(),
 		WithStateStore(store),
 		WithStateMask(newAESStateMasker(t, stateMaskKey)),
 	)
@@ -250,7 +245,7 @@ func TestEncodeSavedEntityShowsMarkerForEncryptedState(t *testing.T) {
 	require.NoError(t, json.Unmarshal(encrypted.Value, &ciphertext))
 	require.NotEmpty(t, ciphertext)
 
-	out, err := EncodeSavedEntity(reg, record)
+	out, err := c.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
 	require.Contains(t, string(out), `password = "(sensitive)"`)

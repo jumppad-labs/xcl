@@ -20,15 +20,15 @@ import (
 )
 
 // ProviderResolver resolves the provider adapter responsible for a given resource.
-// Satisfied by *registry.PluginRegistry; exists so the walk callbacks can be tested
-// against a mock instead of a real plugin registry.
+// Satisfied by *catalog.Catalog; exists so the walk callbacks can be tested
+// against a mock instead of a real catalog.
 type ProviderResolver interface {
 	GetProviderForResource(resource any) plugins.ProviderAdapter
 }
 
 // TypeRegistry reports which resource types are plain Go types registered
 // without a plugin. Resources of these types are handled like builtins, no
-// provider is ever called for them. Satisfied by *registry.PluginRegistry.
+// provider is ever called for them. Satisfied by *catalog.Catalog.
 type TypeRegistry interface {
 	IsRegisteredType(entityType, subtype string) bool
 }

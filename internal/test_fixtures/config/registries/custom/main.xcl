@@ -1,0 +1,5 @@
+# person is provided by a plugin from a registry the test defines itself
+resource "person" "ada" {
+  first_name = "Ada"
+  last_name  = "Lovelace"
+}

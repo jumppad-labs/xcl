@@ -36,7 +36,7 @@ func TestApplyWithMissingProviderEmitsErrorEventForTheResource(t *testing.T) {
 	collector := &eventCollector{}
 
 	options := testOptions(t)
-	options.PluginRegistry = h.registry
+	options.Catalog = h.registry
 	options.StateStore = h.store
 	options.ProviderResolver = resolver
 	options.Emit = collector.collect

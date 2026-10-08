@@ -10,7 +10,6 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -22,9 +21,8 @@ import (
 func encodeCreatedConfiguration(t *testing.T) string {
 	t.Helper()
 
-	r := registry.NewPluginRegistry()
 	recorder := &testutil.EventRecorder{}
-	c := newKubeConfig(t, r, recorder.Record, t.TempDir(), testStateKey)
+	c := newKubeConfig(t, recorder.Record, t.TempDir(), testStateKey)
 
 	require.NoError(t, c.Apply(kubeConfigDir))
 
@@ -34,7 +32,7 @@ func encodeCreatedConfiguration(t *testing.T) string {
 			continue
 		}
 
-		text, err := xcl.EncodeSavedEntity(r, e.Data, xcl.IncludeComputed())
+		text, err := c.EncodeSavedEntity(e.Data, xcl.IncludeComputed())
 		if errors.Is(err, xcl.ErrNotEncodable) {
 			continue
 		}

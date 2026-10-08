@@ -10,7 +10,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -60,15 +60,14 @@ func (r *recordingStore) Clear() error {
 	return nil
 }
 
-func newSecretRegistry(t *testing.T) *registry.PluginRegistry {
-	t.Helper()
+// withSecretTypes declares the Secret and SecretConsumer fixture types on a
+// local registry and returns the option adding it
+func withSecretTypes() ConfigOption {
+	declared := registry.NewLocal()
+	declared.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret)
+	declared.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer)
 
-	reg := registry.NewPluginRegistry()
-
-	require.NoError(t, reg.RegisterType(&registered.Secret{}, "resource", registered.TypeSecret))
-	require.NoError(t, reg.RegisterType(&registered.SecretConsumer{}, "resource", registered.TypeSecretConsumer))
-
-	return reg
+	return WithRegistry(declared)
 }
 
 func sensitiveBasicPath(t *testing.T) string {
@@ -86,7 +85,7 @@ func TestApplySavesRealSensitiveValueToStateFile(t *testing.T) {
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
-	c, err := NewConfig(WithPluginRegistry(newSecretRegistry(t)), WithStateStore(store))
+	c, err := NewConfig(withSecretTypes(), WithStateStore(store))
 	require.NoError(t, err)
 
 	require.NoError(t, c.Apply(sensitiveBasicPath(t)))
@@ -99,18 +98,17 @@ func TestApplySavesRealSensitiveValueToStateFile(t *testing.T) {
 	require.NotContains(t, string(contents), "(sensitive)")
 }
 
-// A later run reads the state back through its own store and the registry, the
-// same decode Destroy and Apply use, and gets the real value, not the marker.
+// A later run reads the state back through its own store and the Config's
+// catalog, the same decode Destroy and Apply use, and gets the real value, not the marker.
 func TestLoadedStateHoldsRealSensitiveValue(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	dir := t.TempDir()
-	reg := newSecretRegistry(t)
 
 	firstStore, err := state.NewFileStateStore(dir)
 	require.NoError(t, err)
 
-	first, err := NewConfig(WithPluginRegistry(reg), WithStateStore(firstStore))
+	first, err := NewConfig(withSecretTypes(), WithStateStore(firstStore))
 	require.NoError(t, err)
 	require.NoError(t, first.Apply(sensitiveBasicPath(t)))
 
@@ -120,7 +118,7 @@ func TestLoadedStateHoldsRealSensitiveValue(t *testing.T) {
 	records, err := secondStore.Load()
 	require.NoError(t, err)
 
-	loaded, err := savedentity.DecodeAll(reg, records, savedentity.ReadOptions{})
+	loaded, err := savedentity.DecodeAll(first.catalog, records, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
 	var literal *registered.Secret
@@ -140,7 +138,7 @@ func TestCustomStateStoreReceivesRawMessagesWithRealSensitiveValue(t *testing.T)
 
 	store := &recordingStore{}
 
-	c, err := NewConfig(WithPluginRegistry(newSecretRegistry(t)), WithStateStore(store))
+	c, err := NewConfig(withSecretTypes(), WithStateStore(store))
 	require.NoError(t, err)
 
 	require.NoError(t, c.Apply(sensitiveBasicPath(t)))
@@ -163,15 +161,14 @@ func TestStateSavedDuringDestroyHoldsRealSensitiveValues(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	store := &recordingStore{}
-	reg := newSecretRegistry(t)
 
-	applied, err := NewConfig(WithPluginRegistry(reg), WithStateStore(store))
+	applied, err := NewConfig(withSecretTypes(), WithStateStore(store))
 	require.NoError(t, err)
 	require.NoError(t, applied.Apply(sensitiveBasicPath(t)))
 
 	savesAfterApply := len(store.saves)
 
-	destroyer, err := NewConfig(WithPluginRegistry(reg), WithStateStore(store))
+	destroyer, err := NewConfig(withSecretTypes(), WithStateStore(store))
 	require.NoError(t, err)
 	require.NoError(t, destroyer.Destroy())
 

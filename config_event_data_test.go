@@ -6,18 +6,16 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
 
 // applyEncodeFixtureWithEventData applies the encode fixture with a file state
 // store and an event handler recording every event, at the given event data
-// level. It returns the recorder, the path the state was written to, the
-// registry the configuration was applied with and the applied configuration,
-// so a test can compare what an event carried against both the saved record
-// and the live entity for the same resource
-func applyEncodeFixtureWithEventData(t *testing.T, level EventDataLevel) (*eventRecorder, string, *registry.PluginRegistry, *Config) {
+// level. It returns the recorder, the path the state was written to and the
+// applied configuration, so a test can compare what an event carried against
+// both the saved record and the live entity for the same resource
+func applyEncodeFixtureWithEventData(t *testing.T, level EventDataLevel) (*eventRecorder, string, *Config) {
 	t.Helper()
 
 	home := os.Getenv("HOME")
@@ -27,8 +25,6 @@ func applyEncodeFixtureWithEventData(t *testing.T, level EventDataLevel) (*event
 		os.Setenv("HOME", home)
 	})
 
-	pr := encodeRegistry(t)
-
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
@@ -36,12 +32,13 @@ func applyEncodeFixtureWithEventData(t *testing.T, level EventDataLevel) (*event
 
 	recorder := &eventRecorder{}
 
-	c, err := NewConfig(
-		WithPluginRegistry(pr),
+	options := append(encodeFixtureOptions(),
 		WithStateStore(store),
 		WithEventHandler(recorder.Record),
 		WithEventData(level),
 	)
+
+	c, err := NewConfig(options...)
 	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/encode/main.xcl")
@@ -50,7 +47,7 @@ func applyEncodeFixtureWithEventData(t *testing.T, level EventDataLevel) (*event
 	err = c.Apply(path)
 	require.NoError(t, err)
 
-	return recorder, statePath, pr, c
+	return recorder, statePath, c
 }
 
 // applyEncodeFixtureWithDefaultEventData applies the encode fixture with an
@@ -66,18 +63,17 @@ func applyEncodeFixtureWithDefaultEventData(t *testing.T) *eventRecorder {
 		os.Setenv("HOME", home)
 	})
 
-	pr := encodeRegistry(t)
-
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
 	recorder := &eventRecorder{}
 
-	c, err := NewConfig(
-		WithPluginRegistry(pr),
+	options := append(encodeFixtureOptions(),
 		WithStateStore(store),
 		WithEventHandler(recorder.Record),
 	)
+
+	c, err := NewConfig(options...)
 	require.NoError(t, err)
 
 	path, err := filepath.Abs("./internal/test_fixtures/config/encode/main.xcl")
@@ -141,7 +137,7 @@ func TestEventsCarryNoDataByDefault(t *testing.T) {
 // as it was before the provider ran, on both the start and the success of a
 // create, so the success reports the configuration rather than the result
 func TestRawEventDataIsPreCallResource(t *testing.T) {
-	recorder, _, _, _ := applyEncodeFixtureWithEventData(t, EventDataRaw)
+	recorder, _, _ := applyEncodeFixtureWithEventData(t, EventDataRaw)
 
 	started := eventDataSingleEvent(t, recorder, encodeNetworkID, "create", "start")
 	require.NotEmpty(t, started.Data)
@@ -159,7 +155,7 @@ func TestRawEventDataIsPreCallResource(t *testing.T) {
 // TestProcessedCreateSuccessCarriesProviderFilledValue asserts the processed
 // level carries the result of the call, the value the provider filled in
 func TestProcessedCreateSuccessCarriesProviderFilledValue(t *testing.T) {
-	recorder, _, _, _ := applyEncodeFixtureWithEventData(t, EventDataProcessed)
+	recorder, _, _ := applyEncodeFixtureWithEventData(t, EventDataProcessed)
 
 	succeeded := eventDataSingleEvent(t, recorder, encodeNetworkID, "create", "success")
 
@@ -173,7 +169,7 @@ func TestProcessedCreateSuccessCarriesProviderFilledValue(t *testing.T) {
 // emitted after the resource's status was set, so the data it carries is the
 // resource as state records it rather than a resource still mid flight
 func TestProcessedCreateSuccessHasCreatedStatus(t *testing.T) {
-	recorder, _, _, _ := applyEncodeFixtureWithEventData(t, EventDataProcessed)
+	recorder, _, _ := applyEncodeFixtureWithEventData(t, EventDataProcessed)
 
 	succeeded := eventDataSingleEvent(t, recorder, encodeNetworkID, "create", "success")
 
@@ -187,7 +183,7 @@ func TestProcessedCreateSuccessHasCreatedStatus(t *testing.T) {
 // the same document state saved for the resource. The state file is written
 // indented so the bytes differ in whitespace, the documents do not
 func TestProcessedCreateSuccessMatchesStateRecord(t *testing.T) {
-	recorder, statePath, _, _ := applyEncodeFixtureWithEventData(t, EventDataProcessed)
+	recorder, statePath, _ := applyEncodeFixtureWithEventData(t, EventDataProcessed)
 
 	succeeded := eventDataSingleEvent(t, recorder, encodeNetworkID, "create", "success")
 	require.NotEmpty(t, succeeded.Data)
@@ -201,7 +197,7 @@ func TestProcessedCreateSuccessMatchesStateRecord(t *testing.T) {
 // a provider carries its resource at the raw level, it was never serialized
 // for a provider call so the resource itself is the raw data
 func TestRegisteredTypeCarriesDataAtRaw(t *testing.T) {
-	recorder, _, _, _ := applyEncodeFixtureWithEventData(t, EventDataRaw)
+	recorder, _, _ := applyEncodeFixtureWithEventData(t, EventDataRaw)
 
 	succeeded := eventDataSingleEvent(t, recorder, encodeDatabaseID, "create", "success")
 
@@ -211,7 +207,7 @@ func TestRegisteredTypeCarriesDataAtRaw(t *testing.T) {
 // TestRegisteredTypeCarriesDataAtProcessed asserts the same registered type
 // carries its resource at the processed level
 func TestRegisteredTypeCarriesDataAtProcessed(t *testing.T) {
-	recorder, _, _, _ := applyEncodeFixtureWithEventData(t, EventDataProcessed)
+	recorder, _, _ := applyEncodeFixtureWithEventData(t, EventDataProcessed)
 
 	succeeded := eventDataSingleEvent(t, recorder, encodeDatabaseID, "create", "success")
 
@@ -223,12 +219,12 @@ func TestRegisteredTypeCarriesDataAtProcessed(t *testing.T) {
 // configuration text as converting the live entity. This is what ties the
 // event data level back to the encoding helpers
 func TestProcessedDataConvertsLikeTheEntity(t *testing.T) {
-	recorder, _, reg, c := applyEncodeFixtureWithEventData(t, EventDataProcessed)
+	recorder, _, c := applyEncodeFixtureWithEventData(t, EventDataProcessed)
 
 	succeeded := eventDataSingleEvent(t, recorder, encodeNetworkID, "create", "success")
 	require.NotEmpty(t, succeeded.Data)
 
-	fromEvent, err := EncodeSavedEntity(reg, succeeded.Data)
+	fromEvent, err := c.EncodeSavedEntity(succeeded.Data)
 	require.NoError(t, err)
 
 	network := encodeEntityByID(t, c, encodeNetworkID)

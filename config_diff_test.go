@@ -10,7 +10,7 @@ import (
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/parser"
-	"github.com/jumppad-labs/xcl/plugins/registry"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/stretchr/testify/require"
 )
@@ -42,11 +42,10 @@ func setupDiffConfig(t *testing.T) *diffFixture {
 		os.Setenv("HOME", home)
 	})
 
-	pr := registry.NewPluginRegistry()
+	local := registry.NewLocal()
 
 	testPlugin := &parser.TestPlugin{}
-	err := pr.RegisterPlugin(testPlugin)
-	require.NoError(t, err)
+	local.RegisterPlugin(testPlugin)
 
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
@@ -54,7 +53,7 @@ func setupDiffConfig(t *testing.T) *diffFixture {
 	recorder := &eventRecorder{}
 
 	c, err := NewConfig(
-		WithPluginRegistry(pr),
+		WithRegistry(local),
 		WithStateStore(store),
 		WithEventHandler(recorder.Record),
 		// the diff tests assert on what events carry, which is nothing

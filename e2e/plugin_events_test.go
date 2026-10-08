@@ -10,7 +10,6 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
-	"github.com/jumppad-labs/xcl/plugins/registry"
 	"github.com/jumppad-labs/xcl/state"
 )
 
@@ -29,7 +28,7 @@ func pluginEventLifecycle(t *testing.T) []xcl.Event {
 	t.Helper()
 
 	recorder := &testutil.EventRecorder{}
-	c := newPluginConfig(t, registry.NewPluginRegistry(), recorder.Record, t.TempDir(), testStateKey)
+	c := newPluginConfig(t, recorder.Record, t.TempDir(), testStateKey)
 
 	require.NoError(t, c.Apply(pluginConfigDir))
 	require.NoError(t, c.Destroy())
@@ -150,16 +149,16 @@ func TestPluginLoadReportedOnceByCore(t *testing.T) {
 }
 
 // TestPluginLoadNamesPluginAndBlockTypes asserts each plugin's load names the
-// plugin as it starts, and names the block types it provides once it has
+// plugin and the registry it came from as it starts, and names the block types it provides once it has
 // loaded. The plugins load in the order they were registered
 func TestPluginLoadNamesPluginAndBlockTypes(t *testing.T) {
 	recorded := pluginEventLifecycle(t)
 
 	require.Equal(t, []pluginEventLoad{
-		{source: "core", phase: "start", meta: map[string]any{"plugin": pluginEventInProcessSource}},
-		{source: "core", phase: "success", meta: map[string]any{"plugin": pluginEventInProcessSource, "block_types": "postgres, redis"}},
-		{source: "core", phase: "start", meta: map[string]any{"plugin": pluginEventExternalSource}},
-		{source: "core", phase: "success", meta: map[string]any{"plugin": pluginEventExternalSource, "block_types": "app, ingress"}},
+		{source: "core", phase: "start", meta: map[string]any{"plugin": pluginEventInProcessSource, "registry": "local"}},
+		{source: "core", phase: "success", meta: map[string]any{"plugin": pluginEventInProcessSource, "registry": "local", "block_types": "postgres, redis"}},
+		{source: "core", phase: "start", meta: map[string]any{"plugin": pluginEventExternalSource, "registry": "local"}},
+		{source: "core", phase: "success", meta: map[string]any{"plugin": pluginEventExternalSource, "registry": "local", "block_types": "app, ingress"}},
 	}, pluginEventLoads(recorded))
 }
 
@@ -333,7 +332,7 @@ func TestExternalProviderDestroyLogsEveryResource(t *testing.T) {
 // provide
 func TestPluginDestroyLeavesSavedStateEmpty(t *testing.T) {
 	stateDir := t.TempDir()
-	c := newPluginConfig(t, registry.NewPluginRegistry(), nil, stateDir, testStateKey)
+	c := newPluginConfig(t, nil, stateDir, testStateKey)
 
 	require.NoError(t, c.Apply(pluginConfigDir))
 	require.NoError(t, c.Destroy())

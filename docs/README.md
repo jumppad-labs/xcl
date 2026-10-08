@@ -34,7 +34,8 @@ not at end users writing `.xcl` config.
 | `config.go`, `options.go`, `events.go` | Public facade: `Config`, functional options, the `Event`/`EventHandler` aliases, and the runner that delivers each operation's events |
 | `types/` | Shared resource metadata: `types.Meta`, `types.ResourceBase`, reflection helpers |
 | `plugins/` | Provider contract (`ProviderAdapter`) and hosting (in-process / gRPC) |
-| `plugins/registry/` | `PluginRegistry` — records plugins, loads them on the first operation, aggregates plugin hosts, resolves types to adapters |
+| `registry/` | Public plugin sources: the `Registry` and `Plugin` interfaces, `InProcess`/`Executable` starters, and the local registry `NewLocal` (in-process plugins, plugin binaries, plugin directories) |
+| `internal/catalog/` | `Catalog` — the `Config`'s private set of declared types and registries; loads plugins on the first operation, checks type name clashes, aggregates plugin hosts, resolves types to adapters |
 | `events/` | The one event shape (`events.Event`), the `Handler`/`Emit` types, the operation, phase and level constants, and `SlogHandler`, the adapter to `log/slog` |
 | `internal/eventstream/` | Delivers one operation's events: a bounded queue that emitters wait on only when it is full, drained into the application's receiver on the calling goroutine |
 | `internal/parser/` | HCL parsing, DAG construction, DAG walk, lifecycle calls, emitting parse, validate and lifecycle events |

@@ -6,7 +6,10 @@ import (
 
 // Event is one thing xcl or a plugin reports, such as a provider's Create
 // starting or succeeding for a resource, a plugin loading, or a log message.
-// See the events package for its fields and the names they take.
+// See the events package for its fields and the names they take. An event
+// delivered by a Config that carries resource data returns, from Entity, the
+// entity that data holds as the Go type registered for it, with sensitive
+// values masked.
 type Event = events.Event
 
 // EventHandler receives every event produced by Validate, Apply and Destroy.
@@ -28,9 +31,10 @@ const (
 	EventDataRaw = events.DataRaw
 
 	// EventDataProcessed carries, on a success event, the resource as xcl
-	// records it in state, including the values the provider filled in. It is
-	// the form EncodeSavedEntity reads, so a receiver can turn it straight
-	// back into configuration text. Sensitive values in it are masked by the
+	// records it in state, including the values the provider filled in. A
+	// receiver reads it as a typed entity with Event.Entity, or turns it
+	// straight back into configuration text with Config.EncodeSavedEntity.
+	// Sensitive values in it are masked by the
 	// event masker, so it matches the state record only where both mask
 	// alike.
 	EventDataProcessed = events.DataProcessed

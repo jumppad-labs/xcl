@@ -33,7 +33,7 @@ func stripEncodeHighlightMarkers(text string) string {
 }
 
 func TestEncodeEntityWithoutHighlightHasNoColourCodes(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
@@ -56,7 +56,7 @@ func TestEncodeEntityWithoutHighlightHasNoColourCodes(t *testing.T) {
 }
 
 func TestEncodeEntityWithHighlightPassesEveryTokenToRenderer(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
@@ -75,7 +75,7 @@ func TestEncodeEntityWithHighlightPassesEveryTokenToRenderer(t *testing.T) {
 }
 
 func TestEncodeEntityWithHighlightStripsToPlainText(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -90,14 +90,14 @@ func TestEncodeEntityWithHighlightStripsToPlainText(t *testing.T) {
 }
 
 func TestEncodeSavedEntityWithHighlightStripsToPlainText(t *testing.T) {
-	_, reg, statePath := applyEncodeFixture(t)
+	c, statePath := applyEncodeFixture(t)
 
 	record := encodeSavedRecordByID(t, statePath, encodeContainerID)
 
-	plain, err := EncodeSavedEntity(reg, record)
+	plain, err := c.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
-	highlighted, err := EncodeSavedEntity(reg, record, Highlight(encodeMarkerRenderer()))
+	highlighted, err := c.EncodeSavedEntity(record, Highlight(encodeMarkerRenderer()))
 	require.NoError(t, err)
 
 	require.NotEqual(t, string(plain), string(highlighted))
@@ -105,7 +105,7 @@ func TestEncodeSavedEntityWithHighlightStripsToPlainText(t *testing.T) {
 }
 
 func TestEncodeEntityWithANSIHighlightStripsToPlainText(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -123,7 +123,7 @@ func TestEncodeEntityWithANSIHighlightStripsToPlainText(t *testing.T) {
 }
 
 func TestEncodeEntityWithHighlightAndShowReferencesLabelsReferenceRoots(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
@@ -139,7 +139,7 @@ func TestEncodeEntityWithHighlightAndShowReferencesLabelsReferenceRoots(t *testi
 }
 
 func TestEncodeEntityWithHighlightAndShowReferencesLabelsNestedReferenceRoots(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -156,7 +156,7 @@ func TestEncodeEntityWithHighlightAndShowReferencesLabelsNestedReferenceRoots(t 
 }
 
 func TestEncodeEntityWithNilRendererMatchesPlainText(t *testing.T) {
-	c, _, _ := applyEncodeFixture(t)
+	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
@@ -170,14 +170,14 @@ func TestEncodeEntityWithNilRendererMatchesPlainText(t *testing.T) {
 }
 
 func TestEncodeSavedEntityWithNilRendererMatchesPlainText(t *testing.T) {
-	_, reg, statePath := applyEncodeFixture(t)
+	c, statePath := applyEncodeFixture(t)
 
 	record := encodeSavedRecordByID(t, statePath, encodeContainerID)
 
-	plain, err := EncodeSavedEntity(reg, record)
+	plain, err := c.EncodeSavedEntity(record)
 	require.NoError(t, err)
 
-	withNil, err := EncodeSavedEntity(reg, record, Highlight(nil))
+	withNil, err := c.EncodeSavedEntity(record, Highlight(nil))
 	require.NoError(t, err)
 
 	require.Equal(t, string(plain), string(withNil))
