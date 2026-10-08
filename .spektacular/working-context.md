@@ -23,3 +23,14 @@ Core gaps (internal/parser/lifecycle.go):
 ## Interview answers
 - Website: document both the plugin-author Changed contract and plan/diff -/+ output.
 - alt.xcl becomes a demo config in its own directory (e.g. example/plugin/config-subnet/), used by example tests and docs.
+
+## Plan workflow (started 2026-10-08)
+- Planning spec 20261008132354-4538504f-replacement-deps (user chose it; only spec without a plan).
+- Success metrics must flow into Testing Approach (no-drift after subnet apply; per-plugin replace tests; plan == apply actions).
+- Plan user answers: replace reason rendered in the comment line ABOVE the header (`# <addr> will be replaced because <dep> is replaced`), not trailing; dependencies look THROUGH provider-less entities (outputs/variables/modules/config-only types) to provider-backed resources.
+- Target repos: xclconfig (core, root) + xcl-website (docs). Not xcl-vscode.
+- Key learning: the diff walk (walkDiff/diffResource/refresh/diffRecorder) is the decide pass; destroyer (reverse DAG over targets) is the destroy phase for replaced+removed; rebuild() in-walk must go.
+- Architecture locked: contract → decide/act → reason/render → example plugins → docs. Replace settings: network subnet; container image/command/env/networks + replaced dep; template destination; person first/last name.
+- Tasks drafted (12 ids used, 4 milestones). Next: open_questions.
+- Assembled & staged plan/context/research to .spektacular/tmp/<plan>/ (metadata commit ea66b09).
+- All 3 docs committed; now in walkthrough (awaiting user sign-off).
