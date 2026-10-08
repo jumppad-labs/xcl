@@ -1,31 +1,23 @@
 {
-  "kind": "plan",
+  "kind": "spec",
   "current_step": "finished",
   "completed_steps": [
     "new",
+    "interview",
     "overview",
-    "discovery",
-    "architecture",
-    "components",
-    "data_structures",
-    "implementation_detail",
-    "dependencies",
-    "testing_approach",
-    "milestones",
-    "tasks",
-    "open_questions",
-    "out_of_scope",
-    "assemble",
+    "requirements",
+    "acceptance_criteria",
+    "constraints",
+    "technical_approach",
+    "success_metrics",
+    "non_goals",
     "verification",
-    "write_plan",
-    "write_context",
-    "write_research",
-    "walkthrough",
+    "split",
     "finished"
   ],
-  "created_at": "2026-10-08T07:30:13.041207883Z",
-  "updated_at": "2026-10-08T08:02:39.120426196Z",
+  "created_at": "2026-10-08T13:23:54.768750144Z",
+  "updated_at": "2026-10-08T13:43:52.202529718Z",
   "data": {
-    "name": "20261008071608-eb05cae0-config-and-plugin-registries"
+    "name": "20261008132354-4538504f-replacement-deps"
   }
 }
