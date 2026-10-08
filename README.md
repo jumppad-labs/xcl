@@ -267,9 +267,11 @@ directory, and the tests that need a real engine skip when none answers.
 
 Every example applies the configuration and prints what it read. The
 configuration-only example keeps no state; the plugin example is a command line tool, `xcl-docker`, with
-`apply <path>`, `status`, `inspect <address>` and `destroy` commands, each a
-separate run sharing the state saved in `./.xcl-docker`. `apply` and
-`destroy` print nothing of their own. `status` reads the state back with
+`apply <path>`, `plan <path>`, `status`, `inspect <address>` and `destroy`
+commands, each a separate run sharing the state saved in `./.xcl-docker`.
+`apply` and `destroy` print nothing of their own. `plan` compares the saved
+state with the configuration at path using `Diff`, changes nothing, and prints
+what an apply would do with `diff.Render`, highlighted on a terminal. `status` reads the state back with
 `Load` and prints it as a tree drawn with
 [Lip Gloss](https://github.com/charmbracelet/lipgloss), and `inspect` prints
 one resource as highlighted configuration text with `EncodeEntity`. Each
@@ -278,8 +280,8 @@ and errors, to the shared [`example/prettylog`](./example/prettylog)
 receiver, set up in one line, which writes styled lines to standard error. It
 shows info and above; set `XCL_LOG_LEVEL=debug` to see plugin loading and
 `Init` messages too. The program's own output goes to standard output. The
-plugin example's `status` and `inspect` are the exception: they print only
-their output, so they give xcl no receiver.
+plugin example's `plan`, `status` and `inspect` are the exception: they
+print only their output, so they give xcl no receiver.
 
 Run any of them from its directory with `make run`. For `plugin` this builds
 `xcl-docker` and the Docker plugin side by side into `build/`, then runs

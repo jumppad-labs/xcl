@@ -10,10 +10,11 @@
 //     compiled into this program. It provides template, a block type with no
 //     subtype, and renders a Handlebars template to a file.
 //
-// It has four commands, each a separate run of the program sharing the state
+// It has five commands, each a separate run of the program sharing the state
 // saved in a directory, ./.xcl-docker by default:
 //
 //	xcl-docker apply [flags] <path>       apply the configuration at path
+//	xcl-docker plan [flags] <path>        print what applying path would change
 //	xcl-docker status [flags]             print what the saved state holds as a tree
 //	xcl-docker inspect [flags] <address>  print the resource at address as configuration
 //	xcl-docker destroy [flags]            remove everything in the saved state
@@ -26,7 +27,7 @@
 // container's address, which the Docker plugin computes when it creates the
 // container, so a value crosses from one plugin to the other.
 //
-// apply and destroy need a Docker engine, reached through DOCKER_HOST or the
+// apply, plan and destroy need a Docker engine, reached through DOCKER_HOST or the
 // default socket. `make build` builds xcl-docker and the Docker plugin side by
 // side into ./build, where xcl-docker finds the plugin. `make run` applies the
 // example configuration, prints the status and destroys it again.
@@ -60,6 +61,7 @@ const usage = `usage: xcl-docker <command> [flags]
 
 commands:
   apply [flags] <path>       apply the configuration at path
+  plan [flags] <path>        print what applying the configuration at path would change
   status [flags]             print what the saved state holds as a tree
   inspect [flags] <address>  print the resource at address as configuration
   destroy [flags]            remove everything in the saved state
@@ -104,6 +106,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 
 		err = applyCommand(stderr, flags.Arg(0), *dockerPlugin, *stateDir)
+	case "plan":
+		if flags.NArg() != 1 {
+			fmt.Fprint(stderr, "plan needs the path of the configuration to compare\n\n"+usage)
+			return 2
+		}
+
+		err = planCommand(stdout, flags.Arg(0), *dockerPlugin, *stateDir)
 	case "status":
 		err = statusCommand(stdout, *dockerPlugin, *stateDir)
 	case "inspect":
@@ -155,6 +164,24 @@ func applyCommand(stderr io.Writer, configDir, dockerPlugin, stateDir string) er
 	}
 
 	return apply(c, configDir)
+}
+
+// planCommand prints what applying the configuration at configDir would change
+// in the state saved in stateDir, as a diff, without changing anything. Each
+// resource in the state is read through its provider, as apply reads it, so a
+// Docker engine must answer. It prints only the diff, so xcl is given no
+// event handler and stays silent.
+func planCommand(stdout io.Writer, configDir, dockerPlugin, stateDir string) error {
+	if err := client.Ping(context.Background()); err != nil {
+		return err
+	}
+
+	c, err := newConfig(nil, dockerPlugin, stateDir)
+	if err != nil {
+		return err
+	}
+
+	return plan(stdout, c, configDir)
 }
 
 // statusCommand prints what the state saved in stateDir holds as a tree. It

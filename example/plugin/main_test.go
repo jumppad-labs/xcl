@@ -356,10 +356,10 @@ func TestRunWithoutACommandPrintsUsage(t *testing.T) {
 func TestRunWithAnUnknownCommandFails(t *testing.T) {
 	stderr := &bytes.Buffer{}
 
-	code := run([]string{"plan"}, io.Discard, stderr)
+	code := run([]string{"frobnicate"}, io.Discard, stderr)
 
 	require.Equal(t, 2, code)
-	require.Contains(t, stderr.String(), `unknown command "plan"`)
+	require.Contains(t, stderr.String(), `unknown command "frobnicate"`)
 	require.Contains(t, stderr.String(), "usage: xcl-docker <command> [flags]")
 }
 
