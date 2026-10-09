@@ -4,6 +4,7 @@ document_status: draft
 spec: 20261008071608-eb05cae0-config-and-plugin-registries
 specs:
     - 20261008071608-eb05cae0-config-and-plugin-registries
+    - 20261009102148-7d0b205b-github-releases-registry
 ---
 
 # Config and plugin registry API

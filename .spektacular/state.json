@@ -1,21 +1,24 @@
 {
   "kind": "spec",
-  "current_step": "acceptance_criteria",
+  "current_step": "finished",
   "completed_steps": [
     "new",
     "interview",
     "overview",
-    "requirements"
+    "requirements",
+    "acceptance_criteria",
+    "constraints",
+    "technical_approach",
+    "success_metrics",
+    "non_goals",
+    "verification",
+    "split",
+    "finished"
   ],
-  "created_at": "2026-10-09T09:25:51.052751188Z",
-  "updated_at": "2026-10-09T09:33:49.16298322Z",
+  "created_at": "2026-10-09T10:21:48.934508147Z",
+  "updated_at": "2026-10-09T10:36:10.599822249Z",
   "data": {
-    "name": "20261009092551-82db0140-plugin-template",
-    "sources": [
-      {
-        "retrieved_date": "2026-10-09",
-        "uri": "https://github.com/jumppad-labs/xcl/issues/8"
-      }
-    ]
+    "epic": "20261009092551-82db0140-plugin-template",
+    "name": "20261009102148-7d0b205b-github-releases-registry"
   }
 }

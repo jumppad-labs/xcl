@@ -1,1 +1,0 @@
-- **Tests follow the repository rules.** testify `require`, no table-driven tests.
