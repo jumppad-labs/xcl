@@ -375,3 +375,98 @@ func TestDiffRendersReplacedDependencyAsReason(t *testing.T) {
 	output := string(diff.Render(result))
 	require.Contains(t, output, "  # "+twoDependenciesUserID+" will be replaced because "+twoDependenciesReplacedID+" is replaced\n-/+ resource \"container\" \"user\" {")
 }
+
+const (
+	decideCredentialBeforeConfig = "../test_fixtures/config/diff/credential/before/main.xcl"
+	decideCredentialAfterConfig  = "../test_fixtures/config/diff/credential/after/main.xcl"
+	decideCredentialID           = "resource.credential.db"
+)
+
+// changePaths returns the path of every change, in order
+func changePaths(changes []entity.PropertyChange) []string {
+	paths := []string{}
+	for _, change := range changes {
+		paths = append(paths, change.Path.String())
+	}
+
+	return paths
+}
+
+// diffChangePaths returns the path of every change the diff lists for a
+// resource, in order
+func diffChangePaths(changes []diff.Change) []string {
+	paths := []string{}
+	for _, change := range changes {
+		paths = append(paths, change.Path.String())
+	}
+
+	return paths
+}
+
+func TestDecideTellsPluginEditedSettingWithPreviousAndNewValues(t *testing.T) {
+	h := applyUpdateRefBefore(t)
+
+	h.runDiff(t, diffUpdateRefEditedConfig)
+
+	require.Equal(t, []entity.PropertyChange{
+		{
+			Path:   entity.Path{}.Attribute("subnet"),
+			Before: "10.0.0.0/16",
+			After:  "10.9.0.0/16",
+		},
+	}, h.plugin.GetChangedChanges(diffUpdateRefAppID))
+}
+
+func TestDecideTellsUnchangedResourceNoChangedSettings(t *testing.T) {
+	h := applyUpdateRefBefore(t)
+
+	h.runDiff(t, diffUpdateRefBeforeConfig)
+
+	require.Contains(t, callsFor(h.plugin.GetCalls(), diffUpdateRefAppID), "changed "+diffUpdateRefAppID)
+	require.Empty(t, h.plugin.GetChangedChanges(diffUpdateRefAppID))
+}
+
+func TestDecideTellsPluginValueFromReplacedDependencyIsNotYetKnown(t *testing.T) {
+	h := applyUpdateRefBefore(t)
+	h.plugin.SetChangedResult(diffUpdateRefAppID, entity.Replace)
+
+	h.runDiff(t, diffUpdateRefBeforeConfig)
+
+	// user names its network after app's provider id, which the replacement
+	// only assigns once the apply runs
+	require.Equal(t, []entity.PropertyChange{
+		{
+			Path:    entity.Path{}.Attribute("network").Index(0).Attribute("name"),
+			Before:  "id-app",
+			After:   nil,
+			Unknown: true,
+		},
+	}, h.plugin.GetChangedChanges(diffUpdateRefUserID))
+}
+
+func TestDecideTellsPluginRealValuesOfEditedSensitiveSetting(t *testing.T) {
+	h := setupLifecycle(t)
+	h.applyAndSave(t, decideCredentialBeforeConfig)
+	h.plugin.ResetCalls()
+
+	h.runDiff(t, decideCredentialAfterConfig)
+
+	require.Equal(t, []entity.PropertyChange{
+		{
+			Path:      entity.Path{}.Attribute("password"),
+			Before:    "diff-before-pw-3a9c",
+			After:     "diff-after-pw-8e1f",
+			Sensitive: true,
+		},
+	}, h.plugin.GetChangedChanges(decideCredentialID))
+}
+
+func TestDecideTellsPluginTheSamePathsThePlanShows(t *testing.T) {
+	h := applyUpdateRefBefore(t)
+
+	result := h.runDiff(t, diffUpdateRefEditedConfig)
+
+	app := diffResourceAt(t, result, diffUpdateRefAppID)
+	require.Equal(t, []string{"subnet"}, diffChangePaths(app.Changes))
+	require.Equal(t, diffChangePaths(app.Changes), changePaths(h.plugin.GetChangedChanges(diffUpdateRefAppID)))
+}

@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
@@ -79,9 +80,37 @@ func (p *networkProvider) Create(ctx context.Context, n *Network) (*Network, err
 }
 
 // Destroy removes the network, a network that is already gone counts as
-// removed
+// removed. Every container still attached is force-disconnected first, so
+// rebuilding a network never fails on its active endpoints; the container's
+// own Update attaches it again to the network that replaces this one.
 func (p *networkProvider) Destroy(ctx context.Context, n *Network, force bool) error {
-	err := p.client.NetworkRemove(ctx, n.DockerID)
+	inspect, err := p.client.NetworkInspect(ctx, n.DockerID, network.InspectOptions{})
+	if dockerclient.IsErrNotFound(err) {
+		plugins.Logger(ctx).Info("network already removed", "name", n.Meta.Name, "id", n.DockerID)
+		return nil
+	}
+
+	if err != nil {
+		return fmt.Errorf("unable to inspect network %s: %w", n.Meta.Name, err)
+	}
+
+	// sorted, so the containers are always detached in the same order
+	attached := make([]string, 0, len(inspect.Containers))
+	for containerID := range inspect.Containers {
+		attached = append(attached, containerID)
+	}
+	sort.Strings(attached)
+
+	for _, containerID := range attached {
+		err := p.client.NetworkDisconnect(ctx, n.DockerID, containerID, true)
+		if err != nil && !dockerclient.IsErrNotFound(err) {
+			return fmt.Errorf("unable to disconnect container %s from network %s: %w", containerID, n.Meta.Name, err)
+		}
+
+		plugins.Logger(ctx).Info("disconnected container from network", "name", n.Meta.Name, "container", containerID)
+	}
+
+	err = p.client.NetworkRemove(ctx, n.DockerID)
 	if err != nil && !dockerclient.IsErrNotFound(err) {
 		return fmt.Errorf("unable to remove network %s: %w", n.Meta.Name, err)
 	}
@@ -101,18 +130,18 @@ func (p *networkProvider) Read(ctx context.Context, old *Network, new *Network) 
 // Changed answers replace when the subnet changes: Docker can not move a
 // network to a new address range, the network has to be removed and created
 // again. Any other change is left to DefaultChanged.
-func (p *networkProvider) Changed(ctx context.Context, old *Network, new *Network, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (p *networkProvider) Changed(ctx context.Context, old *Network, new *Network, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	if old.Subnet != new.Subnet {
 		return entity.Replace, nil
 	}
 
-	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+	return p.DefaultChanged.Changed(ctx, old, new, changes, dependencies)
 }
 
 // Update returns the network unchanged. Every setting Docker can not change in
 // place answers replace in Changed, so Update is only reached for changes that
 // need no Docker call, such as xcl's own metadata.
-func (p *networkProvider) Update(ctx context.Context, n *Network) (*Network, error) {
+func (p *networkProvider) Update(ctx context.Context, n *Network, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Network, error) {
 	return n, nil
 }
 

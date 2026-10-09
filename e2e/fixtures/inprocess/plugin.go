@@ -87,12 +87,12 @@ func (p *postgresProvider) Init(state plugins.State, functions plugins.ProviderF
 // Changed answers replace when the location changes, the connection identity changes with it, so the
 // e2e scenarios have a provider-decided replacement. Every other change is
 // left to DefaultChanged.
-func (p *postgresProvider) Changed(ctx context.Context, old *services.PostgreSQL, new *services.PostgreSQL, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (p *postgresProvider) Changed(ctx context.Context, old *services.PostgreSQL, new *services.PostgreSQL, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	if old.Location != new.Location {
 		return entity.Replace, nil
 	}
 
-	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+	return p.DefaultChanged.Changed(ctx, old, new, changes, dependencies)
 }
 
 // Create sets the computed connection string, configured fields are never
@@ -117,7 +117,7 @@ func (p *postgresProvider) Read(ctx context.Context, old *services.PostgreSQL, n
 }
 
 // Update sets the computed connection string for the changed configuration
-func (p *postgresProvider) Update(ctx context.Context, db *services.PostgreSQL) (*services.PostgreSQL, error) {
+func (p *postgresProvider) Update(ctx context.Context, db *services.PostgreSQL, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*services.PostgreSQL, error) {
 	if err := connect(db); err != nil {
 		return nil, err
 	}
@@ -199,7 +199,7 @@ func (p *redisProvider) Read(ctx context.Context, old *services.Redis, new *serv
 }
 
 // Update sets the computed connection string for the changed configuration
-func (p *redisProvider) Update(ctx context.Context, cache *services.Redis) (*services.Redis, error) {
+func (p *redisProvider) Update(ctx context.Context, cache *services.Redis, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*services.Redis, error) {
 	cache.ConnectionString = cacheConnectionString(cache)
 	plugins.Logger(ctx).Info("updated cache", "connection_string", cache.ConnectionString)
 

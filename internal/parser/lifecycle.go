@@ -154,9 +154,16 @@ func (l *resourceLifecycle) run(r any) error {
 
 // update calls the provider's Update for a resource decided update. It is
 // sent the configuration as decoded now, with real values, and the computed
-// values the decide pass read.
+// values the decide pass read. It is told the settings that changed, worked
+// out again from the real values, and the dependencies its provider was told
+// about while deciding.
 func (l *resourceLifecycle) update(r any, dec decision, adapter plugins.ProviderAdapter) error {
 	meta, err := types.GetMeta(r)
+	if err != nil {
+		return err
+	}
+
+	changes, err := l.updateChanges(r, meta)
 	if err != nil {
 		return err
 	}
@@ -171,7 +178,7 @@ func (l *resourceLifecycle) update(r any, dec decision, adapter plugins.Provider
 	}
 
 	duration, err := l.callProvider(events.OperationUpdate, r, data, func(ctx context.Context) ([]byte, error) {
-		return adapter.Update(ctx, data)
+		return adapter.Update(ctx, data, changes, dec.dependencies)
 	})
 	if errors.Is(err, errNotReached) {
 		return err
@@ -189,6 +196,27 @@ func (l *resourceLifecycle) update(r any, dec decision, adapter plugins.Provider
 	emitLifecycle(l.options, meta, events.OperationUpdate, events.PhaseSuccess, duration, nil, data, r)
 
 	return nil
+}
+
+// updateChanges returns the provider's view of the settings of r that changed
+// since the last apply. The comparison is the plan's own, run again now that
+// every value is known: values produced earlier in the same apply are real,
+// and a setting that was only known once the apply ran stays listed with its
+// real value, so the settings match those the plan showed.
+func (l *resourceLifecycle) updateChanges(r any, meta *types.Meta) ([]entity.PropertyChange, error) {
+	saved, err := findByID(l.previous.GetResources(), meta.ID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find resource %s in previous state: %w", meta.ID, err)
+	}
+
+	revealed := resolveUnknown(l.revealedChanges(meta, diff.ActionUpdate, saved, r), r)
+
+	changes, err := pluginChanges(revealed)
+	if err != nil {
+		return nil, fmt.Errorf("unable to describe the changes to resource %s: %w", meta.ID, err)
+	}
+
+	return changes, nil
 }
 
 // keep saves a resource decided unchanged as its provider read it while
@@ -296,8 +324,9 @@ func (l *resourceLifecycle) decideResource(r any, meta *types.Meta) error {
 	switch oldMeta.Status {
 	case types.StatusCreated, types.StatusUpdated:
 	default:
-		l.recordReplace(meta, diff.ReplaceFailed, nil, old, r)
-		l.recorder.decide(meta.ID, decision{action: diff.ActionReplace, reason: diff.ReplaceFailed})
+		changes := l.changes(meta, diff.ActionReplace, old, r)
+		l.recordReplace(meta, diff.ReplaceFailed, nil, changes)
+		l.recorder.decide(meta.ID, decision{action: diff.ActionReplace, reason: diff.ReplaceFailed, changes: changes})
 		return nil
 	}
 
@@ -333,32 +362,26 @@ func (l *resourceLifecycle) decideResource(r any, meta *types.Meta) error {
 		l.recorder.decide(meta.ID, decision{action: diff.ActionCreate, dependencies: dependencies})
 
 	case refreshReplace:
-		configured, err := decodeCopy(r, copies.configured)
-		if err != nil {
-			return err
-		}
-
 		reason, replacedDeps := replaceReason(dependencies)
+		changes := planChanges(copies.revealed, l.diffOptions.RevealSensitive)
 
-		l.recordReplace(meta, reason, replacedDeps, old, configured)
+		l.recordReplace(meta, reason, replacedDeps, changes)
 		l.recorder.decide(meta.ID, decision{
 			action:       diff.ActionReplace,
 			reason:       reason,
 			replacedDeps: replacedDeps,
 			dependencies: dependencies,
+			changes:      changes,
 			read:         copies.read,
 		})
 
 	case refreshChanged:
 		// the configuration as written is compared, not what the provider
 		// read back, so drift alone lists no changes
-		configured, err := decodeCopy(r, copies.configured)
-		if err != nil {
-			return err
-		}
+		changes := planChanges(copies.revealed, l.diffOptions.RevealSensitive)
 
-		l.recordPending(meta, diff.ActionUpdate, old, configured)
-		l.recorder.decide(meta.ID, decision{action: diff.ActionUpdate, dependencies: dependencies, read: copies.read})
+		l.recordPendingResource(meta, diff.Resource{Action: diff.ActionUpdate, Dependencies: planDependencies(dependencies)}, changes)
+		l.recorder.decide(meta.ID, decision{action: diff.ActionUpdate, dependencies: dependencies, changes: changes, read: copies.read})
 
 	default:
 		l.recorder.recordUnchanged()
@@ -366,6 +389,26 @@ func (l *resourceLifecycle) decideResource(r any, meta *types.Meta) error {
 	}
 
 	return nil
+}
+
+// planDependencies returns the plan's view of the dependencies an update's
+// provider was told about, nil when there are none
+func planDependencies(dependencies []entity.DependencyChange) []diff.Dependency {
+	if len(dependencies) == 0 {
+		return nil
+	}
+
+	planned := make([]diff.Dependency, 0, len(dependencies))
+	for _, dependency := range dependencies {
+		action := diff.ActionUpdate
+		if dependency.Change == entity.Replace {
+			action = diff.ActionReplace
+		}
+
+		planned = append(planned, diff.Dependency{Address: dependency.Address, Action: action})
+	}
+
+	return planned
 }
 
 // replaceReason returns why a provider answered replace: because of the
@@ -394,29 +437,37 @@ func replaceReason(dependencies []entity.DependencyChange) (diff.ReplaceReason, 
 // diff may list a resource an apply then leaves alone, never the other way
 // round.
 func (l *resourceLifecycle) recordPending(meta *types.Meta, action diff.Action, saved, configured any) {
-	l.recordPendingResource(meta, diff.Resource{Action: action}, saved, configured)
+	l.recordPendingResource(meta, diff.Resource{Action: action}, l.changes(meta, action, saved, configured))
 }
 
 // recordReplace records a resource an apply would replace, with the reason
-// and the replaced dependencies behind it, see recordPending
-func (l *resourceLifecycle) recordReplace(meta *types.Meta, reason diff.ReplaceReason, replacedDeps []string, saved, configured any) {
-	l.recordPendingResource(meta, diff.Resource{Action: diff.ActionReplace, Reason: reason, ReplacedDeps: replacedDeps}, saved, configured)
+// and the replaced dependencies behind it and the plan's view of its changes,
+// see recordPending
+func (l *resourceLifecycle) recordReplace(meta *types.Meta, reason diff.ReplaceReason, replacedDeps []string, changes []diff.Change) {
+	l.recordPendingResource(meta, diff.Resource{Action: diff.ActionReplace, Reason: reason, ReplacedDeps: replacedDeps}, changes)
 }
 
 // recordPendingResource records resource, completed with the entity's
-// address and changes, see recordPending
-func (l *resourceLifecycle) recordPendingResource(meta *types.Meta, resource diff.Resource, saved, configured any) {
+// address and the plan's view of its changes, see recordPending
+func (l *resourceLifecycle) recordPendingResource(meta *types.Meta, resource diff.Resource, changes []diff.Change) {
 	resource.Address = meta.ID
-	resource.Changes = l.changes(meta, resource.Action, saved, configured)
+	resource.Changes = changes
 
 	l.recorder.markPending(meta.ID)
 	l.recorder.record(resource)
 }
 
-// changes returns the changes to a resource's configured values an apply
-// taking action would make
+// changes returns the plan's view of the changes to a resource's configured
+// values an apply taking action would make, see planChanges
 func (l *resourceLifecycle) changes(meta *types.Meta, action diff.Action, saved, configured any) []diff.Change {
-	return resourceChanges(action, saved, configured, l.bodies[meta.ID], l.recorder.unknownPaths(meta.ID), l.diffOptions.RevealSensitive)
+	return planChanges(l.revealedChanges(meta, action, saved, configured), l.diffOptions.RevealSensitive)
+}
+
+// revealedChanges returns the changes to a resource's configured values an
+// apply taking action would make, with real sensitive values. It is the one
+// comparison both the plan's and the provider's views are taken from.
+func (l *resourceLifecycle) revealedChanges(meta *types.Meta, action diff.Action, saved, configured any) []diff.Change {
+	return resourceChanges(action, saved, configured, l.bodies[meta.ID], l.recorder.unknownPaths(meta.ID), true)
 }
 
 // decodeCopy returns a new resource of the same type as r holding the
@@ -498,12 +549,19 @@ type refreshed struct {
 	// read is the resource as the provider read it, empty when it was not
 	// found
 	read []byte
+
+	// revealed are the changes of the configured copy against the saved
+	// copy, with real sensitive values; the provider and the plan are each
+	// shown their own view of them
+	revealed []diff.Change
 }
 
 // refresh reads a resource that exists in the previous state through its
 // provider and asks whether it changed. The computed values saved last time
 // are carried onto the configured resource, the provider reads the real
 // resource, and change detection compares the saved copy with what was read.
+// The provider is also told the settings that changed, worked out by the
+// plan's own comparison of the saved copy with the configured one.
 // It never creates or updates anything: apply and diff each act on the
 // outcome.
 //
@@ -528,6 +586,20 @@ func (l *resourceLifecycle) refresh(r any, old any, adapter plugins.ProviderAdap
 	copies.configured, err = wire.Marshal(r)
 	if err != nil {
 		return refreshUnchanged, copies, fmt.Errorf("unable to serialize resource %s: %w", meta.ID, err)
+	}
+
+	// the configuration as written is compared with the saved copy, exactly
+	// as the plan compares it, so the provider is told what the plan shows
+	configured, err := decodeCopy(r, copies.configured)
+	if err != nil {
+		return refreshUnchanged, copies, err
+	}
+
+	copies.revealed = l.revealedChanges(meta, diff.ActionUpdate, old, configured)
+
+	changes, err := pluginChanges(copies.revealed)
+	if err != nil {
+		return refreshUnchanged, copies, fmt.Errorf("unable to describe the changes to resource %s: %w", meta.ID, err)
 	}
 
 	// computed values are carried over before the read, so they survive even
@@ -574,7 +646,7 @@ func (l *resourceLifecycle) refresh(r any, old any, adapter plugins.ProviderAdap
 	change := entity.NoChange
 	duration, err = l.callProvider(events.OperationChanged, r, copies.read, func(ctx context.Context) ([]byte, error) {
 		var changedErr error
-		change, changedErr = adapter.Changed(ctx, copies.old, copies.read, dependencies)
+		change, changedErr = adapter.Changed(ctx, copies.old, copies.read, changes, dependencies)
 		return nil, changedErr
 	})
 	if errors.Is(err, errNotReached) {
@@ -696,6 +768,11 @@ func (l *resourceLifecycle) callProvider(operation string, r any, data []byte, c
 	}
 
 	if len(result) > 0 {
+		// the provider owns computed values: one it leaves out of its result,
+		// such as an address it cleared, must not keep the value carried
+		// over from the last apply
+		clearComputed(reflect.ValueOf(r))
+
 		if err := json.Unmarshal(result, r); err != nil {
 			decodeErr := fmt.Errorf("unable to decode %s result: %w", operation, err)
 			emitLifecycle(l.options, meta, operation, events.PhaseError, duration, decodeErr, data, r)

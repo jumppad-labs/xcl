@@ -243,13 +243,34 @@ work, each laid out the way a plugin author would lay out their own project:
   ([`plugin/plugins/template`](./example/plugin/plugins/template)) is an
   in-process plugin, compiled into the program. It provides `template`, a
   block type with no subtype written `template "welcome" {}`, and renders a
-  Handlebars template to a file.
+  Handlebars template to a file, with the permissions in its optional `mode`
+  (an octal string, `"0644"` when unset).
 
 A plugin registers each block type with its own call to
 `plugins.RegisterResourceProvider` in `Init`, passing an empty subtype for a
 type like `template`. The container's `ip_address` is computed by the Docker
 plugin when it creates the container, and the template's `variables` read it,
-so a value moves from the external plugin to the in-process one.
+so a value moves from the external plugin to the in-process one. Values move
+the other way too: the `init` template renders a script with `mode = "0755"`,
+and the container's `init_script` reads its destination and mounts the file
+read-only at `/docker-entrypoint.d/90-xcl-init.sh`, where nginx runs it when
+the container starts.
+
+The container's provider decides and acts from what xcl tells it, the
+settings that changed and the dependencies the same apply updates or
+replaces. Its `Changed` answers replace for a change within `image`,
+`command`, `environment` or `init_script`, which Docker fixes when it creates
+a container, or when a dependency that is not a Docker network is replaced,
+such as the `init` template. A change to its networks, or a network that is
+updated or replaced, answers update, and a dependency that is only updated,
+such as the `init` template rendering new content, leaves it alone. Its
+`Update` hot swaps the running container's networks: it rebuilds the previous
+attachments by putting back each network change's `Before` value,
+disconnects the networks that went away or whose aliases changed, connects
+the new ones, reconnects those whose network was replaced, and reads the
+container's new address. The network's `Destroy` force-disconnects every
+container still attached before it removes the network, so a network can be
+rebuilt under a running container.
 
 Their providers log from each lifecycle method with
 `plugins.Logger(ctx).Info("created network", "name", n.Meta.Name, "id", n.DockerID)`,
@@ -286,23 +307,25 @@ print only their output, so they give xcl no receiver.
 Run any of them from its directory with `make run`. For `plugin` this builds
 `xcl-docker` and the Docker plugin side by side into `build/`, then runs
 `apply ./config`, `status` and `destroy` in turn, and it has the extra Makefile
-targets `build`, `replace`, `generate` and `clean`; every example has `run`
-and `test`. The plugin tests build both binaries themselves.
+targets `build`, `replace`, `swap`, `rebuild-init`, `remove-network`,
+`generate` and `clean`; every example has `run` and `test`. The plugin tests
+build both binaries themselves.
 
 `./config` is the plugin example's whole configuration and applies on its
 own. Next to it, [`plugin/config-subnet`](./example/plugin/config-subnet) is
 the same configuration with the network's address range widened from
 `10.42.0.0/24` to `10.42.0.0/23`. Docker cannot move a network to a new range
 in place, so the network's provider answers replace when its `subnet`
-changes, and the container's provider answers replace when a resource it
-depends on is replaced, since it would be left attached to a network that no
-longer exists. `make replace` applies `./config`, then plans and applies
-`./config-subnet`, prints the state and destroys everything. The plan shows
-each replacement as `-/+` with the reason above it:
+changes. The container is not replaced with it: it is told the network is
+replaced and answers update, and its `Update` reattaches the running
+container to the new network, keeping its ID. `make replace` applies
+`./config`, then plans and applies `./config-subnet`, prints the state and
+destroys everything. The plan shows the replacement as `-/+` and the
+container's update with the dependency behind it:
 
 ```
-  # docker.container.web will be replaced because docker.network.app is replaced
--/+ docker "container" "web" {}
+  # docker.container.web will be updated because docker.network.app is replaced
+  ~ docker "container" "web" {}
 
   # docker.network.app will be replaced, it cannot be updated in place
 -/+ docker "network" "app" {
@@ -314,16 +337,41 @@ each replacement as `-/+` with the reason above it:
       ~ variables["address"] = "10.42.0.2" -> (known after apply)
     }
 
-Diff: 0 to create, 1 to update, 2 to replace, 0 to delete, 0 unchanged.
+Diff: 0 to create, 2 to update, 1 to replace, 0 to delete, 1 unchanged.
 ```
 
-The container's configuration is unchanged; it is replaced only because its
-network is. The template reads the container's address, which is only known
-once the new container exists, so it is updated. Applying `./config-subnet`
-reads and asks about all three first, then destroys the container and the
-network, dependents first, creates the network on `10.42.0.0/23` and the
-container on it, and updates the template with the container's new address.
-Planning `./config-subnet` again shows `Diff: no changes, 3 unchanged.`
+The container's configuration is unchanged; it is updated only because its
+network is replaced. The template reads the container's address, which is
+only known once the container is on the new network, so it is updated; the
+`init` template, which reads only the network's name, is unchanged. Applying
+`./config-subnet` destroys the old network, which detaches the container,
+creates the network on `10.42.0.0/23`, connects the same container to it and
+updates the template with the container's new address.
+
+Three more variants each have a Makefile target that applies `./config`,
+then plans and applies the variant, prints the state and destroys
+everything:
+
+- `make swap` applies [`plugin/config-swap`](./example/plugin/config-swap),
+  which adds a `backend` network and moves the container to it. The container
+  is updated in place, disconnected from `app` and connected to `backend`
+  with the same ID: `Diff: 1 to create, 2 to update, 0 to replace, 0 to
+  delete, 2 unchanged.`
+- `make rebuild-init` applies [`plugin/config-init`](./example/plugin/config-init),
+  which moves the init script's destination. The template cannot move its
+  file in place, so it is replaced, and the container that mounts the script
+  is replaced because it is: `Diff: 0 to create, 1 to update, 2 to replace,
+  0 to delete, 1 unchanged.` Editing only the script's content, as
+  [`plugin/config-init-content`](./example/plugin/config-init-content) does,
+  renders the file again and leaves the container alone.
+- `make remove-network` applies
+  [`plugin/config-remove`](./example/plugin/config-remove), which removes the
+  network and every reference to it. The network is deleted, detaching the
+  container, which is updated in place and keeps running with no network:
+  `Diff: 0 to create, 3 to update, 0 to replace, 1 to delete, 0 unchanged.`
+  Removing only the network block and leaving references to it, as
+  [`plugin/config-dangling`](./example/plugin/config-dangling) does, is
+  rejected by validation before anything changes.
 
 Each example is a Go module of its own, pointed at this checkout with a
 `replace` directive, so it can be copied out of the repository: drop the

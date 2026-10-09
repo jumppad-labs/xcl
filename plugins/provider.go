@@ -81,10 +81,17 @@ type ResourceProvider[T any] interface {
 	//
 	// The ctx parameter provides cancellation and timeout control.
 	// The resource parameter contains the desired resource configuration.
+	// The changes parameter lists the settings that differ from the last
+	// apply, each with its previous and new value. Every value is real: by
+	// the time Update runs, no new value is still unknown.
+	// The dependencies parameter is exactly the list given to Changed.
+	//
+	// A sensitive setting's change holds its real values; the change masks
+	// them itself when printed or logged. Values are plain JSON values.
 	// Returns the updated resource with new state and any update error.
 	//
 	// The implementation should periodically check the context for cancellation.
-	Update(ctx context.Context, resource T) (T, error)
+	Update(ctx context.Context, resource T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (T, error)
 
 	// Changed decides what applying the desired configuration needs for a
 	// resource, by comparing the current state with the desired configuration.
@@ -93,6 +100,11 @@ type ResourceProvider[T any] interface {
 	// The old parameter contains the resource as saved by the last apply.
 	// The new parameter contains the current configuration after it has been
 	// through Read, so it holds both configuration edits and observed drift.
+	// The changes parameter lists the settings that differ from the last
+	// apply, each with its previous and new value. A new value that is only
+	// known once the apply runs has Unknown set and a nil After.
+	// A sensitive setting's change holds its real values; the change masks
+	// them itself when printed or logged. Values are plain JSON values.
 	// The dependencies parameter lists the resources this one directly depends
 	// on that the same apply will update or replace, each with its outcome.
 	// Dependencies that will not change are not listed.
@@ -106,7 +118,7 @@ type ResourceProvider[T any] interface {
 	// defining Changed on the provider overrides it.
 	// Returns the change the resource needs and any error encountered while
 	// deciding it.
-	Changed(ctx context.Context, old T, new T, dependencies []entity.DependencyChange) (entity.Change, error)
+	Changed(ctx context.Context, old T, new T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error)
 
 	// Functions returns the functions exposed by the provider that can be called
 	// by other providers.

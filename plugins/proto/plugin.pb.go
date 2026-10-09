@@ -72,6 +72,56 @@ func (Change) EnumDescriptor() ([]byte, []int) {
 	return file_plugins_plugin_proto_rawDescGZIP(), []int{0}
 }
 
+// StepKind is what one step of a path selects, see entity.StepKind
+type StepKind int32
+
+const (
+	StepKind_STEP_KIND_ATTRIBUTE StepKind = 0
+	StepKind_STEP_KIND_INDEX     StepKind = 1
+	StepKind_STEP_KIND_KEY       StepKind = 2
+)
+
+// Enum value maps for StepKind.
+var (
+	StepKind_name = map[int32]string{
+		0: "STEP_KIND_ATTRIBUTE",
+		1: "STEP_KIND_INDEX",
+		2: "STEP_KIND_KEY",
+	}
+	StepKind_value = map[string]int32{
+		"STEP_KIND_ATTRIBUTE": 0,
+		"STEP_KIND_INDEX":     1,
+		"STEP_KIND_KEY":       2,
+	}
+)
+
+func (x StepKind) Enum() *StepKind {
+	p := new(StepKind)
+	*p = x
+	return p
+}
+
+func (x StepKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (StepKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_plugins_plugin_proto_enumTypes[1].Descriptor()
+}
+
+func (StepKind) Type() protoreflect.EnumType {
+	return &file_plugins_plugin_proto_enumTypes[1]
+}
+
+func (x StepKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use StepKind.Descriptor instead.
+func (StepKind) EnumDescriptor() ([]byte, []int) {
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{1}
+}
+
 // Plugin service messages
 type GetTypesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -668,6 +718,8 @@ type UpdateRequest struct {
 	EntityType    string                 `protobuf:"bytes,1,opt,name=entity_type,json=entityType,proto3" json:"entity_type,omitempty"`
 	EntitySubType string                 `protobuf:"bytes,2,opt,name=entity_sub_type,json=entitySubType,proto3" json:"entity_sub_type,omitempty"`
 	EntityData    []byte                 `protobuf:"bytes,3,opt,name=entity_data,json=entityData,proto3" json:"entity_data,omitempty"`
+	Changes       []*PropertyChange      `protobuf:"bytes,4,rep,name=changes,proto3" json:"changes,omitempty"`
+	Dependencies  []*DependencyChange    `protobuf:"bytes,5,rep,name=dependencies,proto3" json:"dependencies,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -719,6 +771,20 @@ func (x *UpdateRequest) GetEntitySubType() string {
 func (x *UpdateRequest) GetEntityData() []byte {
 	if x != nil {
 		return x.EntityData
+	}
+	return nil
+}
+
+func (x *UpdateRequest) GetChanges() []*PropertyChange {
+	if x != nil {
+		return x.Changes
+	}
+	return nil
+}
+
+func (x *UpdateRequest) GetDependencies() []*DependencyChange {
+	if x != nil {
+		return x.Dependencies
 	}
 	return nil
 }
@@ -829,6 +895,154 @@ func (x *DependencyChange) GetChange() Change {
 	return Change_CHANGE_NO_CHANGE
 }
 
+// PathStep is one step of the path to a setting, see entity.Step
+type PathStep struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          StepKind               `protobuf:"varint,1,opt,name=kind,proto3,enum=proto.StepKind" json:"kind,omitempty"`
+	Attribute     string                 `protobuf:"bytes,2,opt,name=attribute,proto3" json:"attribute,omitempty"`
+	Index         int64                  `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
+	Key           string                 `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PathStep) Reset() {
+	*x = PathStep{}
+	mi := &file_plugins_plugin_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PathStep) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PathStep) ProtoMessage() {}
+
+func (x *PathStep) ProtoReflect() protoreflect.Message {
+	mi := &file_plugins_plugin_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PathStep.ProtoReflect.Descriptor instead.
+func (*PathStep) Descriptor() ([]byte, []int) {
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *PathStep) GetKind() StepKind {
+	if x != nil {
+		return x.Kind
+	}
+	return StepKind_STEP_KIND_ATTRIBUTE
+}
+
+func (x *PathStep) GetAttribute() string {
+	if x != nil {
+		return x.Attribute
+	}
+	return ""
+}
+
+func (x *PathStep) GetIndex() int64 {
+	if x != nil {
+		return x.Index
+	}
+	return 0
+}
+
+func (x *PathStep) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+// PropertyChange is one setting that differs between the last apply and the
+// new configuration, see entity.PropertyChange. before and after hold JSON
+// values; empty means the value is absent.
+type PropertyChange struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          []*PathStep            `protobuf:"bytes,1,rep,name=path,proto3" json:"path,omitempty"`
+	Before        []byte                 `protobuf:"bytes,2,opt,name=before,proto3" json:"before,omitempty"`
+	After         []byte                 `protobuf:"bytes,3,opt,name=after,proto3" json:"after,omitempty"`
+	Unknown       bool                   `protobuf:"varint,4,opt,name=unknown,proto3" json:"unknown,omitempty"`
+	Sensitive     bool                   `protobuf:"varint,5,opt,name=sensitive,proto3" json:"sensitive,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PropertyChange) Reset() {
+	*x = PropertyChange{}
+	mi := &file_plugins_plugin_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PropertyChange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PropertyChange) ProtoMessage() {}
+
+func (x *PropertyChange) ProtoReflect() protoreflect.Message {
+	mi := &file_plugins_plugin_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PropertyChange.ProtoReflect.Descriptor instead.
+func (*PropertyChange) Descriptor() ([]byte, []int) {
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *PropertyChange) GetPath() []*PathStep {
+	if x != nil {
+		return x.Path
+	}
+	return nil
+}
+
+func (x *PropertyChange) GetBefore() []byte {
+	if x != nil {
+		return x.Before
+	}
+	return nil
+}
+
+func (x *PropertyChange) GetAfter() []byte {
+	if x != nil {
+		return x.After
+	}
+	return nil
+}
+
+func (x *PropertyChange) GetUnknown() bool {
+	if x != nil {
+		return x.Unknown
+	}
+	return false
+}
+
+func (x *PropertyChange) GetSensitive() bool {
+	if x != nil {
+		return x.Sensitive
+	}
+	return false
+}
+
 type ChangedRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	EntityType    string                 `protobuf:"bytes,1,opt,name=entity_type,json=entityType,proto3" json:"entity_type,omitempty"`
@@ -836,13 +1050,14 @@ type ChangedRequest struct {
 	OldEntityData []byte                 `protobuf:"bytes,3,opt,name=old_entity_data,json=oldEntityData,proto3" json:"old_entity_data,omitempty"`
 	NewEntityData []byte                 `protobuf:"bytes,4,opt,name=new_entity_data,json=newEntityData,proto3" json:"new_entity_data,omitempty"`
 	Dependencies  []*DependencyChange    `protobuf:"bytes,5,rep,name=dependencies,proto3" json:"dependencies,omitempty"`
+	Changes       []*PropertyChange      `protobuf:"bytes,6,rep,name=changes,proto3" json:"changes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ChangedRequest) Reset() {
 	*x = ChangedRequest{}
-	mi := &file_plugins_plugin_proto_msgTypes[14]
+	mi := &file_plugins_plugin_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -854,7 +1069,7 @@ func (x *ChangedRequest) String() string {
 func (*ChangedRequest) ProtoMessage() {}
 
 func (x *ChangedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_plugin_proto_msgTypes[14]
+	mi := &file_plugins_plugin_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -867,7 +1082,7 @@ func (x *ChangedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangedRequest.ProtoReflect.Descriptor instead.
 func (*ChangedRequest) Descriptor() ([]byte, []int) {
-	return file_plugins_plugin_proto_rawDescGZIP(), []int{14}
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ChangedRequest) GetEntityType() string {
@@ -905,6 +1120,13 @@ func (x *ChangedRequest) GetDependencies() []*DependencyChange {
 	return nil
 }
 
+func (x *ChangedRequest) GetChanges() []*PropertyChange {
+	if x != nil {
+		return x.Changes
+	}
+	return nil
+}
+
 type ChangedResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
@@ -915,7 +1137,7 @@ type ChangedResponse struct {
 
 func (x *ChangedResponse) Reset() {
 	*x = ChangedResponse{}
-	mi := &file_plugins_plugin_proto_msgTypes[15]
+	mi := &file_plugins_plugin_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -927,7 +1149,7 @@ func (x *ChangedResponse) String() string {
 func (*ChangedResponse) ProtoMessage() {}
 
 func (x *ChangedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_plugin_proto_msgTypes[15]
+	mi := &file_plugins_plugin_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -940,7 +1162,7 @@ func (x *ChangedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangedResponse.ProtoReflect.Descriptor instead.
 func (*ChangedResponse) Descriptor() ([]byte, []int) {
-	return file_plugins_plugin_proto_rawDescGZIP(), []int{15}
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ChangedResponse) GetError() string {
@@ -972,7 +1194,7 @@ type LogRequest struct {
 
 func (x *LogRequest) Reset() {
 	*x = LogRequest{}
-	mi := &file_plugins_plugin_proto_msgTypes[16]
+	mi := &file_plugins_plugin_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -984,7 +1206,7 @@ func (x *LogRequest) String() string {
 func (*LogRequest) ProtoMessage() {}
 
 func (x *LogRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_plugin_proto_msgTypes[16]
+	mi := &file_plugins_plugin_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -997,7 +1219,7 @@ func (x *LogRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogRequest.ProtoReflect.Descriptor instead.
 func (*LogRequest) Descriptor() ([]byte, []int) {
-	return file_plugins_plugin_proto_rawDescGZIP(), []int{16}
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *LogRequest) GetMessage() string {
@@ -1029,7 +1251,7 @@ type LogResponse struct {
 
 func (x *LogResponse) Reset() {
 	*x = LogResponse{}
-	mi := &file_plugins_plugin_proto_msgTypes[17]
+	mi := &file_plugins_plugin_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1041,7 +1263,7 @@ func (x *LogResponse) String() string {
 func (*LogResponse) ProtoMessage() {}
 
 func (x *LogResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_plugin_proto_msgTypes[17]
+	mi := &file_plugins_plugin_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1054,7 +1276,7 @@ func (x *LogResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogResponse.ProtoReflect.Descriptor instead.
 func (*LogResponse) Descriptor() ([]byte, []int) {
-	return file_plugins_plugin_proto_rawDescGZIP(), []int{17}
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{19}
 }
 
 // State service messages
@@ -1067,7 +1289,7 @@ type StateGetRequest struct {
 
 func (x *StateGetRequest) Reset() {
 	*x = StateGetRequest{}
-	mi := &file_plugins_plugin_proto_msgTypes[18]
+	mi := &file_plugins_plugin_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1079,7 +1301,7 @@ func (x *StateGetRequest) String() string {
 func (*StateGetRequest) ProtoMessage() {}
 
 func (x *StateGetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_plugin_proto_msgTypes[18]
+	mi := &file_plugins_plugin_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1092,7 +1314,7 @@ func (x *StateGetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateGetRequest.ProtoReflect.Descriptor instead.
 func (*StateGetRequest) Descriptor() ([]byte, []int) {
-	return file_plugins_plugin_proto_rawDescGZIP(), []int{18}
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *StateGetRequest) GetKey() string {
@@ -1112,7 +1334,7 @@ type StateGetResponse struct {
 
 func (x *StateGetResponse) Reset() {
 	*x = StateGetResponse{}
-	mi := &file_plugins_plugin_proto_msgTypes[19]
+	mi := &file_plugins_plugin_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1124,7 +1346,7 @@ func (x *StateGetResponse) String() string {
 func (*StateGetResponse) ProtoMessage() {}
 
 func (x *StateGetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_plugin_proto_msgTypes[19]
+	mi := &file_plugins_plugin_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1137,7 +1359,7 @@ func (x *StateGetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateGetResponse.ProtoReflect.Descriptor instead.
 func (*StateGetResponse) Descriptor() ([]byte, []int) {
-	return file_plugins_plugin_proto_rawDescGZIP(), []int{19}
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *StateGetResponse) GetResourceData() []byte {
@@ -1163,7 +1385,7 @@ type StateFindRequest struct {
 
 func (x *StateFindRequest) Reset() {
 	*x = StateFindRequest{}
-	mi := &file_plugins_plugin_proto_msgTypes[20]
+	mi := &file_plugins_plugin_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1175,7 +1397,7 @@ func (x *StateFindRequest) String() string {
 func (*StateFindRequest) ProtoMessage() {}
 
 func (x *StateFindRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_plugin_proto_msgTypes[20]
+	mi := &file_plugins_plugin_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1188,7 +1410,7 @@ func (x *StateFindRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateFindRequest.ProtoReflect.Descriptor instead.
 func (*StateFindRequest) Descriptor() ([]byte, []int) {
-	return file_plugins_plugin_proto_rawDescGZIP(), []int{20}
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *StateFindRequest) GetPattern() string {
@@ -1208,7 +1430,7 @@ type StateFindResponse struct {
 
 func (x *StateFindResponse) Reset() {
 	*x = StateFindResponse{}
-	mi := &file_plugins_plugin_proto_msgTypes[21]
+	mi := &file_plugins_plugin_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1220,7 +1442,7 @@ func (x *StateFindResponse) String() string {
 func (*StateFindResponse) ProtoMessage() {}
 
 func (x *StateFindResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugins_plugin_proto_msgTypes[21]
+	mi := &file_plugins_plugin_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1233,7 +1455,7 @@ func (x *StateFindResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateFindResponse.ProtoReflect.Descriptor instead.
 func (*StateFindResponse) Descriptor() ([]byte, []int) {
-	return file_plugins_plugin_proto_rawDescGZIP(), []int{21}
+	return file_plugins_plugin_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *StateFindResponse) GetResourcesData() [][]byte {
@@ -1297,26 +1519,40 @@ const file_plugins_plugin_proto_rawDesc = "" +
 	"\ventity_data\x18\x01 \x01(\fR\n" +
 	"entityData\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12\x1b\n" +
-	"\tnot_found\x18\x03 \x01(\bR\bnotFound\"y\n" +
+	"\tnot_found\x18\x03 \x01(\bR\bnotFound\"\xe7\x01\n" +
 	"\rUpdateRequest\x12\x1f\n" +
 	"\ventity_type\x18\x01 \x01(\tR\n" +
 	"entityType\x12&\n" +
 	"\x0fentity_sub_type\x18\x02 \x01(\tR\rentitySubType\x12\x1f\n" +
 	"\ventity_data\x18\x03 \x01(\fR\n" +
-	"entityData\"V\n" +
+	"entityData\x12/\n" +
+	"\achanges\x18\x04 \x03(\v2\x15.proto.PropertyChangeR\achanges\x12;\n" +
+	"\fdependencies\x18\x05 \x03(\v2\x17.proto.DependencyChangeR\fdependencies\"V\n" +
 	"\x0eUpdateResponse\x12\x14\n" +
 	"\x05error\x18\x01 \x01(\tR\x05error\x12.\n" +
 	"\x13updated_entity_data\x18\x02 \x01(\fR\x11updatedEntityData\"S\n" +
 	"\x10DependencyChange\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12%\n" +
-	"\x06change\x18\x02 \x01(\x0e2\r.proto.ChangeR\x06change\"\xe6\x01\n" +
+	"\x06change\x18\x02 \x01(\x0e2\r.proto.ChangeR\x06change\"u\n" +
+	"\bPathStep\x12#\n" +
+	"\x04kind\x18\x01 \x01(\x0e2\x0f.proto.StepKindR\x04kind\x12\x1c\n" +
+	"\tattribute\x18\x02 \x01(\tR\tattribute\x12\x14\n" +
+	"\x05index\x18\x03 \x01(\x03R\x05index\x12\x10\n" +
+	"\x03key\x18\x04 \x01(\tR\x03key\"\x9b\x01\n" +
+	"\x0ePropertyChange\x12#\n" +
+	"\x04path\x18\x01 \x03(\v2\x0f.proto.PathStepR\x04path\x12\x16\n" +
+	"\x06before\x18\x02 \x01(\fR\x06before\x12\x14\n" +
+	"\x05after\x18\x03 \x01(\fR\x05after\x12\x18\n" +
+	"\aunknown\x18\x04 \x01(\bR\aunknown\x12\x1c\n" +
+	"\tsensitive\x18\x05 \x01(\bR\tsensitive\"\x97\x02\n" +
 	"\x0eChangedRequest\x12\x1f\n" +
 	"\ventity_type\x18\x01 \x01(\tR\n" +
 	"entityType\x12&\n" +
 	"\x0fentity_sub_type\x18\x02 \x01(\tR\rentitySubType\x12&\n" +
 	"\x0fold_entity_data\x18\x03 \x01(\fR\roldEntityData\x12&\n" +
 	"\x0fnew_entity_data\x18\x04 \x01(\fR\rnewEntityData\x12;\n" +
-	"\fdependencies\x18\x05 \x03(\v2\x17.proto.DependencyChangeR\fdependencies\"T\n" +
+	"\fdependencies\x18\x05 \x03(\v2\x17.proto.DependencyChangeR\fdependencies\x12/\n" +
+	"\achanges\x18\x06 \x03(\v2\x15.proto.PropertyChangeR\achanges\"T\n" +
 	"\x0fChangedResponse\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12%\n" +
 	"\x06change\x18\x03 \x01(\x0e2\r.proto.ChangeR\x06changeJ\x04\b\x01\x10\x02\"S\n" +
@@ -1339,7 +1575,11 @@ const file_plugins_plugin_proto_rawDesc = "" +
 	"\x06Change\x12\x14\n" +
 	"\x10CHANGE_NO_CHANGE\x10\x00\x12\x11\n" +
 	"\rCHANGE_UPDATE\x10\x01\x12\x12\n" +
-	"\x0eCHANGE_REPLACE\x10\x022\x9c\x03\n" +
+	"\x0eCHANGE_REPLACE\x10\x02*K\n" +
+	"\bStepKind\x12\x17\n" +
+	"\x13STEP_KIND_ATTRIBUTE\x10\x00\x12\x13\n" +
+	"\x0fSTEP_KIND_INDEX\x10\x01\x12\x11\n" +
+	"\rSTEP_KIND_KEY\x10\x022\x9c\x03\n" +
 	"\rPluginService\x12;\n" +
 	"\bGetTypes\x12\x16.proto.GetTypesRequest\x1a\x17.proto.GetTypesResponse\x12;\n" +
 	"\bValidate\x12\x16.proto.ValidateRequest\x1a\x17.proto.ValidateResponse\x125\n" +
@@ -1368,69 +1608,77 @@ func file_plugins_plugin_proto_rawDescGZIP() []byte {
 	return file_plugins_plugin_proto_rawDescData
 }
 
-var file_plugins_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_plugins_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_plugins_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_plugins_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_plugins_plugin_proto_goTypes = []any{
 	(Change)(0),               // 0: proto.Change
-	(*GetTypesRequest)(nil),   // 1: proto.GetTypesRequest
-	(*GetTypesResponse)(nil),  // 2: proto.GetTypesResponse
-	(*RegisteredType)(nil),    // 3: proto.RegisteredType
-	(*ValidateRequest)(nil),   // 4: proto.ValidateRequest
-	(*ValidateResponse)(nil),  // 5: proto.ValidateResponse
-	(*CreateRequest)(nil),     // 6: proto.CreateRequest
-	(*CreateResponse)(nil),    // 7: proto.CreateResponse
-	(*DestroyRequest)(nil),    // 8: proto.DestroyRequest
-	(*DestroyResponse)(nil),   // 9: proto.DestroyResponse
-	(*ReadRequest)(nil),       // 10: proto.ReadRequest
-	(*ReadResponse)(nil),      // 11: proto.ReadResponse
-	(*UpdateRequest)(nil),     // 12: proto.UpdateRequest
-	(*UpdateResponse)(nil),    // 13: proto.UpdateResponse
-	(*DependencyChange)(nil),  // 14: proto.DependencyChange
-	(*ChangedRequest)(nil),    // 15: proto.ChangedRequest
-	(*ChangedResponse)(nil),   // 16: proto.ChangedResponse
-	(*LogRequest)(nil),        // 17: proto.LogRequest
-	(*LogResponse)(nil),       // 18: proto.LogResponse
-	(*StateGetRequest)(nil),   // 19: proto.StateGetRequest
-	(*StateGetResponse)(nil),  // 20: proto.StateGetResponse
-	(*StateFindRequest)(nil),  // 21: proto.StateFindRequest
-	(*StateFindResponse)(nil), // 22: proto.StateFindResponse
+	(StepKind)(0),             // 1: proto.StepKind
+	(*GetTypesRequest)(nil),   // 2: proto.GetTypesRequest
+	(*GetTypesResponse)(nil),  // 3: proto.GetTypesResponse
+	(*RegisteredType)(nil),    // 4: proto.RegisteredType
+	(*ValidateRequest)(nil),   // 5: proto.ValidateRequest
+	(*ValidateResponse)(nil),  // 6: proto.ValidateResponse
+	(*CreateRequest)(nil),     // 7: proto.CreateRequest
+	(*CreateResponse)(nil),    // 8: proto.CreateResponse
+	(*DestroyRequest)(nil),    // 9: proto.DestroyRequest
+	(*DestroyResponse)(nil),   // 10: proto.DestroyResponse
+	(*ReadRequest)(nil),       // 11: proto.ReadRequest
+	(*ReadResponse)(nil),      // 12: proto.ReadResponse
+	(*UpdateRequest)(nil),     // 13: proto.UpdateRequest
+	(*UpdateResponse)(nil),    // 14: proto.UpdateResponse
+	(*DependencyChange)(nil),  // 15: proto.DependencyChange
+	(*PathStep)(nil),          // 16: proto.PathStep
+	(*PropertyChange)(nil),    // 17: proto.PropertyChange
+	(*ChangedRequest)(nil),    // 18: proto.ChangedRequest
+	(*ChangedResponse)(nil),   // 19: proto.ChangedResponse
+	(*LogRequest)(nil),        // 20: proto.LogRequest
+	(*LogResponse)(nil),       // 21: proto.LogResponse
+	(*StateGetRequest)(nil),   // 22: proto.StateGetRequest
+	(*StateGetResponse)(nil),  // 23: proto.StateGetResponse
+	(*StateFindRequest)(nil),  // 24: proto.StateFindRequest
+	(*StateFindResponse)(nil), // 25: proto.StateFindResponse
 }
 var file_plugins_plugin_proto_depIdxs = []int32{
-	3,  // 0: proto.GetTypesResponse.types:type_name -> proto.RegisteredType
-	0,  // 1: proto.DependencyChange.change:type_name -> proto.Change
-	14, // 2: proto.ChangedRequest.dependencies:type_name -> proto.DependencyChange
-	0,  // 3: proto.ChangedResponse.change:type_name -> proto.Change
-	1,  // 4: proto.PluginService.GetTypes:input_type -> proto.GetTypesRequest
-	4,  // 5: proto.PluginService.Validate:input_type -> proto.ValidateRequest
-	6,  // 6: proto.PluginService.Create:input_type -> proto.CreateRequest
-	8,  // 7: proto.PluginService.Destroy:input_type -> proto.DestroyRequest
-	10, // 8: proto.PluginService.Read:input_type -> proto.ReadRequest
-	12, // 9: proto.PluginService.Update:input_type -> proto.UpdateRequest
-	15, // 10: proto.PluginService.Changed:input_type -> proto.ChangedRequest
-	17, // 11: proto.HostCallbackService.Info:input_type -> proto.LogRequest
-	17, // 12: proto.HostCallbackService.Debug:input_type -> proto.LogRequest
-	17, // 13: proto.HostCallbackService.Warn:input_type -> proto.LogRequest
-	17, // 14: proto.HostCallbackService.Error:input_type -> proto.LogRequest
-	19, // 15: proto.HostCallbackService.Get:input_type -> proto.StateGetRequest
-	21, // 16: proto.HostCallbackService.Find:input_type -> proto.StateFindRequest
-	2,  // 17: proto.PluginService.GetTypes:output_type -> proto.GetTypesResponse
-	5,  // 18: proto.PluginService.Validate:output_type -> proto.ValidateResponse
-	7,  // 19: proto.PluginService.Create:output_type -> proto.CreateResponse
-	9,  // 20: proto.PluginService.Destroy:output_type -> proto.DestroyResponse
-	11, // 21: proto.PluginService.Read:output_type -> proto.ReadResponse
-	13, // 22: proto.PluginService.Update:output_type -> proto.UpdateResponse
-	16, // 23: proto.PluginService.Changed:output_type -> proto.ChangedResponse
-	18, // 24: proto.HostCallbackService.Info:output_type -> proto.LogResponse
-	18, // 25: proto.HostCallbackService.Debug:output_type -> proto.LogResponse
-	18, // 26: proto.HostCallbackService.Warn:output_type -> proto.LogResponse
-	18, // 27: proto.HostCallbackService.Error:output_type -> proto.LogResponse
-	20, // 28: proto.HostCallbackService.Get:output_type -> proto.StateGetResponse
-	22, // 29: proto.HostCallbackService.Find:output_type -> proto.StateFindResponse
-	17, // [17:30] is the sub-list for method output_type
-	4,  // [4:17] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	4,  // 0: proto.GetTypesResponse.types:type_name -> proto.RegisteredType
+	17, // 1: proto.UpdateRequest.changes:type_name -> proto.PropertyChange
+	15, // 2: proto.UpdateRequest.dependencies:type_name -> proto.DependencyChange
+	0,  // 3: proto.DependencyChange.change:type_name -> proto.Change
+	1,  // 4: proto.PathStep.kind:type_name -> proto.StepKind
+	16, // 5: proto.PropertyChange.path:type_name -> proto.PathStep
+	15, // 6: proto.ChangedRequest.dependencies:type_name -> proto.DependencyChange
+	17, // 7: proto.ChangedRequest.changes:type_name -> proto.PropertyChange
+	0,  // 8: proto.ChangedResponse.change:type_name -> proto.Change
+	2,  // 9: proto.PluginService.GetTypes:input_type -> proto.GetTypesRequest
+	5,  // 10: proto.PluginService.Validate:input_type -> proto.ValidateRequest
+	7,  // 11: proto.PluginService.Create:input_type -> proto.CreateRequest
+	9,  // 12: proto.PluginService.Destroy:input_type -> proto.DestroyRequest
+	11, // 13: proto.PluginService.Read:input_type -> proto.ReadRequest
+	13, // 14: proto.PluginService.Update:input_type -> proto.UpdateRequest
+	18, // 15: proto.PluginService.Changed:input_type -> proto.ChangedRequest
+	20, // 16: proto.HostCallbackService.Info:input_type -> proto.LogRequest
+	20, // 17: proto.HostCallbackService.Debug:input_type -> proto.LogRequest
+	20, // 18: proto.HostCallbackService.Warn:input_type -> proto.LogRequest
+	20, // 19: proto.HostCallbackService.Error:input_type -> proto.LogRequest
+	22, // 20: proto.HostCallbackService.Get:input_type -> proto.StateGetRequest
+	24, // 21: proto.HostCallbackService.Find:input_type -> proto.StateFindRequest
+	3,  // 22: proto.PluginService.GetTypes:output_type -> proto.GetTypesResponse
+	6,  // 23: proto.PluginService.Validate:output_type -> proto.ValidateResponse
+	8,  // 24: proto.PluginService.Create:output_type -> proto.CreateResponse
+	10, // 25: proto.PluginService.Destroy:output_type -> proto.DestroyResponse
+	12, // 26: proto.PluginService.Read:output_type -> proto.ReadResponse
+	14, // 27: proto.PluginService.Update:output_type -> proto.UpdateResponse
+	19, // 28: proto.PluginService.Changed:output_type -> proto.ChangedResponse
+	21, // 29: proto.HostCallbackService.Info:output_type -> proto.LogResponse
+	21, // 30: proto.HostCallbackService.Debug:output_type -> proto.LogResponse
+	21, // 31: proto.HostCallbackService.Warn:output_type -> proto.LogResponse
+	21, // 32: proto.HostCallbackService.Error:output_type -> proto.LogResponse
+	23, // 33: proto.HostCallbackService.Get:output_type -> proto.StateGetResponse
+	25, // 34: proto.HostCallbackService.Find:output_type -> proto.StateFindResponse
+	22, // [22:35] is the sub-list for method output_type
+	9,  // [9:22] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_plugins_plugin_proto_init() }
@@ -1443,8 +1691,8 @@ func file_plugins_plugin_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugins_plugin_proto_rawDesc), len(file_plugins_plugin_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   22,
+			NumEnums:      2,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

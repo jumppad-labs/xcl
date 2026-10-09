@@ -133,8 +133,18 @@ func (s *GRPCServer) Update(ctx context.Context, req *proto.UpdateRequest) (*pro
 		return &proto.UpdateResponse{Error: "no registered type found for " + types.TypeKey(req.EntityType, req.EntitySubType)}, nil
 	}
 
+	changes, err := fromProtoPropertyChanges(req.Changes)
+	if err != nil {
+		return &proto.UpdateResponse{Error: errorToString(err)}, nil
+	}
+
+	dependencies, err := fromProtoDependencies(req.Dependencies)
+	if err != nil {
+		return &proto.UpdateResponse{Error: errorToString(err)}, nil
+	}
+
 	// Call the adapter's Update method which returns mutated data
-	updatedData, err := rt.Adapter.Update(ctx, req.EntityData)
+	updatedData, err := rt.Adapter.Update(ctx, req.EntityData, changes, dependencies)
 	return &proto.UpdateResponse{
 		Error:             errorToString(err),
 		UpdatedEntityData: updatedData,
@@ -147,12 +157,17 @@ func (s *GRPCServer) Changed(ctx context.Context, req *proto.ChangedRequest) (*p
 		return nil, err
 	}
 
+	changes, err := fromProtoPropertyChanges(req.Changes)
+	if err != nil {
+		return &proto.ChangedResponse{Error: errorToString(err)}, nil
+	}
+
 	dependencies, err := fromProtoDependencies(req.Dependencies)
 	if err != nil {
 		return &proto.ChangedResponse{Error: errorToString(err)}, nil
 	}
 
-	change, err := s.plugin.Changed(ctx, req.EntityType, req.EntitySubType, req.OldEntityData, req.NewEntityData, dependencies)
+	change, err := s.plugin.Changed(ctx, req.EntityType, req.EntitySubType, req.OldEntityData, req.NewEntityData, changes, dependencies)
 	if err != nil {
 		return &proto.ChangedResponse{Error: errorToString(err)}, nil
 	}

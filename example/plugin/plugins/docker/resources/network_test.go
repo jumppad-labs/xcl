@@ -131,6 +131,10 @@ func TestNetworkCreateReturnsDockerErrors(t *testing.T) {
 func TestNetworkDestroyRemovesTheNetworkByID(t *testing.T) {
 	client := mocks.NewMockDocker(t)
 	client.EXPECT().
+		NetworkInspect(context.Background(), "net-123", network.InspectOptions{}).
+		Return(network.Inspect{ID: "net-123"}, nil).
+		Once()
+	client.EXPECT().
 		NetworkRemove(context.Background(), "net-123").
 		Return(nil).
 		Once()
@@ -144,8 +148,112 @@ func TestNetworkDestroyRemovesTheNetworkByID(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestNetworkDestroySucceedsWhenTheNetworkIsGone(t *testing.T) {
+func TestNetworkDestroyWithNothingAttachedInspectsThenRemoves(t *testing.T) {
+	var calls []string
+
 	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkInspect(context.Background(), "net-123", network.InspectOptions{}).
+		Run(func(_ context.Context, _ string, _ network.InspectOptions) {
+			calls = append(calls, "inspect")
+		}).
+		Return(network.Inspect{ID: "net-123", Containers: map[string]network.EndpointResource{}}, nil).
+		Once()
+	client.EXPECT().
+		NetworkRemove(context.Background(), "net-123").
+		Run(func(_ context.Context, _ string) {
+			calls = append(calls, "remove")
+		}).
+		Return(nil).
+		Once()
+
+	provider := &networkProvider{client: client}
+	n := testNetwork()
+	n.DockerID = "net-123"
+
+	err := provider.Destroy(context.Background(), n, false)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"inspect", "remove"}, calls)
+}
+
+func TestNetworkDestroyForceDisconnectsAttachedContainersInSortedOrderBeforeRemoving(t *testing.T) {
+	var calls []string
+
+	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkInspect(context.Background(), "net-123", network.InspectOptions{}).
+		Run(func(_ context.Context, _ string, _ network.InspectOptions) {
+			calls = append(calls, "inspect")
+		}).
+		Return(network.Inspect{
+			ID: "net-123",
+			Containers: map[string]network.EndpointResource{
+				"container-b": {Name: "web"},
+				"container-a": {Name: "api"},
+			},
+		}, nil).
+		Once()
+	client.EXPECT().
+		NetworkDisconnect(context.Background(), "net-123", "container-a", true).
+		Run(func(_ context.Context, _ string, containerID string, _ bool) {
+			calls = append(calls, "disconnect "+containerID)
+		}).
+		Return(nil).
+		Once()
+	client.EXPECT().
+		NetworkDisconnect(context.Background(), "net-123", "container-b", true).
+		Run(func(_ context.Context, _ string, containerID string, _ bool) {
+			calls = append(calls, "disconnect "+containerID)
+		}).
+		Return(nil).
+		Once()
+	client.EXPECT().
+		NetworkRemove(context.Background(), "net-123").
+		Run(func(_ context.Context, _ string) {
+			calls = append(calls, "remove")
+		}).
+		Return(nil).
+		Once()
+
+	provider := &networkProvider{client: client}
+	n := testNetwork()
+	n.DockerID = "net-123"
+
+	err := provider.Destroy(context.Background(), n, false)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"inspect",
+		"disconnect container-a",
+		"disconnect container-b",
+		"remove",
+	}, calls)
+}
+
+func TestNetworkDestroySucceedsWithoutRemovingWhenInspectFindsTheNetworkGone(t *testing.T) {
+	// the strict mock fails the test if NetworkRemove is called
+	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkInspect(context.Background(), "net-123", network.InspectOptions{}).
+		Return(network.Inspect{}, errdefs.NotFound(errors.New("no such network"))).
+		Once()
+
+	provider := &networkProvider{client: client}
+	n := testNetwork()
+	n.DockerID = "net-123"
+
+	err := provider.Destroy(context.Background(), n, false)
+
+	require.NoError(t, err)
+}
+
+func TestNetworkDestroySucceedsWhenTheNetworkIsGoneByRemoveTime(t *testing.T) {
+	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkInspect(context.Background(), "net-123", network.InspectOptions{}).
+		Return(network.Inspect{ID: "net-123"}, nil).
+		Once()
 	client.EXPECT().
 		NetworkRemove(context.Background(), "net-123").
 		Return(errdefs.NotFound(errors.New("no such network"))).
@@ -160,10 +268,93 @@ func TestNetworkDestroySucceedsWhenTheNetworkIsGone(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestNetworkDestroyReturnsDockerErrors(t *testing.T) {
+func TestNetworkDestroyIgnoresAContainerAlreadyGoneOnDisconnectAndStillRemoves(t *testing.T) {
+	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkInspect(context.Background(), "net-123", network.InspectOptions{}).
+		Return(network.Inspect{
+			ID: "net-123",
+			Containers: map[string]network.EndpointResource{
+				"container-a": {Name: "api"},
+			},
+		}, nil).
+		Once()
+	client.EXPECT().
+		NetworkDisconnect(context.Background(), "net-123", "container-a", true).
+		Return(errdefs.NotFound(errors.New("no such container"))).
+		Once()
+	client.EXPECT().
+		NetworkRemove(context.Background(), "net-123").
+		Return(nil).
+		Once()
+
+	provider := &networkProvider{client: client}
+	n := testNetwork()
+	n.DockerID = "net-123"
+
+	err := provider.Destroy(context.Background(), n, false)
+
+	require.NoError(t, err)
+}
+
+func TestNetworkDestroyReturnsInspectErrors(t *testing.T) {
+	dockerErr := errors.New("daemon unavailable")
+
+	// the strict mock fails the test if NetworkRemove is called
+	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkInspect(context.Background(), "net-123", network.InspectOptions{}).
+		Return(network.Inspect{}, dockerErr).
+		Once()
+
+	provider := &networkProvider{client: client}
+	n := testNetwork()
+	n.DockerID = "net-123"
+
+	err := provider.Destroy(context.Background(), n, false)
+
+	require.ErrorIs(t, err, dockerErr)
+	require.ErrorContains(t, err, "app")
+}
+
+func TestNetworkDestroyReturnsDisconnectErrorsWithoutRemoving(t *testing.T) {
+	dockerErr := errors.New("daemon unavailable")
+
+	// the strict mock fails the test if NetworkRemove is called
+	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkInspect(context.Background(), "net-123", network.InspectOptions{}).
+		Return(network.Inspect{
+			ID: "net-123",
+			Containers: map[string]network.EndpointResource{
+				"container-a": {Name: "api"},
+			},
+		}, nil).
+		Once()
+	client.EXPECT().
+		NetworkDisconnect(context.Background(), "net-123", "container-a", true).
+		Return(dockerErr).
+		Once()
+
+	provider := &networkProvider{client: client}
+	n := testNetwork()
+	n.DockerID = "net-123"
+
+	err := provider.Destroy(context.Background(), n, false)
+
+	require.ErrorIs(t, err, dockerErr)
+	require.ErrorContains(t, err, "app")
+	require.ErrorContains(t, err, "container-a")
+}
+
+func TestNetworkDestroyReturnsRemoveErrors(t *testing.T) {
 	dockerErr := errors.New("network has active endpoints")
 
 	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkInspect(context.Background(), "net-123", network.InspectOptions{}).
+		Return(network.Inspect{ID: "net-123"}, nil).
+		Once()
 	client.EXPECT().
 		NetworkRemove(context.Background(), "net-123").
 		Return(dockerErr).
@@ -200,7 +391,7 @@ func TestNetworkChangedReplacesOnSubnetChange(t *testing.T) {
 	new := testNetwork()
 	new.Subnet = "10.43.0.0/24"
 
-	change, err := p.Changed(context.Background(), old, new, nil)
+	change, err := p.Changed(context.Background(), old, new, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, entity.Replace, change)
 }
@@ -213,7 +404,7 @@ func TestNetworkChangedReportsNoChangeForIdenticalNetwork(t *testing.T) {
 	new := testNetwork()
 	new.Subnet = "10.42.0.0/24"
 
-	change, err := p.Changed(context.Background(), old, new, nil)
+	change, err := p.Changed(context.Background(), old, new, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, entity.NoChange, change)
 }

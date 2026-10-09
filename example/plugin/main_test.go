@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
@@ -191,6 +192,39 @@ func TestApplyRendersTheTemplateWithTheContainerAddress(t *testing.T) {
 	require.Equal(t, expected, string(rendered))
 }
 
+func TestApplyRendersAnExecutableInitScript(t *testing.T) {
+	c := applyExample(t)
+
+	initScript, err := xcl.Find[template.Template](c, "template.init")
+	require.NoError(t, err)
+
+	info, err := os.Stat(initScript.Destination)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0755), info.Mode().Perm())
+}
+
+func TestApplyMountsTheInitScriptReadOnlyIntoTheContainer(t *testing.T) {
+	c := applyExample(t)
+
+	web, err := xcl.Find[resources.Container](c, "docker.container.web")
+	require.NoError(t, err)
+
+	initScript, err := xcl.Find[template.Template](c, "template.init")
+	require.NoError(t, err)
+
+	scriptPath, err := filepath.Abs(initScript.Destination)
+	require.NoError(t, err)
+
+	inspect, err := newDockerClient(t).ContainerInspect(context.Background(), web.DockerID)
+	require.NoError(t, err)
+
+	require.Len(t, inspect.Mounts, 1)
+	require.Equal(t, mount.TypeBind, inspect.Mounts[0].Type)
+	require.Equal(t, scriptPath, inspect.Mounts[0].Source)
+	require.Equal(t, "/docker-entrypoint.d/90-xcl-init.sh", inspect.Mounts[0].Destination)
+	require.False(t, inspect.Mounts[0].RW)
+}
+
 func TestApplyFindsTheResourcesOfBothPlugins(t *testing.T) {
 	c := applyExample(t)
 
@@ -270,10 +304,11 @@ func TestStatusPrintsTheAppliedResourcesAsATree(t *testing.T) {
 
 	// out is not a terminal, so the tree is plain text
 	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
-	require.Len(t, lines, 3)
+	require.Len(t, lines, 4)
 	require.Equal(t, "● docker.network.app  10.42.0.0/24 · "+app.DockerID[:12], lines[0])
-	require.Equal(t, "└── ● docker.container.web  nginx:1.27-alpine · "+web.IPAddress+" · "+web.DockerID[:12], lines[1])
-	require.True(t, strings.HasPrefix(lines[2], "    └── ● template.welcome  "), "unexpected line: %q", lines[2])
+	require.True(t, strings.HasPrefix(lines[1], "└── ● template.init  "), "unexpected line: %q", lines[1])
+	require.Equal(t, "    └── ● docker.container.web  nginx:1.27-alpine · "+web.IPAddress+" · "+web.DockerID[:12], lines[2])
+	require.True(t, strings.HasPrefix(lines[3], "        └── ● template.welcome  "), "unexpected line: %q", lines[3])
 }
 
 func TestStatusReportsWhatApplySaved(t *testing.T) {
@@ -322,7 +357,8 @@ func TestInspectPrintsTheContainerAsConfiguration(t *testing.T) {
 	// out is not a terminal, so the text is plain
 	printed := out.String()
 	require.True(t, strings.HasPrefix(printed, `docker "container" "web" {`), "unexpected text:\n%s", printed)
-	require.Contains(t, printed, `image = "nginx:1.27-alpine"`)
+	require.Contains(t, printed, `image       = "nginx:1.27-alpine"`)
+	require.Contains(t, printed, "init_script = template.init.destination")
 	require.Contains(t, printed, "name    = docker.network.app.meta.name")
 	require.Contains(t, printed, `ip_address = "`+web.IPAddress+`" # set by the provider`)
 	require.Contains(t, printed, `docker_id  = "`+web.DockerID+`" # set by the provider`)
@@ -429,16 +465,17 @@ func TestSubnetChangeRemovesTheOldNetwork(t *testing.T) {
 	require.True(t, dockerclient.IsErrNotFound(err), "expected the old network to be gone, got: %s", err)
 }
 
-func TestSubnetChangeAttachesANewContainer(t *testing.T) {
+func TestSubnetChangeKeepsTheContainerAttached(t *testing.T) {
 	first, changed := applySubnetChange(t, t.TempDir())
 
 	old, err := xcl.Find[resources.Container](first, "docker.container.web")
 	require.NoError(t, err)
 
+	// the container is updated in place, not replaced
 	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.DockerID)
-	require.NotEqual(t, old.DockerID, web.DockerID)
+	require.Equal(t, old.DockerID, web.DockerID)
 
 	app, err := xcl.Find[resources.Network](changed, "docker.network.app")
 	require.NoError(t, err)
@@ -482,5 +519,5 @@ func TestPlanAfterSubnetChangeReportsNoChanges(t *testing.T) {
 	err = plan(out, c, "./config-subnet")
 	require.NoError(t, err)
 
-	require.Equal(t, "Diff: no changes, 3 unchanged.\n", out.String())
+	require.Equal(t, "Diff: no changes, 4 unchanged.\n", out.String())
 }

@@ -1,0 +1,59 @@
+# The plugin example's main configuration (../config) with the app network
+# removed, together with every reference to it. Applying it after ../config
+# destroys the network, detaching the web container, and updates the container
+# in place, which keeps running with no network. The templates no longer name
+# the network, so they are updated too. See `make remove-network`.
+#
+# The docker blocks come from the external Docker plugin, the template blocks
+# from the in-process template plugin.
+#
+# Variables can be overridden with environment variables prefixed HCL_VAR_,
+# i.e. HCL_VAR_output_dir.
+
+# output_dir is where the rendered templates are written
+variable "output_dir" {
+  default = "./build/rendered"
+}
+
+# A script the web container runs when it starts. The mode makes it
+# executable, which the nginx image needs before it runs a script from its
+# entrypoint directory. Editing the source renders the file again and leaves
+# the container alone; moving the destination replaces the template, and with
+# it the container that mounts the script.
+template "init" {
+  source = <<-EOF
+  #!/bin/sh
+  echo "web has no network" > /usr/share/nginx/html/init.txt
+  EOF
+
+  destination = "${variable.output_dir}/init.sh"
+  mode        = "0755"
+}
+
+# An nginx container named web on the app network. Referring to the network
+# orders the blocks, web is always created after app and destroyed before it.
+# Changing its networks moves the running container in place; changing its
+# image, command, environment or init script creates a new one.
+docker "container" "web" {
+  image = "nginx:1.27-alpine"
+
+  # mounted into the nginx entrypoint directory, run when the container starts
+  init_script = template.init.destination
+}
+
+# template has no subtype, so it takes just a name. Its variables read the
+# container's ip_address, which the Docker plugin computes when it creates the
+# container, so a value crosses from the external plugin to the in-process
+# one.
+template "welcome" {
+  source = <<-EOF
+  Welcome, the web container has no network.
+  The web container answers at http://{{address}}/
+  EOF
+
+  destination = "${variable.output_dir}/welcome.txt"
+
+  variables = {
+    address = docker.container.web.ip_address
+  }
+}

@@ -227,6 +227,55 @@ func copyComputed(dst, src reflect.Value) {
 	}
 }
 
+// clearComputed sets every computed field of value to its zero value, in the
+// value itself and in its nested blocks. value must be addressable.
+func clearComputed(value reflect.Value) {
+	switch value.Kind() {
+	case reflect.Ptr:
+		if value.IsNil() {
+			return
+		}
+
+		clearComputed(value.Elem())
+
+	case reflect.Struct:
+		if blockElement(value.Type()) == nil {
+			return
+		}
+
+		for _, f := range structFields(value.Type()) {
+			field := value.FieldByIndex(f.index)
+
+			if isComputed(f.field) {
+				field.Set(reflect.Zero(field.Type()))
+				continue
+			}
+
+			if blockElement(f.field.Type) != nil {
+				clearComputed(field)
+			}
+		}
+
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < value.Len(); i++ {
+			clearComputed(value.Index(i))
+		}
+
+	case reflect.Map:
+		if value.IsNil() {
+			return
+		}
+
+		for _, key := range value.MapKeys() {
+			// map elements are not addressable, copy, clear and store back
+			element := reflect.New(value.Type().Elem()).Elem()
+			element.Set(value.MapIndex(key))
+			clearComputed(element)
+			value.SetMapIndex(key, element)
+		}
+	}
+}
+
 // pairElements pairs the elements of two lists of blocks, returning a map of
 // index in a to index in b. Elements are paired by the element type's key
 // fields when it has any, otherwise by position.

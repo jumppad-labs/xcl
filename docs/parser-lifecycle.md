@@ -116,11 +116,12 @@ saved as failed, destroy_failed, or anything else
 
 saved as created or updated
     -> dependencies = dependencyChanges(...)
+    -> changes = the plan's comparison of saved with configured
     -> carry computed values from the saved copy onto the configured copy
     -> Read(saved, configured)
          ErrNotFound -> reset to the configured copy  -> create
          other error -> the decision fails, the apply fails
-    -> Changed(saved, read result, dependencies)
+    -> Changed(saved, read result, changes, dependencies)
          error           -> the decision fails, the apply fails
          entity.NoChange -> unchanged
          entity.Update   -> update
@@ -139,6 +140,23 @@ left out. Outputs, variables, modules and registered (config-only) types are
 looked through to the provider-backed resources behind them; a
 provider-backed dependency is not, so the list is direct dependencies only.
 
+`changes` is worked out by `refresh` before `Read` runs, with the plan's own
+comparison: the configured copy as written, decoded before any computed value
+is carried onto it, against the saved copy. The provider is therefore told
+exactly the settings the plan shows, at the same paths, and drift found by
+`Read` lists no changes. Each is converted to an `entity.PropertyChange`
+(`pluginChanges`, [`change_views.go`](../internal/parser/change_views.go))
+holding plain JSON values; a sensitive setting's change holds its real values,
+which the plan, events and logs never show. A new value only known once the
+apply runs is listed with `Unknown` set and a nil `After`.
+
+An update records the dependencies its provider was told about on the plan,
+`diff.Resource.Dependencies` (JSON `dependencies`), so an update with no
+changes of its own is rendered with its reason, `# docker.container.web will be
+updated because docker.network.app is replaced`. Only an update with neither
+changes nor dependencies is described as `changed outside xcl and will be
+updated`.
+
 A resource whose configuration uses a value only known after the apply, a
 computed value of a dependency decided create, update or replace, is read
 with its saved values in place of the unknown ones, and is decided at least
@@ -154,11 +172,20 @@ resources it decided for each action and why each replaced one is replaced.
 create or replace
     -> Create(configured copy)                 status created
 update
+    -> changes = the plan's comparison again, with real values
     -> carry computed values read while deciding onto the configured copy
-    -> Update(configured copy)                 status updated
+    -> Update(configured copy, changes, dependencies recorded while deciding)
+                                               status updated
 unchanged
     -> keep the read result and the previous status, no provider call
 ```
+
+`updateChanges` runs the same comparison as deciding did, against the
+saved copy, now that every value is known: values produced earlier in the
+same apply are real, and a setting that was unknown while deciding stays
+listed, with its real value, so `Update` is told the settings the plan showed
+and none is ever `Unknown`. `dependencies` is the list recorded with the
+decision, the same one `Changed` was given.
 
 A replaced resource was destroyed before the walk started, with its saved
 copy, so it is created like a new one. A replacement happens whether or not
@@ -173,6 +200,12 @@ configured (non-computed) value the provider changed
 ([`configured_check.go`](../internal/parser/configured_check.go)): message
 `provider changed a configured value`, the resource and step on the event and
 the field path in `Meta["field"]`. The warning never fails the apply. The
+provider's result is authoritative for computed values: `callProvider`
+clears every computed field of the resource (`clearComputed`,
+[`computed.go`](../internal/parser/computed.go)) before decoding a non-empty
+result into it, so a computed value the provider leaves out, such as an
+`omitempty` address it cleared, is cleared rather than kept from the last
+apply. The
 [Plugin Developer Guide](plugin-developer-guide.md) describes what providers
 may change in each call.
 

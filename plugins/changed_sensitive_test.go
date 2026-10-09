@@ -24,7 +24,7 @@ func TestDefaultChangedReportsChangeWhenOnlyASensitiveValueDiffers(t *testing.T)
 	old := &sensitiveResource{Name: "web", Password: types.NewSensitive("first")}
 	new := &sensitiveResource{Name: "web", Password: types.NewSensitive("second")}
 
-	change, err := DefaultChanged[*sensitiveResource]{}.Changed(context.Background(), old, new, nil)
+	change, err := DefaultChanged[*sensitiveResource]{}.Changed(context.Background(), old, new, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, entity.Update, change)
 }
@@ -33,7 +33,7 @@ func TestDefaultChangedReportsNoChangeWhenSensitiveValuesAreEqual(t *testing.T) 
 	old := &sensitiveResource{Name: "web", Password: types.NewSensitive("same")}
 	new := &sensitiveResource{Name: "web", Password: types.NewSensitive("same")}
 
-	change, err := DefaultChanged[*sensitiveResource]{}.Changed(context.Background(), old, new, nil)
+	change, err := DefaultChanged[*sensitiveResource]{}.Changed(context.Background(), old, new, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, entity.NoChange, change)
 }
@@ -60,6 +60,7 @@ func TestTypedProviderAdapterChangedDetectsOnlyASensitiveValueChange(t *testing.
 		context.Background(),
 		[]byte(`{"name":"web","password":"first"}`),
 		[]byte(`{"name":"web","password":"second"}`),
+		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -91,7 +92,7 @@ func (p *sensitiveEchoProvider) Read(ctx context.Context, old *sensitiveResource
 	return new, nil
 }
 
-func (p *sensitiveEchoProvider) Update(ctx context.Context, resource *sensitiveResource) (*sensitiveResource, error) {
+func (p *sensitiveEchoProvider) Update(ctx context.Context, resource *sensitiveResource, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*sensitiveResource, error) {
 	return resource, nil
 }
 

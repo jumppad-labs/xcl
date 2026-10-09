@@ -21,7 +21,8 @@ not at end users writing `.xcl` config.
 - [Plugin Developer Guide](plugin-developer-guide.md) — the provider contract
   (`Create`/`Read`/`Changed`/`Update`/`Destroy`), what `old` and `new` are,
   how `Changed` answers an `entity.Change` (no change, update or replace)
-  from the dependency list it is given, what each method may and may not
+  from the settings that changed and the dependency list it is given, what
+  `Update` is told, what each method may and may not
   touch, computed fields, and what happens when a call fails.
 - [State & Persistence](state.md) — what `State` holds, the resource
   statuses, what is saved after a failed apply and during a destroy, and how
@@ -34,7 +35,7 @@ not at end users writing `.xcl` config.
 | Path | Purpose |
 |---|---|
 | `config.go`, `options.go`, `events.go` | Public facade: `Config`, functional options, the `Event`/`EventHandler` aliases, and the runner that delivers each operation's events |
-| `entity/` | `entity.Change` and `entity.DependencyChange`: the answer a provider's `Changed` gives and the dependency list it is given |
+| `entity/` | `entity.Change`, `entity.DependencyChange` and `entity.PropertyChange`: the answer a provider's `Changed` gives, the dependency list and the changed settings `Changed` and `Update` are given; `entity.Path`, the location of a setting (`diff.Path` is an alias of it) |
 | `types/` | Shared resource metadata: `types.Meta`, `types.ResourceBase`, reflection helpers |
 | `plugins/` | Provider contract (`ProviderAdapter`) and hosting (in-process / gRPC) |
 | `registry/` | Public plugin sources: the `Registry` and `Plugin` interfaces, `InProcess`/`Executable` starters, and the local registry `NewLocal` (in-process plugins, plugin binaries, plugin directories) |

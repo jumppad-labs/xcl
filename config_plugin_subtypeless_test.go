@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -74,7 +75,7 @@ func (p *subtypelessWidgetProvider) Read(ctx context.Context, old *subtypelessWi
 	return new, nil
 }
 
-func (p *subtypelessWidgetProvider) Update(ctx context.Context, w *subtypelessWidget) (*subtypelessWidget, error) {
+func (p *subtypelessWidgetProvider) Update(ctx context.Context, w *subtypelessWidget, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*subtypelessWidget, error) {
 	return w, nil
 }
 

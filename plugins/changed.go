@@ -27,10 +27,10 @@ type DefaultChanged[T any] struct{}
 // when they do not. It compares the JSON form of both resources, ignoring xcl's
 // resource metadata (meta, depends_on and disabled).
 //
-// It ignores dependencies and never answers entity.Replace: a provider that
+// It ignores both the changes and the dependencies lists, and never answers entity.Replace: a provider that
 // cannot change some settings in place, or that must react to a replaced
 // dependency, defines its own Changed and defers to this one for the rest.
-func (DefaultChanged[T]) Changed(ctx context.Context, old T, new T, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (DefaultChanged[T]) Changed(ctx context.Context, old T, new T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	oldValue, err := comparableJSON(old)
 	if err != nil {
 		return entity.NoChange, fmt.Errorf("unable to compare old resource: %w", err)

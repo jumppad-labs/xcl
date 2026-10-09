@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"sort"
 
 	"github.com/docker/docker/api/types/container"
@@ -34,6 +35,12 @@ type Container struct {
 
 	// Environment holds the container's environment variables
 	Environment map[string]string `xcl:"environment,optional" json:"environment,omitempty"`
+
+	// InitScript is the path of a script the container runs when it starts,
+	// mounted read-only into the nginx image's entrypoint directory. It is
+	// usually a template's destination, so replacing that template replaces
+	// the container.
+	InitScript string `xcl:"init_script,optional" json:"init_script,omitempty"`
 
 	// Networks are the networks the container joins, one nested network block
 	// each. The container is created on the first and connected to the rest.
@@ -103,7 +110,12 @@ func (p *containerProvider) Create(ctx context.Context, c *Container) (*Containe
 		}
 	}
 
-	resp, err := p.client.ContainerCreate(ctx, config, &container.HostConfig{}, networking, nil, c.Meta.Name)
+	hostConfig, err := initScriptMount(c.InitScript)
+	if err != nil {
+		return nil, fmt.Errorf("unable to mount the init script of container %s: %w", c.Meta.Name, err)
+	}
+
+	resp, err := p.client.ContainerCreate(ctx, config, hostConfig, networking, nil, c.Meta.Name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create container %s: %w", c.Meta.Name, err)
 	}
@@ -119,6 +131,26 @@ func (p *containerProvider) Create(ctx context.Context, c *Container) (*Containe
 	plugins.Logger(ctx).Info("created container", "name", c.Meta.Name, "image", c.Image, "ip_address", c.IPAddress)
 
 	return c, nil
+}
+
+// initScriptPath is where the init script is mounted. The nginx image's
+// entrypoint runs every executable script in /docker-entrypoint.d before it
+// starts nginx.
+const initScriptPath = "/docker-entrypoint.d/90-xcl-init.sh"
+
+// initScriptMount returns the host configuration that mounts script
+// read-only at initScriptPath, none when there is no script
+func initScriptMount(script string) (*container.HostConfig, error) {
+	if script == "" {
+		return &container.HostConfig{}, nil
+	}
+
+	path, err := filepath.Abs(script)
+	if err != nil {
+		return nil, err
+	}
+
+	return &container.HostConfig{Binds: []string{path + ":" + initScriptPath + ":ro"}}, nil
 }
 
 // pullImage pulls ref unless Docker already has it
@@ -240,33 +272,146 @@ func (p *containerProvider) Read(ctx context.Context, old *Container, new *Conta
 	return new, nil
 }
 
-// Changed answers replace when a resource the container depends on is
-// replaced, such as the network it is attached to, since the container would
-// be left attached to a network that no longer exists. It also answers replace
-// when the image, command, environment or networks change: Docker fixes them
-// when it creates a container. Any other change is left to DefaultChanged.
-func (p *containerProvider) Changed(ctx context.Context, old *Container, new *Container, dependencies []entity.DependencyChange) (entity.Change, error) {
+// replaceSettings are the settings Docker fixes when it creates a container,
+// a change to any of them needs a new container
+var replaceSettings = []entity.Path{
+	entity.Path{}.Attribute("image"),
+	entity.Path{}.Attribute("command"),
+	entity.Path{}.Attribute("environment"),
+	entity.Path{}.Attribute("init_script"),
+}
+
+// Changed decides from what it is told. It answers replace when the image,
+// command, environment or init script changed, since Docker fixes them when
+// it creates a container, or when a dependency other than a Docker network is
+// replaced, such as the template that renders the init script. A change to
+// the container's networks, or a network that is updated or replaced, is
+// handled in place by Update, which moves the running container between
+// networks. Any other change to its settings answers update. A dependency
+// that is only updated, such as the init script's template rendering new
+// content, leaves the container alone: the decision is left to
+// DefaultChanged.
+func (p *containerProvider) Changed(ctx context.Context, old *Container, new *Container, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
+	for _, change := range changes {
+		for _, setting := range replaceSettings {
+			if change.Within(setting) {
+				return entity.Replace, nil
+			}
+		}
+	}
+
 	for _, dependency := range dependencies {
-		if dependency.Change == entity.Replace {
+		if dependency.Change == entity.Replace && !isNetworkAddress(dependency.Address) {
 			return entity.Replace, nil
 		}
 	}
 
-	if old.Image != new.Image ||
-		!equalStrings(old.Command, new.Command) ||
-		!equalEnvironment(old.Environment, new.Environment) ||
-		!equalAttachments(old.Networks, new.Networks) {
-		return entity.Replace, nil
+	if len(changes) > 0 {
+		return entity.Update, nil
 	}
 
-	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+	for _, dependency := range dependencies {
+		if isNetworkAddress(dependency.Address) {
+			return entity.Update, nil
+		}
+	}
+
+	return p.DefaultChanged.Changed(ctx, old, new, changes, dependencies)
 }
 
-// Update returns the container unchanged. Every setting Docker can not change
-// in place answers replace in Changed, so Update is only reached for changes
-// that need no Docker call, such as xcl's own metadata.
-func (p *containerProvider) Update(ctx context.Context, c *Container) (*Container, error) {
+// Update moves the running container between networks, working only from what
+// it is told, never from what Docker reports:
+//
+//   - the previous attachments are the configured ones with each network
+//     change's previous value put back
+//   - networks that went away, or whose aliases changed, are disconnected
+//   - networks that are new, or whose aliases changed, are connected
+//   - networks that were replaced are connected again, since destroying a
+//     network detaches every container
+//
+// When it moved the container it reads the container's new address, an
+// output, not previous state.
+func (p *containerProvider) Update(ctx context.Context, c *Container, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Container, error) {
+	previous, err := previousAttachments(c.Networks, changes)
+	if err != nil {
+		return nil, fmt.Errorf("unable to work out the previous networks of container %s: %w", c.Meta.Name, err)
+	}
+
+	moved := false
+
+	for _, attachment := range previous {
+		current, ok := findAttachment(c.Networks, attachment.Name)
+		if ok && equalStrings(current.Aliases, attachment.Aliases) {
+			continue
+		}
+
+		// a network that was removed or rebuilt has already detached it
+		err := p.client.NetworkDisconnect(ctx, attachment.Name, c.DockerID, true)
+		if err != nil && !dockerclient.IsErrNotFound(err) {
+			return nil, fmt.Errorf("unable to disconnect container %s from network %s: %w", c.Meta.Name, attachment.Name, err)
+		}
+
+		plugins.Logger(ctx).Info("disconnected container from network", "name", c.Meta.Name, "network", attachment.Name)
+		moved = true
+	}
+
+	connected := map[string]bool{}
+	for _, attachment := range c.Networks {
+		before, ok := findAttachment(previous, attachment.Name)
+		if ok && equalStrings(before.Aliases, attachment.Aliases) {
+			continue
+		}
+
+		if err := p.connect(ctx, c, attachment); err != nil {
+			return nil, err
+		}
+
+		connected[attachment.Name] = true
+		moved = true
+	}
+
+	for _, dependency := range dependencies {
+		if dependency.Change != entity.Replace || !isNetworkAddress(dependency.Address) {
+			continue
+		}
+
+		attachment, ok := findAttachment(c.Networks, networkName(dependency.Address))
+		if !ok || connected[attachment.Name] {
+			continue
+		}
+
+		if err := p.connect(ctx, c, attachment); err != nil {
+			return nil, err
+		}
+
+		connected[attachment.Name] = true
+		moved = true
+	}
+
+	if !moved {
+		return c, nil
+	}
+
+	inspect, err := p.client.ContainerInspect(ctx, c.DockerID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to inspect container %s: %w", c.Meta.Name, err)
+	}
+
+	c.IPAddress = firstAddress(c, inspect)
+
 	return c, nil
+}
+
+// connect attaches the container to a network with the attachment's aliases
+func (p *containerProvider) connect(ctx context.Context, c *Container, attachment NetworkAttachment) error {
+	err := p.client.NetworkConnect(ctx, attachment.Name, c.DockerID, &network.EndpointSettings{Aliases: attachment.Aliases})
+	if err != nil {
+		return fmt.Errorf("unable to connect container %s to network %s: %w", c.Meta.Name, attachment.Name, err)
+	}
+
+	plugins.Logger(ctx).Info("connected container to network", "name", c.Meta.Name, "network", attachment.Name)
+
+	return nil
 }
 
 // Functions returns nil, the provider offers no functions
@@ -283,39 +428,6 @@ func equalStrings(a, b []string) bool {
 
 	for i := range a {
 		if a[i] != b[i] {
-			return false
-		}
-	}
-
-	return true
-}
-
-// equalEnvironment reports whether two environments hold the same variables, a
-// nil environment equals an empty one
-func equalEnvironment(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for key, value := range a {
-		other, ok := b[key]
-		if !ok || other != value {
-			return false
-		}
-	}
-
-	return true
-}
-
-// equalAttachments reports whether two lists of network blocks attach to the
-// same networks, in the same order, with the same aliases
-func equalAttachments(a, b []NetworkAttachment) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := range a {
-		if a[i].Name != b[i].Name || !equalStrings(a[i].Aliases, b[i].Aliases) {
 			return false
 		}
 	}

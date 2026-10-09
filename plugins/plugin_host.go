@@ -26,11 +26,11 @@ type PluginHost interface {
 	Read(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) ([]byte, error)
 
 	// Update updates an existing entity
-	Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
+	Update(ctx context.Context, entityType, entitySubType string, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error)
 
 	// Changed decides what applying new needs for the entity saved as old,
 	// given the dependencies the same apply will update or replace
-	Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
+	Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error)
 
 	// Stop shuts down the plugin host and cleans up resources
 	Stop()

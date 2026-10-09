@@ -33,8 +33,8 @@ type ResourceProvider[T any] interface {
     Create(ctx context.Context, resource T) (T, error)
     Destroy(ctx context.Context, resource T, force bool) error
     Read(ctx context.Context, old T, new T) (T, error)
-    Update(ctx context.Context, resource T) (T, error)
-    Changed(ctx context.Context, old T, new T, dependencies []entity.DependencyChange) (entity.Change, error)
+    Update(ctx context.Context, resource T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (T, error)
+    Changed(ctx context.Context, old T, new T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error)
     Functions() ProviderFunctions
 }
 ```
@@ -53,18 +53,37 @@ it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
   ([`plugins/errors.go`](../plugins/errors.go)) when the real resource no
   longer exists, and xcl creates it again. xcl checks for it with
   `errors.Is`, so it can be wrapped.
-- `Changed(ctx, old, new, dependencies)` compares the saved copy with what
-  `Read` returned and answers what the apply does with the resource, an
-  `entity.Change` ([`entity/change.go`](../entity/change.go)):
+- `Changed(ctx, old, new, changes, dependencies)` compares the saved copy
+  with what `Read` returned and answers what the apply does with the
+  resource, an `entity.Change` ([`entity/change.go`](../entity/change.go)):
   `entity.NoChange` leaves it alone, `entity.Update` calls `Update`, and
-  `entity.Replace` destroys it, then creates it again. `dependencies` lists
-  the resources it directly depends on that the same apply will update or
-  replace, each an `entity.DependencyChange{Address, Change}`. Embed
+  `entity.Replace` destroys it, then creates it again. `changes` lists the
+  settings that differ from the last apply, each an `entity.PropertyChange`
+  ([`entity/property_change.go`](../entity/property_change.go)) with its
+  `Path`, `Before` and `After` values, found by the same comparison the plan
+  is made from, so the paths are exactly the plan's. A new value only known
+  once the apply runs has `Unknown` set and a nil `After`. `dependencies`
+  lists the resources it directly depends on that the same apply will update
+  or replace, each an `entity.DependencyChange{Address, Change}`. Embed
   `plugins.DefaultChanged[T]` ([`plugins/changed.go`](../plugins/changed.go))
   to get a comparison of the JSON form of both copies that ignores `meta`,
-  `depends_on` and `disabled`, answering update or no change; define
-  `Changed` on the provider to override it, for example to answer replace
+  `depends_on` and `disabled`, answering update or no change, and ignores
+  both lists; define `Changed` on the provider to override it, for example
+  to answer replace
   (see [Overriding `Changed`](plugin-developer-guide.md#overriding-changed)).
+- `Update(ctx, resource, changes, dependencies)` changes the resource in
+  place. `changes` is the same comparison run again when the apply reaches
+  the resource, so every value is real, including values produced earlier in
+  the same apply; `dependencies` is exactly the list `Changed` was given.
+- A change's `Path` ([`entity/path.go`](../entity/path.go)) is a list of
+  steps, written like `network[0].name` or `environment["LOG_LEVEL"]`;
+  `change.At(path)` matches it exactly and `change.Within(path)` matches it
+  or anything inside it, such as
+  `change.Within(entity.Path{}.Attribute("network"))`. Values are plain JSON
+  values (`string`, `float64`, `bool`, `nil`, `[]any`, `map[string]any`). A
+  sensitive setting's change holds its real values, so a provider can act on
+  them; `String`, `Format`, `LogValue` and `MarshalJSON` show `(sensitive)`
+  in their place, and plans, events and logs never show them.
 
 ### 2. `ProviderAdapter` — the uniform contract
 
@@ -80,8 +99,8 @@ type ProviderAdapter interface {
     Create(ctx context.Context, entityData []byte) ([]byte, error)
     Destroy(ctx context.Context, entityData []byte, force bool) error
     Read(ctx context.Context, oldEntityData []byte, newEntityData []byte) ([]byte, error)
-    Update(ctx context.Context, entityData []byte) ([]byte, error)
-    Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
+    Update(ctx context.Context, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error)
+    Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error)
 }
 ```
 
@@ -114,8 +133,8 @@ type PluginHost interface {
     Create(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
     Destroy(ctx context.Context, entityType, entitySubType string, entityData []byte) error
     Read(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) ([]byte, error)
-    Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
-    Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
+    Update(ctx context.Context, entityType, entitySubType string, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error)
+    Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error)
     Stop()
 }
 ```
@@ -153,7 +172,7 @@ adapter's error `errors.Is` `ErrNotFound`, and the host side
 `ErrNotFound`. Every other error arrives at the host as a plain error with
 the provider's message.
 
-`Changed` crosses the process boundary with its own messages:
+`Changed` and `Update` cross the process boundary with their own messages:
 
 ```protobuf
 enum Change {
@@ -167,12 +186,39 @@ message DependencyChange {
   Change change = 2;
 }
 
+// StepKind is what one step of a path selects, see entity.StepKind
+enum StepKind {
+  STEP_KIND_ATTRIBUTE = 0;
+  STEP_KIND_INDEX = 1;
+  STEP_KIND_KEY = 2;
+}
+
+// PathStep is one step of the path to a setting, see entity.Step
+message PathStep {
+  StepKind kind = 1;
+  string attribute = 2;
+  int64 index = 3;
+  string key = 4;
+}
+
+// PropertyChange is one setting that differs between the last apply and the
+// new configuration, see entity.PropertyChange. before and after hold JSON
+// values; empty means the value is absent.
+message PropertyChange {
+  repeated PathStep path = 1;
+  bytes before = 2;
+  bytes after = 3;
+  bool unknown = 4;
+  bool sensitive = 5;
+}
+
 message ChangedRequest {
   string entity_type = 1;
   string entity_sub_type = 2;
   bytes old_entity_data = 3;
   bytes new_entity_data = 4;
   repeated DependencyChange dependencies = 5;
+  repeated PropertyChange changes = 6;
 }
 
 message ChangedResponse {
@@ -180,6 +226,14 @@ message ChangedResponse {
   reserved 1;
   string error = 2;
   Change change = 3;
+}
+
+message UpdateRequest {
+  string entity_type = 1;
+  string entity_sub_type = 2;
+  bytes entity_data = 3;
+  repeated PropertyChange changes = 4;
+  repeated DependencyChange dependencies = 5;
 }
 ```
 
@@ -189,6 +243,15 @@ enum. A value either side does not know is an error, never a silent
 answered with the `bool changed` field now reserved, sends no `change`, which
 reads as `CHANGE_NO_CHANGE`: it would never be updated, so external plugins
 must be rebuilt against this version of xcl.
+
+The same file converts the property change list. Each `before` and `after`
+travels as the JSON bytes of the value, encoded on its own, never through
+`PropertyChange`'s own JSON form, which masks sensitive values; the plugin
+side decodes them back into plain JSON values. An external plugin's provider
+is therefore told exactly what an in-process one is: the same paths, the
+same values, sensitive values included, and the same `unknown` and
+`sensitive` flags. A plugin built before `changes` existed is not told them,
+so external plugins must be rebuilt.
 
 ## Registering a provider
 

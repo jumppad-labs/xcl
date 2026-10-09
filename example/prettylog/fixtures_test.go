@@ -3,6 +3,7 @@ package prettylog_test
 import (
 	"context"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -131,7 +132,7 @@ func (p *networkProvider) Read(ctx context.Context, old *Network, new *Network) 
 	return new, nil
 }
 
-func (p *networkProvider) Update(ctx context.Context, network *Network) (*Network, error) {
+func (p *networkProvider) Update(ctx context.Context, network *Network, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Network, error) {
 	return network, nil
 }
 
@@ -167,7 +168,7 @@ func (p *containerProvider) Read(ctx context.Context, old *Container, new *Conta
 	return new, nil
 }
 
-func (p *containerProvider) Update(ctx context.Context, container *Container) (*Container, error) {
+func (p *containerProvider) Update(ctx context.Context, container *Container, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Container, error) {
 	return container, nil
 }
 

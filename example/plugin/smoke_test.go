@@ -69,8 +69,9 @@ func TestSmokeApplyStatusDestroyShareTheSavedState(t *testing.T) {
 	require.NoError(t, err, "stdout:\n%s\nstderr:\n%s", stdout, stderr)
 	require.Empty(t, stderr, "status prints only its tree")
 	require.Contains(t, stdout, "● docker.network.app")
-	require.Contains(t, stdout, "└── ● docker.container.web")
-	require.Contains(t, stdout, "    └── ● template.welcome")
+	require.Contains(t, stdout, "└── ● template.init")
+	require.Contains(t, stdout, "    └── ● docker.container.web")
+	require.Contains(t, stdout, "        └── ● template.welcome")
 
 	stdout, stderr, err = runExample(t, binary, env, "inspect", "--state", stateDir, "docker.container.web")
 	require.NoError(t, err, "stdout:\n%s\nstderr:\n%s", stdout, stderr)

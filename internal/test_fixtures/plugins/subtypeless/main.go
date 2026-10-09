@@ -9,6 +9,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -62,7 +63,7 @@ func (p *widgetProvider) Read(ctx context.Context, old *Widget, new *Widget) (*W
 	return new, nil
 }
 
-func (p *widgetProvider) Update(ctx context.Context, w *Widget) (*Widget, error) {
+func (p *widgetProvider) Update(ctx context.Context, w *Widget, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Widget, error) {
 	return w, nil
 }
 

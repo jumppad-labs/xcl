@@ -206,3 +206,38 @@ func TestContainerDestroyRemovesItFromDocker(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, dockerclient.IsErrNotFound(err), "expected not found, got: %s", err)
 }
+
+func TestNetworkDestroyDetachesAttachedContainersAndRemovesTheNetwork(t *testing.T) {
+	requireDocker(t)
+
+	c := newDockerClient(t)
+	networkName := uniqueName(t)
+	containerName := uniqueName(t)
+
+	// cleanups run last registered first, so the container goes before the
+	// network, which should already be gone
+	removeNetworkOnCleanup(t, c, networkName)
+	removeContainerOnCleanup(t, c, containerName)
+
+	networks := &networkProvider{client: c}
+	createdNetwork, err := networks.Create(context.Background(), integrationNetwork(networkName))
+	require.NoError(t, err)
+
+	containers := &containerProvider{client: c}
+	_, err = containers.Create(context.Background(), integrationContainer(containerName, networkName))
+	require.NoError(t, err)
+
+	err = networks.Destroy(context.Background(), createdNetwork, false)
+	require.NoError(t, err)
+
+	_, err = c.NetworkInspect(context.Background(), networkName, network.InspectOptions{})
+	require.Error(t, err)
+	require.True(t, dockerclient.IsErrNotFound(err), "expected not found, got: %s", err)
+
+	inspect, err := c.ContainerInspect(context.Background(), containerName)
+	require.NoError(t, err)
+	require.NotNil(t, inspect.State)
+	require.True(t, inspect.State.Running)
+	require.NotNil(t, inspect.NetworkSettings)
+	require.NotContains(t, inspect.NetworkSettings.Networks, networkName)
+}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
@@ -44,7 +45,7 @@ func (p *thingProvider) Read(ctx context.Context, old *Thing, new *Thing) (*Thin
 	return new, nil
 }
 
-func (p *thingProvider) Update(ctx context.Context, resource *Thing) (*Thing, error) {
+func (p *thingProvider) Update(ctx context.Context, resource *Thing, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Thing, error) {
 	return resource, nil
 }
 

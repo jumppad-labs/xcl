@@ -127,12 +127,12 @@ func (a *sourcedAdapter) Read(ctx context.Context, oldEntityData []byte, newEnti
 	return a.next.Read(a.withSource(ctx), oldEntityData, newEntityData)
 }
 
-func (a *sourcedAdapter) Update(ctx context.Context, entityData []byte) ([]byte, error) {
-	return a.next.Update(a.withSource(ctx), entityData)
+func (a *sourcedAdapter) Update(ctx context.Context, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error) {
+	return a.next.Update(a.withSource(ctx), entityData, changes, dependencies)
 }
 
-func (a *sourcedAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
-	return a.next.Changed(a.withSource(ctx), oldEntityData, newEntityData, dependencies)
+func (a *sourcedAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
+	return a.next.Changed(a.withSource(ctx), oldEntityData, newEntityData, changes, dependencies)
 }
 
 // GetTypes returns the types handled by the plugin
@@ -161,14 +161,14 @@ func (h *DirectPluginHost) Read(ctx context.Context, entityType, entitySubType s
 }
 
 // Update updates an existing entity
-func (h *DirectPluginHost) Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
-	return h.plugin.Update(h.withSource(ctx), entityType, entitySubType, entityData)
+func (h *DirectPluginHost) Update(ctx context.Context, entityType, entitySubType string, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error) {
+	return h.plugin.Update(h.withSource(ctx), entityType, entitySubType, entityData, changes, dependencies)
 }
 
 // Changed decides what applying new needs for the entity saved as old,
 // given the dependencies the same apply will update or replace
-func (h *DirectPluginHost) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
-	return h.plugin.Changed(h.withSource(ctx), entityType, entitySubType, oldEntityData, newEntityData, dependencies)
+func (h *DirectPluginHost) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
+	return h.plugin.Changed(h.withSource(ctx), entityType, entitySubType, oldEntityData, newEntityData, changes, dependencies)
 }
 
 // withSource returns ctx with its logger naming the plugin as the source

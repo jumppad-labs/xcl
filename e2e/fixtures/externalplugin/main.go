@@ -1,13 +1,14 @@
 // Command externalplugin is the end-to-end suite's external plugin. It is
 // compiled to its own binary, which xcl starts as a separate process and
 // talks to over gRPC. It provides the app and ingress block types of
-// testdata/plugin. The suite's TestMain builds it once per run.
+// testdata/plugin, and the recorder block type of ../recorder. The suite's TestMain builds it once per run.
 package main
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/jumppad-labs/xcl/e2e/fixtures/recorder"
 	"github.com/jumppad-labs/xcl/e2e/fixtures/services"
 	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
@@ -44,7 +45,7 @@ func (p *ExternalPlugin) Init(logger logger.Logger, state plugins.State) error {
 		return err
 	}
 
-	return plugins.RegisterResourceProvider(
+	err = plugins.RegisterResourceProvider(
 		&p.PluginBase,
 		logger,
 		state,
@@ -53,6 +54,13 @@ func (p *ExternalPlugin) Init(logger logger.Logger, state plugins.State) error {
 		&services.Ingress{},
 		&ingressProvider{},
 	)
+	if err != nil {
+		return err
+	}
+
+	// recorder records what each Changed and Update call is told changed,
+	// so a test can compare it with the same provider run in-process
+	return recorder.Register(&p.PluginBase, logger, state)
 }
 
 // appProvider handles the lifecycle of app blocks, the only thing it creates
@@ -89,7 +97,7 @@ func (p *appProvider) Read(ctx context.Context, old *services.App, new *services
 	return new, nil
 }
 
-func (p *appProvider) Update(ctx context.Context, app *services.App) (*services.App, error) {
+func (p *appProvider) Update(ctx context.Context, app *services.App, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*services.App, error) {
 	app.URL = appURL(app)
 	plugins.Logger(ctx).Info("updated app", "url", app.URL)
 
@@ -130,12 +138,12 @@ func (p *ingressProvider) Init(state plugins.State, functions plugins.ProviderFu
 // Changed answers replace when the hostname changes, the route is identified by its hostname, so the
 // e2e scenarios have a provider-decided replacement. Every other change is
 // left to DefaultChanged.
-func (p *ingressProvider) Changed(ctx context.Context, old *services.Ingress, new *services.Ingress, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (p *ingressProvider) Changed(ctx context.Context, old *services.Ingress, new *services.Ingress, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	if old.Hostname != new.Hostname {
 		return entity.Replace, nil
 	}
 
-	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+	return p.DefaultChanged.Changed(ctx, old, new, changes, dependencies)
 }
 
 // Create receives the ingress with the computed url of the app it routes to,
@@ -152,7 +160,7 @@ func (p *ingressProvider) Read(ctx context.Context, old *services.Ingress, new *
 	return new, nil
 }
 
-func (p *ingressProvider) Update(ctx context.Context, ingress *services.Ingress) (*services.Ingress, error) {
+func (p *ingressProvider) Update(ctx context.Context, ingress *services.Ingress, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*services.Ingress, error) {
 	plugins.Logger(ctx).Info("updated ingress")
 
 	return ingress, nil

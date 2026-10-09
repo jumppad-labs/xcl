@@ -97,6 +97,18 @@ type TestPlugin struct {
 	// Changed call was told about
 	ChangedDependencies map[string][]entity.DependencyChange
 
+	// ChangedChanges maps resource ID to the changed settings its last
+	// Changed call was told about
+	ChangedChanges map[string][]entity.PropertyChange
+
+	// UpdateChanges maps resource ID to the changed settings its last Update
+	// call was told about
+	UpdateChanges map[string][]entity.PropertyChange
+
+	// UpdateDependencies maps resource ID to the dependencies its last Update
+	// call was told about
+	UpdateDependencies map[string][]entity.DependencyChange
+
 	// CreateSetsID sets the network's ProviderID to "id-<name>" on Create, it is
 	// enabled by Init
 	CreateSetsID bool
@@ -148,6 +160,51 @@ func (p *TestPlugin) GetChangedDependencies(resourceID string) []entity.Dependen
 	defer p.mu.Unlock()
 
 	dependencies, ok := p.ChangedDependencies[resourceID]
+	if !ok {
+		return nil
+	}
+
+	return append([]entity.DependencyChange(nil), dependencies...)
+}
+
+// GetChangedChanges returns the changed settings the last Changed call for
+// the resource with the given ID was told about, nil when it was told none or
+// was never asked
+func (p *TestPlugin) GetChangedChanges(resourceID string) []entity.PropertyChange {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	changes, ok := p.ChangedChanges[resourceID]
+	if !ok {
+		return nil
+	}
+
+	return append([]entity.PropertyChange(nil), changes...)
+}
+
+// GetUpdateChanges returns the changed settings the last Update call for the
+// resource with the given ID was told about, nil when it was told none or was
+// never called
+func (p *TestPlugin) GetUpdateChanges(resourceID string) []entity.PropertyChange {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	changes, ok := p.UpdateChanges[resourceID]
+	if !ok {
+		return nil
+	}
+
+	return append([]entity.PropertyChange(nil), changes...)
+}
+
+// GetUpdateDependencies returns the dependencies the last Update call for the
+// resource with the given ID was told about, nil when it was told none or was
+// never called
+func (p *TestPlugin) GetUpdateDependencies(resourceID string) []entity.DependencyChange {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	dependencies, ok := p.UpdateDependencies[resourceID]
 	if !ok {
 		return nil
 	}
@@ -249,6 +306,9 @@ func (p *TestPlugin) ResetCalls() {
 	p.UpdatedResources = []string{}
 	p.ChangedCalls = []string{}
 	p.ChangedDependencies = map[string][]entity.DependencyChange{}
+	p.ChangedChanges = map[string][]entity.PropertyChange{}
+	p.UpdateChanges = map[string][]entity.PropertyChange{}
+	p.UpdateDependencies = map[string][]entity.DependencyChange{}
 	p.Calls = []string{}
 	p.ReadCalls = []ReadCall{}
 	p.CallTimes = []CallTime{}
@@ -636,7 +696,7 @@ func (p *TestResourceProvider[T]) Read(ctx context.Context, old T, resource T) (
 }
 
 // Update tracks the resource name for testing
-func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T) (result T, err error) {
+func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (result T, err error) {
 	started := time.Now()
 
 	meta, err := types.GetMeta(resource)
@@ -650,6 +710,14 @@ func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T) (resul
 
 	p.plugin.UpdatedResources = append(p.plugin.UpdatedResources, meta.ID)
 	p.plugin.Calls = append(p.plugin.Calls, "update "+meta.ID)
+	if p.plugin.UpdateChanges == nil {
+		p.plugin.UpdateChanges = map[string][]entity.PropertyChange{}
+	}
+	p.plugin.UpdateChanges[meta.ID] = append([]entity.PropertyChange(nil), changes...)
+	if p.plugin.UpdateDependencies == nil {
+		p.plugin.UpdateDependencies = map[string][]entity.DependencyChange{}
+	}
+	p.plugin.UpdateDependencies[meta.ID] = append([]entity.DependencyChange(nil), dependencies...)
 
 	if err, exists := p.plugin.UpdateErrors[meta.ID]; exists && err != nil {
 		return resource, err
@@ -662,7 +730,7 @@ func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T) (resul
 
 // Changed tracks the comparison, returns a configured error or result, and
 // otherwise uses the default change detection
-func (p *TestResourceProvider[T]) Changed(ctx context.Context, old T, new T, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (p *TestResourceProvider[T]) Changed(ctx context.Context, old T, new T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	oldMeta, err := types.GetMeta(old)
 	if err != nil {
 		return entity.NoChange, err
@@ -680,6 +748,10 @@ func (p *TestResourceProvider[T]) Changed(ctx context.Context, old T, new T, dep
 		p.plugin.ChangedDependencies = map[string][]entity.DependencyChange{}
 	}
 	p.plugin.ChangedDependencies[newMeta.ID] = append([]entity.DependencyChange(nil), dependencies...)
+	if p.plugin.ChangedChanges == nil {
+		p.plugin.ChangedChanges = map[string][]entity.PropertyChange{}
+	}
+	p.plugin.ChangedChanges[newMeta.ID] = append([]entity.PropertyChange(nil), changes...)
 	changedErr, hasError := p.plugin.ChangedErrors[newMeta.ID]
 	changedResult, hasResult := p.plugin.ChangedResults[newMeta.ID]
 	p.plugin.mu.Unlock()
@@ -692,7 +764,7 @@ func (p *TestResourceProvider[T]) Changed(ctx context.Context, old T, new T, dep
 		return changedResult, nil
 	}
 
-	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+	return p.DefaultChanged.Changed(ctx, old, new, changes, dependencies)
 }
 
 // Functions returns no functions

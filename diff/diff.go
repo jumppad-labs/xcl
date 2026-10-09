@@ -99,11 +99,26 @@ type Resource struct {
 	// other reason and action.
 	ReplacedDeps []string `json:"replaced_dependencies,omitempty"`
 
+	// Dependencies are the resources behind an update that the same apply
+	// updates or replaces, sorted by address, as its provider was told about
+	// them. It is empty for every other action.
+	Dependencies []Dependency `json:"dependencies,omitempty"`
+
 	// Changes lists the configured values that would change, one per
 	// changed field in field declaration order. An update may have none,
 	// when its real counterpart changed outside xcl, and a delete never has
 	// any.
 	Changes []Change `json:"changes,omitempty"`
+}
+
+// Dependency is a resource another depends on that the same apply updates or
+// replaces.
+type Dependency struct {
+	// Address is the dependency's address, such as resource.network.app.
+	Address string `json:"address"`
+
+	// Action is ActionUpdate or ActionReplace.
+	Action Action `json:"action"`
 }
 
 // Change is one configured value that would change.

@@ -1307,6 +1307,7 @@ func setupRefresh(t *testing.T, h *lifecycleHarness) *refreshScenario {
 		types:    h.registry,
 		bodies:   map[string]*hclsyntax.Body{},
 		progress: newApplyProgress(),
+		recorder: newDiffRecorder(),
 	}
 
 	return &refreshScenario{

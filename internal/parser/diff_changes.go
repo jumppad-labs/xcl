@@ -304,7 +304,7 @@ func (c *changeCollector) unknownChange(path diff.Path, saved reflect.Value) {
 // unknownAt returns true when path is an unknown path
 func (c *changeCollector) unknownAt(path diff.Path) bool {
 	for _, u := range c.unknown {
-		if pathEqual(u, path) {
+		if u.Equal(path) {
 			return true
 		}
 	}
@@ -315,27 +315,12 @@ func (c *changeCollector) unknownAt(path diff.Path) bool {
 // unknownUnder returns true when an unknown path lies inside path
 func (c *changeCollector) unknownUnder(path diff.Path) bool {
 	for _, u := range c.unknown {
-		if len(u) > len(path) && pathEqual(u[:len(path)], path) {
+		if len(u) > len(path) && u.Within(path) {
 			return true
 		}
 	}
 
 	return false
-}
-
-// pathEqual returns true when both paths have the same steps
-func pathEqual(a, b diff.Path) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-
-	return true
 }
 
 // setInBody returns true when the body sets the attribute or holds a block
