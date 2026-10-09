@@ -1,31 +1,21 @@
 {
-  "kind": "plan",
-  "current_step": "finished",
+  "kind": "spec",
+  "current_step": "acceptance_criteria",
   "completed_steps": [
     "new",
+    "interview",
     "overview",
-    "discovery",
-    "architecture",
-    "components",
-    "data_structures",
-    "implementation_detail",
-    "dependencies",
-    "testing_approach",
-    "milestones",
-    "tasks",
-    "open_questions",
-    "out_of_scope",
-    "assemble",
-    "verification",
-    "write_plan",
-    "write_context",
-    "write_research",
-    "walkthrough",
-    "finished"
+    "requirements"
   ],
-  "created_at": "2026-10-08T20:07:38.017861136Z",
-  "updated_at": "2026-10-08T20:30:48.254591198Z",
+  "created_at": "2026-10-09T09:25:51.052751188Z",
+  "updated_at": "2026-10-09T09:33:49.16298322Z",
   "data": {
-    "name": "20261008194959-b128e508-update-property-changes"
+    "name": "20261009092551-82db0140-plugin-template",
+    "sources": [
+      {
+        "retrieved_date": "2026-10-09",
+        "uri": "https://github.com/jumppad-labs/xcl/issues/8"
+      }
+    ]
   }
 }
