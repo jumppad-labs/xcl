@@ -29,8 +29,8 @@ type ProviderAdapter interface {
 	Create(ctx context.Context, entityData []byte) ([]byte, error)
 	Destroy(ctx context.Context, entityData []byte, force bool) error
 	Read(ctx context.Context, oldEntityData []byte, newEntityData []byte) ([]byte, error)
-	Update(ctx context.Context, entityData []byte) ([]byte, error)
-	Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
+	Update(ctx context.Context, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error)
+	Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error)
 }
 
 // TypedProviderAdapter wraps a ResourceProvider[T] to implement ProviderAdapter.
@@ -181,7 +181,7 @@ func (a *TypedProviderAdapter[T]) Read(ctx context.Context, oldEntityData []byte
 	return readData, nil
 }
 
-func (a *TypedProviderAdapter[T]) Update(ctx context.Context, entityData []byte) ([]byte, error) {
+func (a *TypedProviderAdapter[T]) Update(ctx context.Context, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error) {
 	// Create a new instance of type T to unmarshal into
 	var resource T
 
@@ -191,7 +191,7 @@ func (a *TypedProviderAdapter[T]) Update(ctx context.Context, entityData []byte)
 	}
 
 	// Call the provider's Update method with the concrete type
-	updatedResource, err := a.provider.Update(ctx, resource)
+	updatedResource, err := a.provider.Update(ctx, resource, changes, dependencies)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func (a *TypedProviderAdapter[T]) Update(ctx context.Context, entityData []byte)
 	return updatedData, nil
 }
 
-func (a *TypedProviderAdapter[T]) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (a *TypedProviderAdapter[T]) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	// Create instances for old and new resources
 	var oldResource, newResource T
 
@@ -221,5 +221,5 @@ func (a *TypedProviderAdapter[T]) Changed(ctx context.Context, oldEntityData []b
 
 	// Call the provider's Changed method with both resources and the
 	// dependencies the same apply will update or replace
-	return a.provider.Changed(ctx, oldResource, newResource, dependencies)
+	return a.provider.Changed(ctx, oldResource, newResource, changes, dependencies)
 }

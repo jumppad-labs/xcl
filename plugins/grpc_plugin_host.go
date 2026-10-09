@@ -270,7 +270,17 @@ func (w *grpcPluginWrapper) Read(ctx context.Context, entityType, entitySubType 
 	return resp.EntityData, nil
 }
 
-func (w *grpcPluginWrapper) Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
+func (w *grpcPluginWrapper) Update(ctx context.Context, entityType, entitySubType string, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error) {
+	protoChanges, err := toProtoPropertyChanges(changes)
+	if err != nil {
+		return nil, err
+	}
+
+	protoDependencies, err := toProtoDependencies(dependencies)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, done := w.callContext(ctx)
 	defer done()
 
@@ -278,6 +288,8 @@ func (w *grpcPluginWrapper) Update(ctx context.Context, entityType, entitySubTyp
 		EntityType:    entityType,
 		EntitySubType: entitySubType,
 		EntityData:    entityData,
+		Changes:       protoChanges,
+		Dependencies:  protoDependencies,
 	})
 	if err != nil {
 		return nil, err
@@ -290,9 +302,14 @@ func (w *grpcPluginWrapper) Update(ctx context.Context, entityType, entitySubTyp
 	return resp.UpdatedEntityData, nil
 }
 
-func (w *grpcPluginWrapper) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (w *grpcPluginWrapper) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	ctx, done := w.callContext(ctx)
 	defer done()
+
+	protoChanges, err := toProtoPropertyChanges(changes)
+	if err != nil {
+		return entity.NoChange, err
+	}
 
 	protoDependencies, err := toProtoDependencies(dependencies)
 	if err != nil {
@@ -304,6 +321,7 @@ func (w *grpcPluginWrapper) Changed(ctx context.Context, entityType, entitySubTy
 		EntitySubType: entitySubType,
 		OldEntityData: oldEntityData,
 		NewEntityData: newEntityData,
+		Changes:       protoChanges,
 		Dependencies:  protoDependencies,
 	})
 	if err != nil {
@@ -390,18 +408,18 @@ func (h *GRPCPluginHost) Read(ctx context.Context, entityType, entitySubType str
 }
 
 // Update updates an existing entity
-func (h *GRPCPluginHost) Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
+func (h *GRPCPluginHost) Update(ctx context.Context, entityType, entitySubType string, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error) {
 	if h.plugin == nil {
 		return nil, fmt.Errorf("plugin not initialized")
 	}
-	return h.plugin.(*grpcPluginWrapper).Update(ctx, entityType, entitySubType, entityData)
+	return h.plugin.(*grpcPluginWrapper).Update(ctx, entityType, entitySubType, entityData, changes, dependencies)
 }
 
 // Changed decides what applying new needs for the entity saved as old,
 // given the dependencies the same apply will update or replace
-func (h *GRPCPluginHost) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (h *GRPCPluginHost) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	if h.plugin == nil {
 		return entity.NoChange, fmt.Errorf("plugin not initialized")
 	}
-	return h.plugin.Changed(ctx, entityType, entitySubType, oldEntityData, newEntityData, dependencies)
+	return h.plugin.Changed(ctx, entityType, entitySubType, oldEntityData, newEntityData, changes, dependencies)
 }

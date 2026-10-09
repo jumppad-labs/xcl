@@ -680,6 +680,75 @@ func (_c *MockDocker_NetworkCreate_Call) RunAndReturn(run func(ctx context.Conte
 	return _c
 }
 
+// NetworkDisconnect provides a mock function for the type MockDocker
+func (_mock *MockDocker) NetworkDisconnect(ctx context.Context, networkID string, containerID string, force bool) error {
+	ret := _mock.Called(ctx, networkID, containerID, force)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NetworkDisconnect")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, bool) error); ok {
+		r0 = returnFunc(ctx, networkID, containerID, force)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockDocker_NetworkDisconnect_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NetworkDisconnect'
+type MockDocker_NetworkDisconnect_Call struct {
+	*mock.Call
+}
+
+// NetworkDisconnect is a helper method to define mock.On call
+//   - ctx context.Context
+//   - networkID string
+//   - containerID string
+//   - force bool
+func (_e *MockDocker_Expecter) NetworkDisconnect(ctx any, networkID any, containerID any, force any) *MockDocker_NetworkDisconnect_Call {
+	return &MockDocker_NetworkDisconnect_Call{Call: _e.mock.On("NetworkDisconnect", ctx, networkID, containerID, force)}
+}
+
+func (_c *MockDocker_NetworkDisconnect_Call) Run(run func(ctx context.Context, networkID string, containerID string, force bool)) *MockDocker_NetworkDisconnect_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDocker_NetworkDisconnect_Call) Return(err error) *MockDocker_NetworkDisconnect_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockDocker_NetworkDisconnect_Call) RunAndReturn(run func(ctx context.Context, networkID string, containerID string, force bool) error) *MockDocker_NetworkDisconnect_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NetworkInspect provides a mock function for the type MockDocker
 func (_mock *MockDocker) NetworkInspect(ctx context.Context, networkID string, options network.InspectOptions) (network.Inspect, error) {
 	ret := _mock.Called(ctx, networkID, options)

@@ -33,6 +33,7 @@ type Docker interface {
 	NetworkInspect(ctx context.Context, networkID string, options network.InspectOptions) (network.Inspect, error)
 	NetworkRemove(ctx context.Context, networkID string) error
 	NetworkConnect(ctx context.Context, networkID, containerID string, config *network.EndpointSettings) error
+	NetworkDisconnect(ctx context.Context, networkID, containerID string, force bool) error
 
 	ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error)
 	ImagePull(ctx context.Context, ref string, options image.PullOptions) (io.ReadCloser, error)

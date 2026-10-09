@@ -89,6 +89,8 @@ message UpdateRequest {
   string entity_type = 1;
   string entity_sub_type = 2;
   bytes entity_data = 3;
+  repeated PropertyChange changes = 4;
+  repeated DependencyChange dependencies = 5;
 }
 
 message UpdateResponse {
@@ -111,12 +113,39 @@ message DependencyChange {
   Change change = 2;
 }
 
+// StepKind is what one step of a path selects, see entity.StepKind
+enum StepKind {
+  STEP_KIND_ATTRIBUTE = 0;
+  STEP_KIND_INDEX = 1;
+  STEP_KIND_KEY = 2;
+}
+
+// PathStep is one step of the path to a setting, see entity.Step
+message PathStep {
+  StepKind kind = 1;
+  string attribute = 2;
+  int64 index = 3;
+  string key = 4;
+}
+
+// PropertyChange is one setting that differs between the last apply and the
+// new configuration, see entity.PropertyChange. before and after hold JSON
+// values; empty means the value is absent.
+message PropertyChange {
+  repeated PathStep path = 1;
+  bytes before = 2;
+  bytes after = 3;
+  bool unknown = 4;
+  bool sensitive = 5;
+}
+
 message ChangedRequest {
   string entity_type = 1;
   string entity_sub_type = 2;
   bytes old_entity_data = 3;
   bytes new_entity_data = 4;
   repeated DependencyChange dependencies = 5;
+  repeated PropertyChange changes = 6;
 }
 
 message ChangedResponse {

@@ -46,7 +46,7 @@ func (p *readRecordingProvider) Read(ctx context.Context, old *testResource, new
 	return p.readResult, p.readError
 }
 
-func (p *readRecordingProvider) Update(ctx context.Context, resource *testResource) (*testResource, error) {
+func (p *readRecordingProvider) Update(ctx context.Context, resource *testResource, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*testResource, error) {
 	return resource, nil
 }
 
@@ -217,11 +217,17 @@ func TestTypedProviderAdapterCreateEmitsNoLogEventsOfItsOwn(t *testing.T) {
 	require.Empty(t, recorder.Events())
 }
 
-// changedRecordingProvider is a fake provider that records the dependencies
-// passed to Changed and returns the configured change and error.
+// changedRecordingProvider is a fake provider that records the changes and
+// dependencies passed to Changed and Update and returns the configured change
+// and error.
 type changedRecordingProvider struct {
+	changedChanges      []entity.PropertyChange
 	changedDependencies []entity.DependencyChange
 	changedCalled       bool
+
+	updateChanges      []entity.PropertyChange
+	updateDependencies []entity.DependencyChange
+	updateCalled       bool
 
 	changedResult entity.Change
 	changedError  error
@@ -243,12 +249,17 @@ func (p *changedRecordingProvider) Read(ctx context.Context, old *testResource, 
 	return new, nil
 }
 
-func (p *changedRecordingProvider) Update(ctx context.Context, resource *testResource) (*testResource, error) {
+func (p *changedRecordingProvider) Update(ctx context.Context, resource *testResource, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*testResource, error) {
+	p.updateCalled = true
+	p.updateChanges = changes
+	p.updateDependencies = dependencies
+
 	return resource, nil
 }
 
-func (p *changedRecordingProvider) Changed(ctx context.Context, old *testResource, new *testResource, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (p *changedRecordingProvider) Changed(ctx context.Context, old *testResource, new *testResource, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	p.changedCalled = true
+	p.changedChanges = changes
 	p.changedDependencies = dependencies
 
 	return p.changedResult, p.changedError
@@ -285,6 +296,7 @@ func TestTypedProviderAdapterChangedPassesDependenciesToProvider(t *testing.T) {
 		context.Background(),
 		[]byte(`{"name":"web","count":1}`),
 		[]byte(`{"name":"web","count":1}`),
+		nil,
 		dependencies,
 	)
 	require.NoError(t, err)
@@ -311,9 +323,143 @@ func TestDirectPluginHostChangedReturnsProviderAnswer(t *testing.T) {
 		"test",
 		[]byte(`{"name":"web","count":1}`),
 		[]byte(`{"name":"web","count":1}`),
+		nil,
 		dependencies,
 	)
 	require.NoError(t, err)
 	require.Equal(t, entity.Replace, change)
 	require.Equal(t, dependencies, provider.changedDependencies)
+}
+
+func TestTypedProviderAdapterChangedPassesChangesToProvider(t *testing.T) {
+	provider := &changedRecordingProvider{changedResult: entity.Update}
+	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("count"), Before: float64(1), After: float64(2)},
+		{Path: entity.Path{}.Attribute("env").Key("TOKEN"), Before: "old", After: "new", Sensitive: true},
+	}
+
+	change, err := adapter.Changed(
+		context.Background(),
+		[]byte(`{"name":"web","count":1}`),
+		[]byte(`{"name":"web","count":2}`),
+		changes,
+		nil,
+	)
+	require.NoError(t, err)
+	require.Equal(t, entity.Update, change)
+
+	require.True(t, provider.changedCalled)
+	require.Equal(t, changes, provider.changedChanges)
+}
+
+func TestTypedProviderAdapterUpdatePassesChangesAndDependenciesToProvider(t *testing.T) {
+	provider := &changedRecordingProvider{}
+	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("count"), Before: float64(1), After: float64(2)},
+		{Path: entity.Path{}.Attribute("name"), Before: "web", Unknown: true},
+	}
+	dependencies := []entity.DependencyChange{
+		{Address: "resource.network.main", Change: entity.Replace},
+	}
+
+	_, err := adapter.Update(
+		context.Background(),
+		[]byte(`{"name":"web","count":2}`),
+		changes,
+		dependencies,
+	)
+	require.NoError(t, err)
+
+	require.True(t, provider.updateCalled)
+	require.Equal(t, changes, provider.updateChanges)
+	require.Equal(t, dependencies, provider.updateDependencies)
+}
+
+func TestDirectPluginHostChangedForwardsChangesAndDependencies(t *testing.T) {
+	provider := &changedRecordingProvider{changedResult: entity.Update}
+	plugin := &changedTestPlugin{provider: provider}
+
+	host, err := NewDirectPluginHost(nil, emptyState{}, plugin)
+	require.NoError(t, err)
+
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("count"), Before: float64(1), After: float64(2)},
+	}
+	dependencies := []entity.DependencyChange{
+		{Address: "resource.network.main", Change: entity.Update},
+	}
+
+	_, err = host.Changed(
+		context.Background(),
+		"resource",
+		"test",
+		[]byte(`{"name":"web","count":1}`),
+		[]byte(`{"name":"web","count":2}`),
+		changes,
+		dependencies,
+	)
+	require.NoError(t, err)
+
+	require.Equal(t, changes, provider.changedChanges)
+	require.Equal(t, dependencies, provider.changedDependencies)
+}
+
+func TestDirectPluginHostUpdateForwardsChangesAndDependencies(t *testing.T) {
+	provider := &changedRecordingProvider{}
+	plugin := &changedTestPlugin{provider: provider}
+
+	host, err := NewDirectPluginHost(nil, emptyState{}, plugin)
+	require.NoError(t, err)
+
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("count"), Before: float64(1), After: float64(2)},
+	}
+	dependencies := []entity.DependencyChange{
+		{Address: "resource.network.main", Change: entity.Replace},
+	}
+
+	_, err = host.Update(
+		context.Background(),
+		"resource",
+		"test",
+		[]byte(`{"name":"web","count":2}`),
+		changes,
+		dependencies,
+	)
+	require.NoError(t, err)
+
+	require.True(t, provider.updateCalled)
+	require.Equal(t, changes, provider.updateChanges)
+	require.Equal(t, dependencies, provider.updateDependencies)
+}
+
+func TestDirectPluginHostAdapterUpdateForwardsChangesAndDependencies(t *testing.T) {
+	provider := &changedRecordingProvider{}
+	plugin := &changedTestPlugin{provider: provider}
+
+	host, err := NewDirectPluginHost(nil, emptyState{}, plugin)
+	require.NoError(t, err)
+
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("count"), Before: float64(1), After: float64(2)},
+	}
+	dependencies := []entity.DependencyChange{
+		{Address: "resource.network.main", Change: entity.Replace},
+	}
+
+	_, err = adapterFor(t, host, "test").Update(
+		context.Background(),
+		[]byte(`{"name":"web","count":2}`),
+		changes,
+		dependencies,
+	)
+	require.NoError(t, err)
+
+	require.True(t, provider.updateCalled)
+	require.Equal(t, changes, provider.updateChanges)
+	require.Equal(t, dependencies, provider.updateDependencies)
 }

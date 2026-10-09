@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/entity"
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
@@ -71,7 +72,7 @@ func (p *thingProvider) Read(ctx context.Context, old *Thing, new *Thing) (*Thin
 	return new, nil
 }
 
-func (p *thingProvider) Update(ctx context.Context, resource *Thing) (*Thing, error) {
+func (p *thingProvider) Update(ctx context.Context, resource *Thing, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Thing, error) {
 	return resource, nil
 }
 
@@ -149,7 +150,7 @@ func (p *chattyProvider) Read(ctx context.Context, old *Thing, new *Thing) (*Thi
 	return new, nil
 }
 
-func (p *chattyProvider) Update(ctx context.Context, resource *Thing) (*Thing, error) {
+func (p *chattyProvider) Update(ctx context.Context, resource *Thing, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Thing, error) {
 	return resource, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/types"
@@ -45,7 +46,7 @@ func (p *vaultProvider) Read(ctx context.Context, old *Vault, new *Vault) (*Vaul
 	return new, nil
 }
 
-func (p *vaultProvider) Update(ctx context.Context, resource *Vault) (*Vault, error) {
+func (p *vaultProvider) Update(ctx context.Context, resource *Vault, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Vault, error) {
 	return resource, nil
 }
 
@@ -73,7 +74,7 @@ func (p *badVaultProvider) Read(ctx context.Context, old *BadVault, new *BadVaul
 	return new, nil
 }
 
-func (p *badVaultProvider) Update(ctx context.Context, resource *BadVault) (*BadVault, error) {
+func (p *badVaultProvider) Update(ctx context.Context, resource *BadVault, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*BadVault, error) {
 	return resource, nil
 }
 

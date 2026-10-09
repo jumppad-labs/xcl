@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
@@ -35,7 +36,7 @@ func (p *loggingProvider) Read(ctx context.Context, old *testResource, new *test
 	return new, nil
 }
 
-func (p *loggingProvider) Update(ctx context.Context, resource *testResource) (*testResource, error) {
+func (p *loggingProvider) Update(ctx context.Context, resource *testResource, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*testResource, error) {
 	return resource, nil
 }
 

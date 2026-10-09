@@ -1,8 +1,10 @@
 # The plugin example's main configuration (../config) with the network's
 # address range changed from 10.42.0.0/24 to 10.42.0.0/23. Docker can not move
 # a network to a new range in place, so applying it after ../config replaces
-# the network and the container attached to it, and updates the template that
-# reads the container's address. See `make replace`.
+# the network. Destroying the old network detaches the web container, which is
+# then updated in place and attached to the new one, keeping its ID. The
+# welcome template, which reads the container's address, is updated too. See
+# `make replace`.
 #
 # The docker blocks come from the external Docker plugin, the template block
 # from the in-process template plugin.
@@ -10,7 +12,7 @@
 # Variables can be overridden with environment variables prefixed HCL_VAR_,
 # i.e. HCL_VAR_output_dir.
 
-# output_dir is where the rendered template is written
+# output_dir is where the rendered templates are written
 variable "output_dir" {
   default = "./build/rendered"
 }
@@ -21,10 +23,34 @@ docker "network" "app" {
   subnet = "10.42.0.0/23"
 }
 
+# A script the web container runs when it starts. The mode makes it
+# executable, which the nginx image needs before it runs a script from its
+# entrypoint directory. Editing the source renders the file again and leaves
+# the container alone; moving the destination replaces the template, and with
+# it the container that mounts the script.
+template "init" {
+  source = <<-EOF
+  #!/bin/sh
+  echo "web joined the {{network}} network" > /usr/share/nginx/html/init.txt
+  EOF
+
+  destination = "${variable.output_dir}/init.sh"
+  mode        = "0755"
+
+  variables = {
+    network = docker.network.app.meta.name
+  }
+}
+
 # An nginx container named web on the app network. Referring to the network
 # orders the blocks, web is always created after app and destroyed before it.
+# Changing its networks moves the running container in place; changing its
+# image, command, environment or init script creates a new one.
 docker "container" "web" {
   image = "nginx:1.27-alpine"
+
+  # mounted into the nginx entrypoint directory, run when the container starts
+  init_script = template.init.destination
 
   # a nested block, repeated once per network the container joins
   network {

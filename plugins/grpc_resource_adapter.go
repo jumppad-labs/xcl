@@ -46,12 +46,12 @@ func (a *GRPCResourceProviderAdapter) Read(ctx context.Context, oldEntityData []
 	return a.wrapper.Read(ctx, a.resourceType, a.resourceSubType, oldEntityData, newEntityData)
 }
 
-func (a *GRPCResourceProviderAdapter) Update(ctx context.Context, entityData []byte) ([]byte, error) {
-	return a.wrapper.Update(ctx, a.resourceType, a.resourceSubType, entityData)
+func (a *GRPCResourceProviderAdapter) Update(ctx context.Context, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error) {
+	return a.wrapper.Update(ctx, a.resourceType, a.resourceSubType, entityData, changes, dependencies)
 }
 
-func (a *GRPCResourceProviderAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
-	return a.wrapper.Changed(ctx, a.resourceType, a.resourceSubType, oldEntityData, newEntityData, dependencies)
+func (a *GRPCResourceProviderAdapter) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
+	return a.wrapper.Changed(ctx, a.resourceType, a.resourceSubType, oldEntityData, newEntityData, changes, dependencies)
 }
 
 // Ensure GRPCResourceProviderAdapter implements ProviderAdapter

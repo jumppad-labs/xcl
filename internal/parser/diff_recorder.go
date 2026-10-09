@@ -38,6 +38,10 @@ type decision struct {
 	// dependencies the same apply will update or replace
 	dependencies []entity.DependencyChange
 
+	// changes are the plan's view of the entity's changed settings, with
+	// sensitive values hidden unless the diff options reveal them
+	changes []diff.Change
+
 	// read is the entity as its provider read it while deciding, empty when
 	// it was not read
 	read []byte

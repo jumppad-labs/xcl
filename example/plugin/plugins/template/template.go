@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/infinytum/raymond/v2"
@@ -38,7 +39,15 @@ type Template struct {
 
 	// Variables are the values the template refers to, i.e. {{address}}
 	Variables map[string]string `xcl:"variables,optional" json:"variables,omitempty"`
+
+	// Mode is the rendered file's permissions as an octal string, i.e.
+	// "0755" for a script that is run. It defaults to "0644".
+	Mode string `xcl:"mode,optional" json:"mode,omitempty"`
 }
+
+// defaultMode is the permissions of a rendered file when the template sets no
+// mode
+const defaultMode fs.FileMode = 0644
 
 // provider renders templates for template blocks and removes the rendered
 // files on destroy
@@ -53,12 +62,12 @@ var _ plugins.ResourceProvider[*Template] = (*provider)(nil)
 // destroyed, removing its file, and created again. A change to the source or
 // variables is left to DefaultChanged, which answers update, and Update
 // renders the file again.
-func (p *provider) Changed(ctx context.Context, old *Template, new *Template, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (p *provider) Changed(ctx context.Context, old *Template, new *Template, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	if old.Destination != new.Destination {
 		return entity.Replace, nil
 	}
 
-	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+	return p.DefaultChanged.Changed(ctx, old, new, changes, dependencies)
 }
 
 // Init logs that the provider is ready, it needs nothing else
@@ -100,7 +109,7 @@ func (p *provider) Read(ctx context.Context, old *Template, new *Template) (*Tem
 }
 
 // Update renders the template again
-func (p *provider) Update(ctx context.Context, t *Template) (*Template, error) {
+func (p *provider) Update(ctx context.Context, t *Template, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Template, error) {
 	err := render(t)
 	if err != nil {
 		return nil, err
@@ -117,8 +126,13 @@ func (p *provider) Functions() plugins.ProviderFunctions {
 }
 
 // render renders t's source with its variables and writes it to its
-// destination, creating the destination's parent directories
+// destination with its mode, creating the destination's parent directories
 func render(t *Template) error {
+	mode, err := fileMode(t.Mode)
+	if err != nil {
+		return err
+	}
+
 	tmpl, err := raymond.Parse(t.Source)
 	if err != nil {
 		return fmt.Errorf("unable to parse template: %w", err)
@@ -146,10 +160,32 @@ func render(t *Template) error {
 		return fmt.Errorf("unable to create the directory for %s: %w", t.Destination, err)
 	}
 
-	err = os.WriteFile(t.Destination, []byte(out), 0644)
+	err = os.WriteFile(t.Destination, []byte(out), mode)
 	if err != nil {
 		return fmt.Errorf("unable to write %s: %w", t.Destination, err)
 	}
 
+	// WriteFile only sets the mode of a file it creates, a file rendered
+	// before keeps its old mode otherwise
+	err = os.Chmod(t.Destination, mode)
+	if err != nil {
+		return fmt.Errorf("unable to set the mode of %s: %w", t.Destination, err)
+	}
+
 	return nil
+}
+
+// fileMode returns the permissions an octal mode string names, defaultMode
+// when it is empty
+func fileMode(mode string) (fs.FileMode, error) {
+	if mode == "" {
+		return defaultMode, nil
+	}
+
+	parsed, err := strconv.ParseUint(mode, 8, 32)
+	if err != nil || parsed > 0o7777 {
+		return 0, fmt.Errorf("mode %q is not an octal file mode such as \"0755\"", mode)
+	}
+
+	return fs.FileMode(parsed), nil
 }

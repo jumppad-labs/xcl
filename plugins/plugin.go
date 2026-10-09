@@ -54,8 +54,8 @@ type PluginEntityProvider interface {
 	Create(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
 	Destroy(ctx context.Context, entityType, entitySubType string, entityData []byte) error
 	Read(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte) ([]byte, error)
-	Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error)
-	Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error)
+	Update(ctx context.Context, entityType, entitySubType string, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error)
+	Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error)
 }
 
 // RegisterResourceProvider registers a typed resource provider with the plugin.
@@ -191,22 +191,22 @@ func (p *PluginBase) Read(ctx context.Context, entityType, entitySubType string,
 }
 
 // Update updates an existing entity.
-func (p *PluginBase) Update(ctx context.Context, entityType, entitySubType string, entityData []byte) ([]byte, error) {
+func (p *PluginBase) Update(ctx context.Context, entityType, entitySubType string, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error) {
 	rt := p.getRegisteredType(entityType, entitySubType)
 	if rt == nil {
 		return nil, errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
 	}
 
-	return rt.Adapter.Update(ctx, entityData)
+	return rt.Adapter.Update(ctx, entityData, changes, dependencies)
 }
 
 // Changed decides what applying new needs for the entity saved as old, given
 // the dependencies the same apply will update or replace.
-func (p *PluginBase) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (p *PluginBase) Changed(ctx context.Context, entityType, entitySubType string, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	rt := p.getRegisteredType(entityType, entitySubType)
 	if rt == nil {
 		return entity.NoChange, errors.New("no registered type found for " + types.TypeKey(entityType, entitySubType))
 	}
 
-	return rt.Adapter.Changed(ctx, oldEntityData, newEntityData, dependencies)
+	return rt.Adapter.Changed(ctx, oldEntityData, newEntityData, changes, dependencies)
 }

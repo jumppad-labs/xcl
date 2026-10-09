@@ -130,6 +130,54 @@ func TestRenderWritesUpdateWithoutChangesAsChangedOutsideXCL(t *testing.T) {
 	require.Contains(t, output, "  # resource.container.cache changed outside xcl and will be updated\n  ~ resource \"container\" \"cache\" {}\n\n")
 }
 
+func TestRenderWritesUpdateWithoutChangesNamingReplacedDependency(t *testing.T) {
+	output := renderOne(diff.Resource{
+		Address:      "resource.container.web",
+		Action:       diff.ActionUpdate,
+		Dependencies: []diff.Dependency{{Address: "resource.network.app", Action: diff.ActionReplace}},
+	}, diff.Summary{Update: 1})
+
+	require.Contains(t, output, "  # resource.container.web will be updated because resource.network.app is replaced\n  ~ resource \"container\" \"web\" {}\n\n")
+}
+
+func TestRenderWritesUpdateWithoutChangesNamingUpdatedDependency(t *testing.T) {
+	output := renderOne(diff.Resource{
+		Address:      "resource.container.web",
+		Action:       diff.ActionUpdate,
+		Dependencies: []diff.Dependency{{Address: "resource.volume.data", Action: diff.ActionUpdate}},
+	}, diff.Summary{Update: 1})
+
+	require.Contains(t, output, "  # resource.container.web will be updated because resource.volume.data is updated\n")
+}
+
+func TestRenderWritesUpdateWithoutChangesNamingReplacedAndUpdatedDependencies(t *testing.T) {
+	output := renderOne(diff.Resource{
+		Address: "resource.container.web",
+		Action:  diff.ActionUpdate,
+		Dependencies: []diff.Dependency{
+			{Address: "resource.network.a", Action: diff.ActionReplace},
+			{Address: "resource.network.b", Action: diff.ActionReplace},
+			{Address: "resource.volume.data", Action: diff.ActionUpdate},
+		},
+	}, diff.Summary{Update: 1})
+
+	require.Contains(t, output, "  # resource.container.web will be updated because resource.network.a, resource.network.b are replaced and resource.volume.data is updated\n")
+}
+
+func TestRenderWritesUpdateWithChangesWithoutDependencyReason(t *testing.T) {
+	output := renderOne(diff.Resource{
+		Address:      "resource.container.web",
+		Action:       diff.ActionUpdate,
+		Dependencies: []diff.Dependency{{Address: "resource.network.app", Action: diff.ActionReplace}},
+		Changes: []diff.Change{
+			{Path: diff.Path{}.Attribute("image"), Before: "nginx:1", After: "nginx:2"},
+		},
+	}, diff.Summary{Update: 1})
+
+	require.Contains(t, output, "  # resource.container.web will be updated\n")
+	require.NotContains(t, output, "because")
+}
+
 func TestRenderWritesAddedElementWithPlusMarker(t *testing.T) {
 	output := renderOne(diff.Resource{
 		Address: "resource.container.api",

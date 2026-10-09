@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/logger"
@@ -652,7 +653,7 @@ func (p *badComputedProvider) Read(ctx context.Context, old *badComputed, resour
 	return resource, nil
 }
 
-func (p *badComputedProvider) Update(ctx context.Context, resource *badComputed) (*badComputed, error) {
+func (p *badComputedProvider) Update(ctx context.Context, resource *badComputed, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*badComputed, error) {
 	return resource, nil
 }
 

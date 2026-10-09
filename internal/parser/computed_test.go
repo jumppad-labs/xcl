@@ -317,3 +317,43 @@ func TestCopyComputedCopiesObjectField(t *testing.T) {
 	require.Equal(t, "p-obj", dst.NetworkObj.ProviderID)
 	require.Equal(t, "10.1.0.0/16", dst.NetworkObj.Subnet)
 }
+
+func TestClearComputedZeroesComputedValues(t *testing.T) {
+	network := structs.Network{Subnet: "10.0.0.0/16", ProviderID: "p-1", Observed: "seen"}
+
+	clearComputed(reflect.ValueOf(&network))
+
+	require.Equal(t, "", network.ProviderID)
+	require.Equal(t, "", network.Observed)
+}
+
+func TestClearComputedKeepsConfiguredValues(t *testing.T) {
+	network := structs.Network{Subnet: "10.0.0.0/16", ProviderID: "p-1"}
+
+	clearComputed(reflect.ValueOf(&network))
+
+	require.Equal(t, "10.0.0.0/16", network.Subnet)
+}
+
+func TestClearComputedZeroesComputedValuesInListBlocks(t *testing.T) {
+	holder := unkeyedHolder{Ports: []unkeyedPort{
+		{Name: "http", Assigned: "8080"},
+		{Name: "https", Assigned: "8443"},
+	}}
+
+	clearComputed(reflect.ValueOf(&holder))
+
+	require.Equal(t, []unkeyedPort{{Name: "http"}, {Name: "https"}}, holder.Ports)
+}
+
+func TestClearComputedZeroesComputedValuesInMapBlocks(t *testing.T) {
+	container := structs.Container{}
+	container.CreatedNetworksMap = map[string]structs.Network{
+		"a": {Subnet: "10.1.0.0/16", ProviderID: "p-a"},
+	}
+
+	clearComputed(reflect.ValueOf(&container))
+
+	require.Equal(t, "", container.CreatedNetworksMap["a"].ProviderID)
+	require.Equal(t, "10.1.0.0/16", container.CreatedNetworksMap["a"].Subnet)
+}

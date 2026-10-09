@@ -158,7 +158,7 @@ func TestPluginLoadNamesPluginAndBlockTypes(t *testing.T) {
 		{source: "core", phase: "start", meta: map[string]any{"plugin": pluginEventInProcessSource, "registry": "local"}},
 		{source: "core", phase: "success", meta: map[string]any{"plugin": pluginEventInProcessSource, "registry": "local", "block_types": "postgres, redis"}},
 		{source: "core", phase: "start", meta: map[string]any{"plugin": pluginEventExternalSource, "registry": "local"}},
-		{source: "core", phase: "success", meta: map[string]any{"plugin": pluginEventExternalSource, "registry": "local", "block_types": "app, ingress"}},
+		{source: "core", phase: "success", meta: map[string]any{"plugin": pluginEventExternalSource, "registry": "local", "block_types": "app, ingress, recorder"}},
 	}, pluginEventLoads(recorded))
 }
 

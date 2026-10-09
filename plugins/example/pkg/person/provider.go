@@ -37,12 +37,12 @@ func (p *ExampleProvider) Init(state plugins.State, functions plugins.ProviderFu
 // ID is derived from the name, so a renamed person can not be updated in
 // place. Any other change is left to DefaultChanged, which answers update or
 // no change.
-func (p *ExampleProvider) Changed(ctx context.Context, old *Person, new *Person, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (p *ExampleProvider) Changed(ctx context.Context, old *Person, new *Person, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	if old.FirstName != new.FirstName || old.LastName != new.LastName {
 		return entity.Replace, nil
 	}
 
-	return p.DefaultChanged.Changed(ctx, old, new, dependencies)
+	return p.DefaultChanged.Changed(ctx, old, new, changes, dependencies)
 }
 
 func (p *ExampleProvider) Create(ctx context.Context, person *Person) (*Person, error) {
@@ -104,7 +104,7 @@ func (p *ExampleProvider) Read(ctx context.Context, old *Person, new *Person) (*
 	return new, nil
 }
 
-func (p *ExampleProvider) Update(ctx context.Context, person *Person) (*Person, error) {
+func (p *ExampleProvider) Update(ctx context.Context, person *Person, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Person, error) {
 	// Handle nil person (when no entity data is provided)
 	if person == nil {
 		plugins.Logger(ctx).Info("Updating person with no entity data")

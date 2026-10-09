@@ -89,8 +89,13 @@ func Highlight(renderer highlight.Renderer) RenderOption {
 // provider decided it alone. A change line is marked + for an added value, - for a
 // removed one and ~ for a changed one, written as before -> after. A value
 // only known once an apply has run is written as (known after apply). A
-// resource with no changes is written as a header with an empty body, and an
-// update with no changes says the resource changed outside xcl.
+// resource with no changes is written as a header with an empty body. An
+// update with no changes names the updated or replaced dependencies behind
+// it, such as
+//
+//	# resource.container.web will be updated because resource.network.app is replaced
+//
+// and, when there are none, says the resource changed outside xcl.
 //
 // A changed sensitive value is written as (sensitive value). Its values are
 // written only when the result carries them, which it does only when the
@@ -230,6 +235,9 @@ func actionPhrase(resource Resource) string {
 	case ActionCreate:
 		return "will be created"
 	case ActionUpdate:
+		if len(resource.Changes) == 0 && len(resource.Dependencies) > 0 {
+			return "will be updated because " + dependencyReason(resource.Dependencies)
+		}
 		if len(resource.Changes) == 0 {
 			return "changed outside xcl and will be updated"
 		}
@@ -241,6 +249,42 @@ func actionPhrase(resource Resource) string {
 	}
 
 	return "will be changed"
+}
+
+// dependencyReason returns what happens to the dependencies behind an update,
+// such as "resource.network.app is replaced" or
+// "resource.network.a, resource.network.b are replaced and resource.volume.c is updated"
+func dependencyReason(dependencies []Dependency) string {
+	replaced := []string{}
+	updated := []string{}
+	for _, dependency := range dependencies {
+		if dependency.Action == ActionReplace {
+			replaced = append(replaced, dependency.Address)
+		} else {
+			updated = append(updated, dependency.Address)
+		}
+	}
+
+	parts := []string{}
+	if len(replaced) > 0 {
+		parts = append(parts, addressesAre(replaced)+" replaced")
+	}
+	if len(updated) > 0 {
+		parts = append(parts, addressesAre(updated)+" updated")
+	}
+
+	return strings.Join(parts, " and ")
+}
+
+// addressesAre returns the addresses joined by commas followed by "is" or
+// "are"
+func addressesAre(addresses []string) string {
+	verb := "is"
+	if len(addresses) > 1 {
+		verb = "are"
+	}
+
+	return strings.Join(addresses, ", ") + " " + verb
 }
 
 // replacePhrase returns what the comment line says about a replacement, by
