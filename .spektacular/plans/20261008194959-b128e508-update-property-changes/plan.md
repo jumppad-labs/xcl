@@ -445,7 +445,7 @@ The Docker example gets scenario tests, because its behaviour is the spec's user
 - The path and change helpers have their own tests.
 - A list of changes and dependencies given to an external plugin arrives at its provider identical to what an in-process provider receives.
 
-#### - [ ] Task: Changed setting type and structured path
+#### - [x] Task: Changed setting type and structured path
 **Id:** f4bc13f8-81c5-4fbc-86d7-27680f4eda5b
 **Repo:** xclconfig
 **Depends on:** none
@@ -456,12 +456,12 @@ Adds the public type that describes one changed setting, beside the existing out
 *Technical detail:* [context.md#task-changed-setting-type-and-structured-path](./context.md#task-changed-setting-type-and-structured-path)
 
 **Acceptance criteria**:
-- [ ] A change at the first network's name is reported as at that name and inside the networks setting
-- [ ] The same change is reported as not inside the image setting
-- [ ] Printing, logging or encoding a sensitive change shows it as hidden, while its fields still hold the real values
-- [ ] Plans render and encode exactly as before, and every existing diff test passes
+- [x] A change at the first network's name is reported as at that name and inside the networks setting
+- [x] The same change is reported as not inside the image setting
+- [x] Printing, logging or encoding a sensitive change shows it as hidden, while its fields still hold the real values
+- [x] Plans render and encode exactly as before, and every existing diff test passes
 
-#### - [ ] Task: Change contract through every plugin layer
+#### - [x] Task: Change contract through every plugin layer
 **Id:** d098cb41-9d56-41ac-9b32-2089eb4756c2
 **Repo:** xclconfig
 **Depends on:**
@@ -473,10 +473,10 @@ Changes the plugin contract so a provider's change decision receives the changed
 *Technical detail:* [context.md#task-change-contract-through-every-plugin-layer](./context.md#task-change-contract-through-every-plugin-layer)
 
 **Acceptance criteria**:
-- [ ] Changes and dependencies given to a plugin run as a separate program reach its provider with the same locations, values, flags and outcomes an in-process provider receives, for both the decision and the update
-- [ ] Sensitive values cross to a separate program with their real values
-- [ ] Values not yet known cross to a separate program still marked as not yet known
-- [ ] The root module, every example module and the external test plugins build, and all their tests pass
+- [x] Changes and dependencies given to a plugin run as a separate program reach its provider with the same locations, values, flags and outcomes an in-process provider receives, for both the decision and the update
+- [x] Sensitive values cross to a separate program with their real values
+- [x] Values not yet known cross to a separate program still marked as not yet known
+- [x] The root module, every example module and the external test plugins build, and all their tests pass
 
 ### Milestone 2: Plugins are told exactly what changed, when deciding and when updating
 **What changes**: The core now fills both lists.
@@ -495,7 +495,7 @@ Changes the plugin contract so a provider's change decision receives the changed
 
 A parity test shows an in-process and an external plugin told identical lists for the same edit.
 
-#### - [ ] Task: One comparison feeds the plan and the plugins
+#### - [x] Task: One comparison feeds the plan and the plugins
 **Id:** a47a3ab3-2835-403c-9b9d-59492709aa42
 **Repo:** xclconfig
 **Depends on:**
@@ -507,12 +507,12 @@ Turns the plan's existing comparison of a resource's last-applied settings again
 *Technical detail:* [context.md#task-one-comparison-feeds-the-plan-and-the-plugins](./context.md#task-one-comparison-feeds-the-plan-and-the-plugins)
 
 **Acceptance criteria**:
-- [ ] The plan view of a sensitive change hides its values unless reveal is on, and the plugin view holds the real values
-- [ ] The plugin view lists exactly the same settings as the plan view
-- [ ] A value not yet known is marked as such in both views, with no made-up new value
-- [ ] A setting that was not yet known when deciding is still listed at update time, with its real value
+- [x] The plan view of a sensitive change hides its values unless reveal is on, and the plugin view holds the real values
+- [x] The plugin view lists exactly the same settings as the plan view
+- [x] A value not yet known is marked as such in both views, with no made-up new value
+- [x] A setting that was not yet known when deciding is still listed at update time, with its real value
 
-#### - [ ] Task: Change decisions are told the changed settings
+#### - [x] Task: Change decisions are told the changed settings
 **Id:** acf2194a-a313-427a-a7df-5ce52d3068bd
 **Repo:** xclconfig
 **Depends on:**
@@ -524,12 +524,12 @@ While deciding, the core computes each saved resource's changed settings before 
 *Technical detail:* [context.md#task-change-decisions-are-told-the-changed-settings](./context.md#task-change-decisions-are-told-the-changed-settings)
 
 **Acceptance criteria**:
-- [ ] When a resource's setting is edited, its plugin is told that setting with its previous and new values when deciding
-- [ ] When a resource takes a value from a dependency the same apply replaces, the decision marks the new value as not yet known
-- [ ] An unchanged resource's decision is told no changed settings
-- [ ] Every plan shows the same changes as before
+- [x] When a resource's setting is edited, its plugin is told that setting with its previous and new values when deciding
+- [x] When a resource takes a value from a dependency the same apply replaces, the decision marks the new value as not yet known
+- [x] An unchanged resource's decision is told no changed settings
+- [x] Every plan shows the same changes as before
 
-#### - [ ] Task: Updates are told the changed settings and dependencies
+#### - [x] Task: Updates are told the changed settings and dependencies
 **Id:** b9d62183-7e90-4813-bb5a-528487d616de
 **Repo:** xclconfig
 **Depends on:**
@@ -541,13 +541,13 @@ When the apply acts, the core works the changed settings out again from the real
 *Technical detail:* [context.md#task-updates-are-told-the-changed-settings-and-dependencies](./context.md#task-updates-are-told-the-changed-settings-and-dependencies)
 
 **Acceptance criteria**:
-- [ ] When a setting is edited and the plugin answers update, the update is told exactly that setting, its location, its previous value and its new value, and no unchanged setting
-- [ ] When only a dependency is replaced and the plugin answers update, the update is told no setting changes and is told the dependency is replaced
-- [ ] A value from a dependency created or changed earlier in the same apply reaches the update as its real value
-- [ ] A sensitive setting's change reaches the update with real values, while the plan, the event stream and the logs show it hidden
-- [ ] For the same edit, the settings in the plan, in the decision and in the update are the same
+- [x] When a setting is edited and the plugin answers update, the update is told exactly that setting, its location, its previous value and its new value, and no unchanged setting
+- [x] When only a dependency is replaced and the plugin answers update, the update is told no setting changes and is told the dependency is replaced
+- [x] A value from a dependency created or changed earlier in the same apply reaches the update as its real value
+- [x] A sensitive setting's change reaches the update with real values, while the plan, the event stream and the logs show it hidden
+- [x] For the same edit, the settings in the plan, in the decision and in the update are the same
 
-#### - [ ] Task: Built-in and external plugins are told the same
+#### - [x] Task: Built-in and external plugins are told the same
 **Id:** 4f6f38cd-b346-4550-bbe0-ece0afab2c9b
 **Repo:** xclconfig
 **Depends on:**
@@ -559,9 +559,9 @@ Adds a small recording provider to the end-to-end fixtures, compiled both into t
 *Technical detail:* [context.md#task-built-in-and-external-plugins-are-told-the-same](./context.md#task-built-in-and-external-plugins-are-told-the-same)
 
 **Acceptance criteria**:
-- [ ] The same edit applied through a built-in plugin and through the same plugin run as a separate program results in identical changes and dependencies told when deciding
-- [ ] The same is true when updating
-- [ ] The comparison covers a plain setting, a sensitive setting and a value from a replaced dependency
+- [x] The same edit applied through a built-in plugin and through the same plugin run as a separate program results in identical changes and dependencies told when deciding
+- [x] The same is true when updating
+- [x] The comparison covers a plain setting, a sensitive setting and a value from a replaced dependency
 
 ### Milestone 3: The plugin example hot swaps networks and rebuilds only what it must
 **What changes**: The Docker example behaves the way the spec describes:
@@ -580,7 +580,7 @@ The example's update works only from what it is told, with no extra calls to dis
 
 The container's unit tests show its update makes only disconnect, connect and address-read calls. Without an engine, these scenario tests skip, as today.
 
-#### - [ ] Task: Network rebuild detaches its containers
+#### - [x] Task: Network rebuild detaches its containers
 **Id:** 9c71fe48-5948-46a5-a51f-a1bc776da01d
 **Repo:** xclconfig
 **Depends on:**
@@ -592,11 +592,11 @@ Gives the example's Docker client the ability to disconnect a container from a n
 *Technical detail:* [context.md#task-network-rebuild-detaches-its-containers](./context.md#task-network-rebuild-detaches-its-containers)
 
 **Acceptance criteria**:
-- [ ] Destroying a network with containers attached disconnects each one and then removes the network
-- [ ] Destroying a network with nothing attached removes it as before
-- [ ] Destroying a network that is already gone still succeeds
+- [x] Destroying a network with containers attached disconnects each one and then removes the network
+- [x] Destroying a network with nothing attached removes it as before
+- [x] Destroying a network that is already gone still succeeds
 
-#### - [ ] Task: Container hot swaps its networks
+#### - [x] Task: Container hot swaps its networks
 **Id:** fff86a62-13ec-4f89-a1c8-4d1a9c57961a
 **Repo:** xclconfig
 **Depends on:**
@@ -613,13 +613,13 @@ Changes the example container's decision so that network changes, and a network 
 *Technical detail:* [context.md#task-container-hot-swaps-its-networks](./context.md#task-container-hot-swaps-its-networks)
 
 **Acceptance criteria**:
-- [ ] Changing a container's network answers update, and the update detaches the old network and attaches the new one
-- [ ] A rebuilt network answers update, and the update reattaches the container to it
-- [ ] Removing a container's only network detaches it and leaves the container with no network
-- [ ] Changing the image, command or environment still answers replace
-- [ ] The update makes no call to discover the container's previous state
+- [x] Changing a container's network answers update, and the update detaches the old network and attaches the new one
+- [x] A rebuilt network answers update, and the update reattaches the container to it
+- [x] Removing a container's only network detaches it and leaves the container with no network
+- [x] Changing the image, command or environment still answers replace
+- [x] The update makes no call to discover the container's previous state
 
-#### - [ ] Task: Container rebuilds when its init script is rebuilt
+#### - [x] Task: Container rebuilds when its init script is rebuilt
 **Id:** 42b0206c-863b-4a24-9c8f-a4c352bf74ef
 **Repo:** xclconfig
 **Depends on:**
@@ -632,11 +632,11 @@ Gives the example's container an init script, rendered by a second template in t
 
 **Acceptance criteria**:
 - [ ] The example configuration renders an executable init script, and the container runs it at start
-- [ ] A replaced init-script template makes the container answer replace
-- [ ] Editing the init script's content without moving it updates the template and leaves the container alone
-- [ ] A template without a mode is written as before
+- [x] A replaced init-script template makes the container answer replace
+- [x] Editing the init script's content without moving it updates the template and leaves the container alone
+- [x] A template without a mode is written as before
 
-#### - [ ] Task: Example scenarios prove hot swap and rebuilds
+#### - [x] Task: Example scenarios prove hot swap and rebuilds
 **Id:** df727eec-77d7-4fcb-8ee3-dfd16cb113ee
 **Repo:** xclconfig
 **Depends on:**
@@ -648,19 +648,19 @@ Rewrites and extends the example's end-to-end scenarios against real Docker. The
 *Technical detail:* [context.md#task-example-scenarios-prove-hot-swap-and-rebuilds](./context.md#task-example-scenarios-prove-hot-swap-and-rebuilds)
 
 **Acceptance criteria**:
-- [ ] Changing the container's network from one network to another keeps the same container, attached to the new network and no longer to the old one
-- [ ] The address-range change rebuilds the network and keeps the same container attached to it, and the plan shows the container updated rather than replaced
-- [ ] Moving the init-script template shows the container replaced because that template is replaced, and Docker then shows a new container
-- [ ] Removing the network and every reference deletes the network and leaves the container running with no network
-- [ ] Removing the network while the container still references it fails validation, and nothing is created, changed or destroyed
-- [ ] After each scenario that applies, the next plan reports no changes
+- [x] Changing the container's network from one network to another keeps the same container, attached to the new network and no longer to the old one
+- [x] The address-range change rebuilds the network and keeps the same container attached to it, and the plan shows the container updated rather than replaced
+- [x] Moving the init-script template shows the container replaced because that template is replaced, and Docker then shows a new container
+- [x] Removing the network and every reference deletes the network and leaves the container running with no network
+- [x] Removing the network while the container still references it fails validation, and nothing is created, changed or destroyed
+- [x] After each scenario that applies, the next plan reports no changes
 
 ### Milestone 4: Documentation shows plugin authors how to use the changes
 **What changes**: The project's guides, the README, the changelog and the documentation site describe the new signatures and what `Changed` and `Update` are told. They use the network hot swap and the init-script rebuild as worked examples. The site no longer claims the Docker example's update does nothing.
 
 **Validation point**: The guides and website pages match the code, as checked by review, and the documentation site builds and passes its check.
 
-#### - [ ] Task: Guides, README and changelog describe the changes
+#### - [x] Task: Guides, README and changelog describe the changes
 **Id:** bf756947-f47e-4639-b46c-489a982083f3
 **Repo:** xclconfig
 **Depends on:**
@@ -672,11 +672,11 @@ Updates the project's own guides, README, the example plugin's README and the ch
 *Technical detail:* [context.md#task-guides-readme-and-changelog-describe-the-changes](./context.md#task-guides-readme-and-changelog-describe-the-changes)
 
 **Acceptance criteria**:
-- [ ] Every signature shown in the guides and README matches the code
-- [ ] The plugin developer guide explains the changed settings and the dependency list for both calls, with the network hot swap and the init-script rebuild as examples
-- [ ] The changelog has an entry for this change, with its breaking changes listed
+- [x] Every signature shown in the guides and README matches the code
+- [x] The plugin developer guide explains the changed settings and the dependency list for both calls, with the network hot swap and the init-script rebuild as examples
+- [x] The changelog has an entry for this change, with its breaking changes listed
 
-#### - [ ] Task: Website shows the changed settings and the hot swap
+#### - [x] Task: Website shows the changed settings and the hot swap
 **Id:** 3d5ec8b7-1ffe-4c3c-9259-becf7e3f9a67
 **Repo:** xcl-website
 **Depends on:**
@@ -688,10 +688,10 @@ Updates the documentation site's "Unchanged, update or replace" page and the plu
 *Technical detail:* [context.md#task-website-shows-the-changed-settings-and-the-hot-swap](./context.md#task-website-shows-the-changed-settings-and-the-hot-swap)
 
 **Acceptance criteria**:
-- [ ] Both pages show the new signatures, matching the code
-- [ ] The pages walk through the network hot swap and the init-script rebuild using the example's real code
-- [ ] No page says the Docker example's update does nothing
-- [ ] The documentation site builds and passes its check
+- [x] Both pages show the new signatures, matching the code
+- [x] The pages walk through the network hot swap and the init-script rebuild using the example's real code
+- [x] No page says the Docker example's update does nothing
+- [x] The documentation site builds and passes its check
 
 ## Open Questions
 
@@ -710,3 +710,315 @@ Updates the documentation site's "Unchanged, update or replace" page and the plu
 - **Configuration language changes.** None. The example's new `init_script` and template `mode` are ordinary provider attributes.
 - **A compatibility layer for plugins built against the current contract.** The contract and protocol break, as the spec allows. External plugins must be rebuilt.
 - **The editor extension (xcl-vscode).** It needs no change.
+
+## Changelog
+
+### 2026-10-09 — Task: Changed setting type and structured path
+
+**What was done**: Moved the structured path type (`Path`, `Step`, `StepKind` and their builders) from `diff` into the public `entity` package, added `Path.Equal` and `Path.Within`, and left `diff` with type aliases so the plan's API and JSON are unchanged. Added `entity.PropertyChange{Path, Before, After, Unknown, Sensitive}` with `At`/`Within`, and `String`/`Format`/`LogValue`/`MarshalJSON` that show `(sensitive)` in place of a sensitive change's values. The parser's private path helpers now delegate to `Path.Equal`/`Path.Within`.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xclconfig: entity/path.go`
+- `xclconfig: entity/path_test.go`
+- `xclconfig: entity/property_change.go`
+- `xclconfig: entity/property_change_test.go`
+- `xclconfig: entity/doc.go`
+- `xclconfig: diff/path.go`
+- `xclconfig: diff/path_test.go`
+- `xclconfig: internal/parser/diff_changes.go`
+
+**Discoveries**: `PropertyChange.String` shows values as JSON text, with an unquoted `(sensitive)` marker. The e2e `TestPluginExampleTestsPass` fails with "network already exists app" when an earlier example run leaves its `web` container and `app` network on the Docker host. The test is fine once they are removed.
+
+### 2026-10-09 — Task: Change contract through every plugin layer
+
+**What was done**: `ResourceProvider.Changed` now takes `changes []entity.PropertyChange` before `dependencies`, and `Update` takes both lists. The two lists pass through `ProviderAdapter`, `TypedProviderAdapter`, `PluginEntityProvider`/`PluginBase`, `PluginHost`, the direct host and its sourced adapter, and the gRPC wrapper, server and resource adapter. The proto gained `StepKind`, `PathStep`, `PropertyChange`, `ChangedRequest.changes = 6` and `UpdateRequest.changes = 4` / `dependencies = 5`. The `plugins/change_proto.go` converters carry each value as raw JSON bytes, with empty bytes meaning absent. Every in-repo plugin and test fake moved to the new signatures. For now the core passes `nil` lists.
+
+**Deviations**:
+- The in-package plugins tests use the extended hand-written `changedRecordingProvider` rather than `plugins/mocks.MockProviderAdapter`, because using the mock from inside `plugins` would create an import cycle.
+- The mock was regenerated after `internal/parser` compiled. The first mockery run used a config limited to the plugins package, since the root config also loads `internal/parser`.
+
+**Files changed**:
+- `xclconfig: plugins/provider.go`
+- `xclconfig: plugins/changed.go`
+- `xclconfig: plugins/adapter.go`
+- `xclconfig: plugins/plugin.go`
+- `xclconfig: plugins/plugin_host.go`
+- `xclconfig: plugins/direct_plugin_host.go`
+- `xclconfig: plugins/grpc_resource_adapter.go`
+- `xclconfig: plugins/grpc_plugin_host.go`
+- `xclconfig: plugins/grpc_server.go`
+- `xclconfig: plugins/plugin.proto`
+- `xclconfig: plugins/proto/plugin.pb.go`
+- `xclconfig: plugins/change_proto.go`
+- `xclconfig: plugins/change_proto_test.go`
+- `xclconfig: plugins/mocks/mock_provider_adapter.go`
+- `xclconfig: plugins/testing/helpers.go`
+- `xclconfig: plugins/adapter_test.go`
+- `xclconfig: plugins/changed_test.go`
+- `xclconfig: plugins/changed_sensitive_test.go`
+- `xclconfig: plugins/direct_plugin_host_test.go`
+- `xclconfig: plugins/grpc_plugin_host_test.go`
+- `xclconfig: plugins/grpc_server_test.go`
+- `xclconfig: plugins/example/e2e_test.go`
+- `xclconfig: plugins/example/pkg/person/provider.go`
+- `xclconfig: plugins/example/pkg/person/provider_test.go`
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/test_plugin.go`
+- `xclconfig: internal/parser/validate_test.go`
+- `xclconfig: internal/test_fixtures/plugins/subtypeless/main.go`
+- `xclconfig: internal/catalog/catalog_test.go`
+- `xclconfig: internal/catalog/sensitive_types_test.go`
+- `xclconfig: registry/local_test.go`
+- `xclconfig: config_plugin_subtypeless_test.go`
+- `xclconfig: e2e/fixtures/externalplugin/main.go`
+- `xclconfig: e2e/fixtures/inprocess/plugin.go`
+- `xclconfig: example/plugin/plugins/docker/resources/container.go`
+- `xclconfig: example/plugin/plugins/docker/resources/container_test.go`
+- `xclconfig: example/plugin/plugins/docker/resources/network.go`
+- `xclconfig: example/plugin/plugins/docker/resources/network_test.go`
+- `xclconfig: example/plugin/plugins/template/template.go`
+- `xclconfig: example/plugin/plugins/template/template_test.go`
+- `xclconfig: example/prettylog/fixtures_test.go`
+
+**Discoveries**:
+- The installed protoc plugins are newer than the pinned ones (v1.36.12 and 1.6.1, against the pinned v1.36.11 and v1.5.1). The pinned versions have to be installed separately.
+- `plugins/mocks` can't be used from in-package `plugins` tests (import cycle).
+- The example modules import the root package and so `internal/parser`: they break whenever `internal/parser` doesn't compile.
+- Docker-backed tests collide on the `app` network if run concurrently.
+
+### 2026-10-09 — Task: One comparison feeds the plan and the plugins
+
+**What was done**: The plan's changes now come from a single real-valued run of `resourceChanges` (`revealedChanges`). The new `internal/parser/change_views.go` shows that result two ways:
+- `planChanges` hides sensitive values unless reveal is on.
+- `pluginChanges` gives `entity.PropertyChange`s with JSON-normalised real values.
+
+`resolveUnknown` gives each change that was unknown when deciding its real value at act time, reading it from the configured resource through `valueAt`. The decision record gained a `changes` field for the plan view.
+
+**Deviations**: The plan sketched `pluginChanges(revealed, unknownAtDecide)`, which would append decide-time unknown paths that the act-time comparison no longer reports. Instead, the act pass will run the comparison with the decide-time unknown paths still marked unknown, then `resolveUnknown` fills in their real values. Every decide-time unknown path is therefore listed, in the plan's order, with no separate append step and no re-sorting.
+
+**Files changed**:
+- `xclconfig: internal/parser/change_views.go`
+- `xclconfig: internal/parser/change_views_test.go`
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/diff_recorder.go`
+
+**Discoveries**: The plan's first open question is answered: blanking each sensitive change's values reproduces today's plan output exactly, and every existing diff test passes. A plain `[]string` setting is compared item by item (`command[0]`), never as one whole-list change. Map keys appear in paths as `env["A"]`.
+
+### 2026-10-09 — Task: Change decisions are told the changed settings
+
+**What was done**: `refresh` now decodes the configured copy and runs the plan's comparison before Read and `Changed`. It passes the plugin view of the result to `Changed`. The plan view is stored in `decision.changes` and recorded for the plan, so a pending resource is no longer compared a second time. `recordReplace` and `recordPendingResource` now take a precomputed plan list. The recording `TestPlugin` records `ChangedChanges`, read through `GetChangedChanges`.
+
+**Deviations**: The `setupRefresh` test helper builds a `resourceLifecycle` by hand. It needed a `newDiffRecorder()`, because `refresh` now reads decide-time unknown paths from the recorder.
+
+**Files changed**:
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/test_plugin.go`
+- `xclconfig: internal/parser/lifecycle_test.go`
+- `xclconfig: internal/parser/decide_test.go`
+
+**Discoveries**: The existing `internal/test_fixtures/config/diff/credential/{before,after}` and `update_ref/{before,edited}` fixtures cover the sensitive and not-yet-known cases, so no new fixtures were needed.
+
+### 2026-10-09 — Task: Updates are told the changed settings and dependencies
+
+**What was done**: In the act pass, `update` now works out the changes again through `updateChanges`. It runs the plan's comparison of the saved copy (from `l.previous`) against the entity decoded with real values, with the decide-time unknown paths. `resolveUnknown` then fills those paths with their real values. The result goes to `Update` as the plugin view, together with the recorded `decision.dependencies`. The recording `TestPlugin` captures `UpdateChanges` and `UpdateDependencies`. The tests confirm that sensitive values reach `Update` but stay hidden in the plan, in events and in logs, and that the plan, the decision and the update list the same paths.
+
+**Deviations**: None beyond the task 3 approach (`resolveUnknown` instead of appending missing unknown paths).
+
+**Files changed**:
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/test_plugin.go`
+- `xclconfig: internal/parser/update_changes_test.go`
+
+**Discoveries**: The plan's second open question is answered for the existing fixtures: the act-time comparison never reported a path the plan did not, whether for a plain, a sensitive or a not-yet-known edit. In the `update_ref` fixture, the test plugin's Create sets `id-<name>`, so a replaced dependency's real value equals its saved value. The change stays listed with Before equal to After.
+
+### 2026-10-09 — Task: Built-in and external plugins are told the same
+
+**What was done**: Added the `e2e/fixtures/recorder` provider. Each `Changed` and `Update` call appends a JSON line holding the real changes and dependencies it was told. The provider is registered in the external fixture binary. `e2e/plugin_changes_test.go` wraps it in-process and applies the same two-step edit through both hosts:
+- a plain value;
+- a sensitive secret;
+- an input taken from a dependency that the same apply replaces.
+
+Separate tests assert that the `changed` and `update` records are identical between the two hosts, and spell out the plain, sensitive and not-yet-known cases.
+
+**Deviations**:
+- The recorder is registered as `("resource", "recorder")`, so its block is `resource "recorder" "a"`, which is the codebase's convention. The plan said type `"recorder"`, subtype `"item"`.
+- `TestPluginLoadNamesPluginAndBlockTypes` now expects the external plugin to list `recorder` among its block types.
+
+**Files changed**:
+- `xclconfig: e2e/fixtures/recorder/recorder.go`
+- `xclconfig: e2e/fixtures/externalplugin/main.go`
+- `xclconfig: e2e/plugin_events_test.go`
+- `xclconfig: e2e/plugin_changes_test.go`
+
+**Discoveries**: `Update` is told the replaced dependency as well as `Changed`, and a replaced resource gets no `update` call.
+
+### 2026-10-09 — Task: Network rebuild detaches its containers
+
+**What was done**: The example's `client.Docker` interface gained `NetworkDisconnect`, and its mock was regenerated with mockery v3.8.0. The network's `Destroy` now does the following:
+- It inspects the network first. A network that is not found counts as already gone.
+- It force-disconnects every attached container, in sorted order, ignoring not-found errors.
+- It then removes the network.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xclconfig: example/plugin/plugins/docker/client/client.go`
+- `xclconfig: example/plugin/plugins/docker/client/mocks/mock_docker.go`
+- `xclconfig: example/plugin/plugins/docker/resources/network.go`
+- `xclconfig: example/plugin/plugins/docker/resources/network_test.go`
+- `xclconfig: example/plugin/plugins/docker/resources/docker_test.go`
+
+**Discoveries**: The containers attached to a network come back as a map from inspect. They are sorted before disconnecting so that the strict-mock tests can rely on the call order.
+
+### 2026-10-09 — Task: Container hot swaps its networks
+
+**What was done**: The example container's `Changed` now decides from what it is told:
+- it answers replace for a change within `image`, `command` or `environment`, or for a replaced dependency that is not a Docker network;
+- otherwise it answers update for any changes or dependencies;
+- with neither, it defers to `DefaultChanged`.
+
+`Update` reconciles only from what it is told:
+- `previousAttachments` rebuilds the previous network blocks by putting back each change's `Before`;
+- it disconnects networks that went away (force, ignoring not-found) and connects new ones;
+- it reconnects networks whose dependency was replaced;
+- if the container moved, it inspects once for the new address.
+
+The subnet scenario tests now expect the same container to stay attached to the rebuilt network, with the container updated rather than replaced.
+
+**Deviations**:
+- User-approved fix outside the plan. With the container updated only because its network is replaced, the plan rendered `# docker.container.web changed outside xcl and will be updated`, which was misleading. `diff.Resource` gained an additive, omitempty `Dependencies []diff.Dependency{Address, Action}` field, filled for updates from the decision's dependency list. `Render` now says `will be updated because docker.network.app is replaced` (and `… is updated`) for an update with no changes of its own. The plan JSON gains this field, contrary to the plan's "plan JSON unchanged", so the docs tasks must cover it.
+- The subnet scenario test rewrites planned for task 10 (`TestSubnetChangeKeepsTheContainerAttached`, `TestPlanOfSubnetChangeReplacesNetworkAndUpdatesContainer`) were done here to keep the tree green.
+
+**Files changed**:
+- `xclconfig: example/plugin/plugins/docker/resources/container.go`
+- `xclconfig: example/plugin/plugins/docker/resources/attachments.go`
+- `xclconfig: example/plugin/plugins/docker/resources/attachments_test.go`
+- `xclconfig: example/plugin/plugins/docker/resources/container_test.go`
+- `xclconfig: example/plugin/main_test.go`
+- `xclconfig: example/plugin/plan_test.go`
+- `xclconfig: diff/diff.go`
+- `xclconfig: diff/render.go`
+- `xclconfig: diff/render_test.go`
+- `xclconfig: internal/parser/lifecycle.go`
+- `xclconfig: internal/parser/update_changes_test.go`
+
+**Discoveries**: Lists are compared position by position, so an alias edit arrives as `network[0].aliases[1]`, and an added or removed attachment as one whole `network[i]` change holding a `map[string]any`. Template blocks have no subtype, so their address is `template.<name>`. The subnet plan now reads 2 to update (container and welcome template) and 1 to replace.
+
+### 2026-10-09 — Task: Container rebuilds when its init script is rebuilt
+
+**What was done**:
+- The template provider gained an optional octal `mode` (default `0644`). The file is chmodded after writing, so re-rendering also changes its mode.
+- The container gained `init_script`, bind-mounted read-only at `/docker-entrypoint.d/90-xcl-init.sh` by its absolute path. A change within `init_script` answers replace.
+- `config/main.xcl` and `config-subnet/main.xcl` gained `template "init"` (`mode = "0755"`) and the container's `init_script = template.init.destination`.
+- The example's count- and format-dependent tests now reflect the fourth resource: status tree, unchanged counts, inspect alignment and the smoke test.
+
+**Deviations**:
+- The container's `Changed` was refined: a non-network dependency that is only updated (for example, the init template re-rendering new content) leaves the container alone. Update is answered only for its own changes or a network dependency. This meets the criterion that a content edit leaves the container alone.
+- The count updates planned for task 10 were made here, to keep the tree green.
+- Criterion "the container runs it at start" is left unchecked. The tests confirm the script is executable and mounted where nginx's entrypoint runs it, but the example's Docker client has no exec or logs call to observe it running. This is captured for the manual test plan.
+
+**Files changed**:
+- `xclconfig: example/plugin/plugins/template/template.go`
+- `xclconfig: example/plugin/plugins/template/template_test.go`
+- `xclconfig: example/plugin/plugins/docker/resources/container.go`
+- `xclconfig: example/plugin/plugins/docker/resources/container_test.go`
+- `xclconfig: example/plugin/config/main.xcl`
+- `xclconfig: example/plugin/config-subnet/main.xcl`
+- `xclconfig: example/plugin/main_test.go`
+- `xclconfig: example/plugin/plan_test.go`
+- `xclconfig: example/plugin/smoke_test.go`
+
+**Discoveries**:
+- On a subnet change, `template.init` stays unchanged: it reads the network's name, which a replace keeps.
+- In the in-process example tests, templates render into `example/plugin/build/rendered` rather than the temp dir in `HCL_VAR_output_dir`. This predates this change, and destroy cleans it up.
+
+### 2026-10-09 — Task: Example scenarios prove hot swap and rebuilds
+
+**What was done**: Added the committed variant dirs `config-swap/`, `config-init/`, `config-init-content/`, `config-remove/` and `config-dangling/`, each with a header comment, and the Makefile targets `swap`, `rebuild-init` and `remove-network`. The `replace` text now describes the in-place reattach. `example/plugin/scenarios_test.go` holds 38 real-Docker tests covering:
+- network swap: same ID, moved to backend;
+- init-script move: container replaced because `template.init` is replaced, giving a new ID;
+- init-script content edit: container untouched;
+- network removal: network deleted, same container running with no network and its address cleared;
+- dangling reference: validation error, Docker unchanged.
+
+Every applying scenario ends with a plan reporting no changes. Plan summaries checked:
+- swap: 1 create, 2 update, 0 replace;
+- init move: 1 update, 2 replace;
+- init content: 1 update;
+- remove: 3 update, 1 delete.
+
+**Deviations**: User-approved core fix outside the plan. `callProvider` decoded a provider's result onto a resource that still held computed values carried over from the last apply. A provider could therefore never clear an `omitempty` computed value: after the network removal, the container kept `ip_address = "10.42.0.2"` and the welcome template rendered it. The new `clearComputed` (`internal/parser/computed.go`) zeroes computed fields, including those in nested blocks, before any non-empty provider result is decoded. The subnet and count test updates planned here were done in tasks 8 and 9.
+
+**Files changed**:
+- `xclconfig: example/plugin/config-swap/main.xcl`
+- `xclconfig: example/plugin/config-init/main.xcl`
+- `xclconfig: example/plugin/config-init-content/main.xcl`
+- `xclconfig: example/plugin/config-remove/main.xcl`
+- `xclconfig: example/plugin/config-dangling/main.xcl`
+- `xclconfig: example/plugin/Makefile`
+- `xclconfig: example/plugin/scenarios_test.go`
+- `xclconfig: internal/parser/computed.go`
+- `xclconfig: internal/parser/computed_test.go`
+- `xclconfig: internal/parser/lifecycle.go`
+
+**Discoveries**:
+- Before the fix, the plan after the removal scenario reported "no changes" even though state was stale, because Read carried the stale computed value forward. A clean follow-up plan alone does not prove the state is correct.
+- Not fixed, and predates this change: `HCL_VAR_` variables are ignored through `xcl.Config`, because the `parser.ParserOptions` built in `config.go` and `config_diff.go` never set `VariableEnvPrefix`. The example's in-process tests therefore render into `example/plugin/build/rendered`.
+- The local engine is podman. Scenarios behave the same there.
+
+### 2026-10-09 — Task: Guides, README and changelog describe the changes
+
+**What was done**:
+- **`docs/plugin-developer-guide.md`:**
+  - The contract block, the decide and act pseudocode, and the `Changed`/`Update` headings now show both lists.
+  - A new "The changed settings" subsection covers the `PropertyChange` fields, unknown vs real values, sensitive self-masking, plain JSON values, list and map paths, and `At`/`Within`.
+  - The container `Changed` and hot-swap `Update` excerpts are copied from the code, along with the network force-detach, the init-script rule and the provider being authoritative over computed values.
+- **`plugins/example/README.md`:** the Changed and Update bullets name both lists.
+- **`docs/plugins.md`:** signatures, the proto excerpt with the new messages and fields, and how values travel.
+- **`docs/parser-lifecycle.md`:** the decide and act trees now show the changes; it also covers `diff.Resource.Dependencies` and `clearComputed`.
+- **`docs/README.md`:** the `entity/` row lists `PropertyChange` and `Path`.
+- **`README.md`:** the plugin example section covers the hot swap, the subnet rebuild keeping the container, the init script, and the swap, rebuild-init and remove-network walkthroughs.
+- **`CHANGELOG.md`:** a new top entry with a `**Breaking:**` list.
+
+**Deviations**: The docs also cover the two user-approved deviations: `diff.Resource.Dependencies` with the rendered dependency reason, and computed values being cleared before a provider result is decoded.
+
+**Files changed**:
+- `xclconfig: docs/plugin-developer-guide.md`
+- `xclconfig: plugins/example/README.md`
+- `xclconfig: docs/plugins.md`
+- `xclconfig: docs/parser-lifecycle.md`
+- `xclconfig: docs/README.md`
+- `xclconfig: README.md`
+- `xclconfig: CHANGELOG.md`
+
+**Discoveries**: The `changes` list holds configuration changes only. Drift that `Read` finds is not listed, which the guides now say explicitly.
+
+### 2026-10-09 — Task: Website shows the changed settings and the hot swap
+
+**What was done**:
+- **`replacement.mdx`:**
+  - The page now shows the new `Changed`/`Update` signatures.
+  - It adds a "What a resource is told about its settings" section: the `PropertyChange` struct, unknown vs real values, sensitive self-masking, paths, `At`/`Within`, and authoritative computed values.
+  - It has the new container `Changed` and hot-swap `Update` excerpts, the init-script rule, the network force-detach and the extended proto excerpt.
+- **`examples/plugins.mdx`:**
+  - All code excerpts are synced to the current example: `template "init"`, `init_script`, template `mode`, `NetworkDisconnect` and the detaching `Destroy`.
+  - The claim that `Update` returns the resource unchanged is removed.
+  - It has real-output walkthroughs for `replace`, `swap`, `rebuild-init` (plus `config-init-content`) and `remove-network`, and an updated "What to notice".
+- **`diff.mdx`:** documents updates naming their dependencies, including the `dependencies` JSON field.
+- **`index.mdx`:** the Plugins card mentions what `Changed`/`Update` are told.
+
+The site builds (11 pages), and `astro check` reports 0 errors.
+
+**Deviations**:
+- `diff.mdx` and `index.mdx` were also updated (the plan named only `replacement.mdx` and `examples/plugins.mdx`), to cover the approved `diff.Resource.Dependencies` change and stale wording.
+- The walkthrough output was captured from real runs against the local engine (podman).
+
+**Files changed**:
+- `xcl-website: src/pages/replacement.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+- `xcl-website: src/pages/diff.mdx`
+- `xcl-website: src/pages/index.mdx`
+
+**Discoveries**: The plugin load log lines now carry `registry=local`, so the site's load excerpts were refreshed too.

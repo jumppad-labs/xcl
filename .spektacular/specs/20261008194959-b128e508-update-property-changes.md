@@ -12,33 +12,33 @@ When a plugin decides a resource can be changed in place, xcl today hands it onl
 
 ## Requirements
 
-- [ ] **Updates are told what changed**
+- [x] **Updates are told what changed**
   When a resource is updated in place, its plugin is told every setting that changed, with each one's location in the resource, its previous value and its new value.
-- [ ] **Updates are told about changing dependencies**
+- [x] **Updates are told about changing dependencies**
   When a resource is updated in place, its plugin is also told which of the resources it depends on the same apply is updating or replacing, and which of the two each one is, exactly as it was told when deciding.
-- [ ] **Change decisions see what changed**
+- [x] **Change decisions see what changed**
   When asked whether a resource changed, a plugin is also told which settings differ from the last apply, with their previous and new values, so it can decide between update and replace without comparing settings itself.
-- [ ] **Values not yet known are marked when deciding**
+- [x] **Values not yet known are marked when deciding**
   When a changed setting's new value is only known once the apply runs, the plugin is told the setting is changing and that its new value is not yet known, rather than being given a made-up value.
-- [ ] **Changes hold real values at update time**
+- [x] **Changes hold real values at update time**
   The settings a plugin is told about when updating hold their real values, never a value still to be worked out, including values that come from resources created or changed earlier in the same apply.
-- [ ] **Sensitive settings are reported with their real values**
+- [x] **Sensitive settings are reported with their real values**
   A plugin is told the real previous and new values of a changed sensitive setting, while plans, events and logs keep hiding them.
-- [ ] **Plugins can easily check where a change is**
+- [x] **Plugins can easily check where a change is**
   Plugin authors can check whether a reported change is at a given setting, or anywhere inside it, without parsing text.
-- [ ] **External plugins receive the same information**
+- [x] **External plugins receive the same information**
   Plugins that run as separate programs are told exactly the same changes and dependencies as plugins built into the program.
-- [ ] **Every plugin in the repository uses the new information**
+- [x] **Every plugin in the repository uses the new information**
   Every plugin shipped in the repository, including the examples and the test plugins, is given the changed settings and dependencies when deciding and updating.
-- [ ] **The plugin example hot swaps networks**
+- [x] **The plugin example hot swaps networks**
   In the plugin example, changing the networks a container is attached to updates the container in place, detaching the old network and attaching the new one, rather than rebuilding the container.
-- [ ] **The plugin example keeps containers through a network rebuild**
+- [x] **The plugin example keeps containers through a network rebuild**
   When the example's network is rebuilt, for example because its address range changed, the container attached to it is updated in place and reattached, not rebuilt. Rebuilding the network does not fail because a container is still attached.
-- [ ] **The plugin example rebuilds a container when its init script is rebuilt**
+- [x] **The plugin example rebuilds a container when its init script is rebuilt**
   The example's container gains an init script, produced by a separate resource in the example that renders it. When the resource that produces the init script is replaced, the container is replaced too.
-- [ ] **A container can lose a network**
+- [x] **A container can lose a network**
   When a network and every reference to it are removed from the example's configuration, the network is removed and the container stays, without that network.
-- [ ] **Documentation shows the new information**
+- [x] **Documentation shows the new information**
   The project's guides and the documentation site show how plugin authors use the changed settings and dependencies when deciding and updating, using the network hot swap and the init script rebuild as examples.
 
 ## Constraints
@@ -55,35 +55,35 @@ When a plugin decides a resource can be changed in place, xcl today hands it onl
 
 ## Acceptance Criteria
 
-- [ ] **An update names the changed setting and its old value**
+- [x] **An update names the changed setting and its old value**
   When a resource's setting is edited and its plugin answers update, a test plugin that records what it is told sees exactly that setting, its location, its previous value and its new value, and no unchanged setting.
-- [ ] **An update with no setting changes still learns its dependencies**
+- [x] **An update with no setting changes still learns its dependencies**
   When a resource's dependency is replaced, its own settings are unchanged, and its plugin answers update, the update is told nothing changed in its own settings and is told the dependency is replaced.
-- [ ] **A change decision sees the changed settings**
+- [x] **A change decision sees the changed settings**
   When a resource's setting is edited, a test plugin that records what it is told when deciding sees that setting with its previous and new values.
-- [ ] **A not-yet-known value is marked when deciding**
+- [x] **A not-yet-known value is marked when deciding**
   When a resource takes a value from a dependency the same apply replaces, the change it is told about when deciding marks the new value as not yet known.
-- [ ] **No value is still to be worked out at update time**
+- [x] **No value is still to be worked out at update time**
   When a resource takes a value from a dependency that is created or changed earlier in the same apply, the change its update is told about holds the real new value.
-- [ ] **Sensitive changes are real for plugins and hidden elsewhere**
+- [x] **Sensitive changes are real for plugins and hidden elsewhere**
   When a sensitive setting changes, the plugin is told its real previous and new values, while the plan, the event stream and the logs show it as hidden.
-- [ ] **A change can be matched to a setting**
+- [x] **A change can be matched to a setting**
   A plugin can tell, without parsing text, that a change to a container's first network name is at that network name and inside the networks setting, and that it is not inside the image setting.
-- [ ] **External and built-in plugins are told the same**
+- [x] **External and built-in plugins are told the same**
   The same edit applied through a plugin built into the program and through the same plugin run as a separate program results in identical changes and dependencies told to the plugin, when deciding and when updating.
-- [ ] **All repository plugins are given the new information**
+- [x] **All repository plugins are given the new information**
   Each plugin shipped in the repository, when deciding and updating a resource whose setting was edited, receives that setting's change and its dependency list, and the full test suite, every example's tests and the external test plugins build and pass.
-- [ ] **Changing a container's network swaps it in place**
+- [x] **Changing a container's network swaps it in place**
   In the plugin example, changing the container's network from one network to another updates the container without rebuilding it. Docker shows the same container, attached to the new network and no longer to the old one.
-- [ ] **Rebuilding the network keeps the container**
+- [x] **Rebuilding the network keeps the container**
   In the plugin example, applying the address-range change rebuilds the network and updates the container in place. Docker shows the network on the new range, the same container attached to it, and the next plan reports no changes.
-- [ ] **Rebuilding the init script rebuilds the container**
+- [x] **Rebuilding the init script rebuilds the container**
   In the plugin example, changing the resource that produces the init script so that it is replaced causes the plan to show the container replaced because that resource is replaced. After the apply, Docker shows a new container.
-- [ ] **Removing a network and its references leaves the container**
+- [x] **Removing a network and its references leaves the container**
   In the plugin example, removing the network and every reference to it deletes the network. The container stays, with no network attached, and the next plan reports no changes.
-- [ ] **A dangling reference is still rejected**
+- [x] **A dangling reference is still rejected**
   Removing a network while the container still references it fails validation, and nothing is created, changed or destroyed.
-- [ ] **The documentation shows the new information**
+- [x] **The documentation shows the new information**
   The project's guides and the documentation site show an update that uses the changed settings and dependencies, with the network hot swap and the init script rebuild as examples. The documentation site builds.
 
 ## Technical Approach
