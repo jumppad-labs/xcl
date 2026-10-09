@@ -1,1 +1,8 @@
-- **Tests follow the repository rules.** testify `require`, no table-driven tests.
+- **Tests follow the repository rules.** testify `require`, Mockery for test doubles, no table-driven tests, and positive and negative cases in separate test functions.
+- **Delivered as a GitHub template repository.** Authors start from it with "Use this template" or `gh repo create --template`, not from a generator.
+- **One template for both ways of running.** A single template serves in-process and separate-program plugins; there are no two variants.
+- **Entity types live in a package named `entities`.**
+- **Public members first in every file.** Exported types and methods are kept together at the top of a file, ahead of unexported helpers.
+- **The template's sample needs no external service.** It builds, tests and applies with nothing else running, while still showing a backend client behind an interface with a test double.
+- **The plugin contract doesn't change.** The template and the example's rebuild use the contract as it is today.
+- **The plugin example keeps its behaviour.** The rebuild changes only layout and ordering.

@@ -1,14 +1,16 @@
 {
   "kind": "spec",
-  "current_step": "acceptance_criteria",
+  "current_step": "technical_approach",
   "completed_steps": [
     "new",
     "interview",
     "overview",
-    "requirements"
+    "requirements",
+    "acceptance_criteria",
+    "constraints"
   ],
   "created_at": "2026-10-09T09:25:51.052751188Z",
-  "updated_at": "2026-10-09T09:33:49.16298322Z",
+  "updated_at": "2026-10-09T09:45:13.653542765Z",
   "data": {
     "name": "20261009092551-82db0140-plugin-template",
     "sources": [

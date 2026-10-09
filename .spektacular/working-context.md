@@ -46,3 +46,6 @@ Source: GitHub issue #8, "Scaffold for new plugins (GitHub template) with an exp
 - Overview confirmed.
 - USER: "we need to keep this template up to date so we should add the repo to the spektacular setup". The template repo must be registered with the Spektacular project, so future specs that change the plugin contract also update it. Captured as a requirement.
 - Requirements confirmed (13).
+- Acceptance criteria confirmed (12).
+- Constraints confirmed (8).
+- Technical approach confirmed. User accepted capturing the standard layout as design doc design:plugin-layout.md (to be authored via spek-design, referenced from Constraints).

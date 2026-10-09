@@ -1,0 +1,7 @@
+- The plugin's layout follows the standard layout in the design document referenced under Constraints: a separate-program entry point, a registration file, one file per entity type, one file per provider with shared helpers in their own file, and a narrow backend client interface with Mockery doubles beside it.
+- The explicit `Changed` answers replace for settings matched with `change.Within`, or for a replaced dependency the resource is built on; otherwise it answers update when anything changed; otherwise it defers to the default.
+- The template's sample resource is backed by a simple local implementation of its client interface, such as files on disk, so it runs with no external service.
+- The template's end-to-end test applies the sample configuration through the plugin, plans to confirm no changes, and destroys.
+- CI runs on GitHub Actions.
+- The template repository is created and registered with the project at the start of implementation, so the plan can attribute work to it.
+- Risk: the template and the plugin example drift apart. The standard layout design is the one reference both are checked against.
