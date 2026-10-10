@@ -177,7 +177,7 @@ The rebuild keeps behaviour, so the main safety net is the suite that already ex
 
 **Validation point**: The plugin module's unit tests pass, and so does the application's whole suite, scenario tests included, with their assertions unchanged. The application's package dependency list contains no Docker SDK package, and the CI example loop builds and vets the plugin module on the minimum Go version.
 
-#### - [ ] Task: Create the plugin module with its entity types and Docker SDK client
+#### - [x] Task: Create the plugin module with its entity types and Docker SDK client
 **Id:** 0f1bffe1-cc6d-4c3a-a390-b5af705028cf
 **Repo:** xcl
 **Depends on:** none
@@ -188,12 +188,12 @@ Give the Docker plugin its own Go module and move the parts that need nothing ne
 *Technical detail:* [context.md#task-create-the-plugin-module-with-its-entity-types-and-docker-sdk-client](./context.md#task-create-the-plugin-module-with-its-entity-types-and-docker-sdk-client)
 
 **Acceptance criteria**:
-- [ ] The plugin directory is a Go module of its own that points at the local xcl.
-- [ ] The network, container and nested network-attachment block types live in a package named `entities`, with the same fields, tags and doc comments, and that package depends on nothing but xcl's types.
-- [ ] The Docker SDK interface, its real client and its generated double live in the plugin's client area, and their existing tests pass there.
-- [ ] Regenerating the doubles from the plugin directory reproduces the committed ones.
+- [x] The plugin directory is a Go module of its own that points at the local xcl.
+- [x] The network, container and nested network-attachment block types live in a package named `entities`, with the same fields, tags and doc comments, and that package depends on nothing but xcl's types.
+- [x] The Docker SDK interface, its real client and its generated double live in the plugin's client area, and their existing tests pass there.
+- [x] Regenerating the doubles from the plugin directory reproduces the committed ones.
 
-#### - [ ] Task: Add the container task layer over the Docker SDK client
+#### - [x] Task: Add the container task layer over the Docker SDK client
 **Id:** 0c49ee6a-7499-4e09-aeb0-c656ae0f9894
 **Repo:** xcl
 **Depends on:**
@@ -205,12 +205,12 @@ Add the plugin's container task layer. It is the one place the plugin turns its 
 *Technical detail:* [context.md#task-add-the-container-task-layer-over-the-docker-sdk-client](./context.md#task-add-the-container-task-layer-over-the-docker-sdk-client)
 
 **Acceptance criteria**:
-- [ ] The task layer makes exactly the Docker calls the providers made before, with the same options, labels, mounts, environment ordering and forced removals.
-- [ ] Docker's "not found" errors come back recognisable as the task layer's own not-found sentinel, and other errors come back unchanged.
-- [ ] The task layer has its own generated strict double for callers' tests.
-- [ ] The task layer depends on neither the entity types nor the providers.
+- [x] The task layer makes exactly the Docker calls the providers made before, with the same options, labels, mounts, environment ordering and forced removals.
+- [x] Docker's "not found" errors come back recognisable as the task layer's own not-found sentinel, and other errors come back unchanged.
+- [x] The task layer has its own generated strict double for callers' tests.
+- [x] The task layer depends on neither the entity types nor the providers.
 
-#### - [ ] Task: Move the providers onto the task layer
+#### - [x] Task: Move the providers onto the task layer
 **Id:** 2e3b4e15-469c-4b06-9c39-8f1e81f55c87
 **Repo:** xcl
 **Depends on:**
@@ -222,11 +222,11 @@ Move the network and container providers, and their shared attachment and label 
 *Technical detail:* [context.md#task-move-the-providers-onto-the-task-layer](./context.md#task-move-the-providers-onto-the-task-layer)
 
 **Acceptance criteria**:
-- [ ] No provider source file imports a Docker library.
-- [ ] Every existing provider unit test still exists under the same name and asserts the same decision or the same set of backend actions, now as task calls.
-- [ ] The real-engine provider tests pass against a Docker engine and skip without one.
+- [x] No provider source file imports a Docker library.
+- [x] Every existing provider unit test still exists under the same name and asserts the same decision or the same set of backend actions, now as task calls.
+- [x] The real-engine provider tests pass against a Docker engine and skip without one.
 
-#### - [ ] Task: Make the plugin type importable and serve it from its own entry point
+#### - [x] Task: Make the plugin type importable and serve it from its own entry point
 **Id:** df9ea2cc-60d5-431f-923f-8b1bf865253a
 **Repo:** xcl
 **Depends on:**
@@ -238,11 +238,11 @@ Turn the plugin type into the module's importable root package. It builds the SD
 *Technical detail:* [context.md#task-make-the-plugin-type-importable-and-serve-it-from-its-own-entry-point](./context.md#task-make-the-plugin-type-importable-and-serve-it-from-its-own-entry-point)
 
 **Acceptance criteria**:
-- [ ] Another program can import the plugin type from the module's root package.
-- [ ] The separate-program entry point builds to a plugin binary that the example application loads as before.
-- [ ] Nothing remains in the plugin directory outside the locations the layout design names.
+- [x] Another program can import the plugin type from the module's root package.
+- [x] The separate-program entry point builds to a plugin binary that the example application loads as before.
+- [x] Nothing remains in the plugin directory outside the locations the layout design names.
 
-#### - [ ] Task: Point the example application at the entity types only
+#### - [x] Task: Point the example application at the entity types only
 **Id:** f33f267a-2c4c-409c-993c-12b7a451fbd5
 **Repo:** xcl
 **Depends on:**
@@ -254,12 +254,12 @@ Make the example application depend on the plugin module and import only its ent
 *Technical detail:* [context.md#task-point-the-example-application-at-the-entity-types-only](./context.md#task-point-the-example-application-at-the-entity-types-only)
 
 **Acceptance criteria**:
-- [ ] The application's own code imports nothing from the plugin except the entity types, and its build includes no Docker library.
-- [ ] Applying, planning or destroying with no Docker engine fails with the same "no Docker engine reachable" message as before.
-- [ ] The application's scenario, unit and smoke tests pass with their assertions unchanged.
-- [ ] The new engine check has its own tests for success, failure and an unsupported address.
+- [x] The application's own code imports nothing from the plugin except the entity types, and its build includes no Docker library.
+- [x] Applying, planning or destroying with no Docker engine fails with the same "no Docker engine reachable" message as before.
+- [x] The application's scenario, unit and smoke tests pass with their assertions unchanged.
+- [x] The new engine check has its own tests for success, failure and an unsupported address.
 
-#### - [ ] Task: Build and test the plugin module in CI and the end-to-end runner
+#### - [x] Task: Build and test the plugin module in CI and the end-to-end runner
 **Id:** bb58e37d-cab2-4074-9c77-d13dee346a94
 **Repo:** xcl
 **Depends on:**
@@ -271,9 +271,9 @@ Add the plugin module to CI's minimum-Go build-and-vet loop over the examples an
 *Technical detail:* [context.md#task-build-and-test-the-plugin-module-in-ci-and-the-end-to-end-runner](./context.md#task-build-and-test-the-plugin-module-in-ci-and-the-end-to-end-runner)
 
 **Acceptance criteria**:
-- [ ] CI builds and vets the plugin module on the minimum supported Go alongside the other examples.
-- [ ] The root end-to-end suite runs the plugin module's tests and fails naming it when they fail.
-- [ ] Building the plugin leaves no untracked output for git to pick up.
+- [x] CI builds and vets the plugin module on the minimum supported Go alongside the other examples.
+- [x] The root end-to-end suite runs the plugin module's tests and fails naming it when they fail.
+- [x] Building the plugin leaves no untracked output for git to pick up.
 
 ### Milestone 2: The Docker plugin reads, decides and is tested the way the standard describes
 
@@ -281,7 +281,7 @@ Add the plugin module to CI's minimum-Go build-and-vet loop over the examples an
 
 **Validation point**: All unit tests still pass. The plugin's end-to-end test passes against a Docker engine and skips without one. A file-by-file read confirms the order, and the plugin directory holds every location the layout design names.
 
-#### - [ ] Task: Put every plugin example file in the standard order
+#### - [x] Task: Put every plugin example file in the standard order
 **Id:** 6333ec79-2f31-4bac-91d5-9422aaff8eda
 **Repo:** xcl
 **Depends on:**
@@ -293,12 +293,12 @@ Reorder every Go source file in the plugin example: the Docker plugin, the in-pr
 *Technical detail:* [context.md#task-put-every-plugin-example-file-in-the-standard-order](./context.md#task-put-every-plugin-example-file-in-the-standard-order)
 
 **Acceptance criteria**:
-- [ ] In every source file of the plugin example, exported types and methods appear before any unexported helper.
-- [ ] Every provider lists its methods in the order Init, Create, Read, Changed, Update, Destroy, Functions.
-- [ ] The network answers replace for a subnet change, update for any other setting change and no change otherwise, as before, with its replace-only settings listed in one place.
-- [ ] All existing tests pass unchanged.
+- [x] In every source file of the plugin example, exported types and methods appear before any unexported helper.
+- [x] Every provider lists its methods in the order Init, Create, Read, Changed, Update, Destroy, Functions.
+- [x] The network answers replace for a subnet change, update for any other setting change and no change otherwise, as before, with its replace-only settings listed in one place.
+- [x] All existing tests pass unchanged.
 
-#### - [ ] Task: Add a sample configuration and end-to-end test to the plugin
+#### - [x] Task: Add a sample configuration and end-to-end test to the plugin
 **Id:** 44018226-dd72-48f1-b1f1-6e7960a89380
 **Repo:** xcl
 **Depends on:**
@@ -310,11 +310,11 @@ Give the plugin a sample configuration of a network and a container attached to 
 *Technical detail:* [context.md#task-add-a-sample-configuration-and-end-to-end-test-to-the-plugin](./context.md#task-add-a-sample-configuration-and-end-to-end-test-to-the-plugin)
 
 **Acceptance criteria**:
-- [ ] With a Docker engine, the end-to-end test applies the sample, sees no changes on the next plan and leaves nothing behind after destroying.
-- [ ] Without a Docker engine, the end-to-end test skips rather than fails.
-- [ ] The sample and the application's configurations can be applied at the same time without name clashes.
+- [x] With a Docker engine, the end-to-end test applies the sample, sees no changes on the next plan and leaves nothing behind after destroying.
+- [x] Without a Docker engine, the end-to-end test skips rather than fails.
+- [x] The sample and the application's configurations can be applied at the same time without name clashes.
 
-#### - [ ] Task: Write a README for the plugin
+#### - [x] Task: Write a README for the plugin
 **Id:** e3de9ca1-a14d-40d4-8596-fc8e734fed15
 **Repo:** xcl
 **Depends on:**
@@ -326,9 +326,9 @@ Write a README for the plugin. It explains what the plugin provides, how its par
 *Technical detail:* [context.md#task-write-a-readme-for-the-plugin](./context.md#task-write-a-readme-for-the-plugin)
 
 **Acceptance criteria**:
-- [ ] The README names each part of the plugin and where it lives, matching the directory.
-- [ ] Every command the README shows works from the plugin directory.
-- [ ] The README shows both ways to register the plugin.
+- [x] The README names each part of the plugin and where it lives, matching the directory.
+- [x] Every command the README shows works from the plugin directory.
+- [x] The README shows both ways to register the plugin.
 
 ### Milestone 3: The documentation shows the example's new layout
 
@@ -336,7 +336,7 @@ Write a README for the plugin. It explains what the plugin provides, how its par
 
 **Validation point**: Every Docker-plugin path quoted in the README, the guides and the site pages exists in the rebuilt example, and the documentation site builds.
 
-#### - [ ] Task: Update the README and guides to the new layout
+#### - [x] Task: Update the README and guides to the new layout
 **Id:** 697bd2b2-b9ee-4aaa-bdd9-89cf567e1021
 **Repo:** xcl
 **Depends on:**
@@ -349,12 +349,12 @@ Update the repository README and the plugin guides wherever they link to or quot
 *Technical detail:* [context.md#task-update-the-readme-and-guides-to-the-new-layout](./context.md#task-update-the-readme-and-guides-to-the-new-layout)
 
 **Acceptance criteria**:
-- [ ] Every Docker-plugin link and quoted file in the README and guides resolves to a file in the rebuilt example.
-- [ ] Code quoted from the plugin matches the rebuilt source.
-- [ ] The README describes the application reading state through the entity types alone.
-- [ ] `CHANGELOG.md` has one top entry headed `## 20261009102138-48e95432-docker-example-standard-layout`, prose first, then a **Breaking:** list naming the Docker plugin's move to its own module and import path and the removal of its old `resources/`, `client/` and `main.go`.
+- [x] Every Docker-plugin link and quoted file in the README and guides resolves to a file in the rebuilt example.
+- [x] Code quoted from the plugin matches the rebuilt source.
+- [x] The README describes the application reading state through the entity types alone.
+- [x] `CHANGELOG.md` has one top entry headed `## 20261009102138-48e95432-docker-example-standard-layout`, prose first, then a **Breaking:** list naming the Docker plugin's move to its own module and import path and the removal of its old `resources/`, `client/` and `main.go`.
 
-#### - [ ] Task: Update the documentation site pages to the new layout
+#### - [x] Task: Update the documentation site pages to the new layout
 **Id:** 19027dee-481d-42d8-aa1e-d5a84a190374
 **Repo:** xcl-website
 **Depends on:**
@@ -367,9 +367,9 @@ Update the site's plugin example page, and the replacement and plugin-logging pa
 *Technical detail:* [context.md#task-update-the-documentation-site-pages-to-the-new-layout](./context.md#task-update-the-documentation-site-pages-to-the-new-layout)
 
 **Acceptance criteria**:
-- [ ] Every code block title and path on the site that names a Docker plugin file names one that exists in the rebuilt example.
-- [ ] Quoted plugin code matches the rebuilt source.
-- [ ] The site builds without errors.
+- [x] Every code block title and path on the site that names a Docker plugin file names one that exists in the rebuilt example.
+- [x] Quoted plugin code matches the rebuilt source.
+- [x] The site builds without errors.
 
 ## Open Questions
 
@@ -387,3 +387,182 @@ One implementation-time condition is worth stating. The plan reads "the rebuild 
 - **Any change to the plugin contract, the block types' settings or the plugin's behaviour.** This includes making `Read` look up the real Docker objects, which the design describes but which would change behaviour; `Read` keeps copying saved IDs as today.
 - **Running the plugin's e2e against other runtimes such as Podman.** The design allows it, but the example targets Docker only.
 - **Behaviour jumppad's engine provides outside any resource** (implicit image cache, registry merging). The design leaves this out of the layout.
+
+## Changelog
+
+### 2026-10-10 — Task: Create the plugin module with its entity types and Docker SDK client
+
+**What was done**: `example/plugin/plugins/docker` is now a Go module of its own (replace to the local xcl). The `Network`, `Container` and `NetworkAttachment` block types were copied verbatim into a new `entities` package that imports only `xcl/types`. The Docker SDK interface with `New` and `Ping` moved to `client/docker` with its test and a regenerated Mockery double, and the plugin got its own `.mockery.yml` and a `Makefile` (build, test, generate, clean).
+
+**Deviations**: The plugin `go.mod` was seeded with the application's indirect require block before `go mod tidy`, so no dependency was bumped. To keep the application building while the old `resources`/`client` packages still live in the new module, the application's `go.mod` already gained the plugin `require` + `replace => ./plugins/docker` in this task (planned for the application task), and its tests and Makefile build the plugin by import path (`github.com/jumppad-labs/xcl/example/plugin/plugins/docker`) until the entry point exists. The application's `go mod tidy` raised a few indirect versions through MVS (otelhttp v0.70.0, httpsnoop v1.1.0, via grpc-gateway). The `client/docker` package doc comment was reworded to name the task layer as its user.
+
+**Files changed**:
+- `xcl: example/plugin/plugins/docker/go.mod`
+- `xcl: example/plugin/plugins/docker/go.sum`
+- `xcl: example/plugin/plugins/docker/.mockery.yml`
+- `xcl: example/plugin/plugins/docker/Makefile`
+- `xcl: example/plugin/plugins/docker/entities/network.go`
+- `xcl: example/plugin/plugins/docker/entities/container.go`
+- `xcl: example/plugin/plugins/docker/client/docker/docker.go`
+- `xcl: example/plugin/plugins/docker/client/docker/docker_test.go`
+- `xcl: example/plugin/plugins/docker/client/docker/mocks/mock_docker.go`
+- `xcl: example/plugin/go.mod`
+- `xcl: example/plugin/go.sum`
+- `xcl: example/plugin/main_test.go`
+- `xcl: example/plugin/smoke_test.go`
+- `xcl: example/plugin/Makefile`
+
+**Discoveries**: Once a directory gains its own `go.mod`, the parent module can still build its `main` package by full import path (`go build <module path>`) as long as the parent requires and replaces it, which avoids `go -C` during the transition. A fresh `go mod tidy` on a new nested module picks latest indirect versions unless the parent's indirect block is copied in first.
+
+### 2026-10-10 — Task: Add the container task layer over the Docker SDK client
+
+**What was done**: Added `client/containers` with the `Tasks` interface (the 11 methods in the plan), its own `Attachment`, `NetworkSpec` and `ContainerSpec` types, the `ErrNotFound` sentinel and `New(docker.Docker) Tasks`. It holds the SDK translation the providers did before: labelled attachable bridge with IPAM only for a subnet, sorted container IDs from a network inspect, forced disconnect and remove, pull only when missing with progress drained (same "unable to list images" / "unable to pull image" messages and "pulling image" log line), container create with sorted `KEY=VALUE` env, first-network endpoint and read-only init-script bind, and addresses keyed by network name. Its generated strict double `client/containers/mocks.MockTasks` is configured in the plugin `.mockery.yml`. 34 unit tests against `MockDocker` pin every call and the not-found translation.
+
+**Deviations**: Docker's "not found" errors are not wrapped as `fmt.Errorf("%w: %w", ErrNotFound, err)` as the context suggested, because that would prefix "docker object not found: " to every provider error message and change observable error text. Instead a small `notFoundError` keeps Docker's message exactly and unwraps to both `ErrNotFound` and Docker's error, so `errors.Is` matches either. The file is already written in the standard file order (unexported `tasks` type with its assertion before `New`, as provider files do).
+
+**Files changed**:
+- `xcl: example/plugin/plugins/docker/client/containers/containers.go`
+- `xcl: example/plugin/plugins/docker/client/containers/containers_test.go`
+- `xcl: example/plugin/plugins/docker/client/containers/mocks/mock_tasks.go`
+- `xcl: example/plugin/plugins/docker/.mockery.yml`
+
+**Discoveries**: Wrapping a sentinel with `%w: %w` changes error text; a multi-unwrap error type (`Unwrap() []error`) lets a layer add a sentinel without changing the message callers wrap.
+
+### 2026-10-10 — Task: Move the providers onto the task layer
+
+**What was done**: Added the `providers` package (`network.go`, `container.go`, `attachments.go`, `labels.go`) built on `containers.Tasks` instead of the SDK client, so no provider imports a Docker library; `errors.Is(err, containers.ErrNotFound)` replaces `dockerclient.IsErrNotFound`, and every error message and log line is kept. The first-network address is chosen by the provider from `ContainerAddresses`, and the init script's absolute path is still computed in the provider so its error stays there. All provider unit tests moved under the same names (70 test functions, name set identical to the old `resources` tests) and use the strict `MockTasks`; the real-engine tests build providers with `containers.New` over the real SDK client and pass against the local engine.
+
+**Deviations**: The new provider, attachment and label files were written directly in the standard file order (lifecycle method order, helpers then unexported vars last), so the later file-order task only confirms them and makes the network's `Changed` explicit. Provider tests whose original point was SDK shape (pull when missing, read-only bind, sorted env, IPAM) now assert the `EnsureImage` call or the `ContainerSpec`/`NetworkSpec` the provider passes, with a comment pointing at the `client/containers` tests that pin the SDK shape. `TestContainerCreateReturnsPullErrors` now checks the task error passes through unchanged (the image name comes from the task layer's message). The old `resources/` package is left in place until the plugin-type task removes it.
+
+**Files changed**:
+- `xcl: example/plugin/plugins/docker/providers/network.go`
+- `xcl: example/plugin/plugins/docker/providers/container.go`
+- `xcl: example/plugin/plugins/docker/providers/attachments.go`
+- `xcl: example/plugin/plugins/docker/providers/labels.go`
+- `xcl: example/plugin/plugins/docker/providers/network_test.go`
+- `xcl: example/plugin/plugins/docker/providers/container_test.go`
+- `xcl: example/plugin/plugins/docker/providers/attachments_test.go`
+- `xcl: example/plugin/plugins/docker/providers/labels_test.go`
+- `xcl: example/plugin/plugins/docker/providers/docker_test.go`
+
+**Discoveries**: In the real-engine tests a local variable named `containers` shadows the `containers` package, so the task layer is built once into `tasks` before the providers.
+
+### 2026-10-10 — Task: Make the plugin type importable and serve it from its own entry point
+
+**What was done**: `plugin.go` is now package `docker`, the module's importable root package. `Init` builds the SDK client with `client/docker.New` (imported as `dockerclient`), wraps it once with `containers.New`, and passes the same task layer to both provider constructors, registering `&entities.Network{}` and `&entities.Container{}` under the unchanged type names and debug line. `cmd/docker/main.go` serves `&docker.Plugin{}`. The old `resources/`, `client/client.go`, `client/client_test.go`, `client/mocks/` and `main.go` are deleted, and the plugin Makefile's `build` target builds `build/docker-plugin` from `./cmd/docker`.
+
+**Deviations**: No new tests were added; the plugin binary loading through the application is exercised by the application's suite once the next task points it at `cmd/docker` (the application does not compile between these two tasks, since it still imported the removed packages).
+
+**Files changed**:
+- `xcl: example/plugin/plugins/docker/plugin.go`
+- `xcl: example/plugin/plugins/docker/cmd/docker/main.go`
+- `xcl: example/plugin/plugins/docker/Makefile`
+- `xcl: example/plugin/plugins/docker/main.go` (deleted)
+- `xcl: example/plugin/plugins/docker/resources/` (deleted)
+- `xcl: example/plugin/plugins/docker/client/client.go` (deleted)
+- `xcl: example/plugin/plugins/docker/client/client_test.go` (deleted)
+- `xcl: example/plugin/plugins/docker/client/mocks/mock_docker.go` (deleted)
+
+**Discoveries**: None.
+
+### 2026-10-10 — Task: Point the example application at the entity types only
+
+**What was done**: The application now imports only `.../plugins/docker/entities` from the plugin (`status.go`), and its pre-flight engine check is a new standard-library `pingDocker` in `engine.go` (`GET /_ping` over `DOCKER_HOST` unix or tcp, default `unix:///var/run/docker.sock`, 5 s timeout, same "no Docker engine reachable" message, nil for other schemes). `go list -deps .` in `example/plugin` lists no `github.com/docker/` package. The tests switch imports to `entities`, `client/docker` and `providers` (for the label constants), `requireDocker` uses `pingDocker`, and `TestMain` and the smoke test build the plugin from `plugins/docker` at `./cmd/docker`; no assertion changed. The Makefile builds the plugin with `go -C plugins/docker build`, and `test`/`generate` delegate to the plugin's Makefile; the application's `.mockery.yml` is removed. New `engine_test.go` covers unix success, tcp success, no engine, an engine error answer and an unsupported scheme. The whole application suite, scenario tests included, passes against a real engine.
+
+**Deviations**: The `go.mod` require/replace for the plugin module was already added in the first task. `pingDocker` also fails on a non-200 answer, and a tcp success test was added beyond the three planned engine tests.
+
+**Files changed**:
+- `xcl: example/plugin/engine.go`
+- `xcl: example/plugin/engine_test.go`
+- `xcl: example/plugin/main.go`
+- `xcl: example/plugin/status.go`
+- `xcl: example/plugin/main_test.go`
+- `xcl: example/plugin/scenarios_test.go`
+- `xcl: example/plugin/smoke_test.go`
+- `xcl: example/plugin/Makefile`
+- `xcl: example/plugin/.mockery.yml` (deleted)
+- `xcl: example/plugin/go.mod`
+- `xcl: example/plugin/go.sum`
+
+**Discoveries**: A unix socket path from `t.TempDir()` can exceed the ~108-byte limit, so the engine tests create the socket directory with `os.MkdirTemp("", ...)`.
+
+### 2026-10-10 — Task: Build and test the plugin module in CI and the end-to-end runner
+
+**What was done**: CI's minimum-Go "Build and vet the examples" loop now includes `example/plugin/plugins/docker`. The root e2e suite gained `TestDockerPluginExampleTestsPass`, running the plugin module's whole suite through `runExampleTests` (a failure names `docker`), and it passes. `.gitignore` ignores `example/plugin/plugins/docker/build/` and a stray `example/plugin/plugins/docker/docker` binary.
+
+**Deviations**: None. The minimum-toolchain (go1.25.0) build was not run locally; the module uses nothing newer than the other examples.
+
+**Files changed**:
+- `xcl: .github/workflows/go.yml`
+- `xcl: e2e/examples_test.go`
+- `xcl: .gitignore`
+
+**Discoveries**: None.
+
+### 2026-10-10 — Task: Put every plugin example file in the standard order
+
+**What was done**: The network's `Changed` now takes the design's explicit form: replace when a change is `Within` a setting in the single `networkReplaceSettings` list (`subnet`), update when any other setting changed, otherwise `DefaultChanged`. `client/docker/docker.go` was reordered (interface, assertion, `New`, `Ping`, then `newSDKClient` and `pingTimeout`). The template plugin's `template.go` now lists the type, the provider and its assertion, then `Init, Create, Read, Changed, Update, Destroy, Functions`, then `render`, `fileMode` and finally `defaultMode`. In the application, `main.go`'s `defaultStateDir`, `dockerPluginName` and `usage` and `status.go`'s `shortIDLength` moved after the functions. The other Docker plugin files were already written in this order in earlier tasks and were confirmed. `TestNetworkChangedReplacesOnSubnetChange` now passes the `subnet` property change xcl reports (assertion unchanged), and `TestNetworkChangedUpdatesWhenANonReplaceSettingChanges` was added. Every suite passes, including the application's scenario tests against a real engine.
+
+**Deviations**: The network's replace list is named `networkReplaceSettings`, since the container provider in the same package already declares `replaceSettings`. The two small network `Changed` test edits were made directly rather than through a test sub-agent.
+
+**Files changed**:
+- `xcl: example/plugin/plugins/docker/providers/network.go`
+- `xcl: example/plugin/plugins/docker/providers/network_test.go`
+- `xcl: example/plugin/plugins/docker/client/docker/docker.go`
+- `xcl: example/plugin/plugins/template/template.go`
+- `xcl: example/plugin/main.go`
+- `xcl: example/plugin/status.go`
+
+**Discoveries**: Unexported provider-specific lists in a shared `providers` package need resource-prefixed names (`networkReplaceSettings`), so the layout's "settings listed in one place" rule is per provider, not per package.
+
+### 2026-10-10 — Task: Add a sample configuration and end-to-end test to the plugin
+
+**What was done**: Added `examples/basic/main.xcl` (a `docker "network" "xcl_plugin_basic"` on `10.73.0.0/24` and an nginx `docker "container" "xcl_plugin_basic"` attached to it) and `e2e/e2e_test.go`. `TestMain` builds `./cmd/docker` into a temp dir; `TestBasicExampleAppliesThenPlansNoChanges` applies the sample through a local registry and checks that a second Config's `Diff` of the same configuration reports `Changed() == 0`; `TestBasicExampleDestroyLeavesNothingInDocker` destroys and checks both Docker IDs are gone through `client/docker`. Both skip without an engine and pass against the local one, leaving nothing behind.
+
+**Deviations**: The sample uses the real block syntax (`docker "network" "<name>"`), not the `resource "docker" ...` form written in the context. The plugin `go.mod` gained indirect requirements (`creasty/defaults`, `go-cmp`, `errwrap`, `raymond`) because the e2e test imports the root `xcl` package; no version changed. The two e2e tests share object names and do not run in parallel with each other.
+
+**Files changed**:
+- `xcl: example/plugin/plugins/docker/examples/basic/main.xcl`
+- `xcl: example/plugin/plugins/docker/e2e/e2e_test.go`
+- `xcl: example/plugin/plugins/docker/go.mod`
+- `xcl: example/plugin/plugins/docker/go.sum`
+
+**Discoveries**: `Config.Diff` loads the saved state itself, so a fresh Config on the same state path can plan without calling `Load`. go-plugin logs `plugin acceptAndServe error: broker closed` when the plugin process shuts down; it is harmless.
+
+### 2026-10-10 — Task: Write a README for the plugin
+
+**What was done**: Added `example/plugin/plugins/docker/README.md`: the two block types and their computed values, the module path, a layout tree of every directory and file with what each holds (matching the directory and the `plugin-layout.md` design), a command table (`make build`, `make test`, `make generate`, `make clean`, each checked from the plugin directory), how the real-engine and e2e tests skip without Docker, registering the plugin in-process (`local.RegisterPlugin(&docker.Plugin{})`) and as a separate program (`local.RegisterExternalPlugin(...)`), and reading state through `entities` alone.
+
+**Deviations**: The layout design lives in the project's design store rather than the repository, so the README names it (`plugin-layout.md`) instead of linking to it.
+
+**Files changed**:
+- `xcl: example/plugin/plugins/docker/README.md`
+
+**Discoveries**: None.
+
+### 2026-10-10 — Task: Update the README and guides to the new layout
+
+**What was done**: The repository README's Docker plugin bullet now describes the plugin as its own module in the standard layout, links its README, `cmd/docker`, `entities`, `providers`, `client/docker` and `client/containers` (with mocks beside each), the sample and e2e, and says the application reads state through the entity types alone. `docs/plugin-developer-guide.md` links to `providers/container.go`, `providers/network.go` and `providers/attachments.go`, and re-quotes the container `Changed`, the network's new explicit `Changed` with `networkReplaceSettings`, and the container `Update` with task calls (`DisconnectNetwork`, `errors.Is(err, containers.ErrNotFound)`, `ContainerAddresses`); every quoted paragraph was checked to occur verbatim in the source. The `docs/plugins.md` logging snippet uses `entities.Network` and the task layer. `CHANGELOG.md` has a new top entry headed with the spec name, prose then a **Breaking:** list. Every Docker-plugin link in the README and guides resolves to an existing path.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl: README.md`
+- `xcl: docs/plugin-developer-guide.md`
+- `xcl: docs/plugins.md`
+- `xcl: CHANGELOG.md`
+
+**Discoveries**: None.
+
+### 2026-10-10 — Task: Update the documentation site pages to the new layout
+
+**What was done**: `src/pages/examples/plugins.mdx` now titles every Docker plugin block with an existing file (`entities/*.go`, `providers/*.go`, `client/docker/docker.go`, `client/containers/containers.go`, `cmd/docker/main.go`), re-quotes `plugin.go`, the providers, the task layer's `Tasks` interface and `CreateContainer`, the external-binary section (own module, root-package `Plugin`, `cmd/docker`, host imports only `entities`), the `main.go` snippets with `pingDocker`, a `status.go` snippet reading `entities`, and the testing section with the two mock packages and `make generate` in `plugins/docker`. `replacement.mdx` and `plugin-logging.mdx` were retitled to `providers/*.go` and re-quoted (network `Changed` in its explicit form). `events.mdx` needed no change. A script confirmed all 57 titled paths exist in the rebuilt example and all 40 Go blocks from `example/plugin` occur verbatim in their source; `npm run build` succeeds (11 pages).
+
+**Deviations**: `plugins.mdx` gained a short "The host imports only the entities" bullet in its "What to notice" list, and `replacement.mdx` had an older prose slip fixed (it named the `Update` variable `resource`; the code uses `c`).
+
+**Files changed**:
+- `xcl-website: src/pages/examples/plugins.mdx`
+- `xcl-website: src/pages/replacement.mdx`
+- `xcl-website: src/pages/plugin-logging.mdx`
+
+**Discoveries**: A fresh worktree of xcl-website has no `node_modules`; `npm ci` inside the worktree is needed before `npm run build`.

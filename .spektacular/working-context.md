@@ -31,3 +31,12 @@ Part of epic 20261009092551-82db0140-plugin-template ("Plugin standard and distr
 - Review done: registry plan wraps registry.Local; template repo created+pushed by user, registration repaired (repo.yaml source file ..), user marked repo as template; that task removed from plan. Repo xclconfig renamed to xcl by user; all plans + summary updated (ordering log section still says xclconfig, written only by epic order). User tagged xcl v0.1.1 and added GPG secrets: template plan drops the xcl-release and pin tasks, scaffold requires v0.1.1, signing-key task reduced to publishing the public key. Public key: shared jumppad-labs Ed25519 key (fpr 15BD A684 3A1F A0EA D1AA 5190 F775 DA00 AFD4 B502) to be served at xcl.dev/keys/jumppad-labs-releases.asc; key task is now an xcl-website agent task. No GoReleaser: template uses make dist + gpg + gh; design plugin-release-assets.md revised; plans + summary updated.
 - Possible cross-plan disagreement: changelog (registry plan has a CHANGELOG task; docker plan leaves it to implement workflow).
 - Q (plugin-template): register xcl-plugin-template repo during planning? A: yes, option A (name xcl-plugin-template, location /home/nicj/code/github.com/jumppad-labs/xcl-plugin-template).
+
+# Orchestrator: implement epic 20261009092551-82db0140-plugin-template (2026-10-10)
+- Order: docker-example -> github-releases-registry -> plugin-template (strictly sequential).
+- Repos clean at start; user told about spek/<spec> branch commits.
+- Worktrees created + child started: 20261009102138-48e95432-docker-example-standard-layout
+- docker-example DONE + merged. Registry worktrees created + child started.
+- registry DONE + merged. Template worktrees created + child started.
+- Q (plugin-template): human task 'publish first signed release' — A: defer until after merge (option 1); release listed as first manual check in test plan.
+- plugin-template DONE + merged. Epic implement complete.

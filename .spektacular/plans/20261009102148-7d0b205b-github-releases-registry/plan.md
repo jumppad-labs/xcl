@@ -188,7 +188,7 @@ All tests follow the project's rules: testify `require`, one behaviour per test 
 
 **Validation point**: The registry and Config-level tests pass against the local fake release server: a fresh install applies and the next plan reports no changes; each of the six platforms caches its own build; the failure cases are refused with the named details and an empty cache; a cached version applies with the server stopped; and the GitHub and local registries load together.
 
-#### - [ ] Task: Add plugin install errors
+#### - [x] Task: Add plugin install errors
 **Id:** 817adb3d-9fcb-4ac7-9497-f8d3238a99ca
 **Repo:** xcl
 **Depends on:** none
@@ -199,10 +199,10 @@ Adds the shared errors a remote registry reports when it cannot install a plugin
 *Technical detail:* [context.md#task-add-plugin-install-errors](./context.md#task-add-plugin-install-errors)
 
 **Acceptance criteria**:
-- [ ] An application can tell "not found" failures from "failed verification" failures with `errors.Is`, through the root package.
-- [ ] The install error's message names the repository, version and platform, and its detail can be recovered with `errors.As`.
+- [x] An application can tell "not found" failures from "failed verification" failures with `errors.Is`, through the root package.
+- [x] The install error's message names the repository, version and platform, and its detail can be recovered with `errors.As`.
 
-#### - [ ] Task: Encode the release asset contract
+#### - [x] Task: Encode the release asset contract
 **Id:** 05fd3a98-1211-4431-a9d0-1e9003af6af9
 **Repo:** xcl
 **Depends on:** none
@@ -213,10 +213,10 @@ Puts every name and format the plugin release asset contract fixes in one place 
 *Technical detail:* [context.md#task-encode-the-release-asset-contract](./context.md#task-encode-the-release-asset-contract)
 
 **Acceptance criteria**:
-- [ ] For each of the six supported platforms the archive and binary names match the contract, with `.zip` and `.exe` on Windows and the version taken from the tag without its `v`.
-- [ ] A well-formed checksums file is read into archive names and hashes, and a malformed one is reported as an error.
+- [x] For each of the six supported platforms the archive and binary names match the contract, with `.zip` and `.exe` on Windows and the version taken from the tag without its `v`.
+- [x] A well-formed checksums file is read into archive names and hashes, and a malformed one is reported as an error.
 
-#### - [ ] Task: Add a fake GitHub release test server
+#### - [x] Task: Add a fake GitHub release test server
 **Id:** cd1af5fa-d5f4-44e4-947d-278aba10afc5
 **Repo:** xcl
 **Depends on:** none
@@ -227,10 +227,10 @@ Adds a shared test helper that builds a plugin release in the contract's layout 
 *Technical detail:* [context.md#task-add-a-fake-github-release-test-server](./context.md#task-add-a-fake-github-release-test-server)
 
 **Acceptance criteria**:
-- [ ] Tests in more than one package can stand up a fake release of a real plugin binary without network access.
-- [ ] Each failure the registry must handle can be produced by a switch on the fake release.
+- [x] Tests in more than one package can stand up a fake release of a real plugin binary without network access.
+- [x] Each failure the registry must handle can be produced by a switch on the fake release.
 
-#### - [ ] Task: Add the GitHub registry type and registration
+#### - [x] Task: Add the GitHub registry type and registration
 **Id:** 8e40a580-1a20-470c-8724-dca2bbb2e0dd
 **Repo:** xcl
 **Depends on:** none
@@ -241,11 +241,11 @@ Adds the public GitHub registry as a wrapper on the existing local registry: its
 *Technical detail:* [context.md#task-add-the-github-registry-type-and-registration](./context.md#task-add-the-github-registry-type-and-registration)
 
 **Acceptance criteria**:
-- [ ] An application can create a GitHub registry and declare a plugin with one line.
-- [ ] A version range, `latest` or a missing version fails at the registration line with a message naming the plugin, before anything is downloaded.
-- [ ] The registry is named `github.com`, declares no Go types unless the application registers them on it (as on a local registry), and defaults its cache to the xcl home directory.
+- [x] An application can create a GitHub registry and declare a plugin with one line.
+- [x] A version range, `latest` or a missing version fails at the registration line with a message naming the plugin, before anything is downloaded.
+- [x] The registry is named `github.com`, declares no Go types unless the application registers them on it (as on a local registry), and defaults its cache to the xcl home directory.
 
-#### - [ ] Task: Add the GitHub release client
+#### - [x] Task: Add the GitHub release client
 **Id:** 31088189-7335-46b7-bc3d-4ce392021f48
 **Repo:** xcl
 **Depends on:**
@@ -258,10 +258,10 @@ Adds the small HTTP client that reads a release by its tag and downloads named a
 *Technical detail:* [context.md#task-add-the-github-release-client](./context.md#task-add-the-github-release-client)
 
 **Acceptance criteria**:
-- [ ] A release that exists is read and its assets can be downloaded by name.
-- [ ] A tag with no release, or a draft release, is reported as not found, naming the repository and version.
+- [x] A release that exists is read and its assets can be downloaded by name.
+- [x] A tag with no release, or a draft release, is reported as not found, naming the repository and version.
 
-#### - [ ] Task: Install, cache and verify plugins at start
+#### - [x] Task: Install, cache and verify plugins at start
 **Id:** 70fc09bb-1048-42d3-b555-4a7d43599499
 **Repo:** xcl
 **Depends on:**
@@ -275,12 +275,12 @@ Makes the registry provide working plugins. Each registered plugin, when started
 *Technical detail:* [context.md#task-install-cache-and-verify-plugins-at-start](./context.md#task-install-cache-and-verify-plugins-at-start)
 
 **Acceptance criteria**:
-- [ ] A plugin installs from an empty cache and starts, and a second start uses the cache without contacting the server.
-- [ ] The cached and started binary is the build named for the current platform, for each of the six supported platforms.
-- [ ] A missing platform build, a release without checksums, or a tampered archive is refused naming the plugin, and nothing is left in the cache.
-- [ ] A cached archive or binary that no longer matches the checksums is refused before the plugin's process starts, on every start.
+- [x] A plugin installs from an empty cache and starts, and a second start uses the cache without contacting the server.
+- [x] The cached and started binary is the build named for the current platform, for each of the six supported platforms.
+- [x] A missing platform build, a release without checksums, or a tampered archive is refused naming the plugin, and nothing is left in the cache.
+- [x] A cached archive or binary that no longer matches the checksums is refused before the plugin's process starts, on every start.
 
-#### - [ ] Task: Apply configurations with plugins from GitHub
+#### - [x] Task: Apply configurations with plugins from GitHub
 **Id:** 6425e0e3-62eb-4a8e-8a6b-469b8da7ac9b
 **Repo:** xcl
 **Depends on:**
@@ -292,10 +292,10 @@ Proves the registry end to end through a `Config`: a configuration using a plugi
 *Technical detail:* [context.md#task-apply-configurations-with-plugins-from-github](./context.md#task-apply-configurations-with-plugins-from-github)
 
 **Acceptance criteria**:
-- [ ] With an empty cache, a configuration using a GitHub-installed plugin applies and the next plan reports no changes.
-- [ ] After one install, the same configuration applies with no network access, using the chosen cache directory.
-- [ ] A missing release fails the apply before anything is applied, with a plugin load error naming the plugin and the `github.com` registry.
-- [ ] One configuration uses a plugin from the local registry and one from the GitHub registry, and both apply.
+- [x] With an empty cache, a configuration using a GitHub-installed plugin applies and the next plan reports no changes.
+- [x] After one install, the same configuration applies with no network access, using the chosen cache directory.
+- [x] A missing release fails the apply before anything is applied, with a plugin load error naming the plugin and the `github.com` registry.
+- [x] One configuration uses a plugin from the local registry and one from the GitHub registry, and both apply.
 
 ### Milestone 2: Trust signing keys and install from private repositories
 
@@ -303,7 +303,7 @@ Proves the registry end to end through a `Config`: a configuration using a plugi
 
 **Validation point**: The signature and token tests pass against the fake release server: trusted-key installs succeed, foreign-key and unsigned releases are refused with an empty cache, changing the trusted keys refuses an already-cached plugin, unsigned releases install without keys, and a token-protected release installs with a token and fails clearly without one.
 
-#### - [ ] Task: Check release signatures against trusted keys
+#### - [x] Task: Check release signatures against trusted keys
 **Id:** 1e912b2d-d170-4fc0-83e5-48df9fa8f535
 **Repo:** xcl
 **Depends on:**
@@ -315,11 +315,11 @@ Adds the trusted-keys option and signature checking with a maintained Go OpenPGP
 *Technical detail:* [context.md#task-check-release-signatures-against-trusted-keys](./context.md#task-check-release-signatures-against-trusted-keys)
 
 **Acceptance criteria**:
-- [ ] With a trusted key, a release signed by that key installs and a release signed by another key, or unsigned, is refused naming the plugin, with nothing cached.
-- [ ] With no trusted keys, an unsigned release with valid checksums installs and applies.
-- [ ] A cached plugin that no longer verifies against the application's current trusted keys is refused before it runs.
+- [x] With a trusted key, a release signed by that key installs and a release signed by another key, or unsigned, is refused naming the plugin, with nothing cached.
+- [x] With no trusted keys, an unsigned release with valid checksums installs and applies.
+- [x] A cached plugin that no longer verifies against the application's current trusted keys is refused before it runs.
 
-#### - [ ] Task: Install from private repositories with a token
+#### - [x] Task: Install from private repositories with a token
 **Id:** f7f8f11e-5c82-4c93-8b28-963372386a86
 **Repo:** xcl
 **Depends on:**
@@ -331,11 +331,11 @@ Adds the token option and reads `GITHUB_TOKEN`, then `GH_TOKEN`, when none is gi
 *Technical detail:* [context.md#task-install-from-private-repositories-with-a-token](./context.md#task-install-from-private-repositories-with-a-token)
 
 **Acceptance criteria**:
-- [ ] A plugin from a token-protected release installs when a token is given by option or environment variable.
-- [ ] Without a token, the failure names the repository and says it was not found or needs a token.
-- [ ] The explicit option wins over `GITHUB_TOKEN`, which wins over `GH_TOKEN`.
+- [x] A plugin from a token-protected release installs when a token is given by option or environment variable.
+- [x] Without a token, the failure names the repository and says it was not found or needs a token.
+- [x] The explicit option wins over `GITHUB_TOKEN`, which wins over `GH_TOKEN`.
 
-#### - [ ] Task: Add an opt-in test against real GitHub
+#### - [x] Task: Add an opt-in test against real GitHub
 **Id:** 9d2c63fe-5500-459b-ae70-2b9b5f473c12
 **Repo:** xcl
 **Depends on:**
@@ -348,8 +348,8 @@ Adds one test that installs and starts a real published plugin from github.com, 
 *Technical detail:* [context.md#task-add-an-opt-in-test-against-real-github](./context.md#task-add-an-opt-in-test-against-real-github)
 
 **Acceptance criteria**:
-- [ ] The default test run skips the test and makes no network requests.
-- [ ] With the environment variables set, the test installs the named release into a temporary cache and starts it.
+- [x] The default test run skips the test and makes no network requests.
+- [x] With the environment variables set, the test installs the named release into a temporary cache and starts it.
 
 ### Milestone 3: Documentation shows how to install plugins from GitHub
 
@@ -357,7 +357,7 @@ Adds one test that installs and starts a real published plugin from github.com, 
 
 **Validation point**: The documentation site builds and type-checks, the new page appears in the Guides navigation, and a reviewer confirms the README, guide, changelog and site page match the shipped API.
 
-#### - [ ] Task: Document the GitHub registry in the repository
+#### - [x] Task: Document the GitHub registry in the repository
 **Id:** bfed6c67-8b75-4675-a8b6-199f7f77c0ed
 **Repo:** xcl
 **Depends on:**
@@ -370,11 +370,11 @@ Explains installing plugins from GitHub releases in the README and the plugin ar
 *Technical detail:* [context.md#task-document-the-github-registry-in-the-repository](./context.md#task-document-the-github-registry-in-the-repository)
 
 **Acceptance criteria**:
-- [ ] The README shows how to install a plugin from GitHub and covers pinning, trusted keys, private repositories and the cache.
-- [ ] The plugin architecture guide describes the GitHub registry beside the local one.
-- [ ] The changelog has an entry for this spec describing the registry and its new dependency.
+- [x] The README shows how to install a plugin from GitHub and covers pinning, trusted keys, private repositories and the cache.
+- [x] The plugin architecture guide describes the GitHub registry beside the local one.
+- [x] The changelog has an entry for this spec describing the registry and its new dependency.
 
-#### - [ ] Task: Add the GitHub registry guide to the documentation site
+#### - [x] Task: Add the GitHub registry guide to the documentation site
 **Id:** 704f35a6-88a5-4adc-8d8c-a52505009a9d
 **Repo:** xcl-website
 **Depends on:**
@@ -387,9 +387,9 @@ Adds a documentation site page on installing plugins from GitHub releases, cover
 *Technical detail:* [context.md#task-add-the-github-registry-guide-to-the-documentation-site](./context.md#task-add-the-github-registry-guide-to-the-documentation-site)
 
 **Acceptance criteria**:
-- [ ] The site has a page covering version pinning, trusted keys, private repositories and the cache.
-- [ ] The page is reachable from the Guides navigation and from the registries page.
-- [ ] The site builds and type-checks.
+- [x] The site has a page covering version pinning, trusted keys, private repositories and the cache.
+- [x] The page is reachable from the Guides navigation and from the registries page.
+- [x] The site builds and type-checks.
 
 ## Open Questions
 
@@ -408,3 +408,185 @@ No other implementation-time uncertainties: every other choice is recorded in th
 - **Connecting to plugins already running elsewhere (`registry.Connect`)** — left open by `plugin-registries.md`.
 - **Publishing releases in the contract's layout** — the plugin template spec (`20261009092551-82db0140-plugin-template`) owns the release packaging (`make dist`) and signing; this plan only installs what that layout describes.
 - **Rate-limit handling and retries against GitHub** — a failed request fails the load with GitHub's status; no backoff or retry is added.
+
+## Changelog
+
+
+### 2026-10-10 — Task: Add plugin install errors
+
+**What was done**: Added `ErrPluginNotFound`, `ErrPluginVerification` and `*PluginInstallError{Repository, Version, Platform, Err}` to the shared `errors` package, and re-exported the sentinels and the detail alias from the root package beside `PluginLoadError`. Tests cover the message, `errors.Is` for each sentinel (and not the other), `errors.As` through wraps and through a `PluginLoadError`.
+
+**Deviations**: None
+
+**Files changed**:
+- `xcl: errors/plugin_install_error.go`
+- `xcl: errors/plugin_install_error_test.go`
+- `xcl: config.go`
+- `xcl: errors_reexport_test.go`
+
+**Discoveries**: `PluginInstallError.Error()` reads `plugin <repo> <version> for <platform>: <cause>`, omitting empty parts; the catalog's `PluginLoadError` unwraps to a slice, so `errors.Is` reaches the install sentinel through both layers.
+
+### 2026-10-10 — Task: Encode the release asset contract
+
+**What was done**: Added `registry/github_assets.go`, the one place holding the plugin release asset contract: `exactTag`, the `platform` type (`currentPlatform`, `String`, `supported`), `namesFor(repository, tag, platform)` returning the archive, checksums, signature and binary names, and `parseChecksums` for `sha256sum`-format files. Tests cover all six platforms, accepted and rejected tags and checksums parsing success and failure, each in its own function.
+
+**Deviations**: Named the helpers `namesFor` (returning an `assetNames` struct) and `platform.supported()` instead of the context's `assetNames(...)` function and `supportedPlatform(p)`; behaviour as planned.
+
+**Files changed**:
+- `xcl: registry/github_assets.go`
+- `xcl: registry/github_assets_test.go`
+
+**Discoveries**: None
+
+### 2026-10-10 — Task: Add a fake GitHub release test server
+
+**What was done**: Added `internal/testutil/github_release.go`, a fake GitHub release served by `httptest` that packs a binary into the contract's archives for all six platforms, writes a `sha256sum`-format checksums file and an armoured detached signature from a key generated in the test, and answers the release-by-tag and asset endpoints. Options drop a platform, the checksums or the signature, sign with another key, tamper an archive, require a token or mark a draft; accessors give the URL, request count, last token, public keys, archives and contract names. Added `BuildFixturePlugin`, building the `subtypeless` fixture plugin once per test binary as `xcl-plugin-widget`, and smoke tests for both.
+
+**Deviations**: Pinned `github.com/ProtonMail/go-crypto` at v1.1.6 rather than the newest v1.5.2: v1.5.2 forces upgrades of `golang.org/x/{text,tools,net,sys,sync,crypto,mod}` across the module, v1.1.6 adds only itself. Its indirect `github.com/cloudflare/circl` was raised from v1.3.7 to v1.6.1 to avoid known advisories in older circl releases. Added `LastToken`, `Archive`, `ArchiveName`, `ChecksumsName` and `SignatureName` accessors beyond the context's list, for the token-precedence and platform tests.
+
+**Files changed**:
+- `xcl: internal/testutil/github_release.go`
+- `xcl: internal/testutil/github_release_test.go`
+- `xcl: internal/testutil/plugins.go`
+- `xcl: internal/testutil/doc.go`
+- `xcl: go.mod`
+- `xcl: go.sum`
+
+**Discoveries**: `go get github.com/ProtonMail/go-crypto@latest` bumps much of `golang.org/x/...`; pin an older release when dependency churn matters. The fixture plugin is built into `os.MkdirTemp` once per test binary and that directory is not removed (no test owns it).
+
+### 2026-10-10 — Task: Add the GitHub registry type and registration
+
+**What was done**: Added the public `registry.GitHub` (`registry/github.go`): `NewGitHub`, `GitHubCacheDir` (expands `~/` and env vars), `GitHubAPIURL`, `RegisterPlugin` validating `owner/repo` and the exact tag and panicking `xcl: registry github.com: plugin "<repository>": ...` otherwise, `RegisterType`/`Types` passed through to a wrapped unexported `*Local`, `Name()` returning `github.com`, and `Plugins` delegating to the wrapped local registry. Each registration adds a `githubPlugin` (named after the repository) to the wrapped registry through `add`; its `Start` was a placeholder until the install task. Package doc mentions the GitHub registry.
+
+**Deviations**: `Plugins` delegation (planned for the install task) was added here so the type satisfies `registry.Registry` from the start. The default cache directory is resolved lazily on each use (`cacheRoot`) rather than at construction.
+
+**Files changed**:
+- `xcl: registry/github.go`
+- `xcl: registry/github_install.go`
+- `xcl: registry/github_test.go`
+- `xcl: registry/registry.go`
+
+**Discoveries**: None
+
+### 2026-10-10 — Task: Add the GitHub release client
+
+**What was done**: Added `registry/github_client.go`, a small `net/http` client pointed at a base URL: `release` reads `GET /repos/{owner}/{repo}/releases/tags/{tag}` with the GitHub API headers, `download` streams an asset through its API URL with `Accept: application/octet-stream`, and `downloadTo` writes one into a new file. A 404 or a draft release is `ErrPluginNotFound` naming the repository and tag; any other non-2xx status is an error carrying the status and the start of the body. Assets are found only by exact name. `GitHub.client()` builds the client from the registry's API URL.
+
+**Deviations**: None
+
+**Files changed**:
+- `xcl: registry/github_client.go`
+- `xcl: registry/github_client_test.go`
+- `xcl: registry/github.go`
+
+**Discoveries**: None
+
+### 2026-10-10 — Task: Install, cache and verify plugins at start
+
+**What was done**: Gave `githubPlugin` its real `Start` (`registry/github_install.go`): it resolves the cache entry `<cache>/github.com/<owner>/<repo>/<tag>/<os>_<arch>/`; on a miss it reads the release, requires the platform archive (`ErrPluginNotFound` otherwise) and the checksums file (`ErrPluginVerification` otherwise), downloads both into a `.install-*` directory beside the entry, verifies the archive, extracts the binary and renames the directory into place; then, on a hit or a fresh install alike, verifies the entry (archive against the checksums, binary against the archive's copy) and returns `Executable(binary).Start(emit)` unchanged. Every failure is a `*PluginInstallError` naming repository, version and platform. `registry/github_verify.go` holds the offline verifier and extraction, reading only the root entry named as the contract names the binary. Downloads, cache hits and verification are logged as `load` events from xcl's core.
+
+**Deviations**: The archive is verified before extraction as well as with the whole entry after it, so an untrusted archive is never decompressed. An unsupported platform is reported as `ErrPluginNotFound` before any request.
+
+**Files changed**:
+- `xcl: registry/github_install.go`
+- `xcl: registry/github_verify.go`
+- `xcl: registry/github_install_test.go`
+- `xcl: registry/github_verify_test.go`
+
+**Discoveries**: Linux refuses to overwrite a running executable (ETXTBSY), so tests that alter a started cached binary delete and rewrite it. A `.install-*` directory left by a killed process is ignored (never a cache hit) but is not cleaned up, in line with the spec's no-pruning non-goal.
+
+### 2026-10-10 — Task: Apply configurations with plugins from GitHub
+
+**What was done**: Added root-package Config tests (`config_github_registry_test.go`) that install the real `xcl-plugin-widget` fixture plugin from the fake release through `xcl.WithRegistry` with one `RegisterPlugin` call: apply from an empty cache then a no-change `Diff`, the computed resource in state, `Destroy`, an offline apply from a chosen cache after the server is stopped (state from the real first apply, no new requests, binary under `<cache>/github.com/acme/xcl-plugin-widget/v1.0.0/<os>_<arch>/`), a missing release failing with a `*PluginLoadError` naming `xcl-plugin-widget` and `github.com` and matching `ErrPluginNotFound` with nothing applied, and a GitHub registry beside a local one in one configuration. Added the `github` and `github_mixed` config fixtures.
+
+**Deviations**: The Config test for an unsigned release installing without trusted keys, planned for the signatures task, was written here since it needs no signature code.
+
+**Files changed**:
+- `xcl: config_github_registry_test.go`
+- `xcl: internal/test_fixtures/config/github/main.xcl`
+- `xcl: internal/test_fixtures/config/github_mixed/main.xcl`
+
+**Discoveries**: Root-package tests that call `isolateHome` must build the fixture plugin first, since the build needs the real module cache under `$HOME`.
+
+### 2026-10-10 — Task: Check release signatures against trusted keys
+
+**What was done**: Added `GitHubTrustedKeys(armored ...string)`; `Plugins` reads the keys with `openpgp.ReadArmoredKeyRing` (a key that cannot be read fails the load, "trusted key N cannot be read", which the catalog reports against the `github.com` registry). With keys trusted, an install requires the release's `<checksums>.sig` and the verifier checks the armoured detached signature over the checksums file with `openpgp.CheckArmoredDetachedSignature` before the archive is trusted, at install and on every start, always with the registry's current keys. Without keys the signature is still downloaded and kept when the release has one, but not checked.
+
+**Deviations**: None
+
+**Files changed**:
+- `xcl: registry/github.go`
+- `xcl: registry/github_install.go`
+- `xcl: registry/github_verify.go`
+- `xcl: registry/github_signature_test.go`
+
+**Discoveries**: None
+
+### 2026-10-10 — Task: Install from private repositories with a token
+
+**What was done**: Added `GitHubToken(token)`; `Plugins` resolves the token from the option, else `GITHUB_TOKEN`, else `GH_TOKEN`, and the release client sends `Authorization: Bearer <token>` on every API and asset request (Go drops it on a redirect to asset storage on another host). Without a token, a 404 says the release was not found or the repository is private and needs a GitHub token; with one, a 404 is plain not found and a 401/403 says the token was rejected.
+
+**Deviations**: None
+
+**Files changed**:
+- `xcl: registry/github.go`
+- `xcl: registry/github_client.go`
+- `xcl: registry/github_token_test.go`
+
+**Discoveries**: GitHub answers a private repository without a token with 404, not 401/403, so a missing-release error cannot tell "absent" from "private"; the message names both.
+
+### 2026-10-10 — Task: Add an opt-in test against real GitHub
+
+**What was done**: Added `TestGitHubRegistryInstallsARealRelease` (`registry/github_live_test.go`), skipped unless `XCL_GITHUB_LIVE_PLUGIN=owner/repo@vX.Y.Z` is set; `XCL_GITHUB_LIVE_KEY` optionally names an armoured public key file to trust, and the token comes from the environment as usual. It installs into a temporary cache, starts the plugin, requires at least one type and stops it. A `make test-github-live` target runs it. The default run skips it with no network requests.
+
+**Deviations**: The task's deliverable is itself the test, so the test step wrote no further tests; verification confirmed the default run skips it.
+
+**Files changed**:
+- `xcl: registry/github_live_test.go`
+- `xcl: Makefile`
+
+**Discoveries**: None
+
+### 2026-10-10 — Task: Document the GitHub registry in the repository
+
+**What was done**: README gains an "Installing plugins from GitHub" subsection after "Registering plugins" (the one-line declaration, exact pinning and its panics, trusted keys, private repositories and tokens, the cache layout, offline use, re-verification on every start, no pruning, and the errors) and a short pointer in the "With plugins" quick start. `docs/plugins.md` describes the GitHub registry beside the local one in "Registries and the catalog": the wrapper on the local registry, install and verification in `Start`, the atomic cache entry, the ordinary `Executable` host, the errors and the release asset contract. `CHANGELOG.md` has an entry for this spec covering the registry, its options, caching, verification, the new errors and the `ProtonMail/go-crypto` dependency with its reason, with no breaking changes.
+
+**Deviations**: None
+
+**Files changed**:
+- `xcl: README.md`
+- `xcl: docs/plugins.md`
+- `xcl: CHANGELOG.md`
+
+**Discoveries**: None
+
+### 2026-10-10 — Task: Add the GitHub registry guide to the documentation site
+
+**What was done**: Added the guide page `src/pages/github-registry.mdx` (declaring a plugin, pinning a version, what a release must contain, trusting signing keys, private repositories, the cache, errors, and a closing link to the registries guide), the "Installing from GitHub" entry in the Guides navigation, and a paragraph linking to it from the registries page's "Several registries and load order" section. `npm run build` builds the page and `astro check` reports no errors or warnings.
+
+**Deviations**: None
+
+**Files changed**:
+- `xcl-website: src/pages/github-registry.mdx`
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: src/pages/registries.mdx`
+
+**Discoveries**: None
+
+### 2026-10-10 — Final verification: example modules
+
+**What was done**: The full `go test ./...` run found the example modules (which require the root module through a local `replace`) missing `go.sum` entries for the new OpenPGP dependency, failing the e2e example tests. `go mod tidy` in each example module adds `github.com/ProtonMail/go-crypto`, `github.com/cloudflare/circl` and `golang.org/x/crypto` as indirect requirements; the whole suite then passes.
+
+**Deviations**: Example module `go.mod`/`go.sum` files changed, which the plan did not list.
+
+**Files changed**:
+- `xcl: example/configonly/go.mod`
+- `xcl: example/configonly/go.sum`
+- `xcl: example/plugin/go.mod`
+- `xcl: example/plugin/go.sum`
+- `xcl: example/plugin/plugins/docker/go.mod`
+- `xcl: example/plugin/plugins/docker/go.sum`
+- `xcl: example/prettylog/go.mod`
+- `xcl: example/prettylog/go.sum`
+
+**Discoveries**: Adding a dependency to the root `xcl` module requires `go mod tidy` in every example module under `example/`, since they `replace` the root module locally and the e2e tests build them.

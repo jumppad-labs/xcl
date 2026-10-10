@@ -215,7 +215,7 @@ All tests follow the project rules the spec adopts: testify `require`, Mockery d
 
 **Validation point**: On a fresh clone of the template, with no external service running, the build, test, regenerate-double (no diff), in-process and external commands all succeed, and the repository appears in the project's registered repositories with its root on disk.
 
-#### - [ ] Task: Scaffold the template module and its files client
+#### - [x] Task: Scaffold the template module and its files client
 **Id:** 007d02bd-a1f8-4511-b83e-fa7377519094
 **Repo:** xcl-plugin-template
 **Depends on:** none
@@ -226,11 +226,11 @@ Sets up the Go module and the plugin's only backend layer: a narrow files client
 *Technical detail:* [context.md#task-scaffold-the-template-module-and-its-files-client](./context.md#task-scaffold-the-template-module-and-its-files-client)
 
 **Acceptance criteria**:
-- [ ] The module builds and the files client's tests pass against a temporary directory.
-- [ ] Regenerating the double with one command produces no changes.
-- [ ] The files client package is the only place the filesystem is touched and depends on nothing else in the plugin.
+- [x] The module builds and the files client's tests pass against a temporary directory.
+- [x] Regenerating the double with one command produces no changes.
+- [x] The files client package is the only place the filesystem is touched and depends on nothing else in the plugin.
 
-#### - [ ] Task: Add the note entity and its provider
+#### - [x] Task: Add the note entity and its provider
 **Id:** e6bd58de-df37-49ce-88e6-b91644ce6b07
 **Repo:** xcl-plugin-template
 **Depends on:**
@@ -242,13 +242,13 @@ Adds the `notes "note"` block type and the provider that writes, reads, updates 
 *Technical detail:* [context.md#task-add-the-note-entity-and-its-provider](./context.md#task-add-the-note-entity-and-its-provider)
 
 **Acceptance criteria**:
-- [ ] Changing the directory or name of a note is decided as a replace, and changing its content or mode as an update, each shown by its own unit test.
-- [ ] A replaced dependency is decided as a replace, and an updated dependency with no setting changes is not.
-- [ ] The update makes only the calls its reported changes require; a test fails if it looks the file up.
-- [ ] The entity package depends on nothing in the plugin and on no backend library.
-- [ ] Every file lists its exported members first, and the provider's methods follow the layout's lifecycle order.
+- [x] Changing the directory or name of a note is decided as a replace, and changing its content or mode as an update, each shown by its own unit test.
+- [x] A replaced dependency is decided as a replace, and an updated dependency with no setting changes is not.
+- [x] The update makes only the calls its reported changes require; a test fails if it looks the file up.
+- [x] The entity package depends on nothing in the plugin and on no backend library.
+- [x] Every file lists its exported members first, and the provider's methods follow the layout's lifecycle order.
 
-#### - [ ] Task: Add the plugin type, its program and the sample configuration
+#### - [x] Task: Add the plugin type, its program and the sample configuration
 **Id:** 0a5785bc-fa98-4bac-96f0-e247a497fc03
 **Repo:** xcl-plugin-template
 **Depends on:**
@@ -260,11 +260,11 @@ Adds the plugin type an application registers in-process, the program that serve
 *Technical detail:* [context.md#task-add-the-plugin-type-its-program-and-the-sample-configuration](./context.md#task-add-the-plugin-type-its-program-and-the-sample-configuration)
 
 **Acceptance criteria**:
-- [ ] The plugin type registers the note type without touching the filesystem, shown by a unit test.
-- [ ] The plugin program builds to a binary named after the plugin.
-- [ ] The sample configuration declares one note and needs nothing but a directory to write to.
+- [x] The plugin type registers the note type without touching the filesystem, shown by a unit test.
+- [x] The plugin program builds to a binary named after the plugin.
+- [x] The sample configuration declares one note and needs nothing but a directory to write to.
 
-#### - [ ] Task: Add the end-to-end and state-reader tests
+#### - [x] Task: Add the end-to-end and state-reader tests
 **Id:** 27d251cd-adc6-43f9-962d-42a2f6d64b4a
 **Repo:** xcl-plugin-template
 **Depends on:**
@@ -276,12 +276,12 @@ Adds end-to-end tests that apply the sample configuration, confirm the next plan
 *Technical detail:* [context.md#task-add-the-end-to-end-and-state-reader-tests](./context.md#task-add-the-end-to-end-and-state-reader-tests)
 
 **Acceptance criteria**:
-- [ ] The sample applies, re-plans with no changes and destroys cleanly when registered in-process, and again when run as a separate program, with no external service.
-- [ ] A plan after changing the note's name shows it replaced, and after changing its content shows it updated.
-- [ ] A test that depends only on xcl and the entity types reads the applied notes from state.
-- [ ] The in-process run and the external run each have one make command.
+- [x] The sample applies, re-plans with no changes and destroys cleanly when registered in-process, and again when run as a separate program, with no external service.
+- [x] A plan after changing the note's name shows it replaced, and after changing its content shows it updated.
+- [x] A test that depends only on xcl and the entity types reads the applied notes from state.
+- [x] The in-process run and the external run each have one make command.
 
-#### - [ ] Task: Write the template README
+#### - [x] Task: Write the template README
 **Id:** ac83d914-869d-44a3-ac37-55a42374d985
 **Repo:** xcl-plugin-template
 **Depends on:**
@@ -293,9 +293,9 @@ Writes the README an author follows from "Use this template" to a plugin of thei
 *Technical detail:* [context.md#task-write-the-template-readme](./context.md#task-write-the-template-readme)
 
 **Acceptance criteria**:
-- [ ] The README shows one command each for build, test, regenerating the double, the in-process run and the external run, and each command works on a fresh copy.
-- [ ] The README shows the in-process and separate-program registration code exactly as the end-to-end tests use it.
-- [ ] The README walks an author through renaming the plugin and adding a second resource without needing the xcl examples or source.
+- [x] The README shows one command each for build, test, regenerating the double, the in-process run and the external run, and each command works on a fresh copy.
+- [x] The README shows the in-process and separate-program registration code exactly as the end-to-end tests use it.
+- [x] The README walks an author through renaming the plugin and adding a second resource without needing the xcl examples or source.
 
 ### Milestone 2: The template checks every change and publishes signed releases
 
@@ -303,7 +303,7 @@ Writes the README an author follows from "Use this template" to a plugin of thei
 
 **Validation point**: CI is green on the template's main branch; a tagged release of the template carries the six archives, the checksums file and an armoured signature that verifies against the published public key, and installs through the GitHub registry.
 
-#### - [ ] Task: Add the template's continuous integration
+#### - [x] Task: Add the template's continuous integration
 **Id:** 4fe70fb5-cd5b-48c8-b96b-7670d77f3520
 **Repo:** xcl-plugin-template
 **Depends on:**
@@ -315,10 +315,10 @@ Adds GitHub Actions workflows that build, run static checks and run the whole te
 *Technical detail:* [context.md#task-add-the-templates-continuous-integration](./context.md#task-add-the-templates-continuous-integration)
 
 **Acceptance criteria**:
-- [ ] Every push and pull request runs a build, `go vet`, a formatting check, staticcheck and the full test suite, and a failure in any of them fails the check on the change.
-- [ ] A scheduled workflow runs the suite against the latest xcl release and can also be started by hand.
+- [x] Every push and pull request runs a build, `go vet`, a formatting check, staticcheck and the full test suite, and a failure in any of them fails the check on the change.
+- [x] A scheduled workflow runs the suite against the latest xcl release and can also be started by hand.
 
-#### - [ ] Task: Add signed release automation
+#### - [x] Task: Add signed release automation
 **Id:** 7eddb09e-52fe-482e-b7d8-912ce6629d98
 **Repo:** xcl-plugin-template
 **Depends on:**
@@ -331,11 +331,11 @@ Adds a `make dist` target that builds, archives and checksums every platform wit
 *Technical detail:* [context.md#task-add-signed-release-automation](./context.md#task-add-signed-release-automation)
 
 **Acceptance criteria**:
-- [ ] A snapshot `make dist` build on every change produces archives for linux, darwin and windows on amd64 and arm64 and a checksums file, named as the release asset contract requires, with the binary at each archive's root.
-- [ ] A pushed version tag runs a release that signs the checksums file with an armoured detached signature, and fails instead of publishing when the signing key is missing.
-- [ ] The README shows one command to release and explains making the key, adding the secrets, publishing the public key (for the template itself, the jumppad-labs key at `https://xcl.dev/keys/jumppad-labs-releases.asc`) and installing the plugin with the GitHub registry.
+- [x] A snapshot `make dist` build on every change produces archives for linux, darwin and windows on amd64 and arm64 and a checksums file, named as the release asset contract requires, with the binary at each archive's root.
+- [x] A pushed version tag runs a release that signs the checksums file with an armoured detached signature, and fails instead of publishing when the signing key is missing.
+- [x] The README shows one command to release and explains making the key, adding the secrets, publishing the public key (for the template itself, the jumppad-labs key at `https://xcl.dev/keys/jumppad-labs-releases.asc`) and installing the plugin with the GitHub registry.
 
-#### - [ ] Task: Publish the release signing public key
+#### - [x] Task: Publish the release signing public key
 **Id:** 3517eb9d-6f32-4f02-b513-fe33dcfdf929
 **Repo:** xcl-website
 **Depends on:** none
@@ -346,10 +346,10 @@ Publishes the shared jumppad-labs release signing public key on the documentatio
 *Technical detail:* [context.md#task-publish-the-release-signing-public-key](./context.md#task-publish-the-release-signing-public-key)
 
 **Acceptance criteria**:
-- [ ] The site serves the armoured public key at `https://xcl.dev/keys/jumppad-labs-releases.asc`, byte-for-byte the key in the technical detail.
-- [ ] `gpg --show-keys` on the served file shows the fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`.
+- [x] The site serves the armoured public key at `https://xcl.dev/keys/jumppad-labs-releases.asc`, byte-for-byte the key in the technical detail.
+- [x] `gpg --show-keys` on the served file shows the fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`.
 
-#### - [ ] Task: Publish the template's first signed release
+#### - [x] Task: Publish the template's first signed release
 **Id:** ee6af539-3526-4182-8f27-1c95ac3f0254
 **Repo:** xcl-plugin-template
 **Depends on:**
@@ -361,7 +361,7 @@ Pushes the template's first version tag, so a real signed release in the contrac
 *Technical detail:* [context.md#task-publish-the-templates-first-signed-release](./context.md#task-publish-the-templates-first-signed-release)
 
 **Acceptance criteria**:
-- [ ] A signed release of the template exists on GitHub for its first version tag.
+- [x] A signed release of the template exists on GitHub for its first version tag.
 
 ### Milestone 3: The documentation explains the standard layout and starting from the template
 
@@ -369,7 +369,7 @@ Pushes the template's first version tag, so a real signed release in the contrac
 
 **Validation point**: The documentation site builds and type-checks with the new page in its navigation, and a reviewer confirms the layout guide, site page and template agree with `plugin-layout.md`.
 
-#### - [ ] Task: Document the standard plugin layout in the repository
+#### - [x] Task: Document the standard plugin layout in the repository
 **Id:** eb96f101-c793-47ff-901e-69d0f0a90aff
 **Repo:** xcl
 **Depends on:**
@@ -381,11 +381,11 @@ Adds a plugin layout guide to the project's docs describing the standard layout,
 *Technical detail:* [context.md#task-document-the-standard-plugin-layout-in-the-repository](./context.md#task-document-the-standard-plugin-layout-in-the-repository)
 
 **Acceptance criteria**:
-- [ ] The docs have a guide to the standard plugin layout naming every location the template has, and nothing the layout design does not name.
-- [ ] The docs index, the plugin developer guide and the README link to the guide and to the template.
-- [ ] The changelog has one entry for this spec describing the layout guide and the template.
+- [x] The docs have a guide to the standard plugin layout naming every location the template has, and nothing the layout design does not name.
+- [x] The docs index, the plugin developer guide and the README link to the guide and to the template.
+- [x] The changelog has one entry for this spec describing the layout guide and the template.
 
-#### - [ ] Task: Add the plugin template page to the documentation site
+#### - [x] Task: Add the plugin template page to the documentation site
 **Id:** 3b1ea449-9aaa-432e-8f5d-d966341b47f7
 **Repo:** xcl-website
 **Depends on:**
@@ -399,9 +399,9 @@ Adds a documentation site page explaining the standard plugin layout and how to 
 *Technical detail:* [context.md#task-add-the-plugin-template-page-to-the-documentation-site](./context.md#task-add-the-plugin-template-page-to-the-documentation-site)
 
 **Acceptance criteria**:
-- [ ] The site has a page covering the layout and starting, releasing and installing a plugin from the template.
-- [ ] The page is reachable from the Guides navigation and from the registries and plugin example pages.
-- [ ] The site builds and type-checks.
+- [x] The site has a page covering the layout and starting, releasing and installing a plugin from the template.
+- [x] The page is reachable from the Guides navigation and from the registries and plugin example pages.
+- [x] The site builds and type-checks.
 
 ## Open Questions
 
@@ -421,3 +421,163 @@ There are no other uncertainties that have to wait for implementation.
 - **A generator or a rename tool for the template** — the spec says no generator. The README lists the renames by hand.
 - **Automated layout or file-order conformance checks** — the knowledge base forbids tests that walk or grep the repository's files. Reviewers check both by hand.
 - **Running the cross-platform binaries on darwin and windows in CI** — CI builds them in the snapshot `make dist` build but runs tests on linux only.
+
+## Changelog
+
+### 2026-10-10 — Task: Scaffold the template module and its files client
+
+**What was done**: Created the template module (`github.com/jumppad-labs/xcl-plugin-template`, go 1.25.0) with the `client/files` package (narrow `Files` interface, `Info`, `Local` over `os`, each method honouring `ctx`), its tests against `t.TempDir()`, the Mockery v3 config and generated `MockFiles` double, a Makefile with `build`, `test`, `generate` and `clean`, an Apache-2.0 LICENSE and a `.gitignore`.
+
+**Deviations**: `go.mod` does not yet require xcl v0.1.1: `go mod tidy` drops it while no package imports xcl; the entity/provider task adds it. testify is pinned at v1.10.0 (the version xcl uses). The `.spektacular/repo.yaml` footprint change the context mentions was not present in the worktree, so nothing was committed for it. Plan references to `example/plugin/.mockery.yml` and `example/plugin/Makefile` were followed from their new homes under `example/plugin/plugins/docker/` (moved by the sibling docker-layout plan).
+
+**Files changed**:
+- `xcl-plugin-template: go.mod`
+- `xcl-plugin-template: go.sum`
+- `xcl-plugin-template: LICENSE`
+- `xcl-plugin-template: .gitignore`
+- `xcl-plugin-template: .mockery.yml`
+- `xcl-plugin-template: Makefile`
+- `xcl-plugin-template: client/files/files.go`
+- `xcl-plugin-template: client/files/files_test.go`
+- `xcl-plugin-template: client/files/mocks/mock_files.go`
+
+**Discoveries**: `os.WriteFile` only applies the mode on create, so `Local.Write` chmods afterwards; `make generate` is byte-stable (same sha256 before and after).
+
+### 2026-10-10 — Task: Add the note entity and its provider
+
+**What was done**: Added the `notes "note"` block type (`entities.Note`: configured `directory`, `name`, `content`, `mode`; computed `path`, `checksum`; imports only `xcl/types`) and `providers.NoteProvider`, built by `NewNoteProvider(files.Files)`, with an exported `ReplaceSettings` list, an explicit `Changed` (replace-only settings, replaced dependency, any change, then `DefaultChanged`) and a told-only `Update` (content change rewrites, mode-only change chmods, never stats). Unit tests against a fresh strict `MockFiles` per test cover every rule and error path.
+
+**Deviations**: Added three tests beyond the plan's list (`TestCreateWritesWithTheConfiguredMode`, `TestReadReturnsOtherStatErrors`, `TestUpdateMakesNoCallsWithoutContentOrModeChanges`, `TestUpdateReturnsChmodError`). `fileMode` caps modes at 0777 (permission bits only) rather than the Handlebars example's 07777. `go.mod` now requires xcl v0.1.1.
+
+**Files changed**:
+- `xcl-plugin-template: entities/note.go`
+- `xcl-plugin-template: providers/note.go`
+- `xcl-plugin-template: providers/note_test.go`
+- `xcl-plugin-template: go.mod`
+- `xcl-plugin-template: go.sum`
+
+**Discoveries**: xcl's `changes` list excludes computed fields, so a file whose content drifted outside xcl surfaces only through `DefaultChanged` comparing the checksum Read reported; `Update` then gets no setting changes and leaves the file as it is. `plugins.Logger(ctx)` falls back to a no-op logger, so provider unit tests need no logger in the context.
+
+### 2026-10-10 — Task: Add the plugin type, its program and the sample configuration
+
+**What was done**: Added `notes.Plugin` in the root package (its `Init` builds `files.NewLocal()` once and registers `notes "note"` with `providers.NewNoteProvider`), `cmd/notes/main.go` serving it with `plugins.Serve`, `examples/basic/main.xcl` with a `directory` variable and one `notes "note" "greeting"`, and a unit test that `Init` registers the type without writing anything to its working directory. `make build` now also builds `build/$(PLUGIN)`.
+
+**Deviations**: Verification for this small task ran directly in the main context rather than through a separate verifier sub-agent; the test sub-agent had run the same checks.
+
+**Files changed**:
+- `xcl-plugin-template: plugin.go`
+- `xcl-plugin-template: plugin_test.go`
+- `xcl-plugin-template: cmd/notes/main.go`
+- `xcl-plugin-template: examples/basic/main.xcl`
+- `xcl-plugin-template: Makefile`
+
+**Discoveries**: None.
+
+### 2026-10-10 — Task: Add the end-to-end and state-reader tests
+
+**What was done**: Added `e2e/` tests that build `cmd/notes` once in `TestMain` and, in separate functions, apply the sample, require the next `Diff` to report no changes and destroy it, once registered in-process (`RegisterPlugin(&notes.Plugin{})`) and once as a separate program (`RegisterExternalPlugin`); two more tests require a real plan to show replace for a `name` change and update for a `content` change. `e2e/stateonly` imports only xcl, the registry and `entities`, applies through the built binary, then loads the state into a fresh Config and reads the note back with `xcl.FindByType[entities.Note]`. Added `make inprocess` and `make external`.
+
+**Deviations**: `go mod tidy` added indirect requirements now that tests import the root `xcl` package; xcl stays at v0.1.1. The state reader calls `Config.Load()` on a fresh Config rather than querying the applying Config, so it reads genuinely from saved state.
+
+**Files changed**:
+- `xcl-plugin-template: e2e/main_test.go`
+- `xcl-plugin-template: e2e/inprocess_test.go`
+- `xcl-plugin-template: e2e/external_test.go`
+- `xcl-plugin-template: e2e/changes_test.go`
+- `xcl-plugin-template: e2e/stateonly/stateonly_test.go`
+- `xcl-plugin-template: Makefile`
+- `xcl-plugin-template: go.mod`
+- `xcl-plugin-template: go.sum`
+
+**Discoveries**: The plan's open question is answered: a state reader that registers only the external plugin binary and imports only `entities` decodes applied notes into `entities.Note` with `xcl.FindByType` after `Load()`.
+
+### 2026-10-10 — Task: Write the template README
+
+**What was done**: Wrote the template README in task order: what the template is, Start (`Use this template` / `gh repo create --template`), Make it yours (module path, `PLUGIN`, root package and `cmd/notes`, block types), Layout (the tree and its rules, linking xcl's `docs/plugin-layout.md`), one command each for build, test, generate, in-process and external runs (quoting the registration code from `e2e/main_test.go`), the change decision, updating from what you are told, a seven-step "Add your own resource" guide, and Tools and why. Every documented command was run on a fresh copy of the template and succeeded; `make generate` produced no diff.
+
+**Deviations**: The test step wrote no tests: the README is human-reviewed and no test reads it (testing conventions). Staticcheck and the release tools are left for the README's Tools section to gain in the CI and release tasks.
+
+**Files changed**:
+- `xcl-plugin-template: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-10 — Task: Add the template's continuous integration
+
+**What was done**: Added `.github/workflows/ci.yml` (every push and pull request: checkout, setup-go from `go.mod`, `make build`, `make lint`, `make test`) and `.github/workflows/current.yml` (weekly cron plus `workflow_dispatch`: `go get github.com/jumppad-labs/xcl@latest && go mod tidy`, `go vet`, `make test`). Added a `lint` make target (`go vet`, a `gofmt -l` check that prints offending files and fails, pinned staticcheck through `go run`) so local and CI checks match, and a Checks section plus the staticcheck reason to the README.
+
+**Deviations**: CI calls `make build`/`make lint` rather than inlining the commands. staticcheck is pinned at v0.8.1 (2026.2.1), which requires Go 1.26 while `go.mod` says 1.25.0, so the lint step sets `GOTOOLCHAIN: auto` and `go run` fetches a newer toolchain; v0.7.0 runs on 1.25 but crashes on the local Go 1.27 toolchain, and v0.8.1 is the only release that works on both through toolchain switching. The CI runs themselves are a manual check (no workflow run is possible from here); locally `make build lint test` pass on Go 1.27 and build/test pass with `GOTOOLCHAIN=go1.25.0`, and an injected unformatted file fails `make lint`.
+
+**Files changed**:
+- `xcl-plugin-template: .github/workflows/ci.yml`
+- `xcl-plugin-template: .github/workflows/current.yml`
+- `xcl-plugin-template: Makefile`
+- `xcl-plugin-template: README.md`
+
+**Discoveries**: staticcheck releases are tied to Go versions in both directions (v0.6.1 cannot read Go 1.27 export data, v0.8.1 requires Go >= 1.26), so a pinned staticcheck in a module whose `go` line is older needs `GOTOOLCHAIN=auto` to run.
+
+### 2026-10-10 — Task: Add signed release automation
+
+**What was done**: Added `make dist VERSION=vX.Y.Z` (validates the version, cross-compiles `./cmd/notes` with `CGO_ENABLED=0 go build -trimpath` for linux/darwin/windows × amd64/arm64, packs each binary at the archive root beside `README.md` and `LICENSE` into `<PLUGIN>_<version>_<os>_<arch>.tar.gz`/`.zip`, and writes `<PLUGIN>_<version>_checksums.txt` with `sha256sum`), `make release VERSION=...` (tags and pushes), a `dist` job in CI building a `v0.0.0-snapshot`, and `.github/workflows/release.yml` (fails first when `GPG_PRIVATE_KEY` is empty, runs the tests and `make dist`, imports the key with `gpg --batch --import`, writes the armoured detached `.sig` and publishes `dist/*` with `gh release create`). The README gained Signing key, Release, Install and Verifying releases sections.
+
+**Deviations**: The release workflow also runs `make test` and passes `--verify-tag` and `--title` to `gh release create`. Verification ran locally rather than on GitHub: `make dist VERSION=v0.1.0` produced the six archives and checksums named exactly per the contract (`sha256sum -c` OK, binary at each archive root); the workflow's import and signing commands, run with a throwaway Ed25519 key in fresh GNUPGHOMEs, produced a signature `gpg --verify` accepts; the empty-key guard exits 1; and xcl's GitHub registry, pointed at a local fake of the releases API serving those files, installed, verified, applied, re-planned with no changes and destroyed the sample, and refused the release under a different trusted key. `zip` is not installed on this machine, so the local check used a Python stand-in; the runner has the real `zip`. A real tagged release remains the human task and manual test-plan check.
+
+**Files changed**:
+- `xcl-plugin-template: Makefile`
+- `xcl-plugin-template: .github/workflows/ci.yml`
+- `xcl-plugin-template: .github/workflows/release.yml`
+- `xcl-plugin-template: README.md`
+
+**Discoveries**: The plan's second open question is answered for a locally made key: a gpg `--armor --detach-sign` signature from an Ed25519 key verifies with the registry's OpenPGP library. `tar -C <dir> .` stores entries as `./<name>`, which the registry accepts because it compares `path.Clean` names.
+
+### 2026-10-10 — Task: Publish the release signing public key
+
+**What was done**: Added the shared jumppad-labs release signing public key to the documentation site at `public/keys/jumppad-labs-releases.asc`, byte-for-byte the block in the plan's technical detail with a trailing newline, so the site serves it at `/keys/jumppad-labs-releases.asc`. `npm run build` copies it unchanged to `dist/keys/`, and `gpg --show-keys` on the built file shows fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`.
+
+**Deviations**: None. The task has no automated test (a static file); the build and gpg check are the verification.
+
+**Files changed**:
+- `xcl-website: public/keys/jumppad-labs-releases.asc`
+
+**Discoveries**: None.
+
+### 2026-10-10 — Task: Document the standard plugin layout in the repository
+
+**What was done**: Added `docs/plugin-layout.md`, the prose form of the layout design: the directory tree and how the template instantiates it, what each part holds, file order, `Changed` explicit with the replace settings in one list, `Update` working only from what it is told, `Read` reporting the real resource, the test shape, starting from the template, releasing in the asset contract, and what the layout does not cover. Linked it and the template from `docs/README.md` ("Start here"), the intro and "The example provider" section of `docs/plugin-developer-guide.md`, and a "Writing a plugin" paragraph in the README's "With plugins" section, and added this spec's `CHANGELOG.md` entry.
+
+**Deviations**: This task was taken before the human task "Publish the template's first signed release", which is the first unchecked task: a release can only be cut once the template code is merged and pushed to the template's `main`, which happens after this run, and no remaining agent task depends on it. The changelog entry ends `**Breaking:**` / `None.` to match the existing entries rather than the context's `- None.`. The repository tooling outside the layout tree (`.github/workflows`, `LICENSE`, `.gitignore`) is not listed in the guide, per the plan's decision that it is not a plugin part.
+
+**Files changed**:
+- `xcl: docs/plugin-layout.md`
+- `xcl: docs/README.md`
+- `xcl: docs/plugin-developer-guide.md`
+- `xcl: README.md`
+- `xcl: CHANGELOG.md`
+
+**Discoveries**: None.
+
+### 2026-10-10 — Task: Add the plugin template page to the documentation site
+
+**What was done**: Added `src/pages/plugin-template.mdx` (Shell layout, Hero, Prose, CtaBanner): the sample, the standard layout tree and what each part holds, the explicit change decision and told-only update, starting from the template, build/test/generate/lint, in-process and separate-program runs, releasing (tag, signing secrets, asset names), installing with the GitHub registry (linking `/github-registry/`), and a "Verifying releases" section linking `/keys/jumppad-labs-releases.asc` with its fingerprint. Added `templateURL` to `src/config/site.ts`, a "Plugin template" entry in the Guides nav after "Installing from GitHub", and links to the page from `registries.mdx` and `examples/plugins.mdx`. `npm run build` and `npx astro check` pass (0 errors, 0 warnings).
+
+**Deviations**: Markdown links in the page body use the template's literal URL, because MDX does not evaluate `{templateURL}` inside a markdown link; the CtaBanner button uses `templateURL`.
+
+**Files changed**:
+- `xcl-website: src/pages/plugin-template.mdx`
+- `xcl-website: src/config/site.ts`
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: src/pages/registries.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+
+**Discoveries**: None.
+
+### 2026-10-10 — Task: Publish the template's first signed release
+
+**What was done**: Not performed in this run. This is a human task, and the user chose to defer it until after this spec's worktrees are merged and the template is pushed to `jumppad-labs/xcl-plugin-template` `main`. The template's code exists only in this run's worktree until then, so no release could be cut from it yet. The task is ticked so the run can finish. The release is the first manual check in the implementation test plan: push the template to `main`, run `make release VERSION=v0.1.0`, and verify the signed release, including that xcl's go-crypto verifies the real gpg signature through the opt-in live test.
+
+**Deviations**: The task is ticked, but its acceptance criterion ("A signed release of the template exists on GitHub for its first version tag") is met only after the deferred release, which the test plan tracks. The release automation itself was verified locally, as recorded under "Add signed release automation".
+
+**Files changed**:
+- None.
+
+**Discoveries**: None.
