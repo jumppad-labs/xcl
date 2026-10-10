@@ -126,6 +126,13 @@ gh := registry.NewGitHub()
 gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v1.2.0")
 ```
 
+**Writing a plugin.** Start from the
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template), a
+GitHub template repository with one working resource that runs both
+in-process and as a separate program, tests against strict doubles and
+publishes signed releases the GitHub registry installs. It follows the
+standard [plugin layout](docs/plugin-layout.md) every xcl plugin uses.
+
 **Registration problems.** Registration returns no errors. Problems are
 reported in one of three places:
 

@@ -9,6 +9,9 @@ The reference implementation is the example provider in
 with its resource type in
 [`resource.go`](../plugins/example/pkg/person/resource.go) next to it. For how
 providers are hosted and registered, see [Plugin Architecture](plugins.md).
+For where a plugin's entity types, providers and clients live, see
+[Plugin Layout](plugin-layout.md); to start a plugin of your own, use the
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template).
 
 ## The contract
 
@@ -871,6 +874,11 @@ resource. See
 [Parser & Resource Lifecycle](parser-lifecycle.md#events-parseroptionsemit).
 
 ## The example provider
+
+For a whole plugin laid out as [Plugin Layout](plugin-layout.md) describes,
+with an explicit `Changed`, an `Update` that acts only on the changes it is
+given and strict-double unit tests, see the
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template).
 
 [`plugins/example/pkg/person/provider.go`](../plugins/example/pkg/person/provider.go)
 follows everything in this guide:
