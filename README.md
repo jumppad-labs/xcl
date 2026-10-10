@@ -241,7 +241,7 @@ memory only, which is all a program that only reads its configuration needs.
 ### Plugins
 
 [`example/plugin`](./example/plugin) applies its configuration
-([`plugin/config`](./example/plugin/config)) through two plugins that do real
+([`plugin/config/full`](./example/plugin/config/full)) through two plugins that do real
 work, each laid out the way a plugin author would lay out their own project:
 
 - The Docker plugin
@@ -335,20 +335,20 @@ print only their output, so they give xcl no receiver.
 
 Run any of them from its directory with `make run`. For `plugin` this builds
 `xcl-docker` and the Docker plugin side by side into `build/`, then runs
-`apply ./config`, `status` and `destroy` in turn, and it has the extra Makefile
+`apply ./config/full`, `status` and `destroy` in turn, and it has the extra Makefile
 targets `build`, `replace`, `swap`, `rebuild-init`, `remove-network`,
 `generate` and `clean`; every example has `run` and `test`. The plugin tests
 build both binaries themselves.
 
-`./config` is the plugin example's whole configuration and applies on its
-own. Next to it, [`plugin/config-subnet`](./example/plugin/config-subnet) is
+`./config/full` is the plugin example's whole configuration and applies on its
+own. Next to it, [`plugin/config/alt-subnet`](./example/plugin/config/alt-subnet) is
 the same configuration with the network's address range widened from
 `10.42.0.0/24` to `10.42.0.0/23`. Docker cannot move a network to a new range
 in place, so the network's provider answers replace when its `subnet`
 changes. The container is not replaced with it: it is told the network is
 replaced and answers update, and its `Update` reattaches the running
 container to the new network, keeping its ID. `make replace` applies
-`./config`, then plans and applies `./config-subnet`, prints the state and
+`./config/full`, then plans and applies `./config/alt-subnet`, prints the state and
 destroys everything. The plan shows the replacement as `-/+` and the
 container's update with the dependency behind it:
 
@@ -373,33 +373,33 @@ The container's configuration is unchanged; it is updated only because its
 network is replaced. The template reads the container's address, which is
 only known once the container is on the new network, so it is updated; the
 `init` template, which reads only the network's name, is unchanged. Applying
-`./config-subnet` destroys the old network, which detaches the container,
+`./config/alt-subnet` destroys the old network, which detaches the container,
 creates the network on `10.42.0.0/23`, connects the same container to it and
 updates the template with the container's new address.
 
-Three more variants each have a Makefile target that applies `./config`,
+Three more variants each have a Makefile target that applies `./config/full`,
 then plans and applies the variant, prints the state and destroys
 everything:
 
-- `make swap` applies [`plugin/config-swap`](./example/plugin/config-swap),
+- `make swap` applies [`plugin/testdata/swap`](./example/plugin/testdata/swap),
   which adds a `backend` network and moves the container to it. The container
   is updated in place, disconnected from `app` and connected to `backend`
   with the same ID: `Diff: 1 to create, 2 to update, 0 to replace, 0 to
   delete, 2 unchanged.`
-- `make rebuild-init` applies [`plugin/config-init`](./example/plugin/config-init),
+- `make rebuild-init` applies [`plugin/config/modified-init`](./example/plugin/config/modified-init),
   which moves the init script's destination. The template cannot move its
   file in place, so it is replaced, and the container that mounts the script
   is replaced because it is: `Diff: 0 to create, 1 to update, 2 to replace,
   0 to delete, 1 unchanged.` Editing only the script's content, as
-  [`plugin/config-init-content`](./example/plugin/config-init-content) does,
+  [`plugin/testdata/init-content`](./example/plugin/testdata/init-content) does,
   renders the file again and leaves the container alone.
 - `make remove-network` applies
-  [`plugin/config-remove`](./example/plugin/config-remove), which removes the
+  [`plugin/config/no-network`](./example/plugin/config/no-network), which removes the
   network and every reference to it. The network is deleted, detaching the
   container, which is updated in place and keeps running with no network:
   `Diff: 0 to create, 3 to update, 0 to replace, 1 to delete, 0 unchanged.`
   Removing only the network block and leaving references to it, as
-  [`plugin/config-dangling`](./example/plugin/config-dangling) does, is
+  [`plugin/testdata/dangling`](./example/plugin/testdata/dangling) does, is
   rejected by validation before anything changes.
 
 Each example is a Go module of its own, pointed at this checkout with a

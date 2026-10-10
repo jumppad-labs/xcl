@@ -99,7 +99,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 }
 
 func destroyCommand(stderr io.Writer, stateDir string) error {
-	panic("unimplemented")
+	c, err := newConfig(eventHandler(stderr), stateDir)
+	if err != nil {
+		return err
+	}
+
+	return c.Destroy()
 }
 
 func applyCommand(stderr io.Writer, config, stateDir string) error {

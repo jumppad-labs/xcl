@@ -56,55 +56,55 @@ func planAgain(t *testing.T, stateDir, configDir string) string {
 }
 
 // applyNetworkSwap applies the example's main configuration, then
-// config-swap, which adds the backend network and moves the web container to
+// testdata/swap, which adds the backend network and moves the web container to
 // it, to the same state, and returns the Config of each apply
 func applyNetworkSwap(t *testing.T, stateDir string) (*xcl.Config, *xcl.Config) {
 	t.Helper()
 
 	first := applyExampleWithState(t, stateDir)
-	changed := applyExampleDir(t, "./config-swap", stateDir)
+	changed := applyExampleDir(t, "./testdata/swap", stateDir)
 
 	return first, changed
 }
 
 // applyInitScriptMove applies the example's main configuration, then
-// config-init, which renders the init script to a new destination, to the
+// config/modified-init, which renders the init script to a new destination, to the
 // same state, and returns the Config of each apply
 func applyInitScriptMove(t *testing.T, stateDir string) (*xcl.Config, *xcl.Config) {
 	t.Helper()
 
 	first := applyExampleWithState(t, stateDir)
-	changed := applyExampleDir(t, "./config-init", stateDir)
+	changed := applyExampleDir(t, "./config/modified-init", stateDir)
 
 	return first, changed
 }
 
 // applyInitScriptEdit applies the example's main configuration, then
-// config-init-content, which edits only the init script's source, to the
+// testdata/init-content, which edits only the init script's source, to the
 // same state, and returns the Config of each apply
 func applyInitScriptEdit(t *testing.T, stateDir string) (*xcl.Config, *xcl.Config) {
 	t.Helper()
 
 	first := applyExampleWithState(t, stateDir)
-	changed := applyExampleDir(t, "./config-init-content", stateDir)
+	changed := applyExampleDir(t, "./testdata/init-content", stateDir)
 
 	return first, changed
 }
 
 // applyNetworkRemoval applies the example's main configuration, then
-// config-remove, which removes the app network and every reference to it, to
+// config/no-network, which removes the app network and every reference to it, to
 // the same state, and returns the Config of each apply
 func applyNetworkRemoval(t *testing.T, stateDir string) (*xcl.Config, *xcl.Config) {
 	t.Helper()
 
 	first := applyExampleWithState(t, stateDir)
-	changed := applyExampleDir(t, "./config-remove", stateDir)
+	changed := applyExampleDir(t, "./config/no-network", stateDir)
 
 	return first, changed
 }
 
 // applyDanglingReference applies the example's main configuration, then
-// tries config-dangling, which removes the app network while the container
+// tries testdata/dangling, which removes the app network while the container
 // and templates still refer to it, to the same state. It returns the Config
 // of the first apply and the error of the second.
 func applyDanglingReference(t *testing.T, stateDir string) (*xcl.Config, error) {
@@ -122,13 +122,13 @@ func applyDanglingReference(t *testing.T, stateDir string) (*xcl.Config, error) 
 		}
 	})
 
-	return first, apply(c, "./config-dangling")
+	return first, apply(c, "./testdata/dangling")
 }
 
-// Network swap: ./config then ./config-swap
+// Network swap: ./config then ./testdata/swap
 
 func TestPlanOfNetworkSwapUpdatesTheContainerInPlace(t *testing.T) {
-	printed := planAfterMainConfig(t, "./config-swap")
+	printed := planAfterMainConfig(t, "./testdata/swap")
 
 	// out is not a terminal, so the diff is plain
 	require.Contains(t, printed, "# docker.container.web will be updated\n")
@@ -139,7 +139,7 @@ func TestPlanOfNetworkSwapUpdatesTheContainerInPlace(t *testing.T) {
 }
 
 func TestPlanOfNetworkSwapCreatesTheBackendNetwork(t *testing.T) {
-	printed := planAfterMainConfig(t, "./config-swap")
+	printed := planAfterMainConfig(t, "./testdata/swap")
 
 	require.Contains(t, printed, "# docker.network.backend will be created")
 	require.Contains(t, printed, `+ docker "network" "backend" {`)
@@ -147,7 +147,7 @@ func TestPlanOfNetworkSwapCreatesTheBackendNetwork(t *testing.T) {
 }
 
 func TestPlanOfNetworkSwapCountsOneCreateTwoUpdatesAndNoReplace(t *testing.T) {
-	printed := planAfterMainConfig(t, "./config-swap")
+	printed := planAfterMainConfig(t, "./testdata/swap")
 
 	// backend is created; the container and the welcome template, which
 	// reads the container's address, are updated
@@ -232,15 +232,15 @@ func TestPlanAfterNetworkSwapReportsNoChanges(t *testing.T) {
 	stateDir := t.TempDir()
 	applyNetworkSwap(t, stateDir)
 
-	printed := planAgain(t, stateDir, "./config-swap")
+	printed := planAgain(t, stateDir, "./testdata/swap")
 
 	require.Equal(t, "Diff: no changes, 5 unchanged.\n", printed)
 }
 
-// Init-script rebuild: ./config then ./config-init
+// Init-script rebuild: ./config then ./config/modified-init
 
 func TestPlanOfInitScriptMoveReplacesTheContainerBecauseTheTemplateIsReplaced(t *testing.T) {
-	printed := planAfterMainConfig(t, "./config-init")
+	printed := planAfterMainConfig(t, "./config/modified-init")
 
 	// out is not a terminal, so the diff is plain
 	require.Contains(t, printed, "# docker.container.web will be replaced because template.init is replaced")
@@ -250,7 +250,7 @@ func TestPlanOfInitScriptMoveReplacesTheContainerBecauseTheTemplateIsReplaced(t 
 }
 
 func TestPlanOfInitScriptMoveCountsTwoReplacesAndOneUpdate(t *testing.T) {
-	printed := planAfterMainConfig(t, "./config-init")
+	printed := planAfterMainConfig(t, "./config/modified-init")
 
 	// the init template and the container are replaced; the welcome
 	// template, which reads the new container's address, is updated
@@ -308,15 +308,15 @@ func TestPlanAfterInitScriptMoveReportsNoChanges(t *testing.T) {
 	stateDir := t.TempDir()
 	applyInitScriptMove(t, stateDir)
 
-	printed := planAgain(t, stateDir, "./config-init")
+	printed := planAgain(t, stateDir, "./config/modified-init")
 
 	require.Equal(t, "Diff: no changes, 4 unchanged.\n", printed)
 }
 
-// Init-script content edit: ./config then ./config-init-content
+// Init-script content edit: ./config then ./testdata/init-content
 
 func TestPlanOfInitScriptEditUpdatesOnlyTheTemplate(t *testing.T) {
-	printed := planAfterMainConfig(t, "./config-init-content")
+	printed := planAfterMainConfig(t, "./testdata/init-content")
 
 	// out is not a terminal, so the diff is plain
 	require.Contains(t, printed, "# template.init will be updated")
@@ -326,7 +326,7 @@ func TestPlanOfInitScriptEditUpdatesOnlyTheTemplate(t *testing.T) {
 }
 
 func TestPlanOfInitScriptEditCountsOneUpdateAndNoReplace(t *testing.T) {
-	printed := planAfterMainConfig(t, "./config-init-content")
+	printed := planAfterMainConfig(t, "./testdata/init-content")
 
 	require.Contains(t, printed, "Diff: 0 to create, 1 to update, 0 to replace, 0 to delete, 3 unchanged.")
 }
@@ -366,15 +366,15 @@ func TestPlanAfterInitScriptEditReportsNoChanges(t *testing.T) {
 	stateDir := t.TempDir()
 	applyInitScriptEdit(t, stateDir)
 
-	printed := planAgain(t, stateDir, "./config-init-content")
+	printed := planAgain(t, stateDir, "./testdata/init-content")
 
 	require.Equal(t, "Diff: no changes, 4 unchanged.\n", printed)
 }
 
-// Network removal: ./config then ./config-remove
+// Network removal: ./config then ./config/no-network
 
 func TestPlanOfNetworkRemovalDeletesTheNetworkAndUpdatesTheContainer(t *testing.T) {
-	printed := planAfterMainConfig(t, "./config-remove")
+	printed := planAfterMainConfig(t, "./config/no-network")
 
 	// out is not a terminal, so the diff is plain
 	require.Contains(t, printed, "# docker.network.app will be deleted")
@@ -387,7 +387,7 @@ func TestPlanOfNetworkRemovalDeletesTheNetworkAndUpdatesTheContainer(t *testing.
 }
 
 func TestPlanOfNetworkRemovalCountsThreeUpdatesOneDeleteAndNoReplace(t *testing.T) {
-	printed := planAfterMainConfig(t, "./config-remove")
+	printed := planAfterMainConfig(t, "./config/no-network")
 
 	// the container and both templates, which no longer name the network,
 	// are updated; the network is deleted
@@ -458,12 +458,12 @@ func TestPlanAfterNetworkRemovalReportsNoChanges(t *testing.T) {
 	stateDir := t.TempDir()
 	applyNetworkRemoval(t, stateDir)
 
-	printed := planAgain(t, stateDir, "./config-remove")
+	printed := planAgain(t, stateDir, "./config/no-network")
 
 	require.Equal(t, "Diff: no changes, 3 unchanged.\n", printed)
 }
 
-// Dangling reference: ./config then ./config-dangling
+// Dangling reference: ./config then ./testdata/dangling
 
 func TestDanglingReferenceFailsValidation(t *testing.T) {
 	_, err := applyDanglingReference(t, t.TempDir())
@@ -508,7 +508,7 @@ func TestDanglingReferenceLeavesTheSavedStateUnchanged(t *testing.T) {
 	applyDanglingReference(t, stateDir)
 
 	// the main configuration still matches the saved state exactly
-	printed := planAgain(t, stateDir, "./config")
+	printed := planAgain(t, stateDir, "./config/full")
 
 	require.Equal(t, "Diff: no changes, 4 unchanged.\n", printed)
 }

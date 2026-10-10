@@ -8,11 +8,11 @@
 BUILD_DIR := build
 XCL_DOCKER := $(BUILD_DIR)/xcl-docker
 DOCKER_PLUGIN := $(BUILD_DIR)/docker-plugin
-CONFIG_DIR := ./config
-SUBNET_DIR := ./config-subnet
-SWAP_DIR := ./config-swap
-INIT_DIR := ./config-init
-REMOVE_DIR := ./config-remove
+CONFIG_DIR := ./config/full
+SUBNET_DIR := ./config/alt-subnet
+SWAP_DIR := ./testdata/swap
+INIT_DIR := ./config/modified-init
+REMOVE_DIR := ./config/no-network
 
 .PHONY: build run replace swap rebuild-init remove-network test generate clean
 
@@ -30,7 +30,7 @@ run: build
 	$(XCL_DOCKER) destroy
 
 # Build, apply the example configuration, then show and apply the address
-# range change in config-subnet, which replaces the network and updates the
+# range change in config/alt-subnet, which replaces the network and updates the
 # container attached to it in place, reattaching it to the new network, and
 # updates the template, then destroy everything again
 replace: build
@@ -40,7 +40,7 @@ replace: build
 	$(XCL_DOCKER) status
 	$(XCL_DOCKER) destroy
 
-# Build, apply the example configuration, then show and apply config-swap,
+# Build, apply the example configuration, then show and apply testdata/swap,
 # which adds a backend network and moves the running container to it in
 # place, then destroy everything again
 swap: build
@@ -50,7 +50,7 @@ swap: build
 	$(XCL_DOCKER) status
 	$(XCL_DOCKER) destroy
 
-# Build, apply the example configuration, then show and apply config-init,
+# Build, apply the example configuration, then show and apply config/modified-init,
 # which moves the init script so its template is replaced, and the container
 # that mounts it with it, then destroy everything again
 rebuild-init: build
@@ -60,7 +60,7 @@ rebuild-init: build
 	$(XCL_DOCKER) status
 	$(XCL_DOCKER) destroy
 
-# Build, apply the example configuration, then show and apply config-remove,
+# Build, apply the example configuration, then show and apply config/no-network,
 # which removes the network and every reference to it, leaving the container
 # running with no network, then destroy everything again
 remove-network: build

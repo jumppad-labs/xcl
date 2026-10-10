@@ -79,7 +79,7 @@ func applyExampleWithState(t *testing.T, stateDir string) *xcl.Config {
 
 	t.Setenv("HCL_VAR_output_dir", t.TempDir())
 
-	return applyExampleDir(t, "./config", stateDir)
+	return applyExampleDir(t, "./config/full", stateDir)
 }
 
 // applyExampleDir applies the configuration in configDir in a new Config
@@ -109,13 +109,13 @@ func applyExampleDir(t *testing.T, configDir, stateDir string) *xcl.Config {
 }
 
 // applySubnetChange applies the example's main configuration, then the
-// address range change in config-subnet to the same state, and returns the
+// address range change in config/alt-subnet to the same state, and returns the
 // Config of each apply
 func applySubnetChange(t *testing.T, stateDir string) (*xcl.Config, *xcl.Config) {
 	t.Helper()
 
 	first := applyExampleWithState(t, stateDir)
-	changed := applyExampleDir(t, "./config-subnet", stateDir)
+	changed := applyExampleDir(t, "./config/alt-subnet", stateDir)
 
 	return first, changed
 }
@@ -248,7 +248,7 @@ func TestApplyFailsForAMissingDockerPlugin(t *testing.T) {
 	c, err := newConfig(nil, missing, t.TempDir())
 	require.NoError(t, err)
 
-	err = apply(c, "./config")
+	err = apply(c, "./config/full")
 	require.Error(t, err)
 	require.ErrorIs(t, err, xcl.ErrPluginLoad)
 	require.Contains(t, err.Error(), "from registry local failed to load")
@@ -518,7 +518,7 @@ func TestPlanAfterSubnetChangeReportsNoChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	out := &bytes.Buffer{}
-	err = plan(out, c, "./config-subnet")
+	err = plan(out, c, "./config/alt-subnet")
 	require.NoError(t, err)
 
 	require.Equal(t, "Diff: no changes, 4 unchanged.\n", out.String())
