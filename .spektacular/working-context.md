@@ -23,3 +23,11 @@ Part of epic 20261009092551-82db0140-plugin-template ("Plugin standard and distr
 - How the registry knows which GPG public key(s) to trust (per plugin, per owner, or configured on the registry).
 - Interview answers: key choice is up to the user (app supplies trusted keys); unsigned releases allowed when no key is configured; platforms linux/darwin/windows x amd64/arm64.
 - Registry spec finished. Epic order: docker-example, registry, template (template depends on registry). Design plugin-release-assets.md is a draft pending user review. Decisions made for review: a release without checksums is refused; cached plugins are re-verified before each start; default cache under xcl home, per repo/version; GoReleaser naming; signature over the checksums file.
+
+# Orchestrator: plan epic 20261009092551-82db0140-plugin-template (2026-10-09)
+- Project root: /home/nicj/code/github.com/jumppad-labs/xcl
+- Started children: 20261009102138-48e95432-docker-example-standard-layout, 20261009102148-7d0b205b-github-releases-registry
+- All 3 plans DONE. Changelog disagreement settled (docker plan now adds entry). Summary written; epic order added registry -> docker-example. Next: end-of-planning review.
+- Review done: registry plan wraps registry.Local; template repo created+pushed by user, registration repaired (repo.yaml source file ..), user marked repo as template; that task removed from plan. Repo xclconfig renamed to xcl by user; all plans + summary updated (ordering log section still says xclconfig, written only by epic order).
+- Possible cross-plan disagreement: changelog (registry plan has a CHANGELOG task; docker plan leaves it to implement workflow).
+- Q (plugin-template): register xcl-plugin-template repo during planning? A: yes, option A (name xcl-plugin-template, location /home/nicj/code/github.com/jumppad-labs/xcl-plugin-template).
