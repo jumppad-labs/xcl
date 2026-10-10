@@ -1,4 +1,4 @@
-package resources
+package providers
 
 // The tests in this file run the providers against a real Docker engine. Each
 // one skips when no engine is reachable, so the suite still passes on a
@@ -16,7 +16,9 @@ import (
 	dockerclient "github.com/docker/docker/client"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client/containers"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client/docker"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/entities"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -27,16 +29,16 @@ const testImage = "nginx:1.27-alpine"
 func requireDocker(t *testing.T) {
 	t.Helper()
 
-	if err := client.Ping(context.Background()); err != nil {
+	if err := docker.Ping(context.Background()); err != nil {
 		t.Skip(err.Error()) // Ping already says no Docker engine is reachable
 	}
 }
 
 // newDockerClient returns a real Docker client, closed when the test ends
-func newDockerClient(t *testing.T) client.Docker {
+func newDockerClient(t *testing.T) docker.Docker {
 	t.Helper()
 
-	c, err := client.New()
+	c, err := docker.New()
 	require.NoError(t, err)
 
 	if closer, ok := c.(interface{ Close() error }); ok {
@@ -59,7 +61,7 @@ func uniqueName(t *testing.T) string {
 
 // removeNetworkOnCleanup removes the network called name when the test ends,
 // a network that is already gone is ignored
-func removeNetworkOnCleanup(t *testing.T, c client.Docker, name string) {
+func removeNetworkOnCleanup(t *testing.T, c docker.Docker, name string) {
 	t.Helper()
 
 	t.Cleanup(func() {
@@ -72,7 +74,7 @@ func removeNetworkOnCleanup(t *testing.T, c client.Docker, name string) {
 
 // removeContainerOnCleanup removes the container called name when the test
 // ends, a container that is already gone is ignored
-func removeContainerOnCleanup(t *testing.T, c client.Docker, name string) {
+func removeContainerOnCleanup(t *testing.T, c docker.Docker, name string) {
 	t.Helper()
 
 	t.Cleanup(func() {
@@ -83,8 +85,8 @@ func removeContainerOnCleanup(t *testing.T, c client.Docker, name string) {
 	})
 }
 
-func integrationNetwork(name string) *Network {
-	return &Network{
+func integrationNetwork(name string) *entities.Network {
+	return &entities.Network{
 		ResourceBase: types.ResourceBase{
 			Meta: types.Meta{
 				ID:   "docker.network." + name,
@@ -95,8 +97,8 @@ func integrationNetwork(name string) *Network {
 	}
 }
 
-func integrationContainer(name string, networkName string) *Container {
-	return &Container{
+func integrationContainer(name string, networkName string) *entities.Container {
+	return &entities.Container{
 		ResourceBase: types.ResourceBase{
 			Meta: types.Meta{
 				ID:   "docker.container." + name,
@@ -105,7 +107,7 @@ func integrationContainer(name string, networkName string) *Container {
 			},
 		},
 		Image: testImage,
-		Networks: []NetworkAttachment{
+		Networks: []entities.NetworkAttachment{
 			{Name: networkName},
 		},
 	}
@@ -118,7 +120,7 @@ func TestNetworkCreateMakesANetworkVisibleInDocker(t *testing.T) {
 	name := uniqueName(t)
 	removeNetworkOnCleanup(t, c, name)
 
-	provider := &networkProvider{client: c}
+	provider := &networkProvider{tasks: containers.New(c)}
 
 	created, err := provider.Create(context.Background(), integrationNetwork(name))
 	require.NoError(t, err)
@@ -138,7 +140,7 @@ func TestNetworkDestroyRemovesItFromDocker(t *testing.T) {
 	name := uniqueName(t)
 	removeNetworkOnCleanup(t, c, name)
 
-	provider := &networkProvider{client: c}
+	provider := &networkProvider{tasks: containers.New(c)}
 
 	created, err := provider.Create(context.Background(), integrationNetwork(name))
 	require.NoError(t, err)
@@ -163,11 +165,13 @@ func TestContainerCreateRunsAContainerAttachedToTheNetwork(t *testing.T) {
 	removeNetworkOnCleanup(t, c, networkName)
 	removeContainerOnCleanup(t, c, containerName)
 
-	networks := &networkProvider{client: c}
+	tasks := containers.New(c)
+
+	networks := &networkProvider{tasks: tasks}
 	_, err := networks.Create(context.Background(), integrationNetwork(networkName))
 	require.NoError(t, err)
 
-	containers := &containerProvider{client: c}
+	containers := &containerProvider{tasks: tasks}
 	created, err := containers.Create(context.Background(), integrationContainer(containerName, networkName))
 	require.NoError(t, err)
 	require.NotEmpty(t, created.DockerID)
@@ -191,11 +195,13 @@ func TestContainerDestroyRemovesItFromDocker(t *testing.T) {
 	removeNetworkOnCleanup(t, c, networkName)
 	removeContainerOnCleanup(t, c, containerName)
 
-	networks := &networkProvider{client: c}
+	tasks := containers.New(c)
+
+	networks := &networkProvider{tasks: tasks}
 	_, err := networks.Create(context.Background(), integrationNetwork(networkName))
 	require.NoError(t, err)
 
-	containers := &containerProvider{client: c}
+	containers := &containerProvider{tasks: tasks}
 	created, err := containers.Create(context.Background(), integrationContainer(containerName, networkName))
 	require.NoError(t, err)
 
@@ -219,11 +225,13 @@ func TestNetworkDestroyDetachesAttachedContainersAndRemovesTheNetwork(t *testing
 	removeNetworkOnCleanup(t, c, networkName)
 	removeContainerOnCleanup(t, c, containerName)
 
-	networks := &networkProvider{client: c}
+	tasks := containers.New(c)
+
+	networks := &networkProvider{tasks: tasks}
 	createdNetwork, err := networks.Create(context.Background(), integrationNetwork(networkName))
 	require.NoError(t, err)
 
-	containers := &containerProvider{client: c}
+	containers := &containerProvider{tasks: tasks}
 	_, err = containers.Create(context.Background(), integrationContainer(containerName, networkName))
 	require.NoError(t, err)
 

@@ -1,7 +1,8 @@
 # Builds and runs xcl-docker, the plugin example. The in-process template
 # plugin (plugins/template/) is compiled into xcl-docker. The external Docker
-# plugin (plugins/docker/) is a standalone program, compiled to its own binary
-# next to xcl-docker, which starts it as a separate process. Applying needs a
+# plugin (plugins/docker/) is a module of its own with its own Makefile; its
+# entry point, plugins/docker/cmd/docker, is compiled to its own binary next
+# to xcl-docker, which starts it as a separate process. Applying needs a
 # Docker engine.
 
 BUILD_DIR := build
@@ -13,17 +14,13 @@ SWAP_DIR := ./config-swap
 INIT_DIR := ./config-init
 REMOVE_DIR := ./config-remove
 
-# MOCKERY is the pinned Mockery release that generates the Docker client mock,
-# run through go run so it needs no install
-MOCKERY := go run github.com/vektra/mockery/v3@v3.8.0
-
 .PHONY: build run replace swap rebuild-init remove-network test generate clean
 
 # Build xcl-docker and the Docker plugin side by side, where xcl-docker
 # finds the plugin
 build:
 	go build -o $(XCL_DOCKER) .
-	go build -o $(DOCKER_PLUGIN) ./plugins/docker
+	go -C plugins/docker build -o ../../$(DOCKER_PLUGIN) ./cmd/docker
 
 # Build, then apply the example configuration, print the saved state and
 # destroy it again, each a separate run of xcl-docker
@@ -73,14 +70,16 @@ remove-network: build
 	$(XCL_DOCKER) status
 	$(XCL_DOCKER) destroy
 
-# Run the example tests, they build the binaries themselves. The tests
-# that need a Docker engine skip when none is reachable.
+# Run the example tests and the Docker plugin's tests, they build the
+# binaries themselves. The tests that need a Docker engine skip when none is
+# reachable.
 test:
 	go test -v ./...
+	$(MAKE) -C plugins/docker test
 
-# Regenerate the mock of the Docker client interface, plugins/docker/client/mocks
+# Regenerate the Docker plugin's client mocks, plugins/docker/client/*/mocks
 generate:
-	$(MOCKERY)
+	$(MAKE) -C plugins/docker generate
 
 # Remove the built binaries, the rendered template and the saved state
 clean:

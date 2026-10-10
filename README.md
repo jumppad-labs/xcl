@@ -230,15 +230,28 @@ work, each laid out the way a plugin author would lay out their own project:
 
 - The Docker plugin
   ([`plugin/plugins/docker`](./example/plugin/plugins/docker)) is an external
-  plugin, a standalone program with its own `main` that xcl starts as a
-  separate process and calls over gRPC. It provides `docker "network"` and
-  `docker "container"`, defined with their providers in
-  [`plugin/plugins/docker/resources`](./example/plugin/plugins/docker/resources),
-  and creates real Docker networks and containers. Its providers hold a narrow
-  `Docker` interface over the Docker SDK, kept in its own `client` package
-  ([`plugin/plugins/docker/client`](./example/plugin/plugins/docker/client)),
-  which the real SDK client satisfies and a Mockery mock stands in for in
-  their unit tests.
+  plugin and a Go module of its own, laid out in the standard plugin layout
+  (see its [README](./example/plugin/plugins/docker/README.md)). Its
+  importable `Plugin` type is in the module's root package, and
+  [`plugin/plugins/docker/cmd/docker`](./example/plugin/plugins/docker/cmd/docker)
+  serves it as a standalone program that xcl starts as a separate process and
+  calls over gRPC. It provides `docker "network"` and `docker "container"`,
+  whose block types are in
+  [`plugin/plugins/docker/entities`](./example/plugin/plugins/docker/entities)
+  and whose providers are in
+  [`plugin/plugins/docker/providers`](./example/plugin/plugins/docker/providers),
+  and creates real Docker networks and containers. The Docker libraries are
+  imported only under `client/`: a narrow `Docker` interface over the Docker
+  SDK in
+  [`plugin/plugins/docker/client/docker`](./example/plugin/plugins/docker/client/docker),
+  and the container task layer the providers use in
+  [`plugin/plugins/docker/client/containers`](./example/plugin/plugins/docker/client/containers),
+  each with a Mockery mock beside it in `mocks/` that the unit tests use. The
+  plugin also carries a sample configuration
+  ([`examples/basic`](./example/plugin/plugins/docker/examples/basic)) and
+  end-to-end tests ([`e2e`](./example/plugin/plugins/docker/e2e)). The
+  application reads what it applied through the entity types alone, so its
+  build includes neither the providers nor the Docker libraries.
 - The template plugin
   ([`plugin/plugins/template`](./example/plugin/plugins/template)) is an
   in-process plugin, compiled into the program. It provides `template`, a

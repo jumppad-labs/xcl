@@ -1,5 +1,17 @@
 # Changelog
 
+## 20261009102138-48e95432-docker-example-standard-layout
+
+The plugin example's Docker plugin is rebuilt to the standard xcl plugin layout, the same shape the plugin template follows. It is now a Go module of its own, `github.com/jumppad-labs/xcl/example/plugin/plugins/docker`, with its importable `Plugin` type in the module's root package and `cmd/docker` serving it as a separate program. Its block types are in `entities`, which imports nothing but xcl's `types`; its providers are in `providers`; and the Docker libraries are imported only under `client/`: `client/docker` is the narrow interface over the Docker SDK with `New` and `Ping`, and `client/containers` is a new container task layer, with its own types and a `containers.ErrNotFound` sentinel, that the providers are built from. Mockery doubles sit beside each client package and are regenerated with `make generate` in the plugin directory. The plugin has its own `Makefile`, `README.md`, a sample configuration in `examples/basic` and end-to-end tests in `e2e` that apply the sample, check that a plan reports no changes and destroy it.
+
+The example application now imports only the plugin's `entities` to read what it applied, and checks for a Docker engine before `apply`, `plan` and `destroy` with a small standard-library ping of `DOCKER_HOST`, keeping the "no Docker engine reachable" message, so its build no longer includes the Docker libraries. Every file in the plugin example lists its public surface first and its private helpers last, provider methods follow `Init, Create, Read, Changed, Update, Destroy, Functions`, and the network's `Changed` takes the explicit form, replacing on a change within `subnet` and updating on any other change. The example's behaviour is unchanged. CI and the root end-to-end runner build, vet and test the plugin module like the other examples.
+
+**Breaking:**
+
+- The Docker plugin example moved to its own module, `github.com/jumppad-labs/xcl/example/plugin/plugins/docker`, required by `example/plugin` through a local `replace`. Its plugin binary is built from that module at `./cmd/docker`; `go build ./plugins/docker` from `example/plugin` no longer works.
+- `example/plugin/plugins/docker/resources`, `example/plugin/plugins/docker/client` (with `client/mocks`) and `example/plugin/plugins/docker/main.go` are removed. The block types are now `entities.Network`, `entities.Container` and `entities.NetworkAttachment`, the providers and label constants are in `providers`, and the providers take a `containers.Tasks` rather than the Docker SDK interface.
+- `example/plugin/.mockery.yml` is removed; the plugin's doubles are generated from `example/plugin/plugins/docker/.mockery.yml`.
+
 ## 20261008194959-b128e508-update-property-changes
 
 Providers are now told what changed. `Changed` and `Update` are both given the settings that differ from the last apply, a `[]entity.PropertyChange`, alongside the dependency list. While deciding, xcl works the list out before `Read` and `Changed` with the plan's own comparison of the saved copy against the configured one, so a provider is told exactly the settings the plan shows, at the same paths, and drift found by `Read` lists none. When the apply reaches a resource decided update, the comparison is run again with real values, including values produced earlier in the same apply, and `Update` is given that list together with the dependency list recorded while deciding, the same one `Changed` was given. `plugins.DefaultChanged` ignores both lists.

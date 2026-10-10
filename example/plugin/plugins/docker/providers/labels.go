@@ -1,8 +1,9 @@
-// Package resources holds the Docker plugin's block types, docker "network"
-// and docker "container", and the providers that create them as real Docker
-// networks and containers. A program using the plugin imports it to read the
-// blocks it applied, i.e. xcl.FindByType[resources.Container].
-package resources
+// Package providers holds the Docker plugin's resource providers, which create
+// docker "network" and docker "container" blocks as real Docker networks and
+// containers. Each provider is built from the container task layer in
+// client/containers, so no provider imports a Docker library: the real task
+// layer when the plugin runs and a mock in the unit tests.
+package providers
 
 import "github.com/jumppad-labs/xcl/types"
 

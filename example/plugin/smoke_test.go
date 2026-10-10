@@ -23,7 +23,8 @@ func buildExample(t *testing.T) string {
 	output, err := build.CombinedOutput()
 	require.NoError(t, err, string(output))
 
-	buildPlugin := exec.Command("go", "build", "-o", filepath.Join(buildDir, dockerPluginName), "./plugins/docker")
+	buildPlugin := exec.Command("go", "build", "-o", filepath.Join(buildDir, dockerPluginName), "./cmd/docker")
+	buildPlugin.Dir = filepath.Join("plugins", "docker")
 	output, err = buildPlugin.CombinedOutput()
 	require.NoError(t, err, string(output))
 

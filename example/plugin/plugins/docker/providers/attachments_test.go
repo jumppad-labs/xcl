@@ -1,4 +1,4 @@
-package resources
+package providers
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/entity"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/entities"
 )
 
 func TestIsNetworkAddressAcceptsANetworkBlock(t *testing.T) {
@@ -25,7 +26,7 @@ func TestIsNetworkAddressRejectsAContainer(t *testing.T) {
 }
 
 func TestPreviousAttachmentsPutsBackARenamedNetwork(t *testing.T) {
-	current := []NetworkAttachment{
+	current := []entities.NetworkAttachment{
 		{Name: "backend", Aliases: []string{"web"}},
 	}
 	changes := []entity.PropertyChange{
@@ -34,11 +35,11 @@ func TestPreviousAttachmentsPutsBackARenamedNetwork(t *testing.T) {
 
 	previous, err := previousAttachments(current, changes)
 	require.NoError(t, err)
-	require.Equal(t, []NetworkAttachment{{Name: "app", Aliases: []string{"web"}}}, previous)
+	require.Equal(t, []entities.NetworkAttachment{{Name: "app", Aliases: []string{"web"}}}, previous)
 }
 
 func TestPreviousAttachmentsDropsAnAddedNetwork(t *testing.T) {
-	current := []NetworkAttachment{
+	current := []entities.NetworkAttachment{
 		{Name: "app", Aliases: []string{"web"}},
 		{Name: "backend"},
 	}
@@ -48,22 +49,22 @@ func TestPreviousAttachmentsDropsAnAddedNetwork(t *testing.T) {
 
 	previous, err := previousAttachments(current, changes)
 	require.NoError(t, err)
-	require.Equal(t, []NetworkAttachment{{Name: "app", Aliases: []string{"web"}}}, previous)
+	require.Equal(t, []entities.NetworkAttachment{{Name: "app", Aliases: []string{"web"}}}, previous)
 }
 
 func TestPreviousAttachmentsRestoresARemovedNetwork(t *testing.T) {
-	current := []NetworkAttachment{}
+	current := []entities.NetworkAttachment{}
 	changes := []entity.PropertyChange{
 		{Path: entity.Path{}.Attribute("network").Index(0), Before: map[string]any{"name": "app", "aliases": []any{"web"}}, After: nil},
 	}
 
 	previous, err := previousAttachments(current, changes)
 	require.NoError(t, err)
-	require.Equal(t, []NetworkAttachment{{Name: "app", Aliases: []string{"web"}}}, previous)
+	require.Equal(t, []entities.NetworkAttachment{{Name: "app", Aliases: []string{"web"}}}, previous)
 }
 
 func TestPreviousAttachmentsDropsAnAddedAlias(t *testing.T) {
-	current := []NetworkAttachment{
+	current := []entities.NetworkAttachment{
 		{Name: "app", Aliases: []string{"web", "www"}},
 	}
 	changes := []entity.PropertyChange{
@@ -72,11 +73,11 @@ func TestPreviousAttachmentsDropsAnAddedAlias(t *testing.T) {
 
 	previous, err := previousAttachments(current, changes)
 	require.NoError(t, err)
-	require.Equal(t, []NetworkAttachment{{Name: "app", Aliases: []string{"web"}}}, previous)
+	require.Equal(t, []entities.NetworkAttachment{{Name: "app", Aliases: []string{"web"}}}, previous)
 }
 
 func TestPreviousAttachmentsIgnoresChangesOutsideTheNetworks(t *testing.T) {
-	current := []NetworkAttachment{
+	current := []entities.NetworkAttachment{
 		{Name: "app"},
 	}
 	changes := []entity.PropertyChange{
@@ -85,5 +86,5 @@ func TestPreviousAttachmentsIgnoresChangesOutsideTheNetworks(t *testing.T) {
 
 	previous, err := previousAttachments(current, changes)
 	require.NoError(t, err)
-	require.Equal(t, []NetworkAttachment{{Name: "app"}}, previous)
+	require.Equal(t, []entities.NetworkAttachment{{Name: "app"}}, previous)
 }

@@ -45,10 +45,6 @@ type Template struct {
 	Mode string `xcl:"mode,optional" json:"mode,omitempty"`
 }
 
-// defaultMode is the permissions of a rendered file when the template sets no
-// mode
-const defaultMode fs.FileMode = 0644
-
 // provider renders templates for template blocks and removes the rendered
 // files on destroy
 type provider struct {
@@ -56,6 +52,31 @@ type provider struct {
 }
 
 var _ plugins.ResourceProvider[*Template] = (*provider)(nil)
+
+// Init logs that the provider is ready, it needs nothing else
+func (p *provider) Init(state plugins.State, functions plugins.ProviderFunctions, log logger.Logger) error {
+	log.Debug("provider ready")
+	return nil
+}
+
+// Create renders the template with its variables and writes the result to the
+// destination
+func (p *provider) Create(ctx context.Context, t *Template) (*Template, error) {
+	err := render(t)
+	if err != nil {
+		return nil, err
+	}
+
+	plugins.Logger(ctx).Info("rendered template", "destination", t.Destination)
+
+	return t, nil
+}
+
+// Read returns the configured template, rendering is cheap so the example
+// does not check the file
+func (p *provider) Read(ctx context.Context, old *Template, new *Template) (*Template, error) {
+	return new, nil
+}
 
 // Changed answers replace when the destination changes: Update renders to the
 // new path but would leave the file at the old one behind, so the template is
@@ -70,15 +91,8 @@ func (p *provider) Changed(ctx context.Context, old *Template, new *Template, ch
 	return p.DefaultChanged.Changed(ctx, old, new, changes, dependencies)
 }
 
-// Init logs that the provider is ready, it needs nothing else
-func (p *provider) Init(state plugins.State, functions plugins.ProviderFunctions, log logger.Logger) error {
-	log.Debug("provider ready")
-	return nil
-}
-
-// Create renders the template with its variables and writes the result to the
-// destination
-func (p *provider) Create(ctx context.Context, t *Template) (*Template, error) {
+// Update renders the template again
+func (p *provider) Update(ctx context.Context, t *Template, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Template, error) {
 	err := render(t)
 	if err != nil {
 		return nil, err
@@ -100,24 +114,6 @@ func (p *provider) Destroy(ctx context.Context, t *Template, force bool) error {
 	plugins.Logger(ctx).Info("removed template", "destination", t.Destination)
 
 	return nil
-}
-
-// Read returns the configured template, rendering is cheap so the example
-// does not check the file
-func (p *provider) Read(ctx context.Context, old *Template, new *Template) (*Template, error) {
-	return new, nil
-}
-
-// Update renders the template again
-func (p *provider) Update(ctx context.Context, t *Template, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Template, error) {
-	err := render(t)
-	if err != nil {
-		return nil, err
-	}
-
-	plugins.Logger(ctx).Info("rendered template", "destination", t.Destination)
-
-	return t, nil
 }
 
 // Functions returns nil, the provider offers no functions
@@ -189,3 +185,7 @@ func fileMode(mode string) (fs.FileMode, error) {
 
 	return fs.FileMode(parsed), nil
 }
+
+// defaultMode is the permissions of a rendered file when the template sets no
+// mode
+const defaultMode fs.FileMode = 0644

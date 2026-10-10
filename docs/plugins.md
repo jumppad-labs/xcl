@@ -422,9 +422,9 @@ a copy of `base` with the message in `Meta`. `logger.Nop()` emits nothing.
 A provider logs through the logger in the call's context:
 
 ```go
-func (p *networkProvider) Create(ctx context.Context, n *Network) (*Network, error) {
-    // ... NetworkCreate through the Docker client
-    n.DockerID = resp.ID
+func (p *networkProvider) Create(ctx context.Context, n *entities.Network) (*entities.Network, error) {
+    // ... CreateNetwork through the plugin's container task layer
+    n.DockerID = id
     plugins.Logger(ctx).Info("created network", "name", n.Meta.Name, "id", n.DockerID)
     return n, nil
 }

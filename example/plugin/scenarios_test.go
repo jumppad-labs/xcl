@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/resources"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/entities"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/template"
 )
 
@@ -157,10 +157,10 @@ func TestPlanOfNetworkSwapCountsOneCreateTwoUpdatesAndNoReplace(t *testing.T) {
 func TestNetworkSwapKeepsTheSameRunningContainer(t *testing.T) {
 	first, changed := applyNetworkSwap(t, t.TempDir())
 
-	old, err := xcl.Find[resources.Container](first, "docker.container.web")
+	old, err := xcl.Find[entities.Container](first, "docker.container.web")
 	require.NoError(t, err)
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.DockerID)
 	require.Equal(t, old.DockerID, web.DockerID)
@@ -174,10 +174,10 @@ func TestNetworkSwapKeepsTheSameRunningContainer(t *testing.T) {
 func TestNetworkSwapAttachesTheContainerToBackend(t *testing.T) {
 	_, changed := applyNetworkSwap(t, t.TempDir())
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 
-	backend, err := xcl.Find[resources.Network](changed, "docker.network.backend")
+	backend, err := xcl.Find[entities.Network](changed, "docker.network.backend")
 	require.NoError(t, err)
 	require.NotEmpty(t, backend.DockerID)
 
@@ -191,7 +191,7 @@ func TestNetworkSwapAttachesTheContainerToBackend(t *testing.T) {
 func TestNetworkSwapDetachesTheContainerFromApp(t *testing.T) {
 	_, changed := applyNetworkSwap(t, t.TempDir())
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 
 	inspect, err := newDockerClient(t).ContainerInspect(context.Background(), web.DockerID)
@@ -203,7 +203,7 @@ func TestNetworkSwapDetachesTheContainerFromApp(t *testing.T) {
 func TestNetworkSwapSavesTheContainerAddressOnBackend(t *testing.T) {
 	_, changed := applyNetworkSwap(t, t.TempDir())
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.IPAddress)
 
@@ -217,10 +217,10 @@ func TestNetworkSwapSavesTheContainerAddressOnBackend(t *testing.T) {
 func TestNetworkSwapKeepsTheAppNetwork(t *testing.T) {
 	first, changed := applyNetworkSwap(t, t.TempDir())
 
-	old, err := xcl.Find[resources.Network](first, "docker.network.app")
+	old, err := xcl.Find[entities.Network](first, "docker.network.app")
 	require.NoError(t, err)
 
-	app, err := xcl.Find[resources.Network](changed, "docker.network.app")
+	app, err := xcl.Find[entities.Network](changed, "docker.network.app")
 	require.NoError(t, err)
 	require.Equal(t, old.DockerID, app.DockerID)
 
@@ -260,10 +260,10 @@ func TestPlanOfInitScriptMoveCountsTwoReplacesAndOneUpdate(t *testing.T) {
 func TestInitScriptMoveCreatesANewRunningContainer(t *testing.T) {
 	first, changed := applyInitScriptMove(t, t.TempDir())
 
-	old, err := xcl.Find[resources.Container](first, "docker.container.web")
+	old, err := xcl.Find[entities.Container](first, "docker.container.web")
 	require.NoError(t, err)
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.DockerID)
 	require.NotEqual(t, old.DockerID, web.DockerID)
@@ -277,7 +277,7 @@ func TestInitScriptMoveCreatesANewRunningContainer(t *testing.T) {
 func TestInitScriptMoveRemovesTheOldContainer(t *testing.T) {
 	first, _ := applyInitScriptMove(t, t.TempDir())
 
-	old, err := xcl.Find[resources.Container](first, "docker.container.web")
+	old, err := xcl.Find[entities.Container](first, "docker.container.web")
 	require.NoError(t, err)
 
 	_, err = newDockerClient(t).ContainerInspect(context.Background(), old.DockerID)
@@ -288,7 +288,7 @@ func TestInitScriptMoveRemovesTheOldContainer(t *testing.T) {
 func TestInitScriptMoveMountsTheMovedScriptIntoTheNewContainer(t *testing.T) {
 	_, changed := applyInitScriptMove(t, t.TempDir())
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 
 	initScript, err := xcl.Find[template.Template](changed, "template.init")
@@ -334,10 +334,10 @@ func TestPlanOfInitScriptEditCountsOneUpdateAndNoReplace(t *testing.T) {
 func TestInitScriptEditKeepsTheSameRunningContainer(t *testing.T) {
 	first, changed := applyInitScriptEdit(t, t.TempDir())
 
-	old, err := xcl.Find[resources.Container](first, "docker.container.web")
+	old, err := xcl.Find[entities.Container](first, "docker.container.web")
 	require.NoError(t, err)
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.DockerID)
 	require.Equal(t, old.DockerID, web.DockerID)
@@ -397,7 +397,7 @@ func TestPlanOfNetworkRemovalCountsThreeUpdatesOneDeleteAndNoReplace(t *testing.
 func TestNetworkRemovalDeletesTheDockerNetwork(t *testing.T) {
 	first, _ := applyNetworkRemoval(t, t.TempDir())
 
-	app, err := xcl.Find[resources.Network](first, "docker.network.app")
+	app, err := xcl.Find[entities.Network](first, "docker.network.app")
 	require.NoError(t, err)
 
 	_, err = newDockerClient(t).NetworkInspect(context.Background(), app.DockerID, network.InspectOptions{})
@@ -408,10 +408,10 @@ func TestNetworkRemovalDeletesTheDockerNetwork(t *testing.T) {
 func TestNetworkRemovalKeepsTheSameRunningContainer(t *testing.T) {
 	first, changed := applyNetworkRemoval(t, t.TempDir())
 
-	old, err := xcl.Find[resources.Container](first, "docker.container.web")
+	old, err := xcl.Find[entities.Container](first, "docker.container.web")
 	require.NoError(t, err)
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.DockerID)
 	require.Equal(t, old.DockerID, web.DockerID)
@@ -425,7 +425,7 @@ func TestNetworkRemovalKeepsTheSameRunningContainer(t *testing.T) {
 func TestNetworkRemovalLeavesTheContainerWithNoNetwork(t *testing.T) {
 	_, changed := applyNetworkRemoval(t, t.TempDir())
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.Empty(t, web.Networks)
 
@@ -441,7 +441,7 @@ func TestNetworkRemovalClearsTheSavedContainerAddress(t *testing.T) {
 
 	// the container is on no network, so Docker reports no address for it and
 	// the provider's Update returns an empty ip_address
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.Empty(t, web.IPAddress)
 }
@@ -476,7 +476,7 @@ func TestDanglingReferenceFailsValidation(t *testing.T) {
 func TestDanglingReferenceKeepsTheDockerNetwork(t *testing.T) {
 	first, _ := applyDanglingReference(t, t.TempDir())
 
-	app, err := xcl.Find[resources.Network](first, "docker.network.app")
+	app, err := xcl.Find[entities.Network](first, "docker.network.app")
 	require.NoError(t, err)
 
 	inspect, err := newDockerClient(t).NetworkInspect(context.Background(), app.DockerID, network.InspectOptions{})
@@ -487,10 +487,10 @@ func TestDanglingReferenceKeepsTheDockerNetwork(t *testing.T) {
 func TestDanglingReferenceKeepsTheSameRunningContainer(t *testing.T) {
 	first, _ := applyDanglingReference(t, t.TempDir())
 
-	web, err := xcl.Find[resources.Container](first, "docker.container.web")
+	web, err := xcl.Find[entities.Container](first, "docker.container.web")
 	require.NoError(t, err)
 
-	app, err := xcl.Find[resources.Network](first, "docker.network.app")
+	app, err := xcl.Find[entities.Network](first, "docker.network.app")
 	require.NoError(t, err)
 
 	inspect, err := newDockerClient(t).ContainerInspect(context.Background(), web.DockerID)

@@ -70,7 +70,7 @@ jobs:
 
     - name: Build and vet the examples
       run: |
-        for example in example/configonly example/plugin example/prettylog; do
+        for example in example/configonly example/plugin example/plugin/plugins/docker example/prettylog; do
           echo "== $example"
           (cd "$example" && go build -v ./... && go vet ./...) || exit 1
         done
