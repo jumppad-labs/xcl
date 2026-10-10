@@ -10,6 +10,7 @@ plugins/example/build/
 __debug_bin*
 example/*/build/
 example/plugin/.xcl-docker/
+example/plugin/plugins/docker/build/
 plugins/example/bin/
 # stray `go build` output: without -o the binary is named after its package dir
 /example/example
@@ -17,6 +18,7 @@ plugins/example/bin/
 /configonly
 example/configonly/configonly
 example/plugin/plugin
+example/plugin/plugins/docker/docker
 example/prettylog/prettylog
 # spektacular debug logs
 .spektacular/debug/

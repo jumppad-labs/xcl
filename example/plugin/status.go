@@ -10,14 +10,10 @@ import (
 	"github.com/charmbracelet/lipgloss/tree"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/resources"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/entities"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/template"
 	"github.com/jumppad-labs/xcl/types"
 )
-
-// shortIDLength is how much of a Docker ID status shows, as the docker CLI
-// does
-const shortIDLength = 12
 
 // statusNode is one resource status shows: its address, the type that
 // colours it, what it depends on, its saved status and a line of details
@@ -50,7 +46,7 @@ func statusNodes(c *xcl.Config) ([]statusNode, error) {
 
 	// Plugin types are held as types generated from the plugin's schema, the
 	// lookup copies them into the plugin's Go type
-	networks, err := xcl.FindByType[resources.Network](c, "docker", "network")
+	networks, err := xcl.FindByType[entities.Network](c, "docker", "network")
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +55,7 @@ func statusNodes(c *xcl.Config) ([]statusNode, error) {
 		nodes = append(nodes, newStatusNode(n.Meta, n.Subnet, shortID(n.DockerID)))
 	}
 
-	containers, err := xcl.FindByType[resources.Container](c, "docker", "container")
+	containers, err := xcl.FindByType[entities.Container](c, "docker", "container")
 	if err != nil {
 		return nil, err
 	}
@@ -287,3 +283,7 @@ func (s statusStyles) label(n statusNode) string {
 
 	return line
 }
+
+// shortIDLength is how much of a Docker ID status shows, as the docker CLI
+// does
+const shortIDLength = 12

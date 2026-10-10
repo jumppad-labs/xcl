@@ -1,11 +1,12 @@
-// Package client is the Docker Engine client the Docker plugin's providers
-// use to create real networks and containers.
+// Package docker is the Docker Engine client the Docker plugin's container
+// task layer, client/containers, uses to create real networks and containers.
 //
-// The providers never use the Docker SDK client directly. They hold a Docker,
-// a narrow interface that mirrors only the SDK methods they call. The real SDK
-// client satisfies it unchanged, and the provider unit tests use a mock
-// generated from it by Mockery, so they run without a Docker engine.
-package client
+// Nothing else in the plugin uses the Docker SDK client directly. The task
+// layer holds a Docker, a narrow interface that mirrors only the SDK methods
+// it calls. The real SDK client satisfies it unchanged, and the task layer's
+// unit tests use a mock generated from it by Mockery, so they run without a
+// Docker engine.
+package docker
 
 import (
 	"context"
@@ -21,10 +22,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// pingTimeout is how long Ping waits for a Docker engine to answer
-const pingTimeout = 5 * time.Second
-
-// Docker is the part of the Docker Engine SDK client the providers use. Each
+// Docker is the part of the Docker Engine SDK client the task layer uses. Each
 // method has the same signature as the SDK's, so *client.Client satisfies it.
 type Docker interface {
 	Ping(ctx context.Context) (types.Ping, error)
@@ -55,15 +53,6 @@ func New() (Docker, error) {
 	return newSDKClient()
 }
 
-func newSDKClient() (*dockerclient.Client, error) {
-	c, err := dockerclient.NewClientWithOpts(dockerclient.WithHostFromEnv(), dockerclient.WithAPIVersionNegotiation())
-	if err != nil {
-		return nil, fmt.Errorf("unable to create Docker client: %w", err)
-	}
-
-	return c, nil
-}
-
 // Ping reports whether a Docker engine is reachable, it returns an error when
 // none answers. The application calls it before applying its configuration,
 // and the tests that need a real engine call it to decide whether to skip.
@@ -83,3 +72,15 @@ func Ping(ctx context.Context) error {
 
 	return nil
 }
+
+func newSDKClient() (*dockerclient.Client, error) {
+	c, err := dockerclient.NewClientWithOpts(dockerclient.WithHostFromEnv(), dockerclient.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, fmt.Errorf("unable to create Docker client: %w", err)
+	}
+
+	return c, nil
+}
+
+// pingTimeout is how long Ping waits for a Docker engine to answer
+const pingTimeout = 5 * time.Second

@@ -1,0 +1,24 @@
+# A sample configuration for the Docker plugin alone: a network and an nginx
+# container attached to it. The e2e tests apply it, check that a plan of the
+# same configuration reports no changes, and destroy it.
+#
+# The block names, which are also the Docker object names, and the subnet are
+# unique to this sample, so it can be applied while the plugin example's own
+# configurations are applied too.
+
+# A Docker bridge network named xcl_plugin_basic. The plugin sets the computed
+# docker_id when it creates it.
+docker "network" "xcl_plugin_basic" {
+  subnet = "10.73.0.0/24"
+}
+
+# An nginx container named xcl_plugin_basic on that network. The plugin sets
+# the computed docker_id and ip_address when it creates it.
+docker "container" "xcl_plugin_basic" {
+  image = "nginx:1.27-alpine"
+
+  network {
+    name    = docker.network.xcl_plugin_basic.meta.name
+    aliases = ["basic"]
+  }
+}

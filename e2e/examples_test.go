@@ -48,6 +48,12 @@ func TestPluginExampleTestsPass(t *testing.T) {
 	runExampleTests(t, "plugin")
 }
 
+func TestDockerPluginExampleTestsPass(t *testing.T) {
+	t.Parallel()
+
+	runExampleTests(t, filepath.Join("plugin", "plugins", "docker"))
+}
+
 func TestPrettylogExampleTestsPass(t *testing.T) {
 	t.Parallel()
 

@@ -2,10 +2,13 @@
 // plugins that do real work. Their providers take part in the lifecycle,
 // creating real things on apply and removing them on destroy:
 //
-//   - The Docker plugin (./plugins/docker) is an external plugin, a standalone
-//     binary that xcl starts as a separate process and calls over gRPC. It
-//     provides docker "network" and docker "container", and creates real
-//     Docker networks and containers.
+//   - The Docker plugin (./plugins/docker) is an external plugin, a module of
+//     its own laid out in the standard plugin layout. Its entry point,
+//     ./plugins/docker/cmd/docker, is a standalone binary that xcl starts as
+//     a separate process and calls over gRPC. It provides docker "network"
+//     and docker "container", and creates real Docker networks and
+//     containers. This program imports only its entity types,
+//     ./plugins/docker/entities, to read the blocks it applied.
 //   - The template plugin (./plugins/template) is an in-process plugin,
 //     compiled into this program. It provides template, a block type with no
 //     subtype, and renders a Handlebars template to a file.
@@ -43,33 +46,10 @@ import (
 	"path/filepath"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/template"
 	"github.com/jumppad-labs/xcl/example/prettylog"
 	"github.com/jumppad-labs/xcl/registry"
 )
-
-// defaultStateDir is where the commands keep the state between runs, unless
-// --state names another directory
-const defaultStateDir = "./.xcl-docker"
-
-// dockerPluginName is the file name of the Docker plugin binary, which
-// xcl-docker looks for next to its own executable unless --plugin names it
-const dockerPluginName = "docker-plugin"
-
-const usage = `usage: xcl-docker <command> [flags]
-
-commands:
-  apply [flags] <path>       apply the configuration at path
-  plan [flags] <path>        print what applying the configuration at path would change
-  status [flags]             print what the saved state holds as a tree
-  inspect [flags] <address>  print the resource at address as configuration
-  destroy [flags]            remove everything in the saved state
-
-flags, given before the path or address:
-  --state <dir>     directory the state is kept in (default ./.xcl-docker)
-  --plugin <path>   Docker plugin binary (default docker-plugin next to xcl-docker)
-`
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -154,7 +134,7 @@ func defaultDockerPlugin() string {
 func applyCommand(stderr io.Writer, configDir, dockerPlugin, stateDir string) error {
 	// The Docker plugin creates real containers, check an engine answers
 	// before applying anything
-	if err := client.Ping(context.Background()); err != nil {
+	if err := pingDocker(context.Background()); err != nil {
 		return err
 	}
 
@@ -172,7 +152,7 @@ func applyCommand(stderr io.Writer, configDir, dockerPlugin, stateDir string) er
 // Docker engine must answer. It prints only the diff, so xcl is given no
 // event handler and stays silent.
 func planCommand(stdout io.Writer, configDir, dockerPlugin, stateDir string) error {
-	if err := client.Ping(context.Background()); err != nil {
+	if err := pingDocker(context.Background()); err != nil {
 		return err
 	}
 
@@ -221,7 +201,7 @@ func inspectCommand(stdout io.Writer, address, dockerPlugin, stateDir string) er
 // from the state alone. Like apply it prints nothing of its own, the events
 // written to stderr end with the destroy's success or error.
 func destroyCommand(stderr io.Writer, dockerPlugin, stateDir string) error {
-	if err := client.Ping(context.Background()); err != nil {
+	if err := pingDocker(context.Background()); err != nil {
 		return err
 	}
 
@@ -292,3 +272,25 @@ func explainPluginLoad(err error) error {
 func destroy(c *xcl.Config) error {
 	return explainPluginLoad(c.Destroy())
 }
+
+// defaultStateDir is where the commands keep the state between runs, unless
+// --state names another directory
+const defaultStateDir = "./.xcl-docker"
+
+// dockerPluginName is the file name of the Docker plugin binary, which
+// xcl-docker looks for next to its own executable unless --plugin names it
+const dockerPluginName = "docker-plugin"
+
+const usage = `usage: xcl-docker <command> [flags]
+
+commands:
+  apply [flags] <path>       apply the configuration at path
+  plan [flags] <path>        print what applying the configuration at path would change
+  status [flags]             print what the saved state holds as a tree
+  inspect [flags] <address>  print the resource at address as configuration
+  destroy [flags]            remove everything in the saved state
+
+flags, given before the path or address:
+  --state <dir>     directory the state is kept in (default ./.xcl-docker)
+  --plugin <path>   Docker plugin binary (default docker-plugin next to xcl-docker)
+`

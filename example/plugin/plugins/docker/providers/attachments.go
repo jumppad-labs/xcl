@@ -1,23 +1,18 @@
-package resources
+package providers
 
 import (
 	"encoding/json"
 	"strings"
 
 	"github.com/jumppad-labs/xcl/entity"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/entities"
 )
-
-// networksSetting is where a container's network blocks are
-var networksSetting = entity.Path{}.Attribute("network")
-
-// removed marks a list element or map entry that did not exist before
-var removed = &struct{}{}
 
 // previousAttachments returns the network blocks the container had before
 // the changes: the current blocks with each network change's previous value
 // put back. An element or key added by a change is dropped and one removed by
 // a change comes back.
-func previousAttachments(current []NetworkAttachment, changes []entity.PropertyChange) ([]NetworkAttachment, error) {
+func previousAttachments(current []entities.NetworkAttachment, changes []entity.PropertyChange) ([]entities.NetworkAttachment, error) {
 	data, err := json.Marshal(current)
 	if err != nil {
 		return nil, err
@@ -50,7 +45,7 @@ func previousAttachments(current []NetworkAttachment, changes []entity.PropertyC
 		return nil, err
 	}
 
-	previous := []NetworkAttachment{}
+	previous := []entities.NetworkAttachment{}
 	if err := json.Unmarshal(data, &previous); err != nil {
 		return nil, err
 	}
@@ -120,14 +115,14 @@ func dropRemoved(value any) any {
 }
 
 // findAttachment returns the network block attaching to the named network
-func findAttachment(attachments []NetworkAttachment, name string) (NetworkAttachment, bool) {
+func findAttachment(attachments []entities.NetworkAttachment, name string) (entities.NetworkAttachment, bool) {
 	for _, attachment := range attachments {
 		if attachment.Name == name {
 			return attachment, true
 		}
 	}
 
-	return NetworkAttachment{}, false
+	return entities.NetworkAttachment{}, false
 }
 
 // isNetworkAddress returns true when the address is a docker "network"
@@ -146,3 +141,9 @@ func isNetworkAddress(address string) bool {
 func networkName(address string) string {
 	return address[strings.LastIndex(address, ".")+1:]
 }
+
+// networksSetting is where a container's network blocks are
+var networksSetting = entity.Path{}.Attribute("network")
+
+// removed marks a list element or map entry that did not exist before
+var removed = &struct{}{}

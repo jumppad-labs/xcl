@@ -1,29 +1,25 @@
-package resources
+package providers
 
 import (
 	"context"
 	"errors"
-	"io"
+	"fmt"
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/errdefs"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/entity"
-	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client/mocks"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client/containers"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client/containers/mocks"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/entities"
 	"github.com/jumppad-labs/xcl/types"
 )
 
-func testContainer() *Container {
-	return &Container{
+func testContainer() *entities.Container {
+	return &entities.Container{
 		ResourceBase: types.ResourceBase{
 			Meta: types.Meta{
 				ID:   "docker.container.web",
@@ -32,73 +28,60 @@ func testContainer() *Container {
 			},
 		},
 		Image: "nginx:1.27",
-		Networks: []NetworkAttachment{
+		Networks: []entities.NetworkAttachment{
 			{Name: "app", Aliases: []string{"web.local"}},
 		},
 	}
 }
 
-// emptyPullProgress returns a pull progress stream that ends straight away
-func emptyPullProgress() io.ReadCloser {
-	return io.NopCloser(strings.NewReader(""))
-}
-
-// expectImagePresent makes Docker report that it already has the image
-func expectImagePresent(client *mocks.MockDocker) {
-	client.EXPECT().
-		ImageList(mock.Anything, mock.Anything).
-		Return([]image.Summary{{ID: "sha256:abc"}}, nil).
-		Once()
-}
-
-// expectContainerCreated makes ContainerCreate succeed with the ID "ctr-123"
-func expectContainerCreated(client *mocks.MockDocker) {
-	client.EXPECT().
-		ContainerCreate(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(container.CreateResponse{ID: "ctr-123"}, nil).
-		Once()
-}
-
-// expectContainerStarted makes ContainerStart succeed
-func expectContainerStarted(client *mocks.MockDocker) {
-	client.EXPECT().
-		ContainerStart(mock.Anything, mock.Anything, mock.Anything).
+// expectImagePresent makes the image task succeed for the test image
+func expectImagePresent(tasks *mocks.MockTasks) {
+	tasks.EXPECT().
+		EnsureImage(mock.Anything, "nginx:1.27").
 		Return(nil).
 		Once()
 }
 
-// expectContainerInspected makes ContainerInspect report the address
-// 10.42.0.5 on the network "app"
-func expectContainerInspected(client *mocks.MockDocker) {
-	client.EXPECT().
-		ContainerInspect(mock.Anything, mock.Anything).
-		Return(container.InspectResponse{
-			NetworkSettings: &container.NetworkSettings{
-				Networks: map[string]*network.EndpointSettings{
-					"app": {IPAddress: "10.42.0.5"},
-				},
-			},
-		}, nil).
+// expectContainerCreated makes CreateContainer succeed with the ID "ctr-123"
+func expectContainerCreated(tasks *mocks.MockTasks) {
+	tasks.EXPECT().
+		CreateContainer(mock.Anything, mock.Anything).
+		Return("ctr-123", nil).
 		Once()
 }
 
-func TestContainerCreatePullsAMissingImage(t *testing.T) {
-	client := mocks.NewMockDocker(t)
-	client.EXPECT().
-		ImageList(mock.Anything, image.ListOptions{
-			Filters: filters.NewArgs(filters.Arg("reference", "nginx:1.27")),
-		}).
-		Return([]image.Summary{}, nil).
+// expectContainerStarted makes StartContainer succeed for "ctr-123"
+func expectContainerStarted(tasks *mocks.MockTasks) {
+	tasks.EXPECT().
+		StartContainer(mock.Anything, "ctr-123").
+		Return(nil).
 		Once()
-	client.EXPECT().
-		ImagePull(mock.Anything, "nginx:1.27", image.PullOptions{}).
-		Return(emptyPullProgress(), nil).
-		Once()
-	expectContainerCreated(client)
-	expectContainerStarted(client)
-	expectContainerInspected(client)
+}
 
-	provider := &containerProvider{client: client}
+// expectContainerInspected makes ContainerAddresses report the address
+// 10.42.0.5 on the network "app"
+func expectContainerInspected(tasks *mocks.MockTasks) {
+	tasks.EXPECT().
+		ContainerAddresses(mock.Anything, "ctr-123").
+		Return(map[string]string{"app": "10.42.0.5"}, nil).
+		Once()
+}
+
+// The image lookup and pull themselves now live in client/containers, whose
+// tests cover pulling a missing image and skipping the pull for a present
+// one. The provider only asks for the image to be ensured.
+
+func TestContainerCreatePullsAMissingImage(t *testing.T) {
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		EnsureImage(mock.Anything, "nginx:1.27").
+		Return(nil).
+		Once()
+	expectContainerCreated(tasks)
+	expectContainerStarted(tasks)
+	expectContainerInspected(tasks)
+
+	provider := &containerProvider{tasks: tasks}
 
 	_, err := provider.Create(context.Background(), testContainer())
 
@@ -106,43 +89,42 @@ func TestContainerCreatePullsAMissingImage(t *testing.T) {
 }
 
 func TestContainerCreateSkipsThePullForAPresentImage(t *testing.T) {
-	client := mocks.NewMockDocker(t)
-	client.EXPECT().
-		ImageList(mock.Anything, image.ListOptions{
-			Filters: filters.NewArgs(filters.Arg("reference", "nginx:1.27")),
-		}).
-		Return([]image.Summary{{ID: "sha256:abc"}}, nil).
+	tasks := mocks.NewMockTasks(t)
+	ensure := tasks.EXPECT().
+		EnsureImage(mock.Anything, "nginx:1.27").
+		Return(nil).
 		Once()
-	expectContainerCreated(client)
-	expectContainerStarted(client)
-	expectContainerInspected(client)
+	create := tasks.EXPECT().
+		CreateContainer(mock.Anything, mock.Anything).
+		Return("ctr-123", nil).
+		Once()
+	mock.InOrder(ensure, create)
+	expectContainerStarted(tasks)
+	expectContainerInspected(tasks)
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 
 	_, err := provider.Create(context.Background(), testContainer())
 
 	require.NoError(t, err)
-	client.AssertNotCalled(t, "ImagePull", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestContainerCreateUsesTheBlocksNameImageAndLabels(t *testing.T) {
-	var gotConfig *container.Config
-	var gotName string
+	var gotSpec containers.ContainerSpec
 
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	client.EXPECT().
-		ContainerCreate(mock.Anything, mock.Anything, &container.HostConfig{}, mock.Anything, (*v1.Platform)(nil), "web").
-		Run(func(_ context.Context, config *container.Config, _ *container.HostConfig, _ *network.NetworkingConfig, _ *v1.Platform, name string) {
-			gotConfig = config
-			gotName = name
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	tasks.EXPECT().
+		CreateContainer(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, spec containers.ContainerSpec) {
+			gotSpec = spec
 		}).
-		Return(container.CreateResponse{ID: "ctr-123"}, nil).
+		Return("ctr-123", nil).
 		Once()
-	expectContainerStarted(client)
-	expectContainerInspected(client)
+	expectContainerStarted(tasks)
+	expectContainerInspected(tasks)
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 	c := testContainer()
 	c.Command = []string{"nginx", "-g", "daemon off;"}
 	c.Environment = map[string]string{
@@ -153,62 +135,64 @@ func TestContainerCreateUsesTheBlocksNameImageAndLabels(t *testing.T) {
 
 	_, err := provider.Create(context.Background(), c)
 
+	// sorting the environment into KEY=VALUE now lives in client/containers
 	require.NoError(t, err)
-	require.Equal(t, "web", gotName)
-	require.Equal(t, &container.Config{
-		Image: "nginx:1.27",
-		Cmd:   []string{"nginx", "-g", "daemon off;"},
-		Env:   []string{"APP=web", "DEBUG=true", "ZONE=eu"},
+	require.Equal(t, containers.ContainerSpec{
+		Name:    "web",
+		Image:   "nginx:1.27",
+		Command: []string{"nginx", "-g", "daemon off;"},
+		Environment: map[string]string{
+			"ZONE":  "eu",
+			"APP":   "web",
+			"DEBUG": "true",
+		},
 		Labels: map[string]string{
 			"created_by": "xcl-example-plugin",
 			"xcl_id":     "docker.container.web",
 		},
-	}, gotConfig)
+		Network: &containers.Attachment{Name: "app", Aliases: []string{"web.local"}},
+	}, gotSpec)
 }
 
 func TestContainerCreateAttachesTheFirstNetworkWithAliases(t *testing.T) {
-	var gotNetworking *network.NetworkingConfig
+	var gotSpec containers.ContainerSpec
 
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	client.EXPECT().
-		ContainerCreate(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(_ context.Context, _ *container.Config, _ *container.HostConfig, networking *network.NetworkingConfig, _ *v1.Platform, _ string) {
-			gotNetworking = networking
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	tasks.EXPECT().
+		CreateContainer(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, spec containers.ContainerSpec) {
+			gotSpec = spec
 		}).
-		Return(container.CreateResponse{ID: "ctr-123"}, nil).
+		Return("ctr-123", nil).
 		Once()
-	expectContainerStarted(client)
-	expectContainerInspected(client)
+	expectContainerStarted(tasks)
+	expectContainerInspected(tasks)
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 
 	_, err := provider.Create(context.Background(), testContainer())
 
 	require.NoError(t, err)
-	require.Equal(t, &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			"app": {Aliases: []string{"web.local"}},
-		},
-	}, gotNetworking)
+	require.Equal(t, &containers.Attachment{Name: "app", Aliases: []string{"web.local"}}, gotSpec.Network)
 }
 
 func TestContainerCreateMountsTheInitScriptReadOnlyByItsAbsolutePath(t *testing.T) {
-	var gotHostConfig *container.HostConfig
+	var gotSpec containers.ContainerSpec
 
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	client.EXPECT().
-		ContainerCreate(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(_ context.Context, _ *container.Config, hostConfig *container.HostConfig, _ *network.NetworkingConfig, _ *v1.Platform, _ string) {
-			gotHostConfig = hostConfig
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	tasks.EXPECT().
+		CreateContainer(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, spec containers.ContainerSpec) {
+			gotSpec = spec
 		}).
-		Return(container.CreateResponse{ID: "ctr-123"}, nil).
+		Return("ctr-123", nil).
 		Once()
-	expectContainerStarted(client)
-	expectContainerInspected(client)
+	expectContainerStarted(tasks)
+	expectContainerInspected(tasks)
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 	c := testContainer()
 	c.InitScript = "build/rendered/init.sh"
 
@@ -218,53 +202,55 @@ func TestContainerCreateMountsTheInitScriptReadOnlyByItsAbsolutePath(t *testing.
 	workingDir, err := os.Getwd()
 	require.NoError(t, err)
 
-	expectedBind := workingDir + "/build/rendered/init.sh:/docker-entrypoint.d/90-xcl-init.sh:ro"
-	require.Equal(t, &container.HostConfig{Binds: []string{expectedBind}}, gotHostConfig)
+	// the read-only bind of this path into the image now lives in
+	// client/containers, the provider passes the script's absolute path
+	require.Equal(t, filepath.Join(workingDir, "build/rendered/init.sh"), gotSpec.InitScript)
 }
 
 func TestContainerCreateWithoutAnInitScriptPassesAnEmptyHostConfig(t *testing.T) {
-	var gotHostConfig *container.HostConfig
+	var gotSpec containers.ContainerSpec
 
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	client.EXPECT().
-		ContainerCreate(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(_ context.Context, _ *container.Config, hostConfig *container.HostConfig, _ *network.NetworkingConfig, _ *v1.Platform, _ string) {
-			gotHostConfig = hostConfig
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	tasks.EXPECT().
+		CreateContainer(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, spec containers.ContainerSpec) {
+			gotSpec = spec
 		}).
-		Return(container.CreateResponse{ID: "ctr-123"}, nil).
+		Return("ctr-123", nil).
 		Once()
-	expectContainerStarted(client)
-	expectContainerInspected(client)
+	expectContainerStarted(tasks)
+	expectContainerInspected(tasks)
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 
 	_, err := provider.Create(context.Background(), testContainer())
 	require.NoError(t, err)
 
-	require.Equal(t, &container.HostConfig{}, gotHostConfig)
+	// client/containers turns an empty init script into an empty host config
+	require.Empty(t, gotSpec.InitScript)
 }
 
 func TestContainerCreateConnectsFurtherNetworks(t *testing.T) {
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	expectContainerCreated(client)
-	client.EXPECT().
-		NetworkConnect(mock.Anything, "backend", "ctr-123", &network.EndpointSettings{Aliases: []string{"api"}}).
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	expectContainerCreated(tasks)
+	tasks.EXPECT().
+		ConnectNetwork(mock.Anything, "backend", "ctr-123", []string{"api"}).
 		Return(nil).
 		Once()
-	client.EXPECT().
-		NetworkConnect(mock.Anything, "metrics", "ctr-123", &network.EndpointSettings{}).
+	tasks.EXPECT().
+		ConnectNetwork(mock.Anything, "metrics", "ctr-123", []string(nil)).
 		Return(nil).
 		Once()
-	expectContainerStarted(client)
-	expectContainerInspected(client)
+	expectContainerStarted(tasks)
+	expectContainerInspected(tasks)
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 	c := testContainer()
 	c.Networks = append(c.Networks,
-		NetworkAttachment{Name: "backend", Aliases: []string{"api"}},
-		NetworkAttachment{Name: "metrics"},
+		entities.NetworkAttachment{Name: "backend", Aliases: []string{"api"}},
+		entities.NetworkAttachment{Name: "metrics"},
 	)
 
 	_, err := provider.Create(context.Background(), c)
@@ -273,23 +259,23 @@ func TestContainerCreateConnectsFurtherNetworks(t *testing.T) {
 }
 
 func TestContainerCreateConnectsFurtherNetworksBeforeStarting(t *testing.T) {
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	expectContainerCreated(client)
-	connect := client.EXPECT().
-		NetworkConnect(mock.Anything, "backend", "ctr-123", mock.Anything).
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	expectContainerCreated(tasks)
+	connect := tasks.EXPECT().
+		ConnectNetwork(mock.Anything, "backend", "ctr-123", mock.Anything).
 		Return(nil).
 		Once()
-	start := client.EXPECT().
-		ContainerStart(mock.Anything, "ctr-123", mock.Anything).
+	start := tasks.EXPECT().
+		StartContainer(mock.Anything, "ctr-123").
 		Return(nil).
 		Once()
 	mock.InOrder(connect, start)
-	expectContainerInspected(client)
+	expectContainerInspected(tasks)
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 	c := testContainer()
-	c.Networks = append(c.Networks, NetworkAttachment{Name: "backend"})
+	c.Networks = append(c.Networks, entities.NetworkAttachment{Name: "backend"})
 
 	_, err := provider.Create(context.Background(), c)
 
@@ -297,16 +283,16 @@ func TestContainerCreateConnectsFurtherNetworksBeforeStarting(t *testing.T) {
 }
 
 func TestContainerCreateStartsTheContainer(t *testing.T) {
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	expectContainerCreated(client)
-	client.EXPECT().
-		ContainerStart(mock.Anything, "ctr-123", container.StartOptions{}).
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	expectContainerCreated(tasks)
+	tasks.EXPECT().
+		StartContainer(mock.Anything, "ctr-123").
 		Return(nil).
 		Once()
-	expectContainerInspected(client)
+	expectContainerInspected(tasks)
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 
 	_, err := provider.Create(context.Background(), testContainer())
 
@@ -314,23 +300,19 @@ func TestContainerCreateStartsTheContainer(t *testing.T) {
 }
 
 func TestContainerCreateFillsTheDockerIDAndAddress(t *testing.T) {
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	expectContainerCreated(client)
-	expectContainerStarted(client)
-	client.EXPECT().
-		ContainerInspect(mock.Anything, "ctr-123").
-		Return(container.InspectResponse{
-			NetworkSettings: &container.NetworkSettings{
-				Networks: map[string]*network.EndpointSettings{
-					"bridge": {IPAddress: "172.17.0.2"},
-					"app":    {IPAddress: "10.42.0.5"},
-				},
-			},
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	expectContainerCreated(tasks)
+	expectContainerStarted(tasks)
+	tasks.EXPECT().
+		ContainerAddresses(mock.Anything, "ctr-123").
+		Return(map[string]string{
+			"bridge": "172.17.0.2",
+			"app":    "10.42.0.5",
 		}, nil).
 		Once()
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 
 	created, err := provider.Create(context.Background(), testContainer())
 
@@ -342,62 +324,59 @@ func TestContainerCreateFillsTheDockerIDAndAddress(t *testing.T) {
 func TestContainerCreateReturnsPullErrors(t *testing.T) {
 	dockerErr := errors.New("pull access denied")
 
-	client := mocks.NewMockDocker(t)
-	client.EXPECT().
-		ImageList(mock.Anything, mock.Anything).
-		Return([]image.Summary{}, nil).
-		Once()
-	client.EXPECT().
-		ImagePull(mock.Anything, "nginx:1.27", mock.Anything).
-		Return(nil, dockerErr).
+	// the task layer names the image in its pull error
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		EnsureImage(mock.Anything, "nginx:1.27").
+		Return(fmt.Errorf("unable to pull image nginx:1.27: %w", dockerErr)).
 		Once()
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 
 	created, err := provider.Create(context.Background(), testContainer())
 
 	require.Nil(t, created)
 	require.ErrorIs(t, err, dockerErr)
 	require.ErrorContains(t, err, "nginx:1.27")
-	client.AssertNotCalled(t, "ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	tasks.AssertNotCalled(t, "CreateContainer", mock.Anything, mock.Anything)
 }
 
 func TestContainerCreateReturnsCreateErrors(t *testing.T) {
 	dockerErr := errors.New("name already in use")
 
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	client.EXPECT().
-		ContainerCreate(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(container.CreateResponse{}, dockerErr).
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	tasks.EXPECT().
+		CreateContainer(mock.Anything, mock.Anything).
+		Return("", dockerErr).
 		Once()
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 
 	created, err := provider.Create(context.Background(), testContainer())
 
 	require.Nil(t, created)
 	require.ErrorIs(t, err, dockerErr)
 	require.ErrorContains(t, err, "web")
-	client.AssertNotCalled(t, "ContainerRemove", mock.Anything, mock.Anything, mock.Anything)
+	tasks.AssertNotCalled(t, "RemoveContainer", mock.Anything, mock.Anything)
 }
 
 func TestContainerCreateRemovesTheContainerWhenStartFails(t *testing.T) {
 	dockerErr := errors.New("port is already allocated")
 
-	client := mocks.NewMockDocker(t)
-	expectImagePresent(client)
-	expectContainerCreated(client)
-	client.EXPECT().
-		ContainerStart(mock.Anything, "ctr-123", mock.Anything).
+	tasks := mocks.NewMockTasks(t)
+	expectImagePresent(tasks)
+	expectContainerCreated(tasks)
+	tasks.EXPECT().
+		StartContainer(mock.Anything, "ctr-123").
 		Return(dockerErr).
 		Once()
-	client.EXPECT().
-		ContainerRemove(mock.Anything, "ctr-123", container.RemoveOptions{Force: true}).
+	tasks.EXPECT().
+		RemoveContainer(mock.Anything, "ctr-123").
 		Return(nil).
 		Once()
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 
 	created, err := provider.Create(context.Background(), testContainer())
 
@@ -407,17 +386,18 @@ func TestContainerCreateRemovesTheContainerWhenStartFails(t *testing.T) {
 }
 
 func TestContainerDestroyStopsAndRemovesTheContainer(t *testing.T) {
-	client := mocks.NewMockDocker(t)
-	client.EXPECT().
-		ContainerStop(mock.Anything, "ctr-123", container.StopOptions{}).
+	tasks := mocks.NewMockTasks(t)
+	stop := tasks.EXPECT().
+		StopContainer(mock.Anything, "ctr-123").
 		Return(nil).
 		Once()
-	client.EXPECT().
-		ContainerRemove(mock.Anything, "ctr-123", container.RemoveOptions{Force: true}).
+	remove := tasks.EXPECT().
+		RemoveContainer(mock.Anything, "ctr-123").
 		Return(nil).
 		Once()
+	mock.InOrder(stop, remove)
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 	c := testContainer()
 	c.DockerID = "ctr-123"
 
@@ -427,32 +407,32 @@ func TestContainerDestroyStopsAndRemovesTheContainer(t *testing.T) {
 }
 
 func TestContainerDestroySucceedsWhenTheContainerIsGone(t *testing.T) {
-	client := mocks.NewMockDocker(t)
-	client.EXPECT().
-		ContainerStop(mock.Anything, "ctr-123", mock.Anything).
-		Return(errdefs.NotFound(errors.New("no such container"))).
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		StopContainer(mock.Anything, "ctr-123").
+		Return(fmt.Errorf("no such container: %w", containers.ErrNotFound)).
 		Once()
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 	c := testContainer()
 	c.DockerID = "ctr-123"
 
 	err := provider.Destroy(context.Background(), c, false)
 
 	require.NoError(t, err)
-	client.AssertNotCalled(t, "ContainerRemove", mock.Anything, mock.Anything, mock.Anything)
+	tasks.AssertNotCalled(t, "RemoveContainer", mock.Anything, mock.Anything)
 }
 
 func TestContainerDestroyReturnsDockerErrors(t *testing.T) {
 	dockerErr := errors.New("daemon unavailable")
 
-	client := mocks.NewMockDocker(t)
-	client.EXPECT().
-		ContainerStop(mock.Anything, "ctr-123", mock.Anything).
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		StopContainer(mock.Anything, "ctr-123").
 		Return(dockerErr).
 		Once()
 
-	provider := &containerProvider{client: client}
+	provider := &containerProvider{tasks: tasks}
 	c := testContainer()
 	c.DockerID = "ctr-123"
 
@@ -463,7 +443,7 @@ func TestContainerDestroyReturnsDockerErrors(t *testing.T) {
 }
 
 func TestContainerReadKeepsTheDockerIDAndAddressFromTheSavedContainer(t *testing.T) {
-	provider := &containerProvider{client: mocks.NewMockDocker(t)}
+	provider := &containerProvider{tasks: mocks.NewMockTasks(t)}
 
 	saved := testContainer()
 	saved.DockerID = "ctr-123"
@@ -482,24 +462,18 @@ func networkPath(index int) entity.Path {
 	return entity.Path{}.Attribute("network").Index(index)
 }
 
-// expectContainerInspectedOnBackend makes ContainerInspect report the address
-// 10.43.0.7 on the network "backend"
-func expectContainerInspectedOnBackend(client *mocks.MockDocker) {
-	client.EXPECT().
-		ContainerInspect(mock.Anything, "ctr-123").
-		Return(container.InspectResponse{
-			NetworkSettings: &container.NetworkSettings{
-				Networks: map[string]*network.EndpointSettings{
-					"backend": {IPAddress: "10.43.0.7"},
-				},
-			},
-		}, nil).
+// expectContainerInspectedOnBackend makes ContainerAddresses report the
+// address 10.43.0.7 on the network "backend"
+func expectContainerInspectedOnBackend(tasks *mocks.MockTasks) {
+	tasks.EXPECT().
+		ContainerAddresses(mock.Anything, "ctr-123").
+		Return(map[string]string{"backend": "10.43.0.7"}, nil).
 		Once()
 }
 
 // savedContainer returns the test container as Update receives it, created
 // with the Docker ID "ctr-123" and the address 10.42.0.5
-func savedContainer() *Container {
+func savedContainer() *entities.Container {
 	c := testContainer()
 	c.DockerID = "ctr-123"
 	c.IPAddress = "10.42.0.5"
@@ -507,7 +481,7 @@ func savedContainer() *Container {
 }
 
 func TestContainerChangedReplacesOnImageChange(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	new := testContainer()
@@ -522,7 +496,7 @@ func TestContainerChangedReplacesOnImageChange(t *testing.T) {
 }
 
 func TestContainerChangedReplacesOnCommandChange(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	old.Command = []string{"nginx", "-g", "daemon off;"}
@@ -538,7 +512,7 @@ func TestContainerChangedReplacesOnCommandChange(t *testing.T) {
 }
 
 func TestContainerChangedReplacesOnEnvironmentChange(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	old.Environment = map[string]string{"MODE": "dev"}
@@ -554,11 +528,11 @@ func TestContainerChangedReplacesOnEnvironmentChange(t *testing.T) {
 }
 
 func TestContainerChangedUpdatesOnNetworkNameChange(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	new := testContainer()
-	new.Networks = []NetworkAttachment{
+	new.Networks = []entities.NetworkAttachment{
 		{Name: "backend", Aliases: []string{"web.local"}},
 	}
 	changes := []entity.PropertyChange{
@@ -571,11 +545,11 @@ func TestContainerChangedUpdatesOnNetworkNameChange(t *testing.T) {
 }
 
 func TestContainerChangedUpdatesOnNetworkAliasesChange(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	new := testContainer()
-	new.Networks = []NetworkAttachment{
+	new.Networks = []entities.NetworkAttachment{
 		{Name: "app", Aliases: []string{"www.local"}},
 	}
 	changes := []entity.PropertyChange{
@@ -588,7 +562,7 @@ func TestContainerChangedUpdatesOnNetworkAliasesChange(t *testing.T) {
 }
 
 func TestContainerChangedUpdatesWhenNetworkIsReplaced(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	new := testContainer()
@@ -602,7 +576,7 @@ func TestContainerChangedUpdatesWhenNetworkIsReplaced(t *testing.T) {
 }
 
 func TestContainerChangedUpdatesWhenNetworkIsOnlyUpdated(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	new := testContainer()
@@ -616,7 +590,7 @@ func TestContainerChangedUpdatesWhenNetworkIsOnlyUpdated(t *testing.T) {
 }
 
 func TestContainerChangedReplacesWhenANonNetworkDependencyIsReplaced(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	new := testContainer()
@@ -630,7 +604,7 @@ func TestContainerChangedReplacesWhenANonNetworkDependencyIsReplaced(t *testing.
 }
 
 func TestContainerChangedReplacesOnInitScriptChange(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	old.InitScript = "build/rendered/init.sh"
@@ -646,7 +620,7 @@ func TestContainerChangedReplacesOnInitScriptChange(t *testing.T) {
 }
 
 func TestContainerChangedReportsNoChangeWhenTheInitScriptTemplateIsOnlyUpdated(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	old.InitScript = "build/rendered/init.sh"
@@ -664,7 +638,7 @@ func TestContainerChangedReportsNoChangeWhenTheInitScriptTemplateIsOnlyUpdated(t
 }
 
 func TestContainerChangedUpdatesWhenTheAppNetworkDependencyIsUpdated(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	old.InitScript = "build/rendered/init.sh"
@@ -681,7 +655,7 @@ func TestContainerChangedUpdatesWhenTheAppNetworkDependencyIsUpdated(t *testing.
 }
 
 func TestContainerChangedReportsNoChangeForIdenticalContainer(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	old.Command = []string{"nginx"}
@@ -697,7 +671,7 @@ func TestContainerChangedReportsNoChangeForIdenticalContainer(t *testing.T) {
 }
 
 func TestContainerChangedTreatsEmptyAndNilCommandAsEqual(t *testing.T) {
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	old := testContainer()
 	old.Command = nil
@@ -709,29 +683,29 @@ func TestContainerChangedTreatsEmptyAndNilCommandAsEqual(t *testing.T) {
 	require.Equal(t, entity.NoChange, change)
 }
 
-// The Update tests use a strict mock: any Docker call without an expectation
+// The Update tests use a strict mock: any task call without an expectation
 // fails the test. Update is only permitted to disconnect, connect and, once
-// the container has moved, inspect it for its new address. No test expects a
-// ContainerInspect, NetworkInspect or ContainerList before a move, so Update
+// the container has moved, read its addresses. No test expects a
+// ContainerAddresses or NetworkContainers call before a move, so Update
 // works only from the changes and dependencies it is told about, never from
 // the container's previous state in Docker.
 
 func TestContainerUpdateMovesTheContainerToTheRenamedNetwork(t *testing.T) {
-	dockerClient := mocks.NewMockDocker(t)
-	dockerClient.EXPECT().
-		NetworkDisconnect(mock.Anything, "app", "ctr-123", true).
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		DisconnectNetwork(mock.Anything, "app", "ctr-123").
 		Return(nil).
 		Once()
-	dockerClient.EXPECT().
-		NetworkConnect(mock.Anything, "backend", "ctr-123", &network.EndpointSettings{Aliases: []string{"web.local"}}).
+	tasks.EXPECT().
+		ConnectNetwork(mock.Anything, "backend", "ctr-123", []string{"web.local"}).
 		Return(nil).
 		Once()
-	expectContainerInspectedOnBackend(dockerClient)
+	expectContainerInspectedOnBackend(tasks)
 
-	p := NewContainerProvider(dockerClient)
+	p := NewContainerProvider(tasks)
 
 	c := savedContainer()
-	c.Networks = []NetworkAttachment{
+	c.Networks = []entities.NetworkAttachment{
 		{Name: "backend", Aliases: []string{"web.local"}},
 	}
 	changes := []entity.PropertyChange{
@@ -744,23 +718,17 @@ func TestContainerUpdateMovesTheContainerToTheRenamedNetwork(t *testing.T) {
 }
 
 func TestContainerUpdateReattachesTheContainerToAReplacedNetwork(t *testing.T) {
-	dockerClient := mocks.NewMockDocker(t)
-	dockerClient.EXPECT().
-		NetworkConnect(mock.Anything, "app", "ctr-123", &network.EndpointSettings{Aliases: []string{"web.local"}}).
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		ConnectNetwork(mock.Anything, "app", "ctr-123", []string{"web.local"}).
 		Return(nil).
 		Once()
-	dockerClient.EXPECT().
-		ContainerInspect(mock.Anything, "ctr-123").
-		Return(container.InspectResponse{
-			NetworkSettings: &container.NetworkSettings{
-				Networks: map[string]*network.EndpointSettings{
-					"app": {IPAddress: "10.42.1.9"},
-				},
-			},
-		}, nil).
+	tasks.EXPECT().
+		ContainerAddresses(mock.Anything, "ctr-123").
+		Return(map[string]string{"app": "10.42.1.9"}, nil).
 		Once()
 
-	p := NewContainerProvider(dockerClient)
+	p := NewContainerProvider(tasks)
 
 	dependencies := []entity.DependencyChange{
 		{Address: "docker.network.app", Change: entity.Replace},
@@ -772,21 +740,17 @@ func TestContainerUpdateReattachesTheContainerToAReplacedNetwork(t *testing.T) {
 }
 
 func TestContainerUpdateDetachesTheContainerFromItsRemovedOnlyNetwork(t *testing.T) {
-	dockerClient := mocks.NewMockDocker(t)
-	dockerClient.EXPECT().
-		NetworkDisconnect(mock.Anything, "app", "ctr-123", true).
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		DisconnectNetwork(mock.Anything, "app", "ctr-123").
 		Return(nil).
 		Once()
-	dockerClient.EXPECT().
-		ContainerInspect(mock.Anything, "ctr-123").
-		Return(container.InspectResponse{
-			NetworkSettings: &container.NetworkSettings{
-				Networks: map[string]*network.EndpointSettings{},
-			},
-		}, nil).
+	tasks.EXPECT().
+		ContainerAddresses(mock.Anything, "ctr-123").
+		Return(map[string]string{}, nil).
 		Once()
 
-	p := NewContainerProvider(dockerClient)
+	p := NewContainerProvider(tasks)
 
 	c := savedContainer()
 	c.Networks = nil
@@ -800,17 +764,17 @@ func TestContainerUpdateDetachesTheContainerFromItsRemovedOnlyNetwork(t *testing
 }
 
 func TestContainerUpdateConnectsOnlyAnAddedNetwork(t *testing.T) {
-	dockerClient := mocks.NewMockDocker(t)
-	dockerClient.EXPECT().
-		NetworkConnect(mock.Anything, "backend", "ctr-123", &network.EndpointSettings{Aliases: []string{"api"}}).
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		ConnectNetwork(mock.Anything, "backend", "ctr-123", []string{"api"}).
 		Return(nil).
 		Once()
-	expectContainerInspected(dockerClient)
+	expectContainerInspected(tasks)
 
-	p := NewContainerProvider(dockerClient)
+	p := NewContainerProvider(tasks)
 
 	c := savedContainer()
-	c.Networks = []NetworkAttachment{
+	c.Networks = []entities.NetworkAttachment{
 		{Name: "app", Aliases: []string{"web.local"}},
 		{Name: "backend", Aliases: []string{"api"}},
 	}
@@ -824,22 +788,22 @@ func TestContainerUpdateConnectsOnlyAnAddedNetwork(t *testing.T) {
 }
 
 func TestContainerUpdateReconnectsWithTheNewAliases(t *testing.T) {
-	dockerClient := mocks.NewMockDocker(t)
-	disconnect := dockerClient.EXPECT().
-		NetworkDisconnect(mock.Anything, "app", "ctr-123", true).
+	tasks := mocks.NewMockTasks(t)
+	disconnect := tasks.EXPECT().
+		DisconnectNetwork(mock.Anything, "app", "ctr-123").
 		Return(nil).
 		Once()
-	dockerClient.EXPECT().
-		NetworkConnect(mock.Anything, "app", "ctr-123", &network.EndpointSettings{Aliases: []string{"web.local", "www.local"}}).
+	tasks.EXPECT().
+		ConnectNetwork(mock.Anything, "app", "ctr-123", []string{"web.local", "www.local"}).
 		Return(nil).
 		Once().
 		NotBefore(disconnect)
-	expectContainerInspected(dockerClient)
+	expectContainerInspected(tasks)
 
-	p := NewContainerProvider(dockerClient)
+	p := NewContainerProvider(tasks)
 
 	c := savedContainer()
-	c.Networks = []NetworkAttachment{
+	c.Networks = []entities.NetworkAttachment{
 		{Name: "app", Aliases: []string{"web.local", "www.local"}},
 	}
 	changes := []entity.PropertyChange{
@@ -852,21 +816,21 @@ func TestContainerUpdateReconnectsWithTheNewAliases(t *testing.T) {
 }
 
 func TestContainerUpdateIgnoresANetworkThatIsAlreadyGoneOnDisconnect(t *testing.T) {
-	dockerClient := mocks.NewMockDocker(t)
-	dockerClient.EXPECT().
-		NetworkDisconnect(mock.Anything, "app", "ctr-123", true).
-		Return(errdefs.NotFound(errors.New("no such network"))).
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		DisconnectNetwork(mock.Anything, "app", "ctr-123").
+		Return(fmt.Errorf("no such network: %w", containers.ErrNotFound)).
 		Once()
-	dockerClient.EXPECT().
-		NetworkConnect(mock.Anything, "backend", "ctr-123", &network.EndpointSettings{Aliases: []string{"web.local"}}).
+	tasks.EXPECT().
+		ConnectNetwork(mock.Anything, "backend", "ctr-123", []string{"web.local"}).
 		Return(nil).
 		Once()
-	expectContainerInspectedOnBackend(dockerClient)
+	expectContainerInspectedOnBackend(tasks)
 
-	p := NewContainerProvider(dockerClient)
+	p := NewContainerProvider(tasks)
 
 	c := savedContainer()
-	c.Networks = []NetworkAttachment{
+	c.Networks = []entities.NetworkAttachment{
 		{Name: "backend", Aliases: []string{"web.local"}},
 	}
 	changes := []entity.PropertyChange{
@@ -879,16 +843,16 @@ func TestContainerUpdateIgnoresANetworkThatIsAlreadyGoneOnDisconnect(t *testing.
 }
 
 func TestContainerUpdateReturnsDisconnectErrors(t *testing.T) {
-	dockerClient := mocks.NewMockDocker(t)
-	dockerClient.EXPECT().
-		NetworkDisconnect(mock.Anything, "app", "ctr-123", true).
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		DisconnectNetwork(mock.Anything, "app", "ctr-123").
 		Return(errors.New("daemon unavailable")).
 		Once()
 
-	p := NewContainerProvider(dockerClient)
+	p := NewContainerProvider(tasks)
 
 	c := savedContainer()
-	c.Networks = []NetworkAttachment{
+	c.Networks = []entities.NetworkAttachment{
 		{Name: "backend", Aliases: []string{"web.local"}},
 	}
 	changes := []entity.PropertyChange{
@@ -902,20 +866,20 @@ func TestContainerUpdateReturnsDisconnectErrors(t *testing.T) {
 }
 
 func TestContainerUpdateReturnsConnectErrors(t *testing.T) {
-	dockerClient := mocks.NewMockDocker(t)
-	dockerClient.EXPECT().
-		NetworkDisconnect(mock.Anything, "app", "ctr-123", true).
+	tasks := mocks.NewMockTasks(t)
+	tasks.EXPECT().
+		DisconnectNetwork(mock.Anything, "app", "ctr-123").
 		Return(nil).
 		Once()
-	dockerClient.EXPECT().
-		NetworkConnect(mock.Anything, "backend", "ctr-123", mock.Anything).
+	tasks.EXPECT().
+		ConnectNetwork(mock.Anything, "backend", "ctr-123", mock.Anything).
 		Return(errors.New("network backend not found")).
 		Once()
 
-	p := NewContainerProvider(dockerClient)
+	p := NewContainerProvider(tasks)
 
 	c := savedContainer()
-	c.Networks = []NetworkAttachment{
+	c.Networks = []entities.NetworkAttachment{
 		{Name: "backend", Aliases: []string{"web.local"}},
 	}
 	changes := []entity.PropertyChange{
@@ -928,8 +892,8 @@ func TestContainerUpdateReturnsConnectErrors(t *testing.T) {
 }
 
 func TestContainerUpdateWithNothingToldMakesNoDockerCalls(t *testing.T) {
-	// a strict mock with no expectations: any Docker call fails the test
-	p := NewContainerProvider(mocks.NewMockDocker(t))
+	// a strict mock with no expectations: any task call fails the test
+	p := NewContainerProvider(mocks.NewMockTasks(t))
 
 	got, err := p.Update(context.Background(), savedContainer(), nil, nil)
 	require.NoError(t, err)
