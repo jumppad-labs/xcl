@@ -19,3 +19,11 @@ mocks-clean:
 setup-mocks: install-mockery mocks
 
 .PHONY: protos install-mockery mocks mocks-clean setup-mocks
+# Install and start a real plugin release from github.com. Set
+# XCL_GITHUB_LIVE_PLUGIN=owner/repo@vX.Y.Z, optionally XCL_GITHUB_LIVE_KEY to
+# the path of an armoured public key to trust, and GITHUB_TOKEN or GH_TOKEN
+# for a private repository. The default test run skips this test.
+test-github-live:
+	go test -count=1 -run TestGitHubRegistryInstallsARealRelease -v ./registry/
+
+.PHONY: test-github-live

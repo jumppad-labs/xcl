@@ -3,6 +3,7 @@ module github.com/jumppad-labs/xcl
 go 1.25.0
 
 require (
+	github.com/ProtonMail/go-crypto v1.1.6
 	github.com/agext/levenshtein v1.2.3
 	github.com/apparentlymart/go-textseg/v15 v15.0.0
 	github.com/creasty/defaults v1.8.0
@@ -33,6 +34,7 @@ require (
 	cloud.google.com/go/storage v1.43.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.5 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
+	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

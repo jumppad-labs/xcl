@@ -117,6 +117,15 @@ One registry can hold Go types and plugins together. `WithRegistry` is the
 one way a `Config` gets anything beyond the builtins, and the registry the one
 place types and plugins are registered.
 
+A plugin published as GitHub releases installs with one line from the GitHub
+registry, which downloads, verifies and caches the build for the current
+platform, see [Installing plugins from GitHub](#installing-plugins-from-github):
+
+```go
+gh := registry.NewGitHub()
+gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v1.2.0")
+```
+
 **Registration problems.** Registration returns no errors. Problems are
 reported in one of three places:
 
@@ -514,6 +523,62 @@ the operation is done, so a program never stops a plugin itself and nothing
 is left running between operations. The process starts afresh each time, so
 the plugin's `Init` runs again and it keeps nothing in memory from one
 operation to the next. In-process plugins load once and stay loaded.
+
+### Installing plugins from GitHub
+
+A plugin published as GitHub releases, laid out as the plugin template
+publishes them, installs with one line. The GitHub registry downloads the release's build
+for the platform the program runs on, checks it against the release's
+checksums, keeps it in a cache and starts it as an external plugin:
+
+```go
+gh := registry.NewGitHub()
+gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v1.2.0")
+
+c, err := xcl.NewConfig(xcl.WithRegistry(local), xcl.WithRegistry(gh))
+```
+
+The plugin is named after the repository, `xcl-plugin-docker`, and is
+installed when plugins load, not when it is registered. A GitHub registry
+wraps a local one, so `RegisterType` works on it too, and it can be given
+beside a local registry or any other.
+
+- **Pin an exact version.** The version is one exact release tag,
+  `v<major>.<minor>.<patch>` with an optional pre-release suffix such as
+  `v1.2.0-rc.1`. An empty version, a range such as `~1.2`, `latest`, a tag
+  without its `v` or a repository that is not `owner/repo` is a programmer
+  error and panics at `RegisterPlugin`, naming the plugin, before anything is
+  downloaded. Draft releases are never installed.
+- **Trust signing keys.** `registry.GitHubTrustedKeys(armored...)` takes
+  ASCII-armoured OpenPGP public keys. When any are given, a plugin is used
+  only when its release's checksums file is signed by one of them; a release
+  signed by another key, or not signed, is refused. Without keys, signatures
+  are not checked and unsigned releases install. A key that cannot be read
+  fails the load against the `github.com` registry.
+- **Private repositories.** Requests carry a GitHub token when there is one:
+  `registry.GitHubToken(token)`, otherwise `GITHUB_TOKEN`, then `GH_TOKEN`.
+  Public repositories need none. Without a token, a private repository's
+  release is reported as not found, saying it may need a token.
+- **The cache.** Plugins are kept under `~/.xcl/cache/plugins`, as
+  `github.com/<owner>/<repo>/<version>/<os>_<arch>/`, or under the directory
+  given with `registry.GitHubCacheDir(dir)`. Each entry holds the release's
+  archive, its checksums file, its signature when it has one, and the
+  extracted binary. A version already in the cache is used without contacting
+  GitHub, so applies work offline, and it is verified again, against the
+  checksums and the application's current trusted keys, every time the plugin
+  is started. An entry is written in one step, so a failed or interrupted
+  download leaves nothing usable. Old versions are never removed; delete them
+  by hand.
+
+A plugin that cannot be installed fails the first operation with a
+`*xcl.PluginLoadError` naming the plugin and the `github.com` registry. It
+wraps a `*xcl.PluginInstallError` naming the `Repository`, `Version` and
+`Platform`, which matches `xcl.ErrPluginNotFound` when the release, or its
+build for this platform, does not exist (or the repository is private and no
+token was given), and `xcl.ErrPluginVerification` when the release has no
+checksums file, a file does not match its checksum, or a signature is missing
+or untrusted. The release layout the registry installs, archive, checksums
+and signature names, is described in [docs/plugins.md](./docs/plugins.md).
 
 ### Querying a configuration
 

@@ -1,0 +1,14 @@
+# widget is provided by a plugin installed from a GitHub release and person by
+# a plugin from the local registry, so applying this needs both registries
+widget "app" {
+  size = 1
+
+  part {
+    name = "a"
+  }
+}
+
+resource "person" "ada" {
+  first_name = "Ada"
+  last_name  = "Lovelace"
+}
