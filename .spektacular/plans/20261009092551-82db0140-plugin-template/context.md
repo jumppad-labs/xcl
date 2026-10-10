@@ -124,7 +124,7 @@ Requirement-to-repo attribution:
 
 ### Task: Publish the release signing public key
 
-State after the plan review: the shared jumppad-labs signing key exists (Ed25519, created 2026-10-10, no expiry, uid `Jumppad Labs (Jumpad Plugin GPG Ke) <hello@jumppad.dev>`, fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`, encryption subkey `4658 C849 42D2 6C06 AC33  2DA2 7E2B F026 0DA3 98D1`), and `gh secret list -R jumppad-labs/xcl-plugin-template` shows `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE`.
+State after the plan review: the shared jumppad-labs signing key exists (Ed25519, created 2026-10-10, no expiry, uid `Jumppad Labs (Jumppad Plugin GPG Key) <hello@jumppad.dev>` (an earlier misspelt uid is revoked in the published key), fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`, encryption subkey `4658 C849 42D2 6C06 AC33  2DA2 7E2B F026 0DA3 98D1`), and `gh secret list -R jumppad-labs/xcl-plugin-template` shows `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE`.
 
 **File changes**:
 
@@ -135,15 +135,21 @@ State after the plan review: the shared jumppad-labs signing key exists (Ed25519
 
 mDMEasoRExYJKwYBBAHaRw8BAQdAiVnm3jhaS5Brb7Hp61aUJZrclX2hhDBzgDC0
 df8vOo60N0p1bXBwYWQgTGFicyAoSnVtcGFkIFBsdWdpbiBHUEcgS2UpIDxoZWxs
-b0BqdW1wcGFkLmRldj6IkAQTFgoAOBYhBBW9poQ6H6Dq0apRkPd12gCv1LUCBQJq
-yhETAhsDBQsJCAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJEPd12gCv1LUC0nMBAJF+
-m4iGchVAhzPDHCVWdx3X/OTSpItcqHm/byA5RcxWAQD7SnO9QY+2c4a0vUY+CpzB
-PCzWsn+FFN/qetAOwkr2Crg4BGrKERMSCisGAQQBl1UBBQEBB0AxMJ6SfExDWfuG
-IzCZpKi3k2LsJmzYhUFp4BDkpyGfFwMBCAeIeAQYFgoAIBYhBBW9poQ6H6Dq0apR
-kPd12gCv1LUCBQJqyhETAhsMAAoJEPd12gCv1LUC5PIA/jAsGdQ7f7BACOBL3Ham
-Zmkv70nnMiQW6GZdXyrCdXz9AP99NcaaWmzcTUPv9NPICAdHQWlyc+gKtzbIyWGG
-myePBg==
-=nhJ1
+b0BqdW1wcGFkLmRldj6IeAQwFgoAIBYhBBW9poQ6H6Dq0apRkPd12gCv1LUCBQJq
+yhaUAh0gAAoJEPd12gCv1LUCqYMBANxfzxjOaTPslIisTvUWceKlq4SYZGhZrF6Y
+5qD5Rpb0AQDogyZzlsvtSG9lIrsWM6egFJossJgt/3M9Y3fTMwXfDoiQBBMWCgA4
+FiEEFb2mhDofoOrRqlGQ93XaAK/UtQIFAmrKERMCGwMFCwkIBwIGFQoJCAsCBBYC
+AwECHgECF4AACgkQ93XaAK/UtQLScwEAkX6biIZyFUCHM8McJVZ3Hdf85NKki1yo
+eb9vIDlFzFYBAPtKc71Bj7ZzhrS9Rj4KnME8LNayf4UU3+p60A7CSvYKtDlKdW1w
+cGFkIExhYnMgKEp1bXBwYWQgUGx1Z2luIEdQRyBLZXkpIDxoZWxsb0BqdW1wcGFk
+LmRldj6IkAQTFgoAOBYhBBW9poQ6H6Dq0apRkPd12gCv1LUCBQJqyhYvAhsDBQsJ
+CAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJEPd12gCv1LUCrNcA/2XkqpC24/cwni9Q
+tm66QOvEheMn4nolShVi/ohIxtfAAP4q49hY8jqERIZcYQVDRN75EPPV3hedFRid
+ettOV0coCbg4BGrKERMSCisGAQQBl1UBBQEBB0AxMJ6SfExDWfuGIzCZpKi3k2Ls
+JmzYhUFp4BDkpyGfFwMBCAeIeAQYFgoAIBYhBBW9poQ6H6Dq0apRkPd12gCv1LUC
+BQJqyhETAhsMAAoJEPd12gCv1LUC5PIA/jAsGdQ7f7BACOBL3HamZmkv70nnMiQW
+6GZdXyrCdXz9AP99NcaaWmzcTUPv9NPICAdHQWlyc+gKtzbIyWGGmyePBg==
+=SpVi
 -----END PGP PUBLIC KEY BLOCK-----
 ```
 
