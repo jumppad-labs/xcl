@@ -7,6 +7,8 @@ created_date: "2026-10-09"
 ## Decisions
 - **Changelog entry per spec.** Plans involved: github-releases-registry, plugin-template, docker-example-standard-layout. The registry and template plans each wrote a top `CHANGELOG.md` entry headed with the spec name (prose, then a **Breaking:** list); the docker-example plan left the changelog to the implement workflow. Outcome: every plan writes its own entry in that format; the docker-example plan's "Update the README and guides to the new layout" task now adds it, with a **Breaking:** list naming the plugin's move to its own module and the removed `resources/`, `client/` and `main.go`.
 - **GitHub registry wraps the local registry (review).** Plan involved: github-releases-registry. Outcome: the registry is a download-and-cache wrapper on `registry.Local`; each plugin start downloads if needed, verifies, then starts through `registry.Executable`. The verifying host that re-checked on every catalog `Restart` was dropped.
+- **No GoReleaser (review).** Plans involved: plugin-template, github-releases-registry; design `plugin-release-assets.md`. Outcome: the template packages releases with `make dist` (go build per platform, tar/zip, `sha256sum`), signs the checksums with plain `gpg` (no `crazy-max/ghaction-import-gpg`) and publishes with `gh release create`; the design's "Producing it" section and the registry plan's signature question were reworded to match.
+- **Release signing key published on xcl.dev (review).** Plan involved: plugin-template. Outcome: the shared jumppad-labs Ed25519 key (fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`) is served at `https://xcl.dev/keys/jumppad-labs-releases.asc` by an xcl-website agent task, with its fingerprint on the plugin template page.
 
 ## Order added for shared files
 - Added: `20261009102148-7d0b205b-github-releases-registry` now depends on `20261009102138-48e95432-docker-example-standard-layout`. Both change `xclconfig:go.sum`, `xclconfig:README.md`, `xclconfig:docs/plugins.md`, `xclconfig:CHANGELOG.md`.
@@ -75,7 +77,7 @@ A hosted registry or marketplace (`NewRemote` stays unbuilt); discovery or searc
 - "Cached plugins are re-verified before each start" is read as each `Plugin.Start` (once per `Config` load), not each catalog `Restart` before an operation; tampering during a long-running `Config` is caught at the next load. Re-verifying on every restart through a wrapping host was dropped at review.
 - The GitHub registry depends on the local registry's unexported `add` and `localEntry`.
 - The archive stays in the cache so a cached plugin can be re-checked offline.
-- Open for implementation: if go-crypto can't verify a real GoReleaser signature, the implementer stops and asks rather than loosening verification.
+- Open for implementation: if go-crypto can't verify the gpg signature a real template release produces, the implementer stops and asks rather than loosening verification.
 
 ### Project-wide rules
 - Changelog: one top `CHANGELOG.md` entry headed with the spec name, prose then a **Breaking:** list; the new dependency and its reason are recorded there.
@@ -97,16 +99,14 @@ A hosted registry or marketplace (`NewRemote` stays unbuilt); discovery or searc
 
 ## 20261009092551-82db0140-plugin-template
 ### Approach
-A new GitHub template repository, `jumppad-labs/xcl-plugin-template` (created, pushed and marked as a template during the plan review, registered as `xcl-plugin-template` with its root at the local checkout), built exactly to `plugin-layout.md`, releasing per `plugin-release-assets.md`. The sample is one domain, `notes`, with resource `notes "note"` writing a note to a file through a narrow `client/files` interface with a strict Mockery double. An exported `ReplaceSettings` list (`directory`, `name`) drives an explicit `Changed`; `Update` acts only on the changes it is told. No host app: `e2e/` holds in-process and external lifecycle tests, and `e2e/stateonly` reads applied notes using only `entities` as the behavioural proof that entity types stand alone. GitHub Actions run CI on every change, a snapshot GoReleaser build and a weekly run against the latest xcl; a tag-triggered GoReleaser release signs with a GPG key from repository secrets. Docs: new `docs/plugin-layout.md` in xcl plus links and changelog entry, and a new xcl-website page with nav entry.
+A new GitHub template repository, `jumppad-labs/xcl-plugin-template` (created, pushed and marked as a template during the plan review, registered as `xcl-plugin-template` with its root at the local checkout), built exactly to `plugin-layout.md`, releasing per `plugin-release-assets.md`. The sample is one domain, `notes`, with resource `notes "note"` writing a note to a file through a narrow `client/files` interface with a strict Mockery double. An exported `ReplaceSettings` list (`directory`, `name`) drives an explicit `Changed`; `Update` acts only on the changes it is told. No host app: `e2e/` holds in-process and external lifecycle tests, and `e2e/stateonly` reads applied notes using only `entities` as the behavioural proof that entity types stand alone. GitHub Actions run CI on every change, a snapshot `make dist` of all six platforms and a weekly run against the latest xcl; a pushed version tag runs `make dist`, signs the checksums with plain gpg from repository secrets and publishes with `gh release create`. Docs: new `docs/plugin-layout.md` in xcl plus links and changelog entry, and a new xcl-website page with nav entry.
 
 ### Milestones and tasks
 - M1, a new plugin builds, tests and applies from the template: scaffold the module and files client; note entity and provider; plugin type, program and sample configuration; e2e and state-reader tests; template README.
-- M2, CI and signed releases: continuous integration; signed release automation; add the release signing key (person); publish an xcl release with the current plugin contract (person); pin the template to that release; publish the template's first signed release (person).
-- M3, docs: document the standard plugin layout (xcl); add the plugin template page to the site (xcl-website).
+- M2, CI and signed releases: continuous integration; signed release automation; publish the template's first signed release (person).
+- M3, docs: document the standard plugin layout (xcl); publish the jumppad-labs release signing public key at `https://xcl.dev/keys/jumppad-labs-releases.asc` (xcl-website); add the plugin template page to the site, with the key's fingerprint (xcl-website).
 
 ### Tasks for a person
-- Generate a GPG signing key and add it to the repository secrets (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`).
-- Cut an xcl release newer than `v0.1.0` (which predates `entity.PropertyChange`).
 - Push the template's first release tag.
 
 ### Out of scope
@@ -119,20 +119,20 @@ An in-process vs external parity test; a hosted registry or marketplace; porting
 - Any replaced dependency means replace, with a comment on where to narrow it.
 - Release, CI, `.gitignore` and `LICENSE` are repository tooling, not layout parts.
 - Every `Files` method takes `ctx` and returns the client's own `Info` type.
-- The template pins an xcl pseudo-version until a person cuts a release.
+- The template requires xcl `v0.1.1`, tagged during the plan review, which carries the current plugin contract.
 - Signing key RSA 4096 or Ed25519, both verifiable by the registry's OpenPGP library.
-- Open for implementation: whether `xcl.FindByType[entities.Note]` reads state when the plugin runs from its binary, and whether the GoReleaser signature verifies with the registry's library; if not, stop and ask.
+- Open for implementation: whether `xcl.FindByType[entities.Note]` reads state when the plugin runs from its binary, and whether the gpg signature the release workflow produces verifies with the registry's library; if not, stop and ask.
 
 ### Project-wide rules
 - Changelog: one top `CHANGELOG.md` entry in xcl headed with the spec name, prose then a **Breaking:** list ("- None.").
-- Release asset contract implemented with GoReleaser name templates matching `plugin-release-assets.md`; Windows `.zip`; armoured detached `.sig` over the checksums; `project_name` = repo name = plugin name.
-- Signing: GPG key in repo secrets, imported with `crazy-max/ghaction-import-gpg`; a missing key fails the release.
+- Release asset contract implemented by `make dist` (go build per platform, tar/zip with the binary at the archive root, `sha256sum`) matching `plugin-release-assets.md`; Windows `.zip`; armoured detached `.sig` over the checksums; plugin name = repo name. No GoReleaser (user decision at review).
+- Signing: the shared jumppad-labs Ed25519 key (fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`) in repo secrets, imported with plain `gpg --batch --import` and used for `gpg --armor --detach-sign`; the workflow fails before publishing when the key secret is empty. Its public key is served from the documentation site at `https://xcl.dev/keys/jumppad-labs-releases.asc`, with the fingerprint printed on the plugin template page.
 - The written layout guide is `docs/plugin-layout.md` in xcl, owned by this plan.
 - `README.md`, `docs/README.md` and `docs/plugin-developer-guide.md` are shared with the docker plan; whichever lands second rebases.
 - Site nav: Guides entry "Plugin template" at `/plugin-template/`, linking to `/github-registry/`.
-- Plugin contract used unchanged; needs an xcl release newer than `v0.1.0`.
-- No tests read README, docs, changelog, workflow or GoReleaser files.
-- Third-party tools pinned and run without installing (Mockery v3.8.0, staticcheck, GoReleaser v2).
+- Plugin contract used unchanged; the template requires xcl `v0.1.1`.
+- No tests read README, docs, changelog, workflow or Makefile release targets.
+- Third-party tools pinned and run without installing (Mockery v3.8.0, staticcheck); release packaging uses only go, tar/zip, sha256sum, gpg and gh.
 
 ### Manual checks
 - A new author goes from "Use this template" to a working plugin in under 15 minutes using only the README.

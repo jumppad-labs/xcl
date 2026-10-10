@@ -18,9 +18,9 @@ This plan publishes the standard xcl plugin layout as a GitHub template reposito
 
 ## Conventions
 
-- **Testing & Mocking (testify `require`, Mockery, no table-driven tests, positive and negative cases in separate functions, tests beside their source, no tests that read repository files)** — the spec makes these the template's own test rules; every provider and client behaviour gets its own test function beside its source, and no test asserts on the README, docs, CHANGELOG, CI workflows or GoReleaser config (those are human-reviewed), nor greps imports to prove the entity types stand alone.
+- **Testing & Mocking (testify `require`, Mockery, no table-driven tests, positive and negative cases in separate functions, tests beside their source, no tests that read repository files)** — the spec makes these the template's own test rules; every provider and client behaviour gets its own test function beside its source, and no test asserts on the README, docs, CHANGELOG, CI workflows or the Makefile's release targets (those are human-reviewed), nor greps imports to prove the entity types stand alone.
 - **Code style (gofmt, go vet, descriptive names, `any`, semantic import grouping)** — applies to all template Go code, and `gofmt`/`go vet` run in the template's CI.
-- **Dependencies: prefer the standard library, document third-party reasons, pin versions** — the files backend uses only `os`, `io/fs`, `crypto/sha256`; the template's only third-party modules are xcl and testify, with Mockery, staticcheck and GoReleaser pinned to exact versions and run through `go run` or a pinned action, each reason given in the README.
+- **Dependencies: prefer the standard library, document third-party reasons, pin versions** — the files backend uses only `os`, `io/fs`, `crypto/sha256`; the template's only third-party modules are xcl and testify, with Mockery and staticcheck pinned to exact versions and run through `go run`, each reason given in the README; release packaging uses only go, tar, zip, sha256sum, gpg and gh, already on the GitHub runner, so it adds no tool to pin.
 - **Patterns & architecture: dependency injection, `context.Context`** — the provider takes its `Files` client through its constructor so tests inject the strict double; provider methods honour the `ctx` they are given.
 - **Project structure: `/cmd` for main applications** — matches the layout design's `cmd/<plugin>/main.go`; the design's tree governs everything else in the template.
 - **Development standards: structured logs** — the provider logs through `plugins.Logger(ctx)` with key/value pairs (`path`, `checksum`), as the existing examples do.
@@ -38,7 +38,7 @@ The plugin template is a new GitHub template repository, `jumppad-labs/xcl-plugi
 
 **Both ways of running, without a host program.** The design names no place for a host application, and the "One shape everywhere" metric forbids a part in an unnamed place, so the in-process and external registrations live in `e2e/`: one test registers `&notes.Plugin{}` with `registry.NewLocal().RegisterPlugin`, another builds `cmd/notes` and registers the binary with `RegisterExternalPlugin`; each applies `examples/basic/main.xcl`, requires the next `Diff` to report no changes, and destroys, in its own test function (not the parity comparison the spec excludes). A separate package, `e2e/stateonly`, imports only xcl, the registry and `entities`, applies through the built binary, and reads the notes back into `entities.Note` with `xcl.FindByType`, which is the behavioural proof that the entity types stand alone (the knowledge base forbids proving it by grepping imports). The README quotes the registration code from these tests and gives one make target each for building, testing, regenerating the Mockery double (pinned and run without installing, as the plugin example does), the in-process run, the external run and tagging a release.
 
-**Checks and signed releases.** GitHub Actions, as the Technical Approach fixes: a CI workflow on every push and pull request builds, runs `go vet`, a `gofmt` check and pinned `staticcheck`, runs the whole suite including `e2e`, and runs a GoReleaser snapshot build so every platform build and the release config are checked on each change; a scheduled workflow re-runs the suite against the latest xcl release (the "stays current" metric). A release workflow on `v*` tags imports the GPG key held as repository secrets and runs GoReleaser, whose defaults give the contract's archive and checksum names (`project_name` is left to default to the repository name, which is the plugin name the contract fixes, so a repository made from the template names its own assets), with `format_overrides` for Windows `.zip`, linux/darwin/windows × amd64/arm64, and a `signs` step writing an ASCII-armoured detached `<checksums>.sig`. A missing key fails the workflow, so an unsigned release is never published. Rejected alternatives — a generator, two templates, a template inside the xcl repo, a host program, hand-rolled release scripts, import-grepping checks — are recorded with evidence in `research.md#alternatives-considered-and-rejected`.
+**Checks and signed releases.** GitHub Actions, as the Technical Approach fixes: a CI workflow on every push and pull request builds, runs `go vet`, a `gofmt` check and pinned `staticcheck`, runs the whole suite including `e2e`, and runs `make dist` with a snapshot version so every platform build and the release packaging are checked on each change; a scheduled workflow re-runs the suite against the latest xcl release (the "stays current" metric). Release packaging uses only go, tar, zip, sha256sum, gpg and gh (user decision at review): `make dist VERSION=vX.Y.Z` cross-compiles `./cmd/notes` with `CGO_ENABLED=0 go build -trimpath` for linux/darwin/windows × amd64/arm64 into a binary named after the repository (the plugin name the contract fixes, held in the Makefile's `PLUGIN`, so a repository made from the template names its own assets), packs each at the archive root into the contract's `<name>_<version>_<os>_<arch>.tar.gz` (`.zip` on Windows, version without the leading `v`) and writes `<name>_<version>_checksums.txt` with `sha256sum`, all into `dist/`. A release workflow on `v*` tags fails before publishing when the `GPG_PRIVATE_KEY` secret is empty, runs `make dist` for the tag, imports the key with `gpg --batch --import`, signs the checksums file into an ASCII-armoured detached `<checksums>.sig` with `gpg`, and publishes `dist/*` with `gh release create` using the workflow's `GITHUB_TOKEN`, so an unsigned release is never published. Rejected alternatives — a generator, two templates, a template inside the xcl repo, a host program, a third-party release tool, a third-party key-import action, import-grepping checks — are recorded with evidence in `research.md#alternatives-considered-and-rejected`.
 
 ## Component Breakdown
 
@@ -52,8 +52,8 @@ The plugin template is a new GitHub template repository, `jumppad-labs/xcl-plugi
 - **Sample configuration (new, template)** — one example configuration with a note whose directory is a variable, applied by the end-to-end tests and the README's commands.
 - **End-to-end suite (new, template)** — builds the plugin program, then applies the sample configuration, confirms the next plan reports no changes and destroys it: once with the plugin registered in-process and once registered as a separate program, each in its own test. A separate state-reader test, depending only on xcl and the entity package, reads applied notes back from state into the entity type.
 - **Build tooling (new, template)** — the make targets an author uses (build, test, generate, in-process and external runs, release), the Mockery configuration, and pinned versions of Mockery and the static-check tool run without installing them.
-- **Continuous integration (new, template)** — GitHub Actions on every push and pull request: build, static checks, the full suite and a snapshot release build of every platform; plus a scheduled run against the latest xcl release.
-- **Release automation (new, template)** — GoReleaser configuration and a tag-triggered GitHub Actions workflow that imports the signing key from repository secrets and publishes archives for linux, darwin and windows on amd64 and arm64, the checksums file and its armoured detached signature, exactly as the release asset contract names them; it fails rather than publish unsigned.
+- **Continuous integration (new, template)** — GitHub Actions on every push and pull request: build, static checks, the full suite and a snapshot `make dist` build of every platform; plus a scheduled run against the latest xcl release.
+- **Release automation (new, template)** — a `make dist` target that builds, archives and checksums every platform, and a tag-triggered GitHub Actions workflow that imports the signing key from repository secrets with gpg, signs the checksums and publishes with `gh` archives for linux, darwin and windows on amd64 and arm64, the checksums file and its armoured detached signature, exactly as the release asset contract names them; it fails rather than publish unsigned.
 - **Template README (new, template)** — the author's guide: start from the template, make it yours, build, test, regenerate doubles, run in-process and as a separate program, add a resource of your own, publish the signing key, release, and install with the GitHub registry.
 - **Plugin layout guide (new, `xcl` docs)** — the written standard layout: the tree, what each part holds, file order, the change decision and told-only update, the test shape, and where to start from the template. Linked from the docs index, the plugin developer guide and the README.
 - **Changelog (changed, `xcl`)** — one entry for this spec recording the layout guide and the template.
@@ -140,7 +140,7 @@ func (p *Plugin) Init(logger logger.Logger, state plugins.State) error // regist
 
 ## Implementation Detail
 
-**A new kind of deliverable: a repository authors copy.** Everything in the template is written to be read and copied, so it favours the obvious over the clever: one resource, one backend, one sample configuration, doc comments that say what an author changes and why, and no helpers that hide a lifecycle step. The template is the first place the standard layout exists in full, so its shape *is* the layout: a reader who opens it sees the design's tree and nothing else beyond repository tooling (Makefile, Mockery and GoReleaser config, GitHub workflows, licence).
+**A new kind of deliverable: a repository authors copy.** Everything in the template is written to be read and copied, so it favours the obvious over the clever: one resource, one backend, one sample configuration, doc comments that say what an author changes and why, and no helpers that hide a lifecycle step. The template is the first place the standard layout exists in full, so its shape *is* the layout: a reader who opens it sees the design's tree and nothing else beyond repository tooling (Makefile, Mockery config, GitHub workflows, licence).
 
 **Patterns followed from the existing examples.** The plugin follows the docker example's proven shape — a plugin type whose `Init` builds clients once and registers each type with a constructor-built provider, a narrow client interface with a real implementation and a Mockery double, provider unit tests that inject the double through the constructor — and xcl's local registry for both registrations. Mockery is configured and run the way the plugin example runs it (pinned, through `go run`, so nothing is installed), and CI follows the xcl repository's workflow (checkout, set up Go, build, vet, test).
 
@@ -150,7 +150,7 @@ func (p *Plugin) Init(logger logger.Logger, state plugins.State) error // regist
 - *Update branches on what changed.* `Update` walks the reported changes and does the least work each one needs, taking previous values only from `Before`, and keeps what a later decision needs (the checksum) as a computed value, so no step ever looks the resource up to find out what it was.
 - *A test for each rule, in its own function.* The provider tests are a readable list — create writes, read fills computed values, read of a missing file reports not found, each replace setting replaces, a replaced dependency replaces, an updated dependency alone does not replace, a content change updates, no change defers, a content update writes only, a mode update changes only the mode, destroy removes — each against a fresh strict double, positive and negative cases apart.
 - *Registration lives in tests.* With no host program, the e2e tests are the canonical examples of registering the plugin in-process and as a separate program, and the README quotes them; the state-reader test sits in its own package so its build graph proves the entity package stands alone.
-- *Release by tag only.* Releasing is pushing a tag; the workflow, the signing key in secrets and GoReleaser do the rest. The same GoReleaser config runs unsigned as a snapshot in CI so a broken release config fails on the change that broke it, not on release day.
+- *Release by tag only.* Releasing is pushing a tag; the workflow, the signing key in secrets, `make dist`, gpg and `gh` do the rest. The same `make dist` runs unsigned with a snapshot version in CI so broken release packaging fails on the change that broke it, not on release day.
 
 **Documentation shape.** The template README is task-ordered (start, make it yours, build, test, generate, run both ways, add a resource, release, install), one command per task. The `xcl` layout guide is the prose form of the layout design, pointing to the template as its worked example; the plugin developer guide, docs index and README point to it rather than repeating it. The site page summarises the same layout and the author's path from "Use this template" to an installed plugin, and defers to the GitHub registry guide for the application side, so no page restates another's detail.
 
@@ -159,14 +159,13 @@ func (p *Plugin) Init(logger logger.Logger, state plugins.State) error // regist
 ## Dependencies
 
 - **Design `plugin-layout.md` from the `design` design source** — the settled plugin layout this plan builds the template and the layout guide to: the tree, what each part holds, file order, the explicit `Changed`, the told-only `Update`, and the test shape. No change needed.
-- **Design `plugin-release-assets.md` from the `design` design source** — the settled release layout the template's GoReleaser configuration publishes: tag form, archive, checksums and signature names and formats, binary at the archive root, platforms. No change needed.
+- **Design `plugin-release-assets.md` from the `design` design source** — the settled release layout the template's `make dist` and release workflow publish (its "Producing it" section accepts any tool that produces the same names and formats): tag form, archive, checksums and signature names and formats, binary at the archive root, platforms. No change needed.
 - **Plan `20261009102148-7d0b205b-github-releases-registry` (final; must land before the template's install docs are finished)** — provides `registry.NewGitHub`, `RegisterPlugin("owner/repo", "vX.Y.Z")` and `GitHubTrustedKeys`, which the template README and the site page show for installing a released plugin, and the site's GitHub registry guide this plan's page links to. The template's code and tests do not depend on it.
 - **Sibling plan `20261009102138-48e95432-docker-example-standard-layout` (independent)** — rebuilds the docker example to the same layout and leaves the written layout guide to this plan; nothing needs to land first, but both edit the README and `docs/` guides, so whichever lands second rebases its doc edits.
-- **xcl module (`github.com/jumppad-labs/xcl`, existing, unchanged)** — the plugin contract (`plugins`, `entity`, `types`, `logger`), `registry.NewLocal`, `Config` operations and query functions. The template must require a version that contains the current contract (`entity.PropertyChange`, the `changes` parameter): only `v0.1.0` is tagged and it predates that, so the template pins a pseudo-version of a pushed xcl commit until **a person cuts an xcl release** with the epic's changes, then pins that release.
+- **xcl module (`github.com/jumppad-labs/xcl`, existing, unchanged)** — the plugin contract (`plugins`, `entity`, `types`, `logger`), `registry.NewLocal`, `Config` operations and query functions. The template must require a version that contains the current contract (`entity.PropertyChange`, the `changes` parameter): `v0.1.1`, tagged during the plan review, contains it, so the template requires `v0.1.1` from the start.
 - **GitHub (external service)** — hosts the template repository (marked as a template), runs GitHub Actions, holds the signing key as repository secrets and serves releases. Creating the repository under `jumppad-labs` and adding the secrets are tasks for a person.
-- **GoReleaser v2 (external tool, pinned)** — builds, archives, checksums and signs releases; run by `goreleaser/goreleaser-action` in the release workflow and as a snapshot in CI.
-- **`crazy-max/ghaction-import-gpg` (GitHub Action, pinned)** — imports the GPG key from secrets for GoReleaser's `signs` step.
-- **GnuPG key (external, made by a person)** — an RSA 4096 or Ed25519 signing key, both of which the registry's OpenPGP library verifies; its public key is published for applications to trust.
+- **Release tools on the GitHub runner (go, tar, zip, sha256sum, gpg and gh; preinstalled on `ubuntu-latest`, nothing extra installed or pinned)** — `make dist` builds, archives and checksums every platform; `gpg` imports the key from secrets and signs the checksums; `gh release create` publishes with the workflow's `GITHUB_TOKEN`.
+- **GnuPG key (external, made by a person)** — the shared jumppad-labs Ed25519 release signing key (fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`), which the registry's OpenPGP library verifies; its public key is published on the documentation site at `https://xcl.dev/keys/jumppad-labs-releases.asc` for applications to trust.
 - **Mockery v3 (`github.com/vektra/mockery/v3`, pinned, run with `go run`)** — generates the files client double, as in the plugin example.
 - **staticcheck (`honnef.co/go/tools`, pinned, run with `go run`)** — static checks in CI.
 - **testify (`github.com/stretchr/testify`, pinned)** — `require` and the mock runtime the generated double uses.
@@ -183,11 +182,11 @@ func (p *Plugin) Init(logger logger.Logger, state plugins.State) error // regist
 - **Plugin type test** — `Init` registers `notes "note"` without touching the filesystem.
 - **End-to-end tests** — build the plugin program once per run; then, in separate test functions, register the plugin in-process and as a separate program, apply the sample configuration into a temporary directory, require the next `Diff` to report no changes, require the note file to exist with the configured content, and destroy, requiring the file gone. Two more e2e functions edit the applied configuration (via variables or a second sample in the test's temp dir) and require the plan to show the note replaced for a `name` change and updated for a `content` change, satisfying the "editing a setting that needs a replace replaces" criterion end to end. State always comes from a real first apply.
 - **State-reader test** — in its own package depending only on xcl, the registry and `entities`: applies through the built plugin program, then reads the notes back from state into `entities.Note` with xcl's typed query and checks their values.
-- **CI** runs build, `go vet`, the `gofmt` check, staticcheck, the whole suite (unit and e2e, no external service needed) and a GoReleaser snapshot build of all six platforms, on every push and pull request.
+- **CI** runs build, `go vet`, the `gofmt` check, staticcheck, the whole suite (unit and e2e, no external service needed) and a snapshot `make dist` build of all six platforms, on every push and pull request.
 
-All tests follow the project rules the spec adopts: testify `require`, Mockery doubles, no table-driven tests, one behaviour per function with positive and negative cases apart, tests beside the code they test. No test reads the README, docs, CHANGELOG, workflow or GoReleaser files; those are reviewed by a person.
+All tests follow the project rules the spec adopts: testify `require`, Mockery doubles, no table-driven tests, one behaviour per function with positive and negative cases apart, tests beside the code they test. No test reads the README, docs, CHANGELOG, workflow files or the Makefile's release targets; those are reviewed by a person.
 
-**Load-bearing assertions.** A fresh template builds, passes, applies, plans no changes and destroys with nothing else running, both in-process and as a separate program; the replace-only settings replace and every other setting updates, in unit tests and in a real plan; `Update` makes exactly the calls its reported changes need, and any lookup of previous state fails the test; an application with only `entities` reads applied notes from state; the release config builds every supported platform on every change.
+**Load-bearing assertions.** A fresh template builds, passes, applies, plans no changes and destroys with nothing else running, both in-process and as a separate program; the replace-only settings replace and every other setting updates, in unit tests and in a real plan; `Update` makes exactly the calls its reported changes need, and any lookup of previous state fails the test; an application with only `entities` reads applied notes from state; `make dist` builds every supported platform on every change.
 
 **Success metrics.**
 
@@ -206,7 +205,7 @@ All tests follow the project rules the spec adopts: testify `require`, Mockery d
 - **Manual — captured in the implementation test plan**: confirm the template repository appears in the project's registered repositories, with a description and a root on disk.
 - **Manual — captured in the implementation test plan**: build the documentation site, check the new page and its nav entry in a browser, and review the layout guide, README links and changelog entry for accuracy.
 
-**Deliberate gaps.** No in-process vs external parity test (spec non-goal). No automated check of file order or layout conformance (review only, per the knowledge base). Release signing is not exercised in CI (the snapshot build skips signing; the tagged release is the manual check). Cross-platform binaries are built in CI but only run on linux.
+**Deliberate gaps.** No in-process vs external parity test (spec non-goal). No automated check of file order or layout conformance (review only, per the knowledge base). Release signing is not exercised in CI (the CI `make dist` build is not signed; the tagged release is the manual check). Cross-platform binaries are built in CI but only run on linux.
 
 ## Milestones & Tasks
 
@@ -327,64 +326,34 @@ Adds GitHub Actions workflows that build, run static checks and run the whole te
 - ac83d914-869d-44a3-ac37-55a42374d985 — Write the template README
 **Execution:** agent
 
-Adds the GoReleaser configuration and a tag-triggered workflow that imports the signing key from repository secrets and publishes the release asset contract exactly: an archive per platform, the checksums file and its armoured signature. CI gains a snapshot build of the same configuration, a make command tags a release, and the README explains creating and publishing the signing key, releasing, and installing the plugin with the GitHub registry.
+Adds a `make dist` target that builds, archives and checksums every platform with only standard tools, and a tag-triggered workflow that imports the signing key from repository secrets with gpg, signs the checksums and publishes with `gh`, producing the release asset contract exactly: an archive per platform, the checksums file and its armoured signature. CI gains a snapshot `make dist` build, a make command tags a release, and the README explains creating and publishing the signing key, releasing, and installing the plugin with the GitHub registry.
 
 *Technical detail:* [context.md#task-add-signed-release-automation](./context.md#task-add-signed-release-automation)
 
 **Acceptance criteria**:
-- [ ] A snapshot build on every change produces archives for linux, darwin and windows on amd64 and arm64 and a checksums file, named as the release asset contract requires, with the binary at each archive's root.
+- [ ] A snapshot `make dist` build on every change produces archives for linux, darwin and windows on amd64 and arm64 and a checksums file, named as the release asset contract requires, with the binary at each archive's root.
 - [ ] A pushed version tag runs a release that signs the checksums file with an armoured detached signature, and fails instead of publishing when the signing key is missing.
-- [ ] The README shows one command to release and explains making the key, adding the secrets, publishing the public key and installing the plugin with the GitHub registry.
+- [ ] The README shows one command to release and explains making the key, adding the secrets, publishing the public key (for the template itself, the jumppad-labs key at `https://xcl.dev/keys/jumppad-labs-releases.asc`) and installing the plugin with the GitHub registry.
 
-#### - [ ] Task: Add the release signing key to the template
+#### - [ ] Task: Publish the release signing public key
 **Id:** 3517eb9d-6f32-4f02-b513-fe33dcfdf929
-**Repo:** xcl-plugin-template
-**Depends on:**
-- 7eddb09e-52fe-482e-b7d8-912ce6629d98 — Add signed release automation
-**Execution:** human — needs a GPG signing key and access to the repository's secrets
-
-Creates the GPG key that signs the template's releases, stores the armoured private key and passphrase as repository secrets, and publishes the public key where applications can fetch and trust it, as the README describes.
-
-*Technical detail:* [context.md#task-add-the-release-signing-key-to-the-template](./context.md#task-add-the-release-signing-key-to-the-template)
-
-**Acceptance criteria**:
-- [ ] The template repository holds the signing key and passphrase as secrets under the names the release workflow reads.
-- [ ] The public key is published at the location the README names.
-
-#### - [ ] Task: Publish an xcl release with the current plugin contract
-**Id:** d5751259-087b-4020-8aed-c524ccab2163
-**Repo:** xcl
+**Repo:** xcl-website
 **Depends on:** none
-**Execution:** human — tagging and publishing an xcl release is a release action outside the repository's code
-
-Tags and publishes an xcl release that contains the plugin contract the template builds to (the changed settings given to `Changed` and `Update`), once the epic's work is on the main branch. The template can then require a real release rather than a commit, and its weekly check has a latest release to run against.
-
-*Technical detail:* [context.md#task-publish-an-xcl-release-with-the-current-plugin-contract](./context.md#task-publish-an-xcl-release-with-the-current-plugin-contract)
-
-**Acceptance criteria**:
-- [ ] An xcl release newer than v0.1.0, containing the current plugin contract, is published and resolvable as a Go module version.
-
-#### - [ ] Task: Pin the template to the xcl release
-**Id:** b8211ebb-2eb0-492c-a1e3-6815b380c285
-**Repo:** xcl-plugin-template
-**Depends on:**
-- d5751259-087b-4020-8aed-c524ccab2163 — Publish an xcl release with the current plugin contract
-- 4fe70fb5-cd5b-48c8-b96b-7670d77f3520 — Add the template's continuous integration
 **Execution:** agent
 
-Moves the template's xcl requirement from a development commit to the published xcl release, so a repository made from the template builds against a real version and the weekly check compares like with like.
+Publishes the shared jumppad-labs release signing public key on the documentation site, at a stable URL the project controls (`https://xcl.dev/keys/jumppad-labs-releases.asc`), so applications can fetch it and pass it to the GitHub registry's trusted keys. The key itself was created during the plan review: an Ed25519 key, fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`, whose private key and passphrase are the template repository's `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` secrets. Its full armoured text is in the technical detail.
 
-*Technical detail:* [context.md#task-pin-the-template-to-the-xcl-release](./context.md#task-pin-the-template-to-the-xcl-release)
+*Technical detail:* [context.md#task-publish-the-release-signing-public-key](./context.md#task-publish-the-release-signing-public-key)
 
 **Acceptance criteria**:
-- [ ] The template requires the published xcl release and all its checks pass against it.
+- [ ] The site serves the armoured public key at `https://xcl.dev/keys/jumppad-labs-releases.asc`, byte-for-byte the key in the technical detail.
+- [ ] `gpg --show-keys` on the served file shows the fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`.
 
 #### - [ ] Task: Publish the template's first signed release
 **Id:** ee6af539-3526-4182-8f27-1c95ac3f0254
 **Repo:** xcl-plugin-template
 **Depends on:**
-- 3517eb9d-6f32-4f02-b513-fe33dcfdf929 — Add the release signing key to the template
-- b8211ebb-2eb0-492c-a1e3-6815b380c285 — Pin the template to the xcl release
+- 3517eb9d-6f32-4f02-b513-fe33dcfdf929 — Publish the release signing public key
 **Execution:** human — pushing a release tag publishes a release, an action outside the repository's code
 
 Pushes the template's first version tag, so a real signed release in the contract's layout exists for authors to see and for the GitHub registry to be checked against.
@@ -422,6 +391,7 @@ Adds a plugin layout guide to the project's docs describing the standard layout,
 **Depends on:**
 - eb96f101-c793-47ff-901e-69d0f0a90aff — Document the standard plugin layout in the repository
 - 7eddb09e-52fe-482e-b7d8-912ce6629d98 — Add signed release automation
+- 3517eb9d-6f32-4f02-b513-fe33dcfdf929 — Publish the release signing public key
 **Execution:** agent
 
 Adds a documentation site page explaining the standard plugin layout and how to start a plugin from the template, build and test it, release it signed and install it with the GitHub registry. The page is added to the Guides navigation and linked from the registries and plugin example pages.
@@ -436,7 +406,7 @@ Adds a documentation site page explaining the standard plugin layout and how to 
 ## Open Questions
 
 - **Can a state reader that registers no plugin type for `notes "note"` decode applied notes into `entities.Note`?** This depends on how xcl's typed query treats a plugin entity when the plugin is loaded from its binary, which only running it shows. The planned state-reader test registers the binary and queries into `entities.Note`. If the conversion fails, or the test can only pass by importing the plugin's root package, STOP and ask the user. Do not weaken the "entity types stand alone" criterion.
-- **Does the GPG signature that GoReleaser's `signs` step produces verify with the GitHub registry's OpenPGP library?** This depends on the key the person creates and on the first real release. If the registry install in the manual checks rejects a genuine signed release, STOP and ask the user. Do not loosen signing or verification.
+- **Does the armoured detached signature the template's release workflow produces with gpg verify with the GitHub registry's OpenPGP library?** This depends on the key the person creates and on the first real release. If the registry install in the manual checks rejects a genuine signed release, STOP and ask the user. Do not loosen signing or verification.
 
 There are no other uncertainties that have to wait for implementation.
 
@@ -450,4 +420,4 @@ There are no other uncertainties that have to wait for implementation.
 - **Any change to the plugin contract or to xcl's Go code** — the spec forbids contract changes. This plan changes only docs and the changelog in `xcl`.
 - **A generator or a rename tool for the template** — the spec says no generator. The README lists the renames by hand.
 - **Automated layout or file-order conformance checks** — the knowledge base forbids tests that walk or grep the repository's files. Reviewers check both by hand.
-- **Running the cross-platform binaries on darwin and windows in CI** — CI builds them in the snapshot release but runs tests on linux only.
+- **Running the cross-platform binaries on darwin and windows in CI** — CI builds them in the snapshot `make dist` build but runs tests on linux only.

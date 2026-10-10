@@ -11,7 +11,7 @@ closed_date: "2026-10-09"
 - The plugin template repository does not exist yet. It is registered in the project as `xcl-plugin-template` (provider git, source `git@github.com:jumppad-labs/xcl-plugin-template.git`), and its footprint is at `/home/nicj/code/github.com/jumppad-labs/xcl-plugin-template/.spektacular/`. Its root stays empty until the first human task creates the GitHub repo and makes that directory the clone.
 - xcl's plugin contract today is in `plugins/provider.go` (`ResourceProvider[T]`) and `plugins/changed.go:24-49` (`DefaultChanged`). `Changed`/`Update` receive `[]entity.PropertyChange` and `[]entity.DependencyChange`, and `entity/property_change.go:50` has `Within`. In-process registration is `registry/local.go:121` and external is `registry/local.go:131`. Serving is `plugins/serve.go:21`.
 - The closest worked plugin is `example/plugin/plugins/docker/` (plugin type, client interface plus Mockery double, constructor-injected providers, strict-double tests). The sibling plan `20261009102138-48e95432-docker-example-standard-layout` moves it to the standard layout. `example/plugin/plugins/template/` is a Handlebars plugin, unrelated to this template.
-- Only `v0.1.0` of xcl is tagged, and it predates `entity.PropertyChange`.
+- xcl `v0.1.1` (tagged during the plan review, at commit `a000ffa`) contains the current plugin contract (`entity.PropertyChange`, `Changed`/`Update` with `changes`); the earlier `v0.1.0` predates it.
 - No written plugin layout guide exists in `docs/`: there are `docs/plugins.md`, `docs/plugin-developer-guide.md` and `docs/README.md`. The site has no plugin template page. Its Guides nav is at `xcl-website:src/components/Nav.astro:17-29`, and the GitHub registry plan adds `/github-registry/`.
 - CI for xcl lives in `.github/workflows/go.yml` (Go 1.27.0 tests, 1.25.0 minimum build).
 
@@ -24,7 +24,7 @@ Requirement-to-repo attribution:
 | Ready-to-build starting plugin; runs in-process and separately; explicit change decision; told-only update; tests in the project's style; entity types stand alone; consistent file order | xcl-plugin-template | `plugin.go`, `cmd/notes/`, `entities/`, `providers/`, `client/files/`, `examples/basic/`, `e2e/`, `Makefile`, `.mockery.yml` |
 | How to build, test and register it | xcl-plugin-template | `README.md` |
 | Checked on every change | xcl-plugin-template | `.github/workflows/ci.yml`, `.github/workflows/current.yml` |
-| Signed releases for every platform | xcl-plugin-template | `.goreleaser.yaml`, `.github/workflows/release.yml` |
+| Signed releases for every platform | xcl-plugin-template | `Makefile` (`dist`, `release`), `.github/workflows/release.yml` |
 | Kept up to date with the project | project registry (`.spektacular` config of xcl) | `spektacular repo add` |
 | A standard plugin layout; documentation | xcl | `docs/plugin-layout.md`, `docs/README.md`, `docs/plugin-developer-guide.md`, `README.md`, `CHANGELOG.md` |
 | Documentation site covers the template | xcl-website | `src/pages/plugin-template.mdx`, `src/components/Nav.astro`, `src/pages/registries.mdx`, `src/pages/examples/plugins.mdx` |
@@ -33,7 +33,7 @@ Requirement-to-repo attribution:
 
 **File changes** (all in the template repository):
 
-- `xcl-plugin-template:go.mod` (new) — `module github.com/jumppad-labs/xcl-plugin-template`, `go 1.25.0` (matches xcl's `go.mod:3`), require `github.com/jumppad-labs/xcl` at a pseudo-version of the pushed commit carrying the current contract (`entity.PropertyChange`, `Changed`/`Update` with `changes`), and `github.com/stretchr/testify` pinned. No `replace` directives.
+- `xcl-plugin-template:go.mod` (new) — `module github.com/jumppad-labs/xcl-plugin-template`, `go 1.25.0` (matches xcl's `go.mod:3`), require `github.com/jumppad-labs/xcl` at `v0.1.1`, the release carrying the current contract (`entity.PropertyChange`, `Changed`/`Update` with `changes`), and `github.com/stretchr/testify` pinned. No `replace` directives.
 - `xcl-plugin-template:LICENSE` (new) — Apache-2.0. The repository already exists on GitHub (public, `main`, marked as a template) and is checked out at the registered root; the uncommitted `.spektacular/repo.yaml` footprint change (source `provider: file`, `location: ..`) is committed with this task.
 - `xcl-plugin-template:.gitignore` (new) — `build/`, `dist/`, `.xcl/`, `out/`.
 - `xcl-plugin-template:client/files/files.go` (new) — package doc; exported first: `Files` interface (`Write`, `Chmod`, `Stat`, `Remove`, each taking `ctx`), `Info{Checksum string; Mode fs.FileMode}`, `Local` struct with `var _ Files = (*Local)(nil)`, `NewLocal()`, then the `Local` methods; unexported helpers (`checksum([]byte) string`) last. `Write` creates parent dirs (`os.MkdirAll`), writes, then `os.Chmod` (WriteFile only sets mode on create — same gotcha handled in `example/plugin/plugins/template/template.go:189-194`), returns `Info`. `Stat` reads the file, returns checksum and mode, wrapping `fs.ErrNotExist`. `Remove` treats `fs.ErrNotExist` as success. Each method checks `ctx.Err()` first.
@@ -91,7 +91,7 @@ Requirement-to-repo attribution:
 
 **File changes**:
 
-- `xcl-plugin-template:README.md` (new) — sections in task order: what the template is (one `notes "note"` resource, in-process and external, signed releases); Start (`Use this template` / `gh repo create <you>/xcl-plugin-<name> --template jumppad-labs/xcl-plugin-template --clone`); Make it yours (module path in `go.mod` and imports, root package and `cmd/<plugin>` directory, `PLUGIN` in the Makefile, block type in `plugin.go`); Layout (the design tree with one line per part, linking xcl's `docs/plugin-layout.md`); Build (`make build`); Test (`make test`); Regenerate the double (`make generate`); Use it in-process (`make inprocess`, quoting the in-process registration lines from `e2e/main_test.go`); Use it as a separate program (`make external`, quoting `RegisterExternalPlugin`); The change decision (`ReplaceSettings`, how `Changed` reads); Updating from what you are told; Add your own resource (step list: entity file, client package and interface, `.mockery.yml` entry + `make generate`, provider file in lifecycle order with replace list, unit tests against the double, register in `plugin.go`, sample config and an e2e test); Tools and why (Mockery, staticcheck, GoReleaser — pinned versions, reason for each, per the dependencies convention). Release and install sections are added by the release automation task.
+- `xcl-plugin-template:README.md` (new) — sections in task order: what the template is (one `notes "note"` resource, in-process and external, signed releases); Start (`Use this template` / `gh repo create <you>/xcl-plugin-<name> --template jumppad-labs/xcl-plugin-template --clone`); Make it yours (module path in `go.mod` and imports, root package and `cmd/<plugin>` directory, `PLUGIN` in the Makefile, block type in `plugin.go`); Layout (the design tree with one line per part, linking xcl's `docs/plugin-layout.md`); Build (`make build`); Test (`make test`); Regenerate the double (`make generate`); Use it in-process (`make inprocess`, quoting the in-process registration lines from `e2e/main_test.go`); Use it as a separate program (`make external`, quoting `RegisterExternalPlugin`); The change decision (`ReplaceSettings`, how `Changed` reads); Updating from what you are told; Add your own resource (step list: entity file, client package and interface, `.mockery.yml` entry + `make generate`, provider file in lifecycle order with replace list, unit tests against the double, register in `plugin.go`, sample config and an e2e test); Tools and why (Mockery, staticcheck — pinned versions, reason for each, per the dependencies convention; release packaging needs only go, tar, zip, sha256sum, gpg and gh). Release and install sections are added by the release automation task.
 
 **Complexity**: Medium
 **Token estimate**: ~25k tokens
@@ -113,38 +113,46 @@ Requirement-to-repo attribution:
 
 **File changes**:
 
-- `xcl-plugin-template:.goreleaser.yaml` (new) — `version: 2`; no `project_name` (defaults to the GitHub repo name, the plugin name per `plugin-release-assets.md`), with a comment saying so; `builds: - main: ./cmd/notes, binary: "{{ .ProjectName }}", env: [CGO_ENABLED=0], goos: [linux, darwin, windows], goarch: [amd64, arm64]`; `archives: - formats: [tar.gz], format_overrides: [{goos: windows, formats: [zip]}], name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}", files: [README.md, LICENSE]` (explicit name template so a GoReleaser default change cannot break the contract); `checksum: name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt", algorithm: sha256`; `signs: - artifacts: checksum, signature: "${artifact}.sig", args: ["--batch", "--yes", "--pinentry-mode", "loopback", "--passphrase", "{{ .Env.GPG_PASSPHRASE }}", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--armor", "--output", "${signature}", "--detach-sign", "${artifact}"]`; `release: draft: false`; `changelog` default.
-- `xcl-plugin-template:.github/workflows/release.yml` (new) — `on: push: tags: ["v*"]`; `permissions: contents: write`; checkout with `fetch-depth: 0`; setup-go from `go.mod`; `make test`; `crazy-max/ghaction-import-gpg@v6` with `gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}`, `passphrase: ${{ secrets.GPG_PASSPHRASE }}` (id `gpg`; fails the job when the secret is empty, so nothing unsigned is published); `goreleaser/goreleaser-action@v6` with a pinned `version`, `args: release --clean`, env `GITHUB_TOKEN`, `GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}`, `GPG_PASSPHRASE`.
-- `xcl-plugin-template:.github/workflows/ci.yml` — add a `snapshot` job: `goreleaser/goreleaser-action@v6` with `args: release --snapshot --clean --skip=sign,publish`, then a step listing `dist/` so the six archive names and the checksums file are visible in the log.
-- `xcl-plugin-template:Makefile` — `release` target: requires `VERSION` (fails with usage when unset or not `v<semver>[-pre]`), runs `git tag $(VERSION) && git push origin $(VERSION)`; `snapshot` target running GoReleaser snapshot locally via `go run github.com/goreleaser/goreleaser/v2@<pinned>`.
-- `xcl-plugin-template:README.md` — sections: Signing key (generate RSA 4096 or Ed25519 with `gpg --quick-generate-key`, export armoured private key into secret `GPG_PRIVATE_KEY`, passphrase into `GPG_PASSPHRASE`, publish the public key: commit nothing, upload to the GitHub account's GPG keys so it is served at `https://github.com/<user>.gpg`, and include it in the release notes/README for applications); Release (`make release VERSION=v0.1.0`; what the release contains, per the asset contract); Install (application side: `registry.NewGitHub(registry.GitHubTrustedKeys(publicKey))`, `RegisterPlugin("<owner>/<repo>", "v0.1.0")`, `xcl.WithRegistry`, linking xcl's GitHub registry guide).
+- `xcl-plugin-template:Makefile` — `dist` target: requires `VERSION` (fails with usage when unset or not `v<semver>[-pre]`); `DIST_VERSION := $(VERSION:v%=%)` (the contract's file names carry the version without its leading `v`); `rm -rf dist && mkdir -p dist`; a shell loop over `linux darwin windows` × `amd64 arm64` running `CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -o dist/stage/$${os}_$${arch}/$(PLUGIN)$${ext} ./cmd/notes` (`ext` is `.exe` on windows; `PLUGIN` is the repository name, the plugin name per `plugin-release-assets.md`), copying `README.md` and `LICENSE` beside the binary, then packing the stage directory's contents so the binary sits at the archive root: `tar -czf dist/$(PLUGIN)_$(DIST_VERSION)_$${os}_$${arch}.tar.gz -C dist/stage/$${os}_$${arch} .`, or on windows `(cd dist/stage/$${os}_$${arch} && zip -q ../../$(PLUGIN)_$(DIST_VERSION)_$${os}_$${arch}.zip *)`; then `rm -rf dist/stage` and `(cd dist && sha256sum *.tar.gz *.zip > $(PLUGIN)_$(DIST_VERSION)_checksums.txt)`, which writes the contract's `<hex>  <archive>` lines. A comment says the target uses only go, tar, zip and sha256sum. `release` target: requires `VERSION` (same check), runs `git tag $(VERSION) && git push origin $(VERSION)`; it stays the one command that releases.
+- `xcl-plugin-template:.github/workflows/ci.yml` — add a `dist` job: checkout, setup-go from `go.mod`, `make dist VERSION=v0.0.0-snapshot`, then `ls -l dist/` so the six archive names and the checksums file are visible in the log. Nothing is signed or published.
+- `xcl-plugin-template:.github/workflows/release.yml` (new) — `on: push: tags: ["v*"]`; `permissions: contents: write`; checkout; setup-go from `go.mod`; a first step with `env: GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}` that fails the job (`echo "GPG_PRIVATE_KEY secret is not set" >&2; exit 1`) when it is empty, so nothing unsigned is ever published; `make test`; `make dist VERSION=${{ github.ref_name }}`; import with `echo "$GPG_PRIVATE_KEY" | gpg --batch --import`; sign with `GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}` in env: `gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --armor --detach-sign --output dist/<checksums>.sig dist/<checksums>` (the checksums file found with `ls dist/*_checksums.txt`); publish with `gh release create "$GITHUB_REF_NAME" dist/*` with `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`. No third-party actions beyond checkout and setup-go.
+- `xcl-plugin-template:README.md` — sections: Signing key (generate RSA 4096 or Ed25519 with `gpg --quick-generate-key`, export armoured private key into secret `GPG_PRIVATE_KEY`, passphrase into `GPG_PASSPHRASE`, publish the public key somewhere stable the author controls; the template's own releases are signed with the shared jumppad-labs key published at `https://xcl.dev/keys/jumppad-labs-releases.asc`, fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`, and a "Verifying releases" block shows fetching it, checking the fingerprint with `gpg --show-keys`, and passing it to `registry.GitHubTrustedKeys`); Release (`make release VERSION=v0.1.0`; what the release contains, per the asset contract; `make dist VERSION=v0.0.0-snapshot` to build the archives locally); Install (application side: `registry.NewGitHub(registry.GitHubTrustedKeys(publicKey))`, `RegisterPlugin("<owner>/<repo>", "v0.1.0")`, `xcl.WithRegistry`, linking xcl's GitHub registry guide).
 
 **Complexity**: Medium
 **Token estimate**: ~30k tokens
-**Agent strategy**: Single agent, sequential; validate with `goreleaser check` and a local snapshot, then inspect `dist/` names against the contract.
+**Agent strategy**: Single agent, sequential; validate with a local `make dist VERSION=v0.0.0-snapshot`, then inspect `dist/` names against the contract, run `sha256sum -c` on the checksums file inside `dist/`, and list an archive of each kind (`tar -tzf`, `unzip -l`) to confirm the binary is at the root.
 
-### Task: Add the release signing key to the template
+### Task: Publish the release signing public key
 
-What the person does: generate a dedicated signing key (`gpg --quick-generate-key "xcl plugin template releases <...>" ed25519 sign never`, or RSA 4096), add repository secrets `GPG_PRIVATE_KEY` (`gpg --armor --export-secret-keys <fpr>`) and `GPG_PASSPHRASE` on `jumppad-labs/xcl-plugin-template`, and publish the armoured public key where the README says (the organisation/maintainer GitHub GPG keys and the README's "Verifying releases" block).
-
-Checked by: `gh secret list -R jumppad-labs/xcl-plugin-template` shows both names; the public key is fetchable at the documented location.
-
-### Task: Publish an xcl release with the current plugin contract
-
-What the person does: once the epic's specs are merged to `main` in `jumppad-labs/xcl`, tag and publish a release newer than `v0.1.0` (e.g. `v0.2.0`) with release notes drawn from `CHANGELOG.md`. Only `v0.1.0` (and a stray `0.1.0`) exist today, and they predate `entity.PropertyChange`.
-
-Checked by: `go list -m github.com/jumppad-labs/xcl@latest` resolves to the new tag.
-
-### Task: Pin the template to the xcl release
+State after the plan review: the shared jumppad-labs signing key exists (Ed25519, created 2026-10-10, no expiry, uid `Jumppad Labs (Jumpad Plugin GPG Ke) <hello@jumppad.dev>`, fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`, encryption subkey `4658 C849 42D2 6C06 AC33  2DA2 7E2B F026 0DA3 98D1`), and `gh secret list -R jumppad-labs/xcl-plugin-template` shows `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE`.
 
 **File changes**:
 
-- `xcl-plugin-template:go.mod`, `xcl-plugin-template:go.sum` — `go get github.com/jumppad-labs/xcl@<release>` and `go mod tidy`.
+- `xcl-website:public/keys/jumppad-labs-releases.asc` (new) — exactly this text, with a trailing newline:
 
-Verify `make lint test` and the CI snapshot pass.
+```
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEasoRExYJKwYBBAHaRw8BAQdAiVnm3jhaS5Brb7Hp61aUJZrclX2hhDBzgDC0
+df8vOo60N0p1bXBwYWQgTGFicyAoSnVtcGFkIFBsdWdpbiBHUEcgS2UpIDxoZWxs
+b0BqdW1wcGFkLmRldj6IkAQTFgoAOBYhBBW9poQ6H6Dq0apRkPd12gCv1LUCBQJq
+yhETAhsDBQsJCAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJEPd12gCv1LUC0nMBAJF+
+m4iGchVAhzPDHCVWdx3X/OTSpItcqHm/byA5RcxWAQD7SnO9QY+2c4a0vUY+CpzB
+PCzWsn+FFN/qetAOwkr2Crg4BGrKERMSCisGAQQBl1UBBQEBB0AxMJ6SfExDWfuG
+IzCZpKi3k2LsJmzYhUFp4BDkpyGfFwMBCAeIeAQYFgoAIBYhBBW9poQ6H6Dq0apR
+kPd12gCv1LUCBQJqyhETAhsMAAoJEPd12gCv1LUC5PIA/jAsGdQ7f7BACOBL3Ham
+Zmkv70nnMiQW6GZdXyrCdXz9AP99NcaaWmzcTUPv9NPICAdHQWlyc+gKtzbIyWGG
+myePBg==
+=nhJ1
+-----END PGP PUBLIC KEY BLOCK-----
+```
+
+Astro copies `public/` as-is, so the build serves it at `/keys/jumppad-labs-releases.asc`.
+
+Verify with `npm run build`, then `gpg --show-keys dist/keys/jumppad-labs-releases.asc` shows fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502`.
 
 **Complexity**: Low
-**Token estimate**: ~5k tokens
+**Token estimate**: ~3k tokens
 **Agent strategy**: Single agent, sequential execution.
 
 ### Task: Publish the template's first signed release
@@ -161,7 +169,7 @@ Checked by: the GitHub release `v0.1.0` exists and is not a draft; the manual ch
 - `docs/README.md:8-31` — add a "Plugin Layout" bullet to "Start here".
 - `docs/plugin-developer-guide.md:1-12` — one sentence in the intro linking the layout guide and the template; `docs/plugin-developer-guide.md:856` "The example provider" — a sentence pointing to the template as the layout's worked example (keep the sibling docker-layout plan's edits intact when rebasing).
 - `README.md:95-140` ("With plugins") or `README.md:225` ("Plugins" example) — a short "Writing a plugin" paragraph linking the template and the layout guide.
-- `CHANGELOG.md:3` — new top entry `## 20261009092551-82db0140-plugin-template`: prose (standard layout written down in `docs/plugin-layout.md`; new template repository `jumppad-labs/xcl-plugin-template` with one resource, in-process and external, strict-double tests, e2e, CI and signed GoReleaser releases in the release asset contract), then `**Breaking:**` with `- None.`
+- `CHANGELOG.md:3` — new top entry `## 20261009092551-82db0140-plugin-template`: prose (standard layout written down in `docs/plugin-layout.md`; new template repository `jumppad-labs/xcl-plugin-template` with one resource, in-process and external, strict-double tests, e2e, CI and signed releases built with `make dist`, gpg and `gh` in the release asset contract), then `**Breaking:**` with `- None.`
 
 No test reads these files (knowledge `conventions/testing-and-mocking.md`).
 
@@ -175,6 +183,7 @@ No test reads these files (knowledge `conventions/testing-and-mocking.md`).
 
 - `xcl-website:src/pages/plugin-template.mdx` (new) — frontmatter `layout: ../layouts/Shell.astro`, `title: "Plugin template - xcl"`, `description`; `<Hero>` and `<Prose>` as `xcl-website:src/pages/registries.mdx:1-30`; sections: the standard layout (tree and one line per part), the change decision and told-only update in brief, start from the template (`Use this template` / `gh repo create --template`), build and test, run in-process and as a separate program, release (tag, signing key secret, what the release holds), install (link to `/github-registry/` from the registry plan); closing `<CtaBanner>` linking to the template repository.
 - `xcl-website:src/config/site.ts` — add `templateURL = "https://github.com/jumppad-labs/xcl-plugin-template"`.
+- `xcl-website:src/pages/plugin-template.mdx` (same page) — a "Verifying releases" section linking `/keys/jumppad-labs-releases.asc`, printing its fingerprint `15BD A684 3A1F A0EA D1AA  5190 F775 DA00 AFD4 B502` so a reader can check the downloaded key against a second source, and showing it passed to `registry.GitHubTrustedKeys`.
 - `xcl-website:src/components/Nav.astro:17-29` — add `{ label: "Plugin template", href: "/plugin-template/" }` to Guides.
 - `xcl-website:src/pages/registries.mdx:25` — a sentence linking the page for authors writing a plugin.
 - `xcl-website:src/pages/examples/plugins.mdx` — a sentence linking the page as the place to start a plugin of your own.
@@ -191,8 +200,7 @@ Verify with `npm run build` and `npx astro check`.
 - **Add the note entity and its provider**: provider unit tests with a fresh `mocks.NewMockFiles(t)` per test, covering every `Changed` rule (each replace setting, replaced dependency, updated dependency alone, content and mode updates, no change) and every `Update` branch with only the expected calls. Unexpected calls fail the test. Errors are tested in separate functions.
 - **Add the plugin type, its program and the sample configuration**: `Init` registers `notes "note"` without touching the disk. The program builds.
 - **Add the end-to-end and state-reader tests**: in-process and external lifecycle (apply, `Diff` with no changes, destroy) in separate functions; the plan shows replace for a `name` change and update for a `content` change; the state reader in its own package queries `entities.Note`. All state comes from real applies.
-- **Add the template's continuous integration / Add signed release automation**: no tests read workflow or GoReleaser files. Correctness is shown by CI runs, the snapshot `dist/` listing and the manual release checks.
-- **Pin the template to the xcl release**: the full suite and lint pass against the release.
+- **Add the template's continuous integration / Add signed release automation**: no tests read workflow files or the Makefile's release targets. Correctness is shown by CI runs, the snapshot `dist/` listing and the manual release checks.
 - **Docs tasks**: no tests (knowledge `conventions/testing-and-mocking.md`). The site build and `astro check` must pass, and a person reviews the content.
 - Manual items (time to first plugin, first resource without guessing, the first green scheduled run, layout agreement, tagged signed release verified with gpg, install with the GitHub registry, README commands on a fresh copy, CI failure reporting, file-order review, repo registration, the site page in a browser) go to the implementation test plan.
 
@@ -218,7 +226,7 @@ All agent tasks are Low or Medium and run as one agent each, in dependency order
 
 ## Migration Notes
 
-No migration is needed: nothing in xcl changes. When the xcl release is published, the template moves from a pseudo-version to that release (its own task). The sibling docker-layout plan edits the same README and `docs/` guides, so whichever lands second rebases its doc edits.
+No migration is needed: nothing in xcl changes. The template requires xcl `v0.1.1` from the start. The sibling docker-layout plan edits the same README and `docs/` guides, so whichever lands second rebases its doc edits.
 
 ## Performance Considerations
 

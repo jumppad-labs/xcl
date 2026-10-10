@@ -16,7 +16,8 @@ closed_date: "2026-10-09"
 - **A small host application inside the template for applying the sample** — rejected: the layout design names no such part, and the success metric "One shape everywhere" forbids parts in places the design does not name. The in-process and external registrations live in the `e2e/` tests (a place the design names), and the README quotes them and runs each with one make target.
 - **An in-process vs external parity test** — explicitly a spec non-goal. The e2e suite runs the in-process lifecycle and the external lifecycle in separate test functions and never compares their results.
 - **Generating the template from the xcl repo with a script / keeping a copy in xcl** — rejected: two copies drift; the spec makes the template a registered project repository so contract changes are planned into it directly.
-- **Hand-rolled release scripts (`go build` matrix + `sha256sum` + `gpg`)** — rejected in favour of GoReleaser, which the release-asset design names as producing the contract with its default archive and checksum names plus a `signs` step (`plugin-release-assets.md`, "Producing it").
+- **GoReleaser for building, archiving, checksumming, signing and publishing releases** — rejected: the user dislikes it (user decision at review). `make dist` with `go build`, tar/zip and `sha256sum`, plus `gpg` and `gh` in the release workflow, produces the same contract; the release-asset design accepts any tool producing the same names and formats (`plugin-release-assets.md`, "Producing it").
+- **`crazy-max/ghaction-import-gpg` for importing the signing key in the release workflow** — rejected: plain `gpg --batch --import` of the secret suffices and adds no third-party action.
 - **golangci-lint for static checks** — rejected as heavier than needed; `go vet`, a `gofmt -l` check and `staticcheck` pinned and run through `go run` (the same "no install" pattern `example/plugin/Makefile:16-18` uses for Mockery) cover "static checks" with fewer moving parts.
 - **Checking "entities stand alone" with `go list -deps` or an import-grepping test** — rejected by the knowledge entry `conventions/testing-and-mocking.md` (no test walks or greps repository source to enforce a rule). Instead a behavioural e2e test in its own package imports only xcl, the registry and `entities`, starts the plugin as a built binary, and reads applied resources from state into the entity types.
 
@@ -33,7 +34,7 @@ closed_date: "2026-10-09"
 - CI shape to copy (setup-go, build, vet, test): `.github/workflows/go.yml`.
 - Changelog format: `CHANGELOG.md` top entry `## <spec-name>`, prose, then `**Breaking:**` list.
 - Docs locations: `docs/README.md` "Start here" list, `docs/plugin-developer-guide.md` ("The example provider" section at :856), `docs/plugins.md`; site nav `xcl-website/src/components/Nav.astro:18-22` (Guides), page pattern `xcl-website/src/pages/registries.mdx` (Shell layout, Hero, Prose).
-- Release layout: GoReleaser defaults give `<project>_<version>_<os>_<arch>.tar.gz` and `<project>_<version>_checksums.txt` (sha256); `format_overrides` for windows zip; `signs` with `artifacts: checksum` and `--armor --detach-sign` writing `${artifact}.sig`; `project_name` defaults to the GitHub repository name, which is the plugin name the asset contract fixes.
+- Release layout: the plugin is pure Go, so `CGO_ENABLED=0 GOOS=<os> GOARCH=<arch> go build -trimpath` cross-compiles all six platforms on one linux runner; `tar -czf -C <dir> .` and `zip` put the binary at the archive root; `sha256sum` writes exactly the contract's `<hex>  <name>` lines; `gpg --armor --detach-sign` writes the ASCII-armoured detached `<checksums>.sig`; `gh release create <tag> dist/*` uploads them with the workflow's `GITHUB_TOKEN`. go (via setup-go), tar, zip, sha256sum, gpg and gh are all on GitHub's `ubuntu-latest` runner. The archive and checksums names use the version without its leading `v` (`plugin-release-assets.md`) and the repository name, which is the plugin name the asset contract fixes.
 
 ## Files examined
 
@@ -60,15 +61,16 @@ closed_date: "2026-10-09"
 
 ## External references
 
-- GoReleaser docs (archives `name_template` default, `format_overrides`, `checksum`, `signs`, `project_name` default) — produces the release asset contract.
-- GoReleaser GitHub Action (`goreleaser/goreleaser-action`) and `crazy-max/ghaction-import-gpg` — import the signing key from repository secrets in the release workflow.
+- GnuPG (`gpg --batch --import`, `--pinentry-mode loopback --passphrase`, `--armor --detach-sign`) — imports the key from repository secrets and signs the checksums file in the release workflow.
+- GitHub CLI `gh release create <tag> <files>` — publishes the release and its assets with the workflow's `GITHUB_TOKEN`.
+- GitHub-hosted `ubuntu-latest` runner image — ships tar, zip, sha256sum, gpg and gh, so the release workflow installs nothing extra.
 - GitHub template repositories ("Use this template", `gh repo create --template`) — the delivery mechanism the spec fixes.
 - Mockery v3 (`github.com/vektra/mockery/v3`) — test doubles, already pinned at v3.8.0 in the example.
 - staticcheck (`honnef.co/go/tools/cmd/staticcheck`) — static checks in CI, run pinned through `go run`.
 
 ## Prior plans / specs consulted
 
-- Plan `20261009102148-7d0b205b-github-releases-registry` (final) — the registry that installs what this template publishes: `registry.NewGitHub(...)`, `RegisterPlugin("owner/repo","v1.2.0")`, `GitHubTrustedKeys(armored...)`, ProtonMail/go-crypto verification; its open question on key algorithm compatibility with GoReleaser's `signs` output is answered here by choosing an RSA 4096 or Ed25519 key (both supported). Its site guide page is where this plan's docs link for installing.
+- Plan `20261009102148-7d0b205b-github-releases-registry` (final) — the registry that installs what this template publishes: `registry.NewGitHub(...)`, `RegisterPlugin("owner/repo","v1.2.0")`, `GitHubTrustedKeys(armored...)`, ProtonMail/go-crypto verification; its open question on key algorithm compatibility with the template's gpg-produced signature is answered here by choosing an RSA 4096 or Ed25519 key (both supported). Its site guide page is where this plan's docs link for installing.
 - Plan `20261009102138-48e95432-docker-example-standard-layout` (being planned in parallel) working notes — it rebuilds the docker example to the layout, keeps the Handlebars template plugin layout as is, and explicitly leaves the written layout guide to this spec.
 - Plan `20261008194959-b128e508-update-property-changes` (via CHANGELOG) — the current `Changed`/`Update` contract the template builds to.
 
@@ -78,7 +80,8 @@ closed_date: "2026-10-09"
 - The template's `go.mod` can require an xcl version containing the current contract. Only `v0.1.0` is tagged today and it predates `entity.PropertyChange`; until a release is cut the template pins a pseudo-version of a pushed xcl commit, and the final pin is an xcl release cut by a person.
 - Declaring nothing but reading a plugin entity from state into `entities.Note` with `xcl.FindByType` works when the plugin is started from its binary (conversion path for plugin entities). If it does not, STOP and ask.
 - A testify-generated Mockery mock with no expectation for a call fails the test on that call (strict double), as the docker example relies on.
-- GoReleaser v2's default archive and checksum names match the contract exactly for amd64/arm64 (no `v1` amd64 suffix). Verified by the snapshot build in CI.
+- `make dist`'s archive and checksums names match the contract exactly (version without its leading `v`, `.zip` on windows, binary at the archive root). Verified by the `dist/` listing of the snapshot build in CI.
+- The `ubuntu-latest` runner keeps shipping tar, zip, sha256sum, gpg and gh; if one disappears, the workflow installs it with `apt-get`.
 
 ## Drafting assumptions
 
@@ -98,9 +101,9 @@ closed_date: "2026-10-09"
 - **Rejected**: a `cmd/host` program (unnamed part), one test comparing both modes (spec non-goal).
 
 ### Chosen direction: separate template repository built to the layout design (architecture)
-- **Decision**: new repo `jumppad-labs/xcl-plugin-template` with the design's tree; filesystem-backed `notes "note"` sample; e2e holds both registrations; GoReleaser + GitHub Actions; docs in xcl `docs/` and one site page.
+- **Decision**: new repo `jumppad-labs/xcl-plugin-template` with the design's tree; filesystem-backed `notes "note"` sample; e2e holds both registrations; `make dist` + gpg + gh in GitHub Actions; docs in xcl `docs/` and one site page.
 - **Rationale**: the spec fixes the template-repository delivery, one template for both modes, no external service, Actions CI and secret-held key; the designs fix layout and asset names; this is the only shape left that satisfies all of them.
-- **Rejected**: a generator, two templates, a copy inside the xcl repo, a host program in the template, hand-rolled release scripts (see research.md).
+- **Rejected**: a generator, two templates, a copy inside the xcl repo, a host program in the template, GoReleaser (see research.md).
 
 ### Replace on any replaced dependency (architecture)
 - **Decision**: the sample `Changed` answers replace for any dependency reported as replaced, with a comment showing where to narrow it to the types a resource is built on.
@@ -112,9 +115,14 @@ closed_date: "2026-10-09"
 - **Rationale**: gives the told-only rule a visible branch that depends on which settings changed, which a single "rewrite everything" update would not show.
 - **Rejected**: always rewriting the file (does not demonstrate acting on the reported changes).
 
+### Release packaging with make dist + gpg + gh, no GoReleaser (user decision at review) (architecture)
+- **Decision**: `make dist VERSION=vX.Y.Z` builds `./cmd/notes` for linux, darwin and windows × amd64 and arm64 with `CGO_ENABLED=0 go build -trimpath`, packs each binary at the root of `<name>_<version>_<os>_<arch>.tar.gz` (`.zip` on windows) and writes `<name>_<version>_checksums.txt` with `sha256sum`, all in `dist/`; CI runs it with a snapshot version on every push and pull request; the tag-triggered release workflow fails before publishing when `GPG_PRIVATE_KEY` is empty, runs `make dist` for the tag, imports the key with `gpg --batch --import`, signs the checksums with `gpg --armor --detach-sign`, and publishes `dist/*` with `gh release create` using `GITHUB_TOKEN`; `make release VERSION=...` stays the one command that tags and pushes.
+- **Rationale**: the user rejected the third-party release tool at review; go, tar/zip, sha256sum, gpg and gh are already on the runner and produce the asset contract exactly, with nothing extra to pin.
+- **Rejected**: GoReleaser (user dislikes it), `crazy-max/ghaction-import-gpg` (plain gpg suffices).
+
 ### Release, CI and tooling files sit outside the layout tree (architecture)
-- **Decision**: `.goreleaser.yaml`, `.github/workflows/*`, `.gitignore` and `LICENSE` are repository tooling, not plugin parts, so they do not breach the "no part in a place the design doesn't name" metric.
-- **Rationale**: the spec itself requires CI and release automation, which GitHub and GoReleaser locate at fixed paths; the design's tree already lists tooling files (`.mockery.yml`, `Makefile`) at the root.
+- **Decision**: `.github/workflows/*`, `.gitignore` and `LICENSE` are repository tooling, not plugin parts, so they do not breach the "no part in a place the design doesn't name" metric.
+- **Rationale**: the spec itself requires CI and release automation, which GitHub Actions locates at a fixed path; the design's tree already lists tooling files (`.mockery.yml`, `Makefile`) at the root.
 - **Rejected**: folding release and CI into the Makefile only (GitHub Actions requires `.github/workflows`).
 
 ### Conventions selected (architecture)
@@ -129,7 +137,7 @@ closed_date: "2026-10-09"
 
 ### Release signing secrets named GPG_PRIVATE_KEY and GPG_PASSPHRASE (data_structures)
 - **Decision**: the release workflow reads the armoured private key and passphrase from secrets `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE`.
-- **Rationale**: the names `crazy-max/ghaction-import-gpg` documents; the spec only says the key is a repository secret.
+- **Rationale**: plain, descriptive names the release workflow's `gpg --batch --import` and signing steps read, and the names the secrets already exist under; the spec only says the key is a repository secret.
 - **Rejected**: other names (no benefit).
 
 ### Pseudo-version until an xcl release is cut by a person (dependencies)

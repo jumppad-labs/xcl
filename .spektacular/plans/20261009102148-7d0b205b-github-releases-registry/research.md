@@ -64,7 +64,7 @@ closed_date: "2026-10-09"
 - GitHub REST API, "Get a release by tag name" (`GET /repos/{owner}/{repo}/releases/tags/{tag}`) and "Get a release asset" (`GET /repos/{owner}/{repo}/releases/assets/{id}` with `Accept: application/octet-stream`, redirects to storage) — the two calls the registry makes; the asset API endpoint works for private repositories with a token, unlike `browser_download_url`.
 - GitHub returns 404 (not 403) for a private repository without a token — why the error says "not found, or it is private and needs a GitHub token".
 - github.com/ProtonMail/go-crypto/openpgp — maintained fork of the deprecated `golang.org/x/crypto/openpgp`; `openpgp.ReadArmoredKeyRing` and `openpgp.CheckArmoredDetachedSignature` cover key parsing and detached-signature checks.
-- GoReleaser default archive/checksum naming and `signs` step — the producer side the design names.
+- The plugin template's `make dist` and release workflow — the producer side: contract archive and checksums names, and the signature the template's release workflow produces (gpg, armoured detached over the checksums).
 - `sha256sum` output format (`<hex>  <name>`).
 
 ## Prior plans / specs consulted
@@ -78,7 +78,7 @@ closed_date: "2026-10-09"
 - The catalog calls `Plugin.Start` once per `Config` when plugins load (`internal/catalog/catalog.go:652-695`), so verification runs per plugin start rather than per operation; a cache entry altered while a long-running `Config` is in use is caught at the next `Config`'s plugin start, not at the catalog's next restart. Accepted at review. (The catalog's structural `restartable` check is no longer relied on: the host is the plain `Executable` host.)
 - `registry.Local`'s unexported `add`/`localEntry` stay usable from the same package; if they are renamed, the GitHub registry's `RegisterPlugin` changes with them.
 - GitHub's release-asset download redirects to a storage host; Go's client drops the `Authorization` header on cross-host redirects, which is the desired behaviour (storage URLs are pre-signed).
-- ProtonMail/go-crypto supports the signatures GoReleaser's `signs` step produces with a default GPG key (RSA/EdDSA).
+- ProtonMail/go-crypto supports the signature the template's release workflow produces (gpg, armoured detached over the checksums), made with a default GPG key (RSA/EdDSA).
 
 ## Drafting assumptions
 
