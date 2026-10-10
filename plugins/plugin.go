@@ -87,7 +87,7 @@ func RegisterResourceProvider[T any](p *PluginBase, logger logger.Logger, state 
 	return p.RegisterType(typeName, subTypeName, resourceInstance, adapter)
 }
 
-// Plugin is a private interface that defines the contract between HCLConfig
+// Plugin is a private interface that defines the contract between XCL
 // and the providers. Init is called once, when the plugin loads. The logger it
 // is given is plugin scoped, for messages written outside a provider call;
 // during a call use Logger(ctx).

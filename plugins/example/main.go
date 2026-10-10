@@ -15,7 +15,7 @@ type PersonPlugin struct {
 // Ensure PersonPlugin implements the Plugin interface
 var _ plugins.Plugin = (*PersonPlugin)(nil)
 
-// Init is called by the HCLConfig framework to initialize the plugin.
+// Init is called by the XCL framework to initialize the plugin.
 // This is where you register all the resource types your plugin handles.
 func (p *PersonPlugin) Init(logger logger.Logger, state plugins.State) error {
 	// Create instances of resources and providers

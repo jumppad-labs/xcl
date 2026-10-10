@@ -210,10 +210,10 @@ The example includes comprehensive testing scenarios:
 
 Run the tests by executing the main example program, which will automatically test all scenarios and report results.
 
-## Integration with HCLConfig
+## Integration with XCL
 
 In a real system, this plugin would be:
-1. **Discovered** by the HCLConfig framework
+1. **Discovered** by the XCL framework
 2. **Initialized** during system startup
 3. **Invoked** when processing HCL files containing person resources
 4. **Managed** through the complete resource lifecycle

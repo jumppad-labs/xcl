@@ -1,6 +1,6 @@
 # Plugin Test Helpers
 
-The `plugins/testing` package provides convenient test helpers for testing HCLConfig plugins, making it easy to create comprehensive test suites for both in-process and external plugins.
+The `plugins/testing` package provides convenient test helpers for testing XCL plugins, making it easy to create comprehensive test suites for both in-process and external plugins.
 
 ## Quick Start
 

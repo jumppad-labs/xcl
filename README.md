@@ -2,10 +2,11 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/jumppad-labs/xcl.svg)](https://pkg.go.dev/github.com/jumppad-labs/xcl)
 
-XCL is a superset of the HashiCorp Configuration Language (HCL). Any HCL file is valid XCL, and XCL adds:
+XCL uses the native syntax of the HashiCorp Configuration Language (HCL) and adds the processing HCL leaves to the
+application:
 
-- **Interpolation**: a parameter in one configuration block can reference a parameter in another, including values
-  that are only known once the referenced resource has been created.
+- **Interpolation**: references between blocks are resolved, so a parameter in one block can use a parameter in
+  another, including values that are only known once the referenced resource has been created.
 - **Graph based processing**: references between blocks build a directed acyclic graph, so every resource is
   processed in dependency order and a value is always set before a dependent resource reads it.
 - **Plugins**: resource types and their providers come from plugins, compiled into your application or run as
@@ -1327,7 +1328,7 @@ the `PostgresSQL` struct will result in a parser error.
 
 ```go
 type PostgreSQL struct {
-	// For a resource to be parsed by HCLConfig it needs to embed the ResourceInfo type and
+	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -1341,7 +1342,7 @@ the previous example has been modified to make `location` optional.
 
 ```go
 type PostgreSQL struct {
-	// For a resource to be parsed by HCLConfig it needs to embed the ResourceInfo type and
+	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -1480,7 +1481,7 @@ type Config struct {
 }
 
 type PostgreSQL struct {
-	// For a resource to be parsed by HCLConfig it needs to embed the ResourceInfo type and
+	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -1546,7 +1547,7 @@ type.
 
 ```go
 type DB struct {
-	// For a resource to be parsed by HCLConfig it needs to embed the ResourceInfo type and
+	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -1635,7 +1636,7 @@ to other resources.
 
 ## Modules
 
-HCLConfig supports modular configuration that enables you to group your configuration or encapsulate certain
+XCL supports modular configuration that enables you to group your configuration or encapsulate certain
 functionality into modules.
 
 A module is a default type, however you still need to create the go structs that 
@@ -1694,7 +1695,7 @@ output "connection_string" {
 
 To read this value you can use the interpolation syntax `module.mymodule_1.output.name`
 The following example shows how an output from one module can be used as an
-input to another module. Because HCLConfig understands the links between resources
+input to another module. Because XCL understands the links between resources
 the resources in `my_other_module` will only be processed after the resources
 in `mymodule_1`.
 
@@ -1799,7 +1800,7 @@ can still look up any entity inside a module by its full address with `Find`.
 
 ## Functions
 
-HCLConfig supports functions that can be used inside your configuration
+XCL supports functions that can be used inside your configuration
 
 
 ```javascript
@@ -1817,7 +1818,7 @@ postgres "mydb" {
 ```
 ### Default functions
 
-For convenience HCLConfig has the following default functions:
+For convenience XCL has the following default functions:
 
 #### len(type)
 
@@ -2054,7 +2055,7 @@ func RandRange(min, max int) (int, error) {
 
 ## Lifecycle Callbacks
 
-HCLConfig provides three hooks that can be used when parsing configuration.
+XCL provides three hooks that can be used when parsing configuration.
 
 * Resource `Processable` interface
 * Parser Callback
@@ -2074,7 +2075,7 @@ to compute the value of the attribute `connection_string`.
 
 ```go
 type PostgreSQL struct {
-	// For a resource to be parsed by HCLConfig it needs to embed the ResourceInfo type and
+	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -2103,7 +2104,7 @@ For example, given the following custom resources
 ```go
 // Config defines the type `config`
 type Config struct {
-	// For a resource to be parsed by HCLConfig it needs to embed the ResourceInfo type and
+	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -2128,7 +2129,7 @@ func (t *Config) Process() error {
 
 // PostgreSQL defines the Resource `postgres`
 type PostgreSQL struct {
-	// For a resource to be parsed by HCLConfig it needs to embed the ResourceInfo type and
+	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -2155,7 +2156,7 @@ And the following configuration that uses these resources
 ```javascript
 resource "config" "myconfig" {
   // resource.postgres.mydb.connection_string will be available after the `Process` has
-  // been called on the `postgres` resource. HCLConfig understands dependency and will
+  // been called on the `postgres` resource. XCL understands dependency and will
   // call Process in a strict order
   db_connection_string = resource.postgres.mydb.connection_string
 }
