@@ -768,12 +768,7 @@ func (l *resourceLifecycle) callProvider(operation string, r any, data []byte, c
 	}
 
 	if len(result) > 0 {
-		// the provider owns computed values: one it leaves out of its result,
-		// such as an address it cleared, must not keep the value carried
-		// over from the last apply
-		clearComputed(reflect.ValueOf(r))
-
-		if err := json.Unmarshal(result, r); err != nil {
+		if err := decodeResult(result, r); err != nil {
 			decodeErr := fmt.Errorf("unable to decode %s result: %w", operation, err)
 			emitLifecycle(l.options, meta, operation, events.PhaseError, duration, decodeErr, data, r)
 			return duration, reportedError{fmt.Errorf("%s failed for %s: %w", operation, id, decodeErr)}
@@ -781,6 +776,79 @@ func (l *resourceLifecycle) callProvider(operation string, r any, data []byte, c
 	}
 
 	return duration, nil
+}
+
+// decodeResult decodes a provider's result into the resource r, leaving its
+// meta as it is.
+//
+// The provider owns computed values: one it leaves out of its result, such as
+// an address it cleared, must not keep the value carried over from the last
+// apply, so computed values are cleared first. Everything else the result
+// leaves out keeps its value.
+//
+// Meta belongs to xcl, not the provider, and the walk resolves addresses by
+// reading the meta of every resource while unrelated resources are being
+// decoded. Writing meta here, even with the values it already holds, would race
+// with those reads, so the result is decoded into a copy and every field but
+// meta is copied back.
+func decodeResult(result []byte, r any) error {
+	target := reflect.ValueOf(r).Elem()
+
+	decoded := reflect.New(target.Type()).Elem()
+	decoded.Set(target)
+
+	// decode the result's meta into a value of its own, rather than into the
+	// maps and slices the copy shares with r
+	meta := metaField(decoded)
+	if meta.IsValid() {
+		meta.Set(reflect.Zero(meta.Type()))
+	}
+
+	clearComputed(decoded.Addr())
+
+	if err := json.Unmarshal(result, decoded.Addr().Interface()); err != nil {
+		return err
+	}
+
+	copyAllButMeta(target, decoded)
+
+	return nil
+}
+
+// metaField returns the Meta field of the ResourceBase embedded in the struct
+// value, or an invalid value when it embeds none
+func metaField(value reflect.Value) reflect.Value {
+	base := value.FieldByName("ResourceBase")
+	if !base.IsValid() || base.Kind() != reflect.Struct {
+		return reflect.Value{}
+	}
+
+	return base.FieldByName("Meta")
+}
+
+// copyAllButMeta sets every settable field of the struct value dst to the
+// field of src, apart from the Meta field of its embedded ResourceBase, which
+// it never writes
+func copyAllButMeta(dst, src reflect.Value) {
+	for i := 0; i < dst.NumField(); i++ {
+		field := dst.Field(i)
+		if !field.CanSet() {
+			continue
+		}
+
+		if dst.Type().Field(i).Name != "ResourceBase" || field.Kind() != reflect.Struct {
+			field.Set(src.Field(i))
+			continue
+		}
+
+		for j := 0; j < field.NumField(); j++ {
+			if field.Type().Field(j).Name == "Meta" || !field.Field(j).CanSet() {
+				continue
+			}
+
+			field.Field(j).Set(src.Field(i).Field(j))
+		}
+	}
 }
 
 // firstStep is the provider step that would run first for a resource: create

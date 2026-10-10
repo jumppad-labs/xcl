@@ -1486,3 +1486,111 @@ func TestRefreshReadErrorReturnsErrorAndLeavesStatusAlone(t *testing.T) {
 	require.Empty(t, h.plugin.GetCreatedResources())
 	require.Empty(t, h.plugin.GetUpdatedResources())
 }
+
+// networkWithMeta returns a network whose meta is set, as a parsed resource's
+// is when the provider is called
+func networkWithMeta() *structs.Network {
+	n := &structs.Network{Subnet: "10.0.0.0/16", ProviderID: "p-1"}
+	n.Meta = types.Meta{
+		ID:         "resource.network.main",
+		Name:       "main",
+		Type:       "resource",
+		Subtype:    "network",
+		Status:     types.StatusCreated,
+		Links:      []string{"resource.network.other"},
+		Properties: map[string]any{"kept": "yes"},
+	}
+
+	return n
+}
+
+func TestDecodeResultSetsTheResultsValues(t *testing.T) {
+	n := networkWithMeta()
+
+	err := decodeResult([]byte(`{"subnet":"10.1.0.0/16","provider_id":"p-2","observed":"seen"}`), n)
+	require.NoError(t, err)
+
+	require.Equal(t, "10.1.0.0/16", n.Subnet)
+	require.Equal(t, "p-2", n.ProviderID)
+	require.Equal(t, "seen", n.Observed)
+}
+
+func TestDecodeResultLeavesMetaUnchanged(t *testing.T) {
+	n := networkWithMeta()
+
+	err := decodeResult([]byte(`{"subnet":"10.0.0.0/16","meta":{"id":"other","name":"other","type":"other","status":"failed","links":["x"],"properties":{"kept":"no","added":"yes"}}}`), n)
+	require.NoError(t, err)
+
+	require.Equal(t, networkWithMeta().Meta, n.Meta)
+}
+
+func TestDecodeResultSetsDependsOnAndDisabled(t *testing.T) {
+	n := networkWithMeta()
+
+	err := decodeResult([]byte(`{"subnet":"10.0.0.0/16","depends_on":["resource.network.other"],"disabled":true}`), n)
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"resource.network.other"}, n.DependsOn)
+	require.True(t, n.Disabled)
+}
+
+func TestDecodeResultClearsComputedValuesTheResultLeavesOut(t *testing.T) {
+	n := networkWithMeta()
+
+	err := decodeResult([]byte(`{"subnet":"10.0.0.0/16"}`), n)
+	require.NoError(t, err)
+
+	require.Empty(t, n.ProviderID)
+}
+
+func TestDecodeResultKeepsConfiguredValuesTheResultLeavesOut(t *testing.T) {
+	n := networkWithMeta()
+
+	err := decodeResult([]byte(`{"provider_id":"p-2"}`), n)
+	require.NoError(t, err)
+
+	require.Equal(t, "10.0.0.0/16", n.Subnet)
+}
+
+func TestDecodeResultLeavesMetaUnchangedOnSchemaRebuiltType(t *testing.T) {
+	r := newTestRegistry(t)
+
+	n, err := r.CreateEntity("resource", "network", "main")
+	require.NoError(t, err)
+
+	before, err := types.GetMeta(n)
+	require.NoError(t, err)
+	want := *before
+
+	err = decodeResult([]byte(`{"subnet":"10.1.0.0/16","provider_id":"p-2","meta":{"name":"other","status":"failed"}}`), n)
+	require.NoError(t, err)
+
+	after, err := types.GetMeta(n)
+	require.NoError(t, err)
+	require.Equal(t, want, *after)
+
+	data, err := json.Marshal(n)
+	require.NoError(t, err)
+
+	result := structs.Network{}
+	err = json.Unmarshal(data, &result)
+	require.NoError(t, err)
+
+	require.Equal(t, "10.1.0.0/16", result.Subnet)
+	require.Equal(t, "p-2", result.ProviderID)
+}
+
+func TestDecodeResultReturnsErrorForAResultThatIsNotJSON(t *testing.T) {
+	n := networkWithMeta()
+
+	err := decodeResult([]byte(`not json`), n)
+	require.Error(t, err)
+}
+
+func TestDecodeResultLeavesTheResourceUnchangedWhenTheResultIsNotJSON(t *testing.T) {
+	n := networkWithMeta()
+
+	_ = decodeResult([]byte(`not json`), n)
+
+	require.Equal(t, networkWithMeta(), n)
+}

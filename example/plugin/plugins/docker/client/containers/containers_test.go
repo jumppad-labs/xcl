@@ -234,6 +234,34 @@ func TestDisconnectNetworkReportsAMissingContainerAsNotFound(t *testing.T) {
 	require.Equal(t, dockerErr.Error(), err.Error())
 }
 
+func TestDisconnectNetworkReportsAContainerNotOnTheNetworkAsNotFound(t *testing.T) {
+	dockerErr := errdefs.Forbidden(errors.New("container ctr-123 is not connected to the network app"))
+	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkDisconnect(mock.Anything, "app", "ctr-123", true).
+		Return(dockerErr).
+		Once()
+
+	err := New(client).DisconnectNetwork(context.Background(), "app", "ctr-123")
+
+	require.ErrorIs(t, err, ErrNotFound)
+	require.Equal(t, dockerErr.Error(), err.Error())
+}
+
+func TestDisconnectNetworkReturnsOtherErrors(t *testing.T) {
+	dockerErr := errdefs.Forbidden(errors.New("operation not permitted"))
+	client := mocks.NewMockDocker(t)
+	client.EXPECT().
+		NetworkDisconnect(mock.Anything, "app", "ctr-123", true).
+		Return(dockerErr).
+		Once()
+
+	err := New(client).DisconnectNetwork(context.Background(), "app", "ctr-123")
+
+	require.ErrorIs(t, err, dockerErr)
+	require.NotErrorIs(t, err, ErrNotFound)
+}
+
 // ConnectNetwork
 
 func TestConnectNetworkAttachesTheContainerWithAliases(t *testing.T) {

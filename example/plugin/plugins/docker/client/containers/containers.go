@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -179,9 +180,17 @@ func (t *tasks) ConnectNetwork(ctx context.Context, networkName, containerID str
 	return notFound(t.client.NetworkConnect(ctx, networkName, containerID, &network.EndpointSettings{Aliases: aliases}))
 }
 
-// DisconnectNetwork force-detaches the container from the network
+// DisconnectNetwork force-detaches the container from the network. A container
+// that is not attached to the network, as when destroying the network already
+// detached it, is reported as ErrNotFound, like a missing network or container.
+// Docker answers that with a forbidden error, and Podman with not found.
 func (t *tasks) DisconnectNetwork(ctx context.Context, networkName, containerID string) error {
-	return notFound(t.client.NetworkDisconnect(ctx, networkName, containerID, true))
+	err := t.client.NetworkDisconnect(ctx, networkName, containerID, true)
+	if err != nil && strings.Contains(err.Error(), "is not connected to") {
+		return &notFoundError{err: err}
+	}
+
+	return notFound(err)
 }
 
 // EnsureImage pulls ref unless Docker already has it, reading the pull's
