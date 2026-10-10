@@ -1,5 +1,15 @@
 # Changelog
 
+## 20261009092551-82db0140-plugin-template
+
+The standard xcl plugin layout is now written down in `docs/plugin-layout.md`: where a plugin's entity types (`entities/`), providers (`providers/`), backend clients and their Mockery doubles (`client/<backend>/`, `mocks/`), its importable plugin type (`plugin.go`), its program (`cmd/<plugin>/`), sample configurations (`examples/`) and end-to-end tests (`e2e/`) live; the file order every source file follows; the explicit `Changed` with the settings that need a replace in one list; the `Update` that acts only on the changes it is given; and the test shape. The docs index, the plugin developer guide and the README link to it.
+
+A new GitHub template repository, `jumppad-labs/xcl-plugin-template`, is the layout's worked example and the place to start a plugin. It has one resource, `notes "note"`, which writes a note to a file, so it builds, tests and applies with nothing else running; it runs registered in-process and as a separate plugin program, each with one make command; its provider is unit tested against a strict Mockery double; its end-to-end tests apply the sample, plan with no changes and destroy it, and read applied notes from state with only the entity package. GitHub Actions build, lint and test every change and run the suite weekly against the latest xcl release, and pushing a version tag publishes a GPG-signed release for linux, darwin and windows on amd64 and arm64 in the release asset contract the GitHub registry installs, built with `make dist`, `gpg` and `gh`.
+
+**Breaking:**
+
+None.
+
 ## 20261009102148-7d0b205b-github-releases-registry
 
 Plugins can now be installed straight from GitHub releases. `registry.NewGitHub` returns a GitHub registry, named `github.com`, given to a `Config` with `xcl.WithRegistry` like any other; `RegisterPlugin("owner/repo", "v1.2.0")` declares a plugin by repository and one exact release tag, and the plugin is named after the repository. When plugins load, the registry downloads the release's build for the current platform (linux, darwin and windows on amd64 and arm64), checks it against the release's checksums file, keeps it in a cache and starts it as an external plugin with `registry.Executable`. The release must follow the plugin release asset contract the plugin template publishes: `<name>_<version>_<os>_<arch>.tar.gz` (`.zip` on windows) with the binary at its root, a required `<name>_<version>_checksums.txt` and an optional armoured detached signature `<name>_<version>_checksums.txt.sig`. A GitHub registry wraps a local registry, so `RegisterType` works on it too.
