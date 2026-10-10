@@ -1,69 +1,74 @@
-# XCL Configuration Parser
+# XCL Configuration Language
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/jumppad-labs/xcl.svg)](https://pkg.go.dev/github.com/jumppad-labs/xcl)
 
-XCL uses the native syntax of the HashiCorp Configuration Language (HCL) and adds the processing HCL leaves to the
-application:
+XCL is a configuration language for describing things and how they relate to each other. It builds on the readability
+of HCL (blocks, attributes and expressions) and adds what modern configuration needs:
 
-- **Interpolation**: references between blocks are resolved, so a parameter in one block can use a parameter in
-  another, including values that are only known once the referenced resource has been created.
-- **Graph based processing**: references between blocks build a directed acyclic graph, so every resource is
-  processed in dependency order and a value is always set before a dependent resource reads it.
-- **Plugins**: resource types and their providers come from plugins, compiled into your application or run as
-  separate programs, and installed from local paths or signed GitHub releases.
+- **References**: any value in a block can come from another block, such as a database's address or a generated
+  password, even one that only exists once that block has been created. XCL works out the value for you.
+- **Graph based processing**: those references form a directed acyclic graph, so every block is processed in
+  dependency order and a value is always set before anything reads it.
+- **Plugins**: block types, and the providers that create, read, update and destroy them, come from plugins run
+  in-process or as separate programs, and installed from local paths or signed releases.
 
-It also supports variables, and modules that load configuration from local or remote sources.
+It also has variables, outputs, modules, functions and state, so a configuration can be planned, applied, changed and
+destroyed.
 
-The project aims to provide a simple API allowing you to define resources as Go structs without needing to fully understand
-the HashiCorp HCL2 library.
+XCL starts from HCL's syntax but does not aim to be compatible with Terraform configuration or other HCL dialects.
+Where XCL can be clearer or do more, it will diverge.
 
-Parsing is a two step approach, first the parser reads the HCL configuration from the supplied files, at this stage a 
-graph is computed based on any references inside the configuration. For example given the following two resources.
+This repository is the Go implementation: you define block types as Go structs, without needing to know the HCL
+library underneath. Implementations for Python, JavaScript and other languages are planned.
 
-```javascript
-resource "postgres" "mydb_2" {
+## Block types
+
+Every block type is registered with a type and, optionally, a subtype. They become the block's labels, followed by its
+name, and the address other blocks use to refer to it:
+
+```hcl
+database "postgres" "main" {
   location = "localhost"
-  port = 5432
-  name = "mydatabase"
-
-  username = "db2"
-  password = resource.postgres.mydb_1.password
+  port     = 5432
+  username = "admin"
+  password = env("DB_PASSWORD")
 }
 
-resource "postgres" "mydb_1" {
-  location = "localhost"
-  port = 5432
-  name = "mydatabase"
-  
-  username = "db1"
-  password = random_password()
+app "web" {
+  database_location = database.postgres.main.location
+  connection_string = database.postgres.main.connection_string
 }
 ```
 
-#### Step 1:
-When the first pass of the parser runs it will read `mydb_2` before `mydb_1`, marshaling each resource into a struct and
-calling the optional `Parse` method on that struct. At this point none of the interpolated properties like 
-`resource.postgres.mydb_1.password` have a value as it is assumed that the referenced resources does not yet exist. At
-this point the parser replaces the interpolated value with a default value for the field.  
+- `database "postgres" "main"` has the type `database`, the subtype `postgres` and the name `main`. Other blocks refer
+  to it as `database.postgres.main`.
+- `app "web"` has the type `app`, no subtype, and the name `web`. Other blocks refer to it as `app.web`.
 
-#### Step 2:
-After resources have been processed from the HCL configuration a graph of dependent resources
-is calculated. Given the previous example where resource `mydb_2` references a property from 
-`mydb_1`, the resultant graph would look like the following.
+A subtype groups related block types under one type: `database "postgres"` and `database "mysql"` can be different Go
+types with different attributes, provided by different plugins.
+
+## How configuration is processed
+
+Processing happens in two steps.
+
+#### Step 1: build the graph
+
+XCL reads every file and finds the references between blocks. `app.web` reads two values from
+`database.postgres.main`, so it depends on it:
 
 ```
-| -- resource.postgres.mydb_2
-     |  -- resource.postgres.mydb_1
+app.web
+└── database.postgres.main
 ```
 
-This graph is then walked, as each resource is processed, any referenced properties are resolved and assigned
-to the struct. For example, when `resource.postgres.mydb_2` is processed the `password` field that contains
-a reference to `resource.postgres.mydb_1` will be assigned the actual value from the linked resource.
+References and `depends_on` together form a directed acyclic graph. A cycle is reported as an error.
 
-The optional `Process` method on the struct is also called, where a resource may contain computed fields the
-user can implement these computations in `Process` as this will make their value available to the next
-node in graph.
+#### Step 2: walk the graph
 
+The graph is walked in dependency order. `database.postgres.main` is processed first: its provider creates the
+database and sets `connection_string`, a computed value only the provider knows. `app.web` is processed next, with
+its references filled in from the database's values. Blocks with no dependency between them are processed at the same
+time, and destroying runs in reverse order.
 
 ## Quick start
 
@@ -77,7 +82,7 @@ configuration and reads it back. No plugin and no provider is needed:
 local := registry.NewLocal()
 local.RegisterType(&resources.Deployment{}, "deployment") // deployment "api" {}
 local.RegisterType(&resources.Service{}, "service")       // service "api" {}
-local.RegisterType(&PostgreSQL{}, "resource", "postgres") // resource "postgres" "main" {}
+local.RegisterType(&PostgreSQL{}, "database", "postgres") // database "postgres" "main" {}
 
 c, err := xcl.NewConfig(xcl.WithRegistry(local))
 if err != nil {
@@ -133,7 +138,7 @@ gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v1.2.0")
 
 **Writing a plugin.** Start from the
 [plugin template](https://github.com/jumppad-labs/xcl-plugin-template), a
-GitHub template repository with one working resource that runs both
+GitHub template repository with one working entity type that runs both
 in-process and as a separate program, tests against strict doubles and
 publishes signed releases the GitHub registry installs. It follows the
 standard [plugin layout](docs/plugin-layout.md) every xcl plugin uses.
@@ -182,7 +187,7 @@ configuration language is asked for:
 - **repeated blocks** — two `container` blocks, each with its own `port` and
   `env` blocks, decoded into a Go slice; a block that appears at most once is
   a pointer, and is `nil` when it is left out
-- **links between resources** — the `service` names the `deployment` by id
+- **links between entities** — the `service` names the `deployment` by id
   and reads its target port out of it
   (`deployment.api.container[0].port[0].container_port`), the `ingress` names
   the `service` the same way, and the container's environment is read out of
@@ -308,7 +313,7 @@ rebuilt under a running container.
 
 Their providers log from each lifecycle method with
 `plugins.Logger(ctx).Info("created network", "name", n.Meta.Name, "id", n.DockerID)`,
-passing no resource details. xcl binds that logger to the resource, its type,
+passing no entity details. xcl binds that logger to the entity, its type,
 the file it was declared in and the step, and names the plugin as the
 message's source, so the in-process and the external plugin read the same in
 the output:
@@ -329,7 +334,7 @@ state with the configuration at path using `Diff`, changes nothing, and prints
 what an apply would do with `diff.Render`, highlighted on a terminal. `status` reads the state back with
 `Load` and prints it as a tree drawn with
 [Lip Gloss](https://github.com/charmbracelet/lipgloss), and `inspect` prints
-one resource as highlighted configuration text with `EncodeEntity`. Each
+one entity as highlighted configuration text with `EncodeEntity`. Each
 example sends everything xcl reports, lifecycle events, plugin log messages
 and errors, to the shared [`example/prettylog`](./example/prettylog)
 receiver, set up in one line, which writes styled lines to standard error. It
@@ -457,8 +462,8 @@ local.RegisterType(&Server{}, "server", "big")
 // a type without one, declared: cache "main" {}, addressed cache.main
 local.RegisterType(&Cache{}, "cache")
 
-// resource is a type like any other: resource "postgres" "main" {}
-local.RegisterType(&PostgreSQL{}, "resource", "postgres")
+// another type with a subtype: database "postgres" "main" {}, addressed database.postgres.main
+local.RegisterType(&PostgreSQL{}, "database", "postgres")
 
 c, err := xcl.NewConfig(xcl.WithRegistry(local))
 if err != nil {
@@ -474,17 +479,17 @@ state store. They are never passed to a provider. `RegisterType` takes a
 pointer to a struct that embeds `types.ResourceBase`.
 
 A type keyword takes a subtype for every declaration or for none, so an
-address can always be read by position. `resource` always takes one.
+address can always be read by position.
 Declaring `server` without a subtype after declaring it with one, or the
 other way round, is a `*xcl.TypeFormError` returned by `NewConfig`; a plugin
 type that does so fails the first operation with a `*xcl.TypeFormError`.
 
 Every type and subtype must be unique across builtin blocks (`variable`,
 `output`, `module`, `root`), declared types and plugin types.
-`server` and `resource "server"` are different types and do not clash.
+`postgres` and `database "postgres"` are different types and do not clash.
 Declaring a type and subtype a builtin or another declared type already has,
 in the same registry or another, is a `*xcl.TypeNameClashError` returned by
-`NewConfig`, naming it, i.e. `resource.postgres`, and both Go types and their
+`NewConfig`, naming it, i.e. `database.postgres`, and both Go types and their
 registries. A clash with a type a plugin provides is reported when the plugins
 load, see below.
 
@@ -598,13 +603,13 @@ Ask the configuration for what you want, as your own Go type, in a single call.
 
 ```go
 // one entity, by its address
-db, err := xcl.Find[PostgreSQL](c, "resource.postgres.main")
+db, err := xcl.Find[PostgreSQL](c, "database.postgres.main")
 
-// every resource "postgres" block
-databases, err := xcl.FindByType[PostgreSQL](c, "resource", "postgres")
+// every database "postgres" block
+databases, err := xcl.FindByType[PostgreSQL](c, "database", "postgres")
 
 // the one you expect there to be exactly one of
-ingress, err := xcl.FindOne[Ingress](c, "resource", "ingress")
+ingress, err := xcl.FindOne[Ingress](c, "ingress")
 
 // every entity of a Go type, without naming it as a string
 all, err := xcl.All[PostgreSQL](c)
@@ -615,7 +620,7 @@ address, matched in order from the left: segment one is the type, segment two
 the subtype where the type takes one. `xcl.FindByType[Server](c, "server",
 "big")` returns every `server "big"` entity. A block declared without a
 subtype, `container "nics"`, is a different type from
-`resource "container" "nics"` and is reached as
+`docker "container" "nics"` and is reached as
 `xcl.FindByType[Container](c, "container")`.
 
 Everything a configuration declares can be enumerated without naming a type,
@@ -736,7 +741,7 @@ well-formed query that matches nothing returns an empty result and a nil error;
 a query that cannot be answered returns an error you can match by identity.
 
 ```go
-db, err := xcl.Find[PostgreSQL](c, "resource.postgres.main")
+db, err := xcl.Find[PostgreSQL](c, "database.postgres.main")
 switch {
 case errors.Is(err, xcl.ErrNotFound):
     // nothing is declared at that address
@@ -745,7 +750,7 @@ case errors.Is(err, xcl.ErrTypeMismatch):
 }
 
 // the detail behind a failure is recoverable
-_, err = xcl.FindOne[PostgreSQL](c, "resource", "postgres")
+_, err = xcl.FindOne[PostgreSQL](c, "database", "postgres")
 var many *xcl.NotUniqueError
 if errors.As(err, &many) {
     fmt.Printf("expected one, found %d\n", many.Count)
@@ -818,8 +823,8 @@ saved plugin type is read back through its plugin's schema, and reports
 itself with `load_state` events. A program that applies in one run and
 reports in another, a `status` command, calls it before looking anything up.
 
-The state is saved after each resource is destroyed, so an interrupted
-`Destroy` picks up where it stopped. A resource whose destroy fails stays in
+The state is saved after each entity is destroyed, so an interrupted
+`Destroy` picks up where it stopped. An entity whose destroy fails stays in
 the state, with everything it depends on, and is named in the error; running
 `Destroy` again retries it. Registered and builtin types never reach a
 provider, they are just removed from the state.
@@ -830,14 +835,14 @@ blocks fails with `xcl.ErrEmptyConfiguration` and changes nothing, use
 `Destroy` to remove everything.
 
 Declare every type and register every plugin when the `Config` is created:
-saved resources of a type the `Config` does not know fail the load with
+saved entities of a type the `Config` does not know fail the load with
 `state.UnknownTypesError` rather than being dropped. Config loads the plugins
 before it loads state.
 
 ### Events and logging
 
 xcl writes no output of its own. Everything it and its plugins report, each
-step of the resource lifecycle, plugin loading, warnings, errors and the log
+step of the entity lifecycle, plugin loading, warnings, errors and the log
 messages plugins write, is one stream of events delivered to the receiver set
 with `WithEventHandler`. With no receiver xcl is silent.
 
@@ -862,15 +867,15 @@ shape for all of them:
 | `Source` | `core` for xcl itself, otherwise the plugin's name |
 | `Operation` | `validate`, `apply`, `destroy`, `load_state`, `parse`, `create`, `read`, `changed`, `update`, `discover`, `load`, or `events` for a blocked announcement |
 | `Phase` | `start`, `success`, `error`, `log` for a log message, `blocked` |
-| `ResourceType`, `ResourceID`, `File` | the resource the event is about and the file it was declared in |
+| `ResourceType`, `ResourceID`, `File` | the entity the event is about and the file it was declared in |
 | `Duration` | how long a step took, or how long emitting was blocked |
 | `Error` | the failure, for the error phase |
-| `Data` | the serialized resource, carried only when you ask for it with `WithEventData`, see below |
+| `Data` | the serialized entity, carried only when you ask for it with `WithEventData`, see below |
 | `Meta` | details; a log message's level and text are under the reserved keys `events.KeyLevel` (`level`) and `events.KeyMessage` (`message`), which caller details never overwrite |
 
-#### Resource data on events
+#### Entity data on events
 
-Events carry no resource data by default. A resource's configuration and state
+Events carry no entity data by default. An entity's configuration and state
 are not something to push through every receiver by accident, so you ask for
 them:
 
@@ -884,11 +889,11 @@ c, err := xcl.NewConfig(
 | Level | What `Data` carries |
 |---|---|
 | `EventDataNone` | nothing, on any event. The default |
-| `EventDataRaw` | on every lifecycle event, the resource as it was before the provider was called |
-| `EventDataProcessed` | on a success event, the resource as xcl records it in state, including the values the provider filled in and the status it ended with. Other phases carry the same as `EventDataRaw` |
+| `EventDataRaw` | on every lifecycle event, the entity as it was before the provider was called |
+| `EventDataProcessed` | on a success event, the entity as xcl records it in state, including the values the provider filled in and the status it ended with. Other phases carry the same as `EventDataRaw` |
 
 `EventDataProcessed` is the record state stores, so it goes straight to
-`EncodeSavedEntity` below. This is how the examples show each resource as it is
+`EncodeSavedEntity` below. This is how the examples show each entity as it is
 created. Sensitive values in `Data` are masked, by default as
 `{"xcl_masked":"redact","value":"(sensitive)"}`, so processed data matches
 the state record only where state and events mask alike; see
@@ -899,7 +904,7 @@ keep what you had.
 
 Each `Validate`, `Apply` and `Destroy` starts with its own `start` event and
 ends with a `success` or an `error` carrying the error it returns. In between
-come the `parse` events, and for each resource a `start` before each provider
+come the `parse` events, and for each entity a `start` before each provider
 call, then any log messages the provider writes during that call, with the
 call's step as their operation, then a `success` or an `error`. Every failure
 that is returned is also emitted as an error event.
@@ -930,7 +935,7 @@ The [`example/prettylog`](./example/prettylog) receiver shows the adapter in
 use with a styled terminal handler.
 
 Plugin authors log from a provider with the logger in the call's context,
-which xcl has already bound to the resource and the step, so they pass none
+which xcl has already bound to the entity and the step, so they pass none
 of it themselves. It works the same in an in-process and an external plugin:
 
 ```go
@@ -948,7 +953,7 @@ See [docs/plugins.md](./docs/plugins.md) for more.
 syntax, ready to print or write to a `.xcl` file:
 
 ```go
-db, err := xcl.Find[*Postgres](c, "resource.postgres.main")
+db, err := xcl.Find[*Postgres](c, "database.postgres.main")
 if err != nil {
 	return err
 }
@@ -962,7 +967,7 @@ fmt.Println(string(text))
 ```
 
 ```hcl
-resource "postgres" "main" {
+database "postgres" "main" {
   location = "localhost"
   port     = 5432
 
@@ -985,7 +990,7 @@ text, err := c.EncodeSavedEntity(event.Data)
 Inside an event handler, `event.Entity()` returns the event's `Data` as the
 registered Go type, with every sensitive value masked, and `nil, nil` when the
 event carries no data. The shipped receiver in
-[`example/prettylog`](./example/prettylog) uses it to write each resource as
+[`example/prettylog`](./example/prettylog) uses it to write each entity as
 configuration text, and is set up with `prettylog.Handler(os.Stderr, level)`.
 
 Both write exactly one block, so convert several entities by calling once for
@@ -1003,7 +1008,7 @@ text, err := xcl.EncodeEntity(db, xcl.IncludeComputed())
 ```
 
 ```hcl
-resource "postgres" "main" {
+database "postgres" "main" {
   location          = "localhost"
   port              = 5432
   connection_string = "postgres://admin@localhost:5432/main" # set by the provider
@@ -1016,9 +1021,9 @@ field is written exactly as the user wrote it instead, whether a bare reference,
 a template or a nested block. Given this configuration:
 
 ```hcl
-resource "app" "web" {
-  db_location = resource.postgres.main.location
-  url         = "https://${resource.postgres.main.location}/app"
+app "web" {
+  db_location = database.postgres.main.location
+  url         = "https://${database.postgres.main.location}/app"
 }
 ```
 
@@ -1029,16 +1034,16 @@ text, err := xcl.EncodeEntity(app, xcl.ShowReferences())
 the text shows each reference as it was written:
 
 ```hcl
-resource "app" "web" {
-  db_location = resource.postgres.main.location
-  url         = "https://${resource.postgres.main.location}/app"
+app "web" {
+  db_location = database.postgres.main.location
+  url         = "https://${database.postgres.main.location}/app"
 }
 ```
 
 Without the option the same entity is written with its resolved values:
 
 ```hcl
-resource "app" "web" {
+app "web" {
   db_location = "localhost"
   url         = "https://localhost/app"
 }
@@ -1079,7 +1084,7 @@ if errors.Is(err, xcl.ErrUnregisteredType) {
 
 Passwords, tokens and other secrets are declared sensitive in the Go type that
 holds them. xcl then shows them only as the fixed marker `(sensitive)` in its
-logs, events, errors, configuration text and printed resources, and in your own
+logs, events, errors, configuration text and printed entities, and in your own
 `fmt`, `log/slog` and `encoding/json` output. State keeps the real value,
 encrypted when you give it a key, and your code reaches it only by asking for
 it.
@@ -1099,7 +1104,7 @@ type Postgres struct {
 ```
 
 ```hcl
-resource "postgres" "main" {
+database "postgres" "main" {
   username = "admin"
   password = env("DB_PASSWORD")
 }
@@ -1115,7 +1120,7 @@ used, such as when opening a connection, and do not print or log what it
 returns: a revealed value is an ordinary value and is no longer protected.
 
 ```go
-db, err := xcl.Find[Postgres](c, "resource.postgres.main")
+db, err := xcl.Find[Postgres](c, "database.postgres.main")
 if err != nil {
 	return err
 }
@@ -1124,7 +1129,7 @@ conn, err := sql.Open("postgres", dsn(db.Username, db.Password.Reveal()))
 ```
 
 Sensitivity follows the value through the configuration. A value referenced
-from a sensitive field, interpolated into a string, passed through a function,
+from a sensitive field, placed inside a string, passed through a function,
 passed into a module, or published by an output, is sensitive too. An output
 holds its sensitive parts as `types.Sensitive` values, so
 `xcl.Find[types.Output](c, "output.db").Value` may be a map whose `password`
@@ -1137,7 +1142,7 @@ declared sensitive fails validation, so `Validate` and `Apply` refuse the
 configuration before anything is created:
 
 ```text
-field "note" of resource.audit.main is not declared sensitive and cannot be
+field "note" of app.audit is not declared sensitive and cannot be
 assigned a sensitive value
 ```
 
@@ -1147,8 +1152,8 @@ detail names the field. There is no option to unwrap automatically; declare
 the field `types.Sensitive[T]` in your type too.
 
 ```go
-_, err := xcl.Find[PlainPostgres](c, "resource.postgres.main")
-// entity "resource.postgres.main" field "password" is sensitive,
+_, err := xcl.Find[PlainPostgres](c, "database.postgres.main")
+// entity "database.postgres.main" field "password" is sensitive,
 // main.PlainPostgres declares it as a plain value
 ```
 
@@ -1238,7 +1243,7 @@ and one with a state masker emit no such warning.
 
 ### Masking sensitive values in events
 
-Resource data on events, see [Resource data on events](#resource-data-on-events),
+Entity data on events, see [Entity data on events](#entity-data-on-events),
 writes each sensitive value through the event masker. The default is
 `mask.Redact()`, which shows the marker inside an envelope naming it:
 
@@ -1311,7 +1316,7 @@ most a `value` beside it, is always read as masked data.
 
 ## Struct Tags
 
-To create types that can be converted from HCL your top level resource needs to embed the
+To create types that can be converted from HCL your top level entity type needs to embed the
 following type into your structs.
 
 ``types.ResourceBase `xcl:",remain"` ``
@@ -1328,7 +1333,7 @@ the `PostgresSQL` struct will result in a parser error.
 
 ```go
 type PostgreSQL struct {
-	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
+	// For an entity to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -1342,7 +1347,7 @@ the previous example has been modified to make `location` optional.
 
 ```go
 type PostgreSQL struct {
-	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
+	// For an entity to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -1381,7 +1386,7 @@ type Config struct {
 This would be configured using the following HCL.
 
 ```javascript
-resource "config" "myconfig" {
+config "myconfig" {
   db_connection_string = "abc"
   timeouts {
     tls_handshake = 10
@@ -1390,7 +1395,7 @@ resource "config" "myconfig" {
 ```
 
 The `Timeout` type used by the field `Timeout` does not need to embed `ResourceBase`
-as it is not a top level resource but all other struct tags that define blocks and
+as it is not a top level entity but all other struct tags that define blocks and
 optional parameters are required.
 
 ### Optional Blocks
@@ -1414,7 +1419,7 @@ type Config struct {
 specified.
 
 ```javascript
-resource "config" "myconfig" {
+config "myconfig" {
   db_connection_string = "abc"
 }
 ```
@@ -1440,7 +1445,7 @@ type Config struct {
 `timeouts` can now be specified multiple times
 
 ```javascript
-resource "config" "myconfig" {
+config "myconfig" {
   db_connection_string = "abc"
   
   timeouts {
@@ -1456,12 +1461,12 @@ resource "config" "myconfig" {
 Note: when parsing the configuration the order of the `Timeouts` field will correspond 
 to the order of the `timeouts` blocks as defined in the `config`.
 
-## References to other resources
+## References to other entities
 
-A resource can reference other resources that can be set through interpolation.
+An entity can reference other entities, whose values are set when the references are resolved.
 
-The following structs define a `config` resource, and a `postgres_sql`
-resource.
+The following structs define a `config` entity, and a `database "postgres"`
+entity.
 
 ```go
 type Config struct {
@@ -1481,7 +1486,7 @@ type Config struct {
 }
 
 type PostgreSQL struct {
-	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
+	// For an entity to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -1490,29 +1495,29 @@ type PostgreSQL struct {
 ```
 
 These are represented as HCL using the following syntax, note: rather than
-referencing an individual attribute from the `postgres_sql` resource the entire
-struct is referenced. When the parser processes the `config` resource and the
-references are resolved the value of the referenced resources are copied to
+referencing an individual attribute from the `database "postgres"` entity the entire
+struct is referenced. When the parser processes the `config` entity and the
+references are resolved the value of the referenced entities are copied to
 the `config`.
 
 ```javascript
-resource "postgres_sql" "main" {
+database "postgres" "main" {
   location = "main.mydomain.com"
 }
 
-resource "postgres_sql" "other_1" {
+database "postgres" "other_1" {
   location = "1.mydomain.com"
 }
 
-resource "postgres_sql" "other_2" {
+database "postgres" "other_2" {
   location = "2.mydomain.com"
 }
 
-resource "config" "default" {
-  main_db_connection = resource.postgres_sql.main
+config "default" {
+  main_db_connection = database.postgres.main
   other_db_connections = [
-    resource.postgres_sql.other_1
-    resource.postgres_sql.other_2
+    database.postgres.other_1
+    database.postgres.other_2
   ]
 }
 ```
@@ -1521,7 +1526,7 @@ You could then access the properties of the referenced `PostgreSQL` structs
 in the normal go way.
 
 ```go
-  conf, err := xcl.Find[Config](c, "resource.config.default")
+  conf, err := xcl.Find[Config](c, "config.default")
   if err != nil {
     return err
   }
@@ -1531,8 +1536,8 @@ in the normal go way.
   fmt.Println("loc other 2", conf.OtherDBConnections[1].Location)
 ```
 
-### Defining shared fields for resources
-It is common that you might have two resources that are similar but have some 
+### Defining shared fields for entities
+It is common that you might have two entity types that are similar but have some 
 differences. For example, you might have two `database`, `postgres` and `mysql`
 that share some common fields like `location` and `port` but have some differences
 that are specific to the implementation.
@@ -1547,7 +1552,7 @@ type.
 
 ```go
 type DB struct {
-	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
+	// For an entity to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -1571,7 +1576,7 @@ type MySQL struct {
 ## Variables
 
 Variables allow dynamic values to be set in your configuration, they are defined
-using the `variable` resource stanza.
+using the `variable` block.
 
 ```javascript
 variable "username" {
@@ -1584,14 +1589,14 @@ variable "connection_string" {
 ```
 
 Setting a default value for a variable will enable it to be used within
-resources.
+entities.
 
 ```javascript
-resource "config" "myconfig1" {
+config "myconfig1" {
   db_connection_string = variable.connection_string 
 }
 
-resource "config" "myconfig2" {
+config "myconfig2" {
   db_connection_string = "${variable.username}:password@localhost"
 }
 ```
@@ -1606,33 +1611,33 @@ export HCL_VAR_username="nic"
 
 The prefix for environment variables can be changed in the `ParserOptions`.
 
-Note: variables can contain interpolated references for other resources as
-the are not parsed by the graph and are parsed before any other resource.
+Note: variables can contain references to other entities as
+the are not parsed by the graph and are parsed before any other entity.
 
-For computed local variables use `local` resources.
+For computed local variables use `local` blocks.
 
 ## Local
 
-Local resources allow you to create, temporary computed variables that can 
+Local blocks allow you to create, temporary computed variables that can 
 be used within your config. For example, if you wanted to compute a value
-that was based on the attribute of another resource you could use a `local`.
+that was based on the attribute of another entity you could use a `local`.
 
 ```javascript
-resource "config" "myconfig1" {
+config "myconfig1" {
   db_connection_string = variable.connection_string 
 }
 
 local "conn" {
-  value = resource.config.myconfig1.db_connection_string == "abc" ? "localhost" : resource.config.myconfig1.db_connection_string
+  value = config.myconfig1.db_connection_string == "abc" ? "localhost" : config.myconfig1.db_connection_string
 }
 
-resource "config" "myconfig2" {
+config "myconfig2" {
   db_connection_string = local.conn
 }
 ```
 
 Unlike variables `local` variables are part of the graph and can contain references
-to other resources.
+to other entities.
 
 ## Modules
 
@@ -1640,13 +1645,13 @@ XCL supports modular configuration that enables you to group your configuration 
 functionality into modules.
 
 A module is a default type, however you still need to create the go structs that 
-define the resources included in your module. The following example shows how you can
+define the entities included in your module. The following example shows how you can
 use a module in the directory `../example/modules/db`, a `db` module that
 declares a database from the variables `db_username` and `db_password` and
 publishes its `connection_string` as an output.
 
 Any sub folder can be a module, to create a module all that is needed is one or more `.hcl` files
-that contain your custom resources.
+that contain your custom blocks.
 
 ```javascript
 // modules can also use 
@@ -1689,14 +1694,14 @@ defines the output `connection_string`.
 
 ```javascript
 output "connection_string" {
-  value = resource.postgres.mydb.connection_string
+  value = database.postgres.mydb.connection_string
 }
 ```
 
-To read this value you can use the interpolation syntax `module.mymodule_1.output.name`
+To read this value you can use the reference `module.mymodule_1.output.name`
 The following example shows how an output from one module can be used as an
-input to another module. Because XCL understands the links between resources
-the resources in `my_other_module` will only be processed after the resources
+input to another module. Because XCL understands the links between entities
+the entities in `my_other_module` will only be processed after the entities
 in `mymodule_1`.
 
 ```javascript
@@ -1723,8 +1728,8 @@ Outputs can also contain complex types like lists ...
 ```javascript
 output "connection_string_list" {
   value = [
-    resource.postgres.mydb1.connection_string,
-    resource.postgres.mydb2.connection_string
+    database.postgres.mydb1.connection_string,
+    database.postgres.mydb2.connection_string
   ]
 }
 ```
@@ -1734,8 +1739,8 @@ and maps ...
 ```javascript
 output "connection_string_map" {
   value = {
-    connection1 = resource.postgres.mydb1.connection_string
-    connection2 = resource.postgres.mydb2.connection_string
+    connection1 = database.postgres.mydb1.connection_string
+    connection2 = database.postgres.mydb2.connection_string
   }
 }
 ```
@@ -1757,12 +1762,12 @@ output "connection_string_map_1" {
 A module's outputs are the only way to reach inside it. From its parent you can
 reference a module's outputs, `module.<name>.output.<name>`, and the module
 itself, as in `depends_on = ["module.mymodule_1"]`, but nothing else. A
-reference to a module's resources, variables or nested modules, or to anything
+reference to a module's entities, variables or nested modules, or to anything
 inside a module nested in it, fails validation with an error naming the
 reference:
 
 ```
-resource 'output.x' refers to 'module.a.resource.postgres.db.connection_string', which is inside module 'a'; only a module's outputs can be referenced from outside it
+resource 'output.x' refers to 'module.a.database.postgres.db.connection_string', which is inside module 'a'; only a module's outputs can be referenced from outside it
 ```
 
 The boundary holds at every level of nesting: a parent reaches only its direct
@@ -1832,10 +1837,10 @@ mytype "test" {
 
 myothertype "test" {
   // Value = 2
-  collection_length = len(resource.mytype.test.collection)
+  collection_length = len(mytype.test.collection)
 
   // Value = 8
-  string_length = len(resource.mytype.test.string)
+  string_length = len(mytype.test.string)
 }
 ```
 
@@ -1901,7 +1906,7 @@ The template_file function provides helpers that can be used inside your
 templates as shown in the example below.
 
 ```javascript
-resource "template" "consul_config" {
+template "consul_config" {
 
   source = <<-EOF
 
@@ -1939,11 +1944,11 @@ trim " abc " // would return the value "abc"
 
 #### dir()
 
-Returns the absolute path of the directory containing the current resource
+Returns the absolute path of the directory containing the current block
 
 ```javascript
 mytype "test" {
-  resource_folder = dir()
+  folder = dir()
 }
 ```
 
@@ -1980,7 +1985,7 @@ mytype "test1" {
 
 mytype "test2" {
   item {
-    name = element(resource.mytype.test1.0, variable property)
+    name = element(mytype.test1.0, variable property)
   }
 }
 ```
@@ -1991,7 +1996,7 @@ In addition to the default functions it is possible to register custom functions
 
 For example, given a requirement to have a function that returns a random number in a set
 range you could write a go function that looks like the following. Note: only a single
-return type can be consumed by the HCL parser and assigned to the resource value.
+return type can be consumed by the HCL parser and assigned to the attribute.
 
 ```go
 func RandRange(min, max int) int {
@@ -2016,7 +2021,7 @@ You set up the parser as normal
 
 ```go
 p := NewParser(DefaultOptions())
-p.RegisterType(&structs.Postgres{}, "resource", "postgres")
+p.RegisterType(&structs.Postgres{}, "postgres")
 ```
 
 However, in order to use the custom function before parsing you register it with the 
@@ -2057,25 +2062,25 @@ func RandRange(min, max int) (int, error) {
 
 XCL provides three hooks that can be used when parsing configuration.
 
-* Resource `Processable` interface
+* Entity `Processable` interface
 * Parser Callback
 * Config Process Callback
 
-### Resource Processable interface
+### Entity Processable interface
 
-The resource `Processable` interface can be added to your resources by adding
+The entity `Processable` interface can be added to your entity types by adding
 a an optional method with the following singature.
 
 ```go
 Process() error
 ```
 
-For example, the `PostgresSQL` resource implement the `Processable` interface
+For example, the `PostgresSQL` type implement the `Processable` interface
 to compute the value of the attribute `connection_string`.
 
 ```go
 type PostgreSQL struct {
-	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
+	// For an entity to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -2097,14 +2102,14 @@ func (t *PostgreSQL) Process() error {
 }
 ```
 
-`Process` is called in strict order depending on the dependencies for your resources.
+`Process` is called in strict order depending on the dependencies for your entities.
 
-For example, given the following custom resources
+For example, given the following custom entity types
 
 ```go
 // Config defines the type `config`
 type Config struct {
-	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
+	// For an entity to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -2127,9 +2132,9 @@ func (t *Config) Process() error {
 	return nil
 }
 
-// PostgreSQL defines the Resource `postgres`
+// PostgreSQL defines the type `database "postgres"`
 type PostgreSQL struct {
-	// For a resource to be parsed by XCL it needs to embed the ResourceInfo type and
+	// For an entity to be parsed by XCL it needs to embed the ResourceInfo type and
 	// add the methods from the `Resource` interface
 	types.ResourceBase `xcl:",remain"`
 
@@ -2151,17 +2156,17 @@ func (t *PostgreSQL) Process() error {
 }
 ```
 
-And the following configuration that uses these resources
+And the following configuration that uses these types
 
 ```javascript
-resource "config" "myconfig" {
-  // resource.postgres.mydb.connection_string will be available after the `Process` has
-  // been called on the `postgres` resource. XCL understands dependency and will
+config "myconfig" {
+  // database.postgres.mydb.connection_string will be available after the `Process` has
+  // been called on the `database.postgres.mydb` entity. XCL understands dependency and will
   // call Process in a strict order
-  db_connection_string = resource.postgres.mydb.connection_string
+  db_connection_string = database.postgres.mydb.connection_string
 }
 
-resource "postgres" "mydb" {
+database "postgres" "mydb" {
   location = "localhost"
   port     = 5432
   name     = "mydatabase"
@@ -2173,8 +2178,8 @@ resource "postgres" "mydb" {
 }
 ```
 
-Because you are referencing the attribute `resource.postgres.mydb.connection_string`
-to set a value in the `config` resource. `Process` for the `PostgreSQL` type will be called
+Because you are referencing the attribute `database.postgres.mydb.connection_string`
+to set a value in the `config` entity. `Process` for the `PostgreSQL` type will be called
 before `Process` for the `Config` type. This allows you to perform any computations or validations
 needed to calculate `connection_string` before `config` attempts to consume the value.
 
@@ -2183,24 +2188,24 @@ method.
 
 ### Parser Callback
 
-Rather than implementing individual resource functions you may prefer to leverage the global
+Rather than implementing individual entity functions you may prefer to leverage the global
 callback that can be set on the `ParserOptions`.
 
 ```go
 o := xcl.DefaultOptions()
 
-// set the callback that will be executed when a resource has been created
+// set the callback that will be executed when an entity has been created
 // this function can be used to execute any external work required for the
-// resource.
+// entity.
 o.ParseCallback = func(r types.Resource) error {
 	fmt.Printf(
-    "resource '%s' named '%s' has been parsed from the file: %s\n", 
+    "entity '%s' named '%s' has been parsed from the file: %s\n", 
     r.Metadata().Type, 
     r.Metadata().Name, 
     r.Metadata().File,
   )
 
-  // cast the Resource into a concrete type
+  // cast the entity into a concrete type
   switch r.Metadata().Type {
     case "config":
       myconfig := r.(*Config)
@@ -2220,7 +2225,7 @@ A final callback is available using the `Process(wf ProcessCallback, reverse boo
 function that is available on the `xcl.Config` type.
 
 `Process` builds a Directed Acyclic Graph for your configuration based on
-the dependency and calls the provided `ProcessCallback` for each resource 
+the dependency and calls the provided `ProcessCallback` for each entity 
 in the graph.
 
 ```go
@@ -2234,16 +2239,16 @@ nc.Process(func(r types.Resource) error {
 
 **Note**  
 While you can mutate the values of the `Resource` passed to the
-ProcessCallback, it will not update any resources that reference this attribute.
+ProcessCallback, it will not update any entities that reference this attribute.
 
-When ParseFile resolves interpolated values it `copies` the value to the destination
-resource. Given the earlier example mutating the `ConnectionString` field on the 
-`postgres` resource would not update the `config` resource even though the  `ProcessCallback`
+When ParseFile resolves references it `copies` the value to the destination
+entity. Given the earlier example mutating the `ConnectionString` field on the 
+`postgres` entity would not update the `config` entity even though the  `ProcessCallback`
 will be called with the `PostgreSQL` type before `Config`.
 
 ### Walking dependencies in reverse
 
-To reverse the order of resources that are provided to the `ProcessCallback` you can
+To reverse the order of entities that are provided to the `ProcessCallback` you can
 set the second process method attribute to `true`.
 
 ```go
@@ -2255,11 +2260,11 @@ nc.Process(func(r types.Resource) error {
 }, true)
 ```
 
-`ProcessCallback` will be called first for resources lowest down in the dependency
-graph `children` before the resources they depend on.
+`ProcessCallback` will be called first for entities lowest down in the dependency
+graph `children` before the entities they depend on.
 
 An ideal use for this method is to clean up any operations that may have been created
-with the `Processable` interface on your resource or the `ParseCallback`.
+with the `Processable` interface on your entity type or the `ParseCallback`.
 
 ## Serialization
 

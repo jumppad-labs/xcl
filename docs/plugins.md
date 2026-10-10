@@ -1,7 +1,7 @@
 # Plugin Architecture
 
 A provider (plugin) is the thing that actually creates, updates, and
-destroys whatever a resource represents (a container, a network, a cloud
+destroys whatever an entity represents (a container, a network, a cloud
 resource, ...). This page covers how a provider is authored, how it's
 exposed to the engine, and the two ways it can be hosted.
 
@@ -24,7 +24,7 @@ PluginHost            -- adds GetTypes()/Stop(), abstracts in-process vs gRPC
 
 ### 1. `ResourceProvider[T]` — what you write
 
-A plugin author writes one of these per resource type, with `T` being their
+A plugin author writes one of these per entity type, with `T` being their
 own concrete Go struct (e.g. `*ContainerResource`):
 
 ```go
@@ -45,17 +45,17 @@ it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
 
 - `Init` gets a plugin scoped logger, for messages written outside a
   provider call. During a call, log through `plugins.Logger(ctx)`, which xcl
-  binds to the resource and step (see [Plugin logging](#plugin-logging)).
-- `Read(ctx, old, new)` reports the real resource. `old` is the copy saved by
+  binds to the entity and step (see [Plugin logging](#plugin-logging)).
+- `Read(ctx, old, new)` reports the real object. `old` is the copy saved by
   the last apply, `new` is the configured copy; `Read` fills `new` in and
-  returns it. It is only called for resources in the previous state.
+  returns it. It is only called for entities in the previous state.
 - `Read` returns `plugins.ErrNotFound`
-  ([`plugins/errors.go`](../plugins/errors.go)) when the real resource no
+  ([`plugins/errors.go`](../plugins/errors.go)) when the real object no
   longer exists, and xcl creates it again. xcl checks for it with
   `errors.Is`, so it can be wrapped.
 - `Changed(ctx, old, new, changes, dependencies)` compares the saved copy
   with what `Read` returned and answers what the apply does with the
-  resource, an `entity.Change` ([`entity/change.go`](../entity/change.go)):
+  entity, an `entity.Change` ([`entity/change.go`](../entity/change.go)):
   `entity.NoChange` leaves it alone, `entity.Update` calls `Update`, and
   `entity.Replace` destroys it, then creates it again. `changes` lists the
   settings that differ from the last apply, each an `entity.PropertyChange`
@@ -63,7 +63,7 @@ it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
   `Path`, `Before` and `After` values, found by the same comparison the plan
   is made from, so the paths are exactly the plan's. A new value only known
   once the apply runs has `Unknown` set and a nil `After`. `dependencies`
-  lists the resources it directly depends on that the same apply will update
+  lists the entities it directly depends on that the same apply will update
   or replace, each an `entity.DependencyChange{Address, Change}`. Embed
   `plugins.DefaultChanged[T]` ([`plugins/changed.go`](../plugins/changed.go))
   to get a comparison of the JSON form of both copies that ignores `meta`,
@@ -71,9 +71,9 @@ it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
   both lists; define `Changed` on the provider to override it, for example
   to answer replace
   (see [Overriding `Changed`](plugin-developer-guide.md#overriding-changed)).
-- `Update(ctx, resource, changes, dependencies)` changes the resource in
+- `Update(ctx, resource, changes, dependencies)` changes the entity in
   place. `changes` is the same comparison run again when the apply reaches
-  the resource, so every value is real, including values produced earlier in
+  the entity, so every value is real, including values produced earlier in
   the same apply; `dependencies` is exactly the list `Changed` was given.
 - A change's `Path` ([`entity/path.go`](../entity/path.go)) is a list of
   steps, written like `network[0].name` or `environment["LOG_LEVEL"]`;
@@ -88,8 +88,8 @@ it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
 ### 2. `ProviderAdapter` — the uniform contract
 
 The rest of the engine (the parser's DAG walk, the catalog) can't
-work with a different generic type per resource — it needs one interface it
-can call regardless of which plugin or resource type it's dealing with:
+work with a different generic type per block type — it needs one interface it
+can call regardless of which plugin or block type it's dealing with:
 
 ```go
 // plugins/adapter.go
@@ -106,7 +106,7 @@ type ProviderAdapter interface {
 
 Everything is `[]byte` (JSON) in and out. This is the interface
 `internal/parser/lifecycle.go` actually calls during the DAG walk (see
-[Parser & Resource Lifecycle](parser-lifecycle.md)) — it never knows or
+[Parser & Entity Lifecycle](parser-lifecycle.md)) — it never knows or
 cares whether the concrete implementation is local or remote.
 
 `TypedProviderAdapter[T]` ([`plugins/adapter.go`](../plugins/adapter.go))
@@ -256,7 +256,7 @@ so external plugins must be rebuilt.
 ## Registering a provider
 
 A plugin embeds `PluginBase` ([`plugins/plugin.go`](../plugins/plugin.go))
-and, per resource type, calls:
+and, per entity type, calls:
 
 ```go
 func RegisterResourceProvider[T any](
@@ -285,7 +285,7 @@ plugin are told apart in what they log outside a call. (It is added with
 `logger.WithTag`, which only tags xcl's own event logger, so it applies to
 in-process plugins; inside an external plugin process the plugin scoped logger
 sends to the host over gRPC and is passed on unchanged.) During a call the
-event names the resource and its type instead. The external Docker plugin in
+event names the entity and its type instead. The external Docker plugin in
 [`example/plugin`](../example/plugin) provides two types this way,
 `docker.network` and `docker.container`. Its in-process template plugin
 provides one, `template`, registered with an empty subtype, so a block is
@@ -297,8 +297,8 @@ written `template "welcome" {}` and its provider's `Init` logs carry
 (via a `GetTypes` RPC call to the plugin process) expose upward.
 
 The out-of-process case is why the schema exists at all: the host process
-doesn't have `T` compiled in, so it can't decode `entityData` itself. When a
-resource of a given type needs to be *instantiated* from HCL (not just
+doesn't have `T` compiled in, so it can't decode `entityData` itself. When an
+entity of a given type needs to be *instantiated* from HCL (not just
 passed through as `[]byte`), the host reconstructs a Go type dynamically
 from the schema via `schema.CreateInstanceFromSchema` — see
 [`internal/catalog/catalog.go:createEntityFromPlugins`](../internal/catalog/catalog.go).
@@ -439,16 +439,16 @@ Its two jobs, used from two different places in the parser:
   `schema.CreateInstanceFromSchema` if found. Used while *parsing* HCL,
   before any dependency graph exists.
 - **`GetProviderForResource(resource any) plugins.ProviderAdapter`** —
-  given an already-decoded resource, find the `ProviderAdapter` that
+  given an already-decoded entity, find the `ProviderAdapter` that
   handles its type (matches `types.GetMeta(resource).Type` and `.Subtype`
   against each host's `GetTypes()`). Used during the DAG walk to actually invoke
-  lifecycle methods (see [Parser & Resource Lifecycle](parser-lifecycle.md)).
+  lifecycle methods (see [Parser & Entity Lifecycle](parser-lifecycle.md)).
 
 These are two different methods on the same struct because they solve two
 different problems (build a Go value vs. look up an RPC target) — code that
 only needs the second one can depend on the narrower
 `parser.ProviderResolver` interface instead of the concrete
-`*catalog.Catalog` (see the "testing" note in [Parser & Resource
+`*catalog.Catalog` (see the "testing" note in [Parser & Entity
 Lifecycle](parser-lifecycle.md)).
 
 ## Plugin logging
@@ -456,7 +456,7 @@ Lifecycle](parser-lifecycle.md)).
 Plugins never write output. Everything a plugin logs becomes an
 `events.Event` with the phase `log` on the same stream as xcl's own events,
 delivered to the application's receiver (see
-[Parser & Resource Lifecycle](parser-lifecycle.md#events-parseroptionsemit)).
+[Parser & Entity Lifecycle](parser-lifecycle.md#events-parseroptionsemit)).
 The level and text are in `Meta` under `events.KeyLevel` (`level`) and
 `events.KeyMessage` (`message`), and the key/value arguments of the call are
 the other `Meta` details, under their own names. The `logger` package holds
@@ -480,9 +480,9 @@ func (p *networkProvider) Create(ctx context.Context, n *entities.Network) (*ent
 The parser puts a logger in the context before each call with
 `plugins.WithLogger` (see
 [The operation context](parser-lifecycle.md#the-operation-context)), bound to
-the resource (`ResourceID`, `ResourceType`, `File`) and the step (`Operation`
+the entity (`ResourceID`, `ResourceType`, `File`) and the step (`Operation`
 is `create`, `read`, `changed`, `update` or `destroy`). The provider passes no
-resource details, and the message arrives between the call's `start` and its
+entity details, and the message arrives between the call's `start` and its
 `success` or `error`. Outside a provider call, `plugins.Logger(ctx)` returns a
 logger that emits nothing.
 
@@ -496,13 +496,13 @@ sets it with `logger.WithSource` before the call reaches the plugin:
   `plugins.PluginBinaryName` (`xcl-plugin-person`, without `.exe`).
 
 Loggers are not kept on the provider: providers are called concurrently for
-different resources, so each call carries its own.
+different entities, so each call carries its own.
 
 ### The plugin scoped logger
 
 `Plugin.Init(logger, state)` and each provider's `Init` get a plugin scoped
 logger, for messages written outside a provider call. Its events have the
-plugin's name as `Source` and `load` as `Operation`, and no resource. The
+plugin's name as `Source` and `load` as `Operation`, and no entity. The
 catalog forwards them to the operation loading the plugins, or later to the
 active operation (see `Activate` above); with neither, they are dropped.
 
@@ -521,7 +521,7 @@ An external plugin's messages cross gRPC through the host callback service
   the plugin, `GRPCServer` puts a `GRPCLogger` carrying that ID into the
   call's context, so `plugins.Logger(ctx)` works the same as in-process. Each
   message is sent as a `LogRequest` with the ID in its `call_id` field, and
-  the host writes it to that call's logger, so it gets the call's resource,
+  the host writes it to that call's logger, so it gets the call's entity,
   step and receiver. A message with no ID, or one for a call that has
   already returned, goes to the plugin scoped logger.
 - **Values as text.** `LogRequest.args` is a list of strings, so detail values
@@ -572,12 +572,11 @@ declares a plain Go type (a pointer to a struct embedding
 with no plugin and no provider, and the registry is given to the `Config`
 with `xcl.WithRegistry`. A plugin
 registers its types the same way, through
-`PluginBase.RegisterType(entityType, subtype, ...)`, and neither has to use
-the `resource` type:
+`PluginBase.RegisterType(entityType, subtype, ...)`:
 
 ```go
 local := registry.NewLocal()
-local.RegisterType(&PostgreSQL{}, "resource", "postgres") // resource "postgres" "main" {}
+local.RegisterType(&PostgreSQL{}, "database", "postgres") // database "postgres" "main" {}
 local.RegisterType(&Server{}, "server", "big")            // server "big" "web" {}
 local.RegisterType(&Cache{}, "cache")                     // cache "main" {}
 
@@ -587,8 +586,7 @@ c, err := xcl.NewConfig(xcl.WithRegistry(local))
 The type is the keyword a block leads with and the subtype its first label.
 A type keyword takes a subtype for every registration or for none, so the
 parser knows from the keyword alone how many labels a block has, and an
-address such as `server.big.web` is read by position. `resource` always takes
-a subtype.
+address such as `server.big.web` is read by position.
 
 `CreateEntity` builds declared types with `reflect.New`, like builtins, so
 blocks decode into the developer's own type and state reload returns that
@@ -617,7 +615,7 @@ where they can first be seen:
 Plugin types are checked when plugins load, against the builtins, the
 declared types, the plugins already loaded and the other types the same
 plugin provides, whatever order the registrations were made in. A clash is a
-`*xcl.TypeNameClashError` naming it, i.e. `resource.postgres`, and a keyword
+`*xcl.TypeNameClashError` naming it, i.e. `database.postgres`, and a keyword
 in the other form a `*xcl.TypeFormError`. A clashing plugin is stopped and
 not added, and the load fails, and with it the operation, even when other
 plugins loaded. There is no precedence between providers.

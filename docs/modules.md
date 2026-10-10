@@ -7,7 +7,7 @@ as a scoped, reusable unit:
 module "consul_1" {
   source = "../single"
   variables = {
-    cpu_resources = resource.container.base.resources.cpu
+    cpu_resources = docker.container.base.resources.cpu
   }
 }
 ```
@@ -24,7 +24,7 @@ sourceDir := filepath.Join(filepath.Dir(file), sourceVal.AsString())
 
 It then discovers `.xcl` files in `sourceDir` (`findXclFiles`) and
 recursively parses each one via `p.parseResourcesInFile(childFile,
-moduleInstanceName)`, scoping every resource found there under
+moduleInstanceName)`, scoping every entity found there under
 `moduleInstanceName` (the parent-qualified instance name, e.g.
 `consul_3.consul_1` for a module nested inside another). Nested modules
 work purely through this recursion — a module's source directory can
@@ -41,8 +41,8 @@ Module parsing is split across two passes (documented in
 [`parser.go:558`](../internal/parser/parser.go#L558)):
 
 - **Phase 1** (`parseModule`, at parse time): create a shell `Module`
-  resource, resolve `source` to a directory, and recursively parse child
-  files into resources scoped under this module's instance name. This
+  entity, resolve `source` to a directory, and recursively parse child
+  files into entities scoped under this module's instance name. This
   happens before any dependency graph or evaluation context exists.
 - **Phase 2** (during the DAG walk, in `walkCallback`): once the module's
   own dependencies are resolved and it has a full HCL evaluation context,
@@ -50,9 +50,9 @@ Module parsing is split across two passes (documented in
   struct tags — see the comment at [`callbacks.go:120`](../internal/parser/callbacks.go#L120)
   explaining why gocty can't represent a heterogeneous object literal
   directly) is evaluated and stashed on `Module.SubContext`, where each
-  child resource's own context-building step picks it up.
+  child entity's own context-building step picks it up.
 
-Cross-module references during interpolation (`module.consul_1.output.x`)
+Cross-module references (`module.consul_1.output.x`)
 are resolved via a `module` namespace built in
 [`internal/parser/context.go`](../internal/parser/context.go).
 
@@ -61,7 +61,7 @@ are resolved via a `module` namespace built in
 A module's outputs are the only way to reach inside it from configuration.
 From its parent, a reference may name a direct child module's output
 (`module.a.output.x`) or the child module itself (`module.a`, typically in
-`depends_on`). A reference to a child's resources, variables or nested modules,
+`depends_on`). A reference to a child's entities, variables or nested modules,
 or to anything in a grandchild (`module.a.b.output.x`), is rejected.
 
 The rule is enforced in stage 2 of validation (`validateReferences` in

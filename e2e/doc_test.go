@@ -4,6 +4,7 @@
 // application or plugin author would. The only internal package they may
 // import is internal/testutil, which holds test helpers and no library code.
 //
-// The suite also runs each example module's tests, so the examples are
-// checked alongside the library they demonstrate.
+// The suite does not run the examples. Each example is a module of its own,
+// tested on its own by the Examples workflow, which checks the examples work,
+// not the library.
 package e2e_test

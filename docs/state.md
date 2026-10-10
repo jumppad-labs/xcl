@@ -15,10 +15,10 @@ There is no public container type. A `StateStore` exchanges plain entities, so
 an implementation needs no type from this library in its signatures and has
 nothing to construct. The parser keeps its own working container internally
 (`internal/parser/entities.go`), which is a mutex-protected flat list with no
-index or status table — a resource's operational status lives on its own
-`types.Meta.Status` field (see [Resource statuses](#resource-statuses)).
+index or status table — an entity's operational status lives on its own
+`types.Meta.Status` field (see [Entity statuses](#entity-statuses)).
 
-Each saved resource keeps its `meta.links` and `meta.module`
+Each saved entity keeps its `meta.links` and `meta.module`
 ([`types/resource.go`](../types/resource.go#L47)): every dependency it has,
 written in `depends_on` or worked out from a reference, as an address relative
 to the module it sits in. `Destroy` resolves them against the saved state with
@@ -30,7 +30,7 @@ ordered from its links.
 Every lookup is a **linear scan** comparing `types.GetMeta(r)` fields against a
 parsed FQRN (fully-qualified resource name, `internal/resources/fqrn.go`) —
 there is no index, which is fine at the scale this is used (one config's worth
-of resources) but worth knowing if you're tempted to call these in a hot loop.
+of entities) but worth knowing if you're tempted to call these in a hot loop.
 
 That applies to the public lookup surface too. `xcl.Find`, `xcl.FindByType`,
 `xcl.FindOne` and `xcl.All` scan `Config.Entities()`, so an address lookup is
@@ -41,9 +41,9 @@ scans. None of this is indexed or cached, deliberately.
 Key operations:
 
 - **`AppendResource(r)`** ([`state.go:35`](../state/state.go#L35)) — computes
-  the resource's FQRN from `Module`/`Name`/`Type` in its `Meta`, sets
-  `Meta.ID` to that FQRN string, and errors with `ResourceExistsError` if a
-  resource with the same FQRN is already present.
+  the entity's FQRN from `Module`/`Name`/`Type` in its `Meta`, sets
+  `Meta.ID` to that FQRN string, and errors with `ResourceExistsError` if an
+  entity with the same FQRN is already present.
 - **`FindResource(path)`** ([`state.go:81`](../state/state.go#L81)) — parses
   `path` as an FQRN and scans for a match.
 - **`FindRelativeResource(path, parentModule)`** ([`state.go:89`](../state/state.go#L89)) —
@@ -56,22 +56,22 @@ Key operations:
   serialization boundary: `json.MarshalIndent(s.resources, "", "  ")`. This
   is what any `StateStore.Save` implementation is expected to persist.
 
-## Resource statuses
+## Entity statuses
 
-xcl records what happened to each resource in `Meta.Status`
+xcl records what happened to each entity in `Meta.Status`
 ([`types/status.go`](../types/status.go)). These are the only values it
 sets:
 
 | Status | Meaning | Next apply |
 |---|---|---|
-| `created` | the provider created the resource | read, then left alone, updated or replaced as its provider's `Changed` answers |
-| `updated` | the provider updated the resource | read, then left alone, updated or replaced as its provider's `Changed` answers |
-| `failed` | creating or updating the resource failed, including the create of a replacement | replaced, without asking its provider: destroyed, then created |
-| `destroyed` | the provider destroyed the resource | — (never saved) |
-| `destroy_failed` | destroying the resource failed, including the destroy of a replacement | removed again if its block is gone, otherwise replaced: the destroy is tried again, then created |
+| `created` | the provider created the entity | read, then left alone, updated or replaced as its provider's `Changed` answers |
+| `updated` | the provider updated the entity | read, then left alone, updated or replaced as its provider's `Changed` answers |
+| `failed` | creating or updating the entity failed, including the create of a replacement | replaced, without asking its provider: destroyed, then created |
+| `destroyed` | the provider destroyed the entity | — (never saved) |
+| `destroy_failed` | destroying the entity failed, including the destroy of a replacement | removed again if its block is gone, otherwise replaced: the destroy is tried again, then created |
 
-`destroyed` is never saved: a destroyed resource is removed from the state
-instead. A `destroy_failed` resource is retried by the next `Destroy`, or by
+`destroyed` is never saved: a destroyed entity is removed from the state
+instead. A `destroy_failed` entity is retried by the next `Destroy`, or by
 the next `Apply` as above.
 
 ## State saved after a failed apply
@@ -80,14 +80,14 @@ A failed apply still produces a state to save. `Parser.Apply` returns it
 together with the error, and `Config.Apply` saves it before returning the
 error, so the next apply picks up where this one stopped:
 
-- resources the walk reached are saved with their new values and status;
-- the failing resource is saved as `failed`, whether it was being created,
+- entities the walk reached are saved with their new values and status;
+- the failing entity is saved as `failed`, whether it was being created,
   updated, or created again as a replacement;
-- resources that existed before but were not reached keep their previous
+- entities that existed before but were not reached keep their previous
   entry;
-- new resources that were not reached are left out.
+- new entities that were not reached are left out.
 
-When a replaced or removed resource fails to be destroyed, the apply stops
+When a replaced or removed entity fails to be destroyed, the apply stops
 before anything is created or changed, and the state saved is the previous
 state minus what was destroyed, with the failures kept as `destroy_failed`
 (see [State during a destroy](#state-during-a-destroy)). The next apply
@@ -99,23 +99,23 @@ no blocks (`xcl.ErrEmptyConfiguration`), or the dependency graph can't be
 built: no provider was called, so the previous state still stands. Nothing
 is saved either when deciding fails or is cancelled: an error from a
 provider's `Read` or `Changed` while the apply decides what to do marks no
-resource failed, since nothing has been created, updated or destroyed, and
+entity failed, since nothing has been created, updated or destroyed, and
 the previous state still stands. See
-[Parser & Resource Lifecycle](parser-lifecycle.md#state-saved-after-a-failed-apply)
+[Parser & Entity Lifecycle](parser-lifecycle.md#state-saved-after-a-failed-apply)
 for how the state is built.
 
 ## State during a destroy
 
 `Config.Destroy` and the destroy phase of `Config.Apply` (its replaced and
-removed resources) save the state
-through the `StateStore` after every resource they destroy, not once at the
+removed entities) save the state
+through the `StateStore` after every entity they destroy, not once at the
 end ([`internal/parser/destroy.go`](../internal/parser/destroy.go#L22)):
 
-- a destroyed resource is removed from the state;
-- a resource whose destroy failed is kept, as the saved copy, with status
+- a destroyed entity is removed from the state;
+- an entity whose destroy failed is kept, as the saved copy, with status
   `destroy_failed`;
-- the resources it depends on are never reached, so they stay as they were.
-  Unrelated resources are still destroyed.
+- the entities it depends on are never reached, so they stay as they were.
+  Unrelated entities are still destroyed.
 
 The saved state is therefore correct at every step. If a destroy is
 interrupted, or returns an error, running `Destroy` again picks up with what
@@ -227,15 +227,15 @@ file accordingly.
 `Parser.Apply` (and `Parser.Validate`) call `Exists()`/`Load()` at the
 start of every run to get the "previous state", the state saved by the last
 apply. `Config.Destroy` calls them too, to get the state to destroy.
-`Parser.Apply` uses each resource's entry in it to decide between
-create, replace (for a resource saved as `failed` or `destroy_failed`) and
+`Parser.Apply` uses each entity's entry in it to decide between
+create, replace (for an entity saved as `failed` or `destroy_failed`) and
 read-then-ask, where its provider's `Changed` answers no change, update or
 replace (see
-[Parser & Resource Lifecycle](parser-lifecycle.md)). `Config.Apply` calls
+[Parser & Entity Lifecycle](parser-lifecycle.md)). `Config.Apply` calls
 `Save()` after adopting the entities the parse produced, including after a failed apply
 (see [State saved after a failed apply](#state-saved-after-a-failed-apply)).
 Destroying, in `Config.Destroy` or an apply's destroy phase, calls `Save()`
-after every resource (see [State during a destroy](#state-during-a-destroy)).
+after every entity (see [State during a destroy](#state-during-a-destroy)).
 
 `state/mocks/mock_state_store.go` is a generated mock of this interface
 (same mockery setup as the plugin mocks — see [Plugin
@@ -273,7 +273,7 @@ can't be created by the catalog (e.g. a plugin that's no longer loaded, or
 a type no registry given to the `Config` declares with `RegisterType`), decoding returns
 [`state.UnknownTypesError`](../state/errors.go) naming every such type,
 sorted and unique, instead of dropping the records — a state returned
-without them would be saved without them, erasing resources that still
+without them would be saved without them, erasing entities that still
 exist. Records that are malformed, or missing `meta`, `meta.type` or
 `meta.name`, are reported in the same error by their id, or by their
 position as `entry N`. This affects `Apply` and `Destroy` alike, so register

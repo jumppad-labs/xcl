@@ -1,12 +1,12 @@
 # Plugin Developer Guide
 
-A provider owns the lifecycle of one resource type. xcl decides *when* to
-call it; the provider decides *what* each call means for the real resource.
+A provider owns the lifecycle of one entity type. xcl decides *when* to
+call it; the provider decides *what* each call means for the real object.
 This guide is about writing the provider side correctly.
 
 The reference implementation is the example provider in
 [`plugins/example/pkg/person/provider.go`](../plugins/example/pkg/person/provider.go),
-with its resource type in
+with its entity type in
 [`resource.go`](../plugins/example/pkg/person/resource.go) next to it. For how
 providers are hosted and registered, see [Plugin Architecture](plugins.md).
 For where a plugin's entity types, providers and clients live, see
@@ -17,7 +17,7 @@ For where a plugin's entity types, providers and clients live, see
 
 A provider implements `plugins.ResourceProvider[T]`
 ([`plugins/provider.go`](../plugins/provider.go)), where `T` is a pointer to
-your resource struct:
+your entity struct:
 
 ```go
 type ResourceProvider[T any] interface {
@@ -44,14 +44,14 @@ the lifecycle methods; log from those through the call's context (see
 `Functions` returns the functions the provider exposes to other providers.
 The rest of this guide is about the lifecycle methods.
 
-## The two copies of a resource
+## The two copies of an entity
 
-Every call on a resource that already exists works with two copies of it:
+Every call on an entity that already exists works with two copies of it:
 
-- **`old`**: the resource as saved to state by the last apply. It holds
+- **`old`**: the entity as saved to state by the last apply. It holds
   everything the provider returned last time, including identity (IDs
   assigned at create time) and observed values.
-- **`new`**: the resource decoded from the current configuration. It holds
+- **`new`**: the entity decoded from the current configuration. It holds
   what the user wrote, plus the computed values xcl carried over from `old`
   (see [Computed fields](#computed-fields)). Observed and derived values are
   empty until `Read` fills them in.
@@ -63,7 +63,7 @@ Keep these straight and the rest follows.
 gives, `entity.Change`, and the two lists `Changed` and `Update` are given:
 the settings that changed, `[]entity.PropertyChange`
 ([`entity/property_change.go`](../entity/property_change.go)), and the
-dependencies that change with the resource, `[]entity.DependencyChange`; see
+dependencies that change with the entity, `[]entity.DependencyChange`; see
 [`Changed`](#changedctx-old-new-changes-dependencies-entitychange-error).
 
 ## Kinds of field
@@ -76,7 +76,7 @@ dependencies that change with the resource, `[]entity.DependencyChange`; see
 | Derived | a file's `checksum` | the provider, in `Create`/`Read`/`Update` | `Read` writes it into `new` |
 
 Identity fields are why `Read` gets `old`: you can't always find the real
-resource from configuration alone. Any field the user must not set, identity
+object from configuration alone. Any field the user must not set, identity
 in particular, should be marked computed.
 
 ## Sensitive fields
@@ -133,15 +133,15 @@ sensitive. Passing the sensitive value itself is safe: logging `db.Password` or
 Every apply runs in two halves
 ([`internal/parser/parser.go`](../internal/parser/parser.go),
 [`internal/parser/lifecycle.go`](../internal/parser/lifecycle.go)). First xcl
-**decides** what happens to every resource, without creating, updating or
+**decides** what happens to every entity, without creating, updating or
 destroying anything. Then it **acts** on those decisions: it destroys, then
 creates and updates. A plan (`Config.Diff`) runs exactly the same decide pass
 and stops there, so a plan and the apply that follows it agree.
 
 ### Decide
 
-xcl walks the resources in dependency order, so every resource is decided
-after everything it depends on. For each one it looks up the resource's entry
+xcl walks the entities in dependency order, so every entity is decided
+after everything it depends on. For each one it looks up the entity's entry
 in the state saved by the last apply:
 
 ```
@@ -165,12 +165,12 @@ saved as created or updated:
 
 `changes` lists the settings that differ between the saved copy and the
 configuration, worked out by the same comparison the plan shows, before `Read`
-is called. `dependencies` lists the resources this one depends on that the
+is called. `dependencies` lists the entities this one depends on that the
 same apply will update or replace; see
 [`Changed`](#changedctx-old-new-changes-dependencies-entitychange-error). A
 status xcl does not recognise is treated like `failed`.
 
-A resource whose configuration uses a value that is only known once the apply
+An entity whose configuration uses a value that is only known once the apply
 has run, such as a computed field of a dependency being created, updated or
 replaced, is still read and asked: xcl puts the saved value in place of the
 unknown one, and lists the setting in `changes` with `Unknown` set. Its
@@ -180,11 +180,11 @@ inputs are about to change, so it is decided at least an update even when
 
 Every `Read` and `Changed` call of the apply happens in this half. An error
 from either fails the apply before anything is created, updated or destroyed:
-no resource is marked failed and the saved state is left as it was.
+no entity is marked failed and the saved state is left as it was.
 
 ### Act: destroy
 
-Every resource decided replace, and every resource that is in the previous
+Every entity decided replace, and every entity that is in the previous
 state but no longer in the configuration, is destroyed with its saved copy,
 before anything is created or updated. Destroys run dependents first, the
 reverse of dependency order, and the state is saved after each one, so a
@@ -196,14 +196,14 @@ Destroy(old)
 ```
 
 If a `Destroy` fails, the saved copy is kept, because it holds the identity
-needed to try again, the resource is saved as `destroy_failed`, and the apply
+needed to try again, the entity is saved as `destroy_failed`, and the apply
 stops without creating or changing anything. The next apply decides it
 replace again (or removes it again, if its block is gone) and tries the
 destroy first.
 
 ### Act: create and update
 
-xcl then walks the resources in dependency order again, decoding each with
+xcl then walks the entities in dependency order again, decoding each with
 real values as its dependencies are created and updated, and follows its
 decision:
 
@@ -214,43 +214,43 @@ update            -> changes = the comparison run again, with real values
 unchanged         -> keep what Read returned and the previous status
 ```
 
-A replaced resource was destroyed in the previous phase, so it is created like
+A replaced entity was destroyed in the previous phase, so it is created like
 a new one. `Update` gets the configuration as decoded now, with the computed
 values `Read` returned while deciding. Its `changes` come from the plan's
 comparison run again now that every value is known, and its `dependencies`
 are the list recorded while deciding, the same list `Changed` was given; see
 [`Update`](#updatectx-resource-changes-dependencies-t-error). Nothing is
-called for an unchanged resource: what `Read` returned is saved and the
+called for an unchanged entity: what `Read` returned is saved and the
 status stays as it was (`created` or `updated`).
 
 When `Read` reports `ErrNotFound`, the computed values carried over from
-`old` are dropped along with the real resource: `Create` gets the resource as
+`old` are dropped along with the real object: `Create` gets the entity as
 configured.
 
 ### Builtin types
 
-`variable`, `output` and `module` resources have no provider. xcl handles
+`variable`, `output` and `module` blocks have no provider. xcl handles
 them itself and makes no provider calls for them.
 
 ## Methods
 
 ### `Create(ctx, resource) (T, error)`
 
-Called when the resource is not in the previous state, when `Read` returned
-`ErrNotFound`, and for a replaced resource, after its `Destroy`.
+Called when the entity is not in the previous state, when `Read` returned
+`ErrNotFound`, and for a replaced entity, after its `Destroy`.
 
-- **Input**: the resource as configured. Computed fields are empty.
+- **Input**: the entity as configured. Computed fields are empty.
 - **May change**: computed, observed and derived fields.
-- **Returns**: the resource with identity, observed and derived fields set.
+- **Returns**: the entity with identity, observed and derived fields set.
   This is what is saved and what `old` will be next time.
 
 ### `Read(ctx, old, new) (T, error)`
 
-Called only for resources saved as `created` or `updated`, so `old` is never
-nil. Look up the real resource and fill in `new` from it.
+Called only for entities saved as `created` or `updated`, so `old` is never
+nil. Look up the real object and fill in `new` from it.
 
 - **Input**: `old` is the saved copy; use its identity fields to find the
-  real resource. `new` is the configured copy with the saved computed values
+  real object. `new` is the configured copy with the saved computed values
   already carried over.
 - **May change**: identity, observed and derived fields on `new`.
 - **Returns**: `new`, filled in. This goes to `Changed`. Its computed values
@@ -262,9 +262,9 @@ The rules:
 - Never change a configured field. If you overwrite `image` with what is
   actually running, the user's change is lost.
 - Never record values that change on their own (see the callout below).
-- Never change the real resource. `Read` only looks: it must not create,
+- Never change the real object. `Read` only looks: it must not create,
   change or remove anything.
-- Return `plugins.ErrNotFound` when the real resource no longer exists. xcl
+- Return `plugins.ErrNotFound` when the real object no longer exists. xcl
   creates it again.
 - Any other error fails the apply before anything is changed. xcl does not
   guess.
@@ -272,15 +272,15 @@ The rules:
 > [!IMPORTANT]
 > **Never record values that change on their own in `Read`.** Uptime,
 > last-seen timestamps, counters and anything else that moves without the
-> resource changing will differ from the saved copy on every apply. `Changed`
+> object changing will differ from the saved copy on every apply. `Changed`
 > then reports a change and xcl calls `Update` on every apply, forever.
-> Record only values that change when the resource really changes.
+> Record only values that change when the object really changes.
 
 ### `Changed(ctx, old, new, changes, dependencies) (entity.Change, error)`
 
-Decides what applying the configuration needs for the resource. `old` is the
+Decides what applying the configuration needs for the entity. `old` is the
 saved copy and `new` is what `Read` returned, so it holds both configuration
-edits and drift in the real resource. `changes` lists the settings that
+edits and drift in the real object. `changes` lists the settings that
 changed and `dependencies` the dependencies that change with it. It must not
 change anything.
 
@@ -288,8 +288,8 @@ It answers one of three `entity.Change` values:
 
 | Answer | What the apply does |
 |---|---|
-| `entity.NoChange` | leaves the resource as it is; nothing is called |
-| `entity.Update` | calls `Update` to change the resource in place |
+| `entity.NoChange` | leaves the entity as it is; nothing is called |
+| `entity.Update` | calls `Update` to change the entity in place |
 | `entity.Replace` | calls `Destroy` with the saved copy, then `Create` |
 
 Most providers should not write this. Embed `plugins.DefaultChanged[T]`
@@ -303,7 +303,7 @@ type ContainerProvider struct {
 ```
 
 `DefaultChanged` compares the JSON form of both copies, ignoring xcl's own
-resource metadata (`meta`, `depends_on` and `disabled`). It answers
+entity metadata (`meta`, `depends_on` and `disabled`). It answers
 `entity.Update` when they differ and `entity.NoChange` when they don't. It
 ignores both `changes` and `dependencies` and never answers `entity.Replace`.
 Because `Read` has put reality into `new`, one comparison catches both kinds
@@ -318,7 +318,7 @@ of change:
 
 #### The changed settings
 
-`changes` lists the settings of the resource that differ between the last
+`changes` lists the settings of the entity that differ between the last
 apply and the configuration, each as an `entity.PropertyChange`
 ([`entity/property_change.go`](../entity/property_change.go)):
 
@@ -336,7 +336,7 @@ type PropertyChange struct {
   the saved copy against the configured copy that the plan shows, so a
   provider is told exactly the settings the plan lists, with the same paths.
   It describes the configuration: drift that `Read` finds in the real
-  resource is not in it, it is in the difference between `old` and `new`.
+  object is not in it, it is in the difference between `old` and `new`.
 - **`Unknown` only while deciding.** When `Changed` is called, a new value
   that is only known once the apply runs, such as a computed field of a
   dependency that is being created or replaced, has `Unknown` set and a nil
@@ -377,11 +377,11 @@ for _, change := range changes {
 }
 ```
 
-An empty list means none of the resource's settings changed.
+An empty list means none of the entity's settings changed.
 
 #### The dependency list
 
-`dependencies` lists the resources this one depends on that the same apply
+`dependencies` lists the entities this one depends on that the same apply
 will update or replace, sorted by address, each as an
 `entity.DependencyChange`:
 
@@ -392,26 +392,26 @@ type DependencyChange struct {
 }
 ```
 
-- **Direct only.** A resource depends on what it references and what it names
-  in `depends_on`. The dependencies of a dependency are not passed on: a
-  resource is told about what it depends on, not about what that depends on.
+- **Direct only.** An entity depends on what it references and what it names
+  in `depends_on`. The dependencies of a dependency are not passed on: an
+  entity is told about what it depends on, not about what that depends on.
 - **Update and replace only.** A dependency that is left unchanged is not
-  listed, and neither is one being created for the first time; a resource
-  that starts referencing a new resource has changed configuration anyway.
-- **Through outputs, variables and modules.** Resources without a provider,
+  listed, and neither is one being created for the first time; an entity
+  that starts referencing a new entity has changed configuration anyway.
+- **Through outputs, variables and modules.** Entities without a provider,
   such as an `output`, a `variable`, a `module` or a registered config-only
-  type, are looked through to the provider-backed resources behind them. A
-  resource inside a module is told about the changing resources the module
+  type, are looked through to the provider-backed entities behind them. An
+  entity inside a module is told about the changing entities the module
   block's `variables` reference.
 
-An empty list means nothing this resource depends on is changing. `Update` is
+An empty list means nothing this entity depends on is changing. `Update` is
 given the same list.
 
 #### Overriding `Changed`
 
 Define `Changed` on your provider when a plain comparison is wrong for your
 type: a setting the real system cannot change in place, a dependency whose
-replacement leaves the resource broken, or two values that differ as text
+replacement leaves the entity broken, or two values that differ as text
 but mean the same thing. Answer what you know and defer to the embedded
 `DefaultChanged` for the rest. The Docker container in the plugin example
 ([`example/plugin/plugins/docker/providers/container.go`](../example/plugin/plugins/docker/providers/container.go))
@@ -517,13 +517,13 @@ If you find yourself computing things in `Changed`, move that work into
 Called only when `Changed` answered `entity.Update`. It is never called for
 `entity.NoChange` or `entity.Replace`.
 
-- **Input**: the resource as configured now, with the computed values `Read`
+- **Input**: the entity as configured now, with the computed values `Read`
   returned while deciding. `changes` lists the settings that changed since
   the last apply, with every value real; see
   [The changed settings](#the-changed-settings). `dependencies` is exactly the
   list `Changed` was given.
 - **May change**: computed, observed and derived fields.
-- **Returns**: the resource with observed and derived fields set to the new
+- **Returns**: the entity with observed and derived fields set to the new
   reality (`running=true` after a restart), so that the next `Read` sees no
   difference. This is what is saved. The provider is authoritative over its
   computed values: one it leaves out of its result, such as an `omitempty`
@@ -531,7 +531,7 @@ Called only when `Changed` answered `entity.Update`. It is never called for
   for `Create` and `Read`.
 
 `resource` is the configuration as it is now; `changes` is how it got there.
-Put each change's `Before` back to rebuild what the resource looked like
+Put each change's `Before` back to rebuild what the entity looked like
 after the last apply, without asking the real system. The Docker container
 does this to move a running container between networks in place. It rebuilds
 the previous `network` blocks from the changes within `network`
@@ -631,11 +631,11 @@ container alone.
 
 ### `Destroy(ctx, resource, force) error`
 
-Removes the real resource. It is called:
+Removes the real object. It is called:
 
-- by `Config.Destroy`, for every resource in the saved state;
-- during an apply, for a resource that was removed from the configuration;
-- during an apply, for a resource decided replace: one `Changed` answered
+- by `Config.Destroy`, for every entity in the saved state;
+- during an apply, for an entity that was removed from the configuration;
+- during an apply, for an entity decided replace: one `Changed` answered
   `entity.Replace` for, or one saved as `failed` or `destroy_failed`.
 
 - **Input**: always the saved copy, never the configured one. After a failed
@@ -644,12 +644,12 @@ Removes the real resource. It is called:
 - **Returns**: only an error. `force` asks for a quick destroy that doesn't
   wait for graceful shutdown; xcl always passes `false` today.
 
-Whether destroying a resource that no longer exists is an error is your
-decision. Any error you return fails the destroy, and the resource is saved
+Whether destroying an object that no longer exists is an error is your
+decision. Any error you return fails the destroy, and the entity is saved
 as `destroy_failed`: a replacement does not create it again, and `Config.Destroy`
 keeps it, and everything it depends on, in the state for the next attempt.
 Treating "already gone" as success is usually right, since xcl only needs
-the resource to be gone.
+the object to be gone.
 
 ## Computed fields
 
@@ -667,8 +667,8 @@ What xcl does with computed fields
 ([`internal/parser/computed.go`](../internal/parser/computed.go)):
 
 - **Users can't set them.** Setting a computed field in configuration is a
-  validation error naming the resource and the field path, for example
-  `resource 'resource.container.web' sets computed field 'network.assigned_address'`.
+  validation error naming the entity and the field path, for example
+  `resource 'docker.container.web' sets computed field 'network.assigned_address'`.
   It is reported before any provider is called.
 - **They must be optional.** A computed field without `xcl:",optional"` is a
   validation error, since no configuration could satisfy it.
@@ -679,12 +679,12 @@ What xcl does with computed fields
   a provider whose `Read` adds nothing still keeps them, and `Changed` sees
   the same values on both copies.
 - **The provider's result is authoritative.** Before xcl decodes what
-  `Create`, `Read` or `Update` returned, it clears the resource's computed
+  `Create`, `Read` or `Update` returned, it clears the entity's computed
   values, so a computed value the provider leaves out of its result, such as
   an `omitempty` address it cleared, is cleared rather than kept from the
   last apply. Return every computed value you want kept.
-- **Dependents can reference them.** Other resources can use a computed
-  value, such as `resource.container.web.container_id`, and see the value
+- **Dependents can reference them.** Other entities can use a computed
+  value, such as `docker.container.web.container_id`, and see the value
   the provider set.
 
 ### Pairing list elements with `key`
@@ -732,16 +732,16 @@ what came back
 ([`internal/parser/configured_check.go`](../internal/parser/configured_check.go)).
 For every non-computed field the provider changed, it emits a warn log event
 to the application's event receiver: `Phase` `log`, `Source` `core`, the
-resource in `ResourceID`, the call in `Operation` (`create`, `read` or
+entity in `ResourceID`, the call in `Operation` (`create`, `read` or
 `update`), and in `Meta` the level `warn`, the message
 `provider changed a configured value` and the field path under `field`.
 Written by `events.SlogHandler`, it reads:
 
 ```
-level=WARN msg="provider changed a configured value" source=core operation=create phase=log resource=resource.container.web type=container.web file=... field=image
+level=WARN msg="provider changed a configured value" source=core operation=create phase=log resource=docker.container.web type=container.web file=... field=image
 ```
 
-The apply continues. Fields whose configuration references another resource
+The apply continues. Fields whose configuration references another entity
 or a module are not reported, since their value comes from elsewhere.
 
 The warning points at a real problem. The changed value is what gets saved,
@@ -769,13 +769,13 @@ it back into `ErrNotFound`.
 ### Any other error
 
 An error from `Read` or `Changed` comes while the apply is still deciding. It
-fails the apply before anything is created, updated or destroyed: no resource
+fails the apply before anything is created, updated or destroyed: no entity
 is marked failed and nothing is saved, so the next apply decides again from
 the same state.
 
-An error from `Create` or `Update` marks the resource `failed`, and one from
+An error from `Create` or `Update` marks the entity `failed`, and one from
 `Destroy` marks it `destroy_failed`; either fails the apply. On the next apply
-a resource saved as either is replaced, without asking its provider:
+an entity saved as either is replaced, without asking its provider:
 destroyed with its saved copy, then created.
 
 ### What happens to the rest of the apply
@@ -783,15 +783,15 @@ destroyed with its saved copy, then created.
 A failed `Destroy` stops the apply before anything is created or changed; see
 [Act: destroy](#act-destroy). After a failed `Create` or `Update`:
 
-- Resources that depend on the failed resource are skipped.
-- Resources that don't depend on it still complete.
+- Entities that depend on the failed entity are skipped.
+- Entities that don't depend on it still complete.
 - The state is saved anyway, so the next apply picks up where this one
   stopped:
-  - resources that were reached are saved with their new values and status;
-  - the failing resource is saved as `failed`;
-  - resources that existed before but were not reached keep their previous
+  - entities that were reached are saved with their new values and status;
+  - the failing entity is saved as `failed`;
+  - entities that existed before but were not reached keep their previous
     entry;
-  - new resources that were not reached are left out.
+  - new entities that were not reached are left out.
 
 `Config.Apply` saves this state and then returns the error. A configuration
 that doesn't parse or validate saves nothing, since no provider was called,
@@ -799,35 +799,35 @@ and neither does an apply that fails, or is cancelled, while deciding.
 
 ## Statuses
 
-xcl records a resource's status in `Meta.Status`
+xcl records an entity's status in `Meta.Status`
 ([`types/status.go`](../types/status.go)). These are the only values it sets:
 
 | Status | Meaning |
 |---|---|
-| `created` | the provider created the resource |
-| `updated` | the provider updated the resource |
-| `failed` | creating or updating the resource failed, including the create of a replacement; it is replaced on the next apply |
-| `destroyed` | never saved: a destroyed resource is removed from the state |
-| `destroy_failed` | destroying the resource failed, including the destroy of a replacement; the destroy is tried again by the next `Destroy`, or the next apply (removed again if its block is gone, replaced if it is still configured) |
+| `created` | the provider created the entity |
+| `updated` | the provider updated the entity |
+| `failed` | creating or updating the entity failed, including the create of a replacement; it is replaced on the next apply |
+| `destroyed` | never saved: a destroyed entity is removed from the state |
+| `destroy_failed` | destroying the entity failed, including the destroy of a replacement; the destroy is tried again by the next `Destroy`, or the next apply (removed again if its block is gone, replaced if it is still configured) |
 
 `Meta` belongs to xcl. Don't set it, and don't confuse `Meta.Status` with
 your own observed fields, like a container's `running`.
 
 ## Ordering
 
-Resources are processed in dependency order. By the time `Create` or
-`Update` is called for a resource, everything it references has already been
+Entities are processed in dependency order. By the time `Create` or
+`Update` is called for an entity, everything it references has already been
 through its own lifecycle, and the references hold the values those providers
 returned. While deciding, `Read` and `Changed` are called after everything
-the resource references has been decided, but before anything is acted on: a
+the entity references has been decided, but before anything is acted on: a
 reference to a value only known after the apply holds the saved value
 instead (see [Decide](#decide)).
 
 Destroys run in the reverse order: children first, the create order reversed,
-built from the links each resource saved. `Destroy` is called
-for a resource only after everything that depends on it has been destroyed,
+built from the links each entity saved. `Destroy` is called
+for an entity only after everything that depends on it has been destroyed,
 so it is never called for a parent once a child's destroy has failed.
-Resources that don't depend on each other are destroyed in parallel.
+Entities that don't depend on each other are destroyed in parallel.
 
 ## Logging from a provider
 
@@ -851,7 +851,7 @@ func (p *ContainerProvider) Create(ctx context.Context, c *Container) (*Containe
 ```
 
 Each message becomes a log event on the application's event stream. xcl has
-already bound the logger to the resource, its type, the file it was declared
+already bound the logger to the entity, its type, the file it was declared
 in and the step, and names your plugin as the event's `Source`, so pass only
 the details of the message itself. The same code works in-process and in an
 external plugin; for an external plugin, detail values cross the process
@@ -870,8 +870,8 @@ operation name `create`, `read`, `changed`, `update` or `destroy`. Because an
 apply decides before it acts, every `read` and `changed` event of an apply
 comes before its first `destroy`, `create` or `update` event. A replacement
 has no operation of its own: it is a `destroy` then a `create` for the same
-resource. See
-[Parser & Resource Lifecycle](parser-lifecycle.md#events-parseroptionsemit).
+entity. See
+[Parser & Entity Lifecycle](parser-lifecycle.md#events-parseroptionsemit).
 
 ## The example provider
 
@@ -902,5 +902,5 @@ follows everything in this guide:
 - `Person.PersonID` is a computed field, set in `Create`.
 - `Read` returns `plugins.ErrNotFound` when the saved email is
   `missing@example.com`. This is a sentinel for demonstration; a real
-  provider would look the resource up by its identity.
+  provider would look the real object up by its identity.
 - It never changes a configured field.

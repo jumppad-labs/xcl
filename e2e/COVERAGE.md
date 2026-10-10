@@ -10,12 +10,13 @@ directory and removes it when the run ends. The suite is part of xcl's root
 module, so `go test ./...` from the repository root runs it.
 
 Each example under `example/` is a Go module of its own, so the root
-`go test ./...` does not reach it directly. The suite runs each example's own
-tests, smoke tests included, through one named test per example (for example
-`TestPluginExampleTestsPass`), and fails naming the example whose tests fail.
-A new example adds its own named runner test to the suite as part of the change
-that adds the example; there is deliberately no test that discovers example
-directories.
+`go test ./...` does not reach it, and the suite does not run it either. The
+examples are tested on their own by the Examples workflow
+(`.github/workflows/examples.yml`), one job per example, which runs that
+example's own tests. Those tests check that the example works, not the
+library, and some need a Docker engine, which xcl's own tests never do. A new
+example adds itself to that workflow's matrix as part of the change that adds
+it.
 
 The examples used to double as xcl's end-to-end tests. Their tests that
 asserted what xcl did were removed once the tests below covered the same

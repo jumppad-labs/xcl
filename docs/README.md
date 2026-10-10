@@ -12,10 +12,10 @@ not at end users writing `.xcl` config.
   everything down from the saved state, and how the packages fit together.
 - [Plugin Architecture](plugins.md) — how providers are authored, hosted
   (in-process vs. out-of-process/gRPC), and registered.
-- [Parser & Resource Lifecycle](parser-lifecycle.md) — how HCL is parsed into
+- [Parser & Entity Lifecycle](parser-lifecycle.md) — how HCL is parsed into
   a dependency graph and walked, and how an apply first decides every
-  resource (`Read`, then `Changed` answering no change, update or replace)
-  and then acts: replaced and removed resources are destroyed children first,
+  entity (`Read`, then `Changed` answering no change, update or replace)
+  and then acts: replaced and removed entities are destroyed children first,
   then `Create`/`Update` run in dependency order; and how `Config.Destroy`
   destroys children first.
 - [Plugin Layout](plugin-layout.md) — the standard layout every plugin
@@ -30,7 +30,7 @@ not at end users writing `.xcl` config.
   from the settings that changed and the dependency list it is given, what
   `Update` is told, what each method may and may not
   touch, computed fields, and what happens when a call fails.
-- [State & Persistence](state.md) — what `State` holds, the resource
+- [State & Persistence](state.md) — what `State` holds, the entity
   statuses, what is saved after a failed apply and during a destroy, and how
   `FileStateStore` serializes it to disk.
 - [Module System](modules.md) — how `module` blocks are resolved and what is
@@ -42,14 +42,14 @@ not at end users writing `.xcl` config.
 |---|---|
 | `config.go`, `options.go`, `events.go` | Public facade: `Config`, functional options, the `Event`/`EventHandler` aliases, and the runner that delivers each operation's events |
 | `entity/` | `entity.Change`, `entity.DependencyChange` and `entity.PropertyChange`: the answer a provider's `Changed` gives, the dependency list and the changed settings `Changed` and `Update` are given; `entity.Path`, the location of a setting (`diff.Path` is an alias of it) |
-| `types/` | Shared resource metadata: `types.Meta`, `types.ResourceBase`, reflection helpers |
+| `types/` | Shared entity metadata: `types.Meta`, `types.ResourceBase`, reflection helpers |
 | `plugins/` | Provider contract (`ProviderAdapter`) and hosting (in-process / gRPC) |
 | `registry/` | Public plugin sources: the `Registry` and `Plugin` interfaces, `InProcess`/`Executable` starters, and the local registry `NewLocal` (in-process plugins, plugin binaries, plugin directories) |
 | `internal/catalog/` | `Catalog` — the `Config`'s private set of declared types and registries; loads plugins on the first operation, checks type name clashes, aggregates plugin hosts, resolves types to adapters |
 | `events/` | The one event shape (`events.Event`), the `Handler`/`Emit` types, the operation, phase and level constants, and `SlogHandler`, the adapter to `log/slog` |
 | `internal/eventstream/` | Delivers one operation's events: a bounded queue that emitters wait on only when it is full, drained into the application's receiver on the calling goroutine |
 | `internal/parser/` | HCL parsing, DAG construction, DAG walk, lifecycle calls, emitting parse, validate and lifecycle events |
-| `internal/resources/` | Built-in resource types: `module`, `output`, `variable`, `root` |
+| `internal/resources/` | Built-in entity types: `module`, `output`, `variable`, `root` |
 | `internal/schema/` | Reflection-based JSON schema generation/instantiation (Go struct ⇄ schema ⇄ dynamic struct) |
 | `internal/modules/` | HTTP client for a Terraform-registry-style remote module API (not yet wired in) |
 | `internal/functions/` | Custom HCL functions available to config authors |

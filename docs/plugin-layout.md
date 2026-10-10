@@ -1,7 +1,7 @@
 # Plugin Layout
 
 Every xcl plugin, whether it runs inside an application or as a separate
-program, uses one layout. A plugin groups the resource types of one domain,
+program, uses one layout. A plugin groups the entity types of one domain,
 such as containers, Kubernetes or templates. The
 [plugin template](https://github.com/jumppad-labs/xcl-plugin-template) is the
 worked example of this layout, the
@@ -19,11 +19,11 @@ are hosted and registered, see [Plugin Architecture](plugins.md).
   plugin.go                    the plugin type: Init builds the clients once and registers each type
   cmd/<plugin>/main.go         serves the plugin as a separate program
   entities/
-    <resource>.go              one block type per file, with its nested block types
+    <entity>.go                one block type per file, with its nested block types
   providers/
-    <resource>.go              one provider per resource type
-    <resource>_<concern>.go    further files for a large provider (images, scaling, ...)
-    <resource>_test.go         strict-double unit tests; real-backend tests skip without one
+    <entity>.go                one provider per entity type
+    <entity>_<concern>.go      further files for a large provider (images, scaling, ...)
+    <entity>_test.go           strict-double unit tests; real-backend tests skip without one
     <concern>.go               helpers shared by the plugin's providers, named for what they do
   client/
     <backend>/                 one package per backend or task layer
@@ -74,10 +74,10 @@ Block types only: structs, their xcl tags and doc comments, and no behaviour.
   example, a container embeds its own image and network blocks.
 - A plugin doesn't import another plugin's entities. It defines its own block
   types, even where they look alike, so plugins don't depend on each other.
-- A resource that needs another plugin's values takes them through an xcl
+- An entity that needs another plugin's values takes them through an xcl
   reference in the configuration, such as a cluster's address.
 - Entities never import providers, clients or backend libraries. An
-  application that reads a plugin's resources from state needs only
+  application that reads a plugin's entities from state needs only
   `entities`, for example `xcl.FindByType[entities.Note](c, "notes", "note")`.
   The template's `e2e/stateonly` test builds with nothing but xcl and
   `entities` to show it.
@@ -86,10 +86,10 @@ Block types only: structs, their xcl tags and doc comments, and no behaviour.
 
 ### `providers/`
 
-The resource providers.
+The entity providers.
 
-- **Files:** one file per resource type, with a large provider split into
-  `<resource>_<concern>.go` files. Helpers shared across the plugin's
+- **Files:** one file per entity type, with a large provider split into
+  `<entity>_<concern>.go` files. Helpers shared across the plugin's
   providers go in files named for their concern.
 - **Sharing:** one provider may serve several closely related types, such as
   a container and a sidecar.
@@ -146,7 +146,7 @@ its private parts:
 
 - It answers replace when a setting that can't change in place has changed,
   matched with `change.Within(entity.Path{}.Attribute("<setting>"))`, or when
-  a dependency the resource is built on is replaced.
+  a dependency the entity is built on is replaced.
 - Otherwise it answers update when any setting changed, and defers to
   `DefaultChanged` when nothing did.
 - The settings that need a replace are listed in one place. In the template
@@ -159,7 +159,7 @@ its private parts:
   }
   ```
 
-- A provider never diffs the resource itself in another method; the decision
+- A provider never diffs the entity itself in another method; the decision
   lives in `Changed`.
 
 ### `Update` works only from what it is told
@@ -174,11 +174,11 @@ its private parts:
 In the template, a `content` change rewrites the note's file and keeps its new
 checksum, and a `mode` change on its own only changes the file's mode.
 
-### `Read` reports the real resource
+### `Read` reports the real object
 
 It replaces jumppad's `Lookup` of backend IDs: anything a caller needs to know
-about the real resource, such as its backend ID, is a computed value `Read`
-fills in. When the resource is gone, `Read` returns `plugins.ErrNotFound`.
+about the real object, such as its backend ID, is a computed value `Read`
+fills in. When the object is gone, `Read` returns `plugins.ErrNotFound`.
 
 ## Tests
 
@@ -211,7 +211,7 @@ Unchanged, it builds, tests and applies its sample with nothing else running.
 Its README walks through making it yours, with one command each for building
 (`make build`), testing (`make test`), regenerating the doubles
 (`make generate`), running it in-process (`make inprocess`) and as a separate
-program (`make external`), and adding a resource of your own.
+program (`make external`), and adding an entity type of your own.
 
 ## Releasing
 

@@ -5,6 +5,7 @@ go 1.27.1
 require (
 	github.com/jumppad-labs/xcl v0.1.1
 	github.com/jumppad-labs/xcl/example/prettylog v0.0.0-20261009105147-a000ffa81afd
+	github.com/stretchr/testify v1.12.1
 )
 
 require (
@@ -37,10 +38,10 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.opentelemetry.io/otel v1.46.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.46.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.40.0 // indirect

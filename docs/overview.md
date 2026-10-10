@@ -1,8 +1,8 @@
 # Overview
 
-xclconfig parses HCL configuration describing resources, resolves them into a
-dependency graph, and — for each resource — calls out to a *provider* (a
-plugin) to actually create/update/destroy whatever the resource represents.
+xclconfig parses HCL configuration describing entities, resolves them into a
+dependency graph, and — for each entity — calls out to a *provider* (a
+plugin) to actually create/update/destroy whatever the entity represents.
 It is architecturally close to Terraform: HCL in, provider RPCs out, state
 persisted in between runs.
 
@@ -15,16 +15,16 @@ Config            (repo root, package xcl)
 
 Parser            (internal/parser)
   does one Apply() call: load previous state -> parse HCL -> destroy
-  removed resources -> build DAG -> walk DAG, decoding each resource and
+  removed entities -> build DAG -> walk DAG, decoding each entity and
   calling its provider
   or one Destroy() call: walk the saved state children first, calling
-  each resource's provider
+  each entity's provider
 
 Catalog           (internal/catalog)
   built by NewConfig from the registries added with WithRegistry,
   reading the Go types each declares; loads the registries' plugins on
   the first operation, aggregates PluginHosts, answers "what Go type is
-  resource X" and "what ProviderAdapter handles resource X"
+  entity X" and "what ProviderAdapter handles entity X"
 ```
 
 `Config` is the only piece meant to be constructed directly by a library
@@ -77,25 +77,25 @@ touches a real provider or disk — useful for testing.
 1. Construct a `parser.Parser` for this call only, handing it `Config`'s
    `StateStore`, `Catalog`, and variables via `ParserOptions`.
 2. Call `p.Apply(paths...)`, see
-   [Parser & Resource Lifecycle](parser-lifecycle.md).
+   [Parser & Entity Lifecycle](parser-lifecycle.md).
 3. Adopt the entities the parse produced as the configuration's own.
 4. If a `StateStore` is configured, `Save` the new state.
 5. Return the error from `p.Apply`, if any.
 
 Before anything is created or changed, `p.Apply` rejects a configuration
 with no blocks (`xcl.ErrEmptyConfiguration`: use `Destroy` to remove
-everything), then decides what happens to every resource without changing
-anything: each provider-backed resource is created, left alone, updated or
+everything), then decides what happens to every entity without changing
+anything: each provider-backed entity is created, left alone, updated or
 replaced, as its provider's `Changed` answers. Only then does it destroy the
-resources being replaced and those in the previous state that are no longer
+entities being replaced and those in the previous state that are no longer
 in the configuration, children first, saving the state after each one, and
 then create and update in dependency order.
 
 State is saved even when the apply failed. When a provider call fails,
 `p.Apply` returns the state the walk reached along with the error: reached
-resources with their new status, the failing resource as `failed`, and the
-previous entry of resources that were not reached.
-When destroying a replaced or removed resource fails, nothing is created or changed, and
+entities with their new status, the failing entity as `failed`, and the
+previous entry of entities that were not reached.
+When destroying a replaced or removed entity fails, nothing is created or changed, and
 the state returned is the previous state minus what was destroyed, with the
 failures as `destroy_failed`; the next apply retries them first.
 `Config.Apply` saves that state and then returns the error. Only when
@@ -125,22 +125,22 @@ consequences of a problem already reported.
    when there is none). Nothing saved, or an empty state, returns nil and
    writes nothing; a load error is returned as `failed to load state: ...`.
 2. Construct a `parser.Parser` and call `p.Destroy(saved)`, which destroys
-   every resource children first, from the same dependency graph as create,
-   built from the links each resource saved. Unrelated resources are destroyed
+   every entity children first, from the same dependency graph as create,
+   built from the links each entity saved. Unrelated entities are destroyed
    in parallel. Variables, outputs, modules, registered types and disabled
    blocks never reach a provider.
-3. The state is saved after every resource, so an interrupted destroy
-   resumes from it. A resource whose destroy fails stays as
+3. The state is saved after every entity, so an interrupted destroy
+   resumes from it. An entity whose destroy fails stays as
    `destroy_failed`, together with everything it depends on, and is named in
    the returned error; calling `Destroy` again retries it.
 4. Adopt what is left as `c.currentState`.
 
-See [Parser & Resource Lifecycle](parser-lifecycle.md#destroy) and
+See [Parser & Entity Lifecycle](parser-lifecycle.md#destroy) and
 [State & Persistence](state.md#state-during-a-destroy).
 
-## Resource metadata convention
+## Entity metadata convention
 
-Every resource type — builtin (`resources.Module`, `resources.Output`, ...)
+Every entity type — builtin (`resources.Module`, `resources.Output`, ...)
 or plugin-defined — embeds [`types.ResourceBase`](../types/resource.go#L58),
 which in turn embeds [`types.Meta`](../types/resource.go#L5):
 
@@ -163,25 +163,25 @@ type Meta struct {
 `Status` is set by xcl, never by providers, and is one of `created`,
 `updated`, `failed`, `destroyed` or `destroy_failed`
 ([`types/status.go`](../types/status.go)). The status saved by the last apply
-decides what the next apply does with the resource: `created` and `updated`
-resources are read and then left alone, updated or replaced as their
-provider's `Changed` answers, `failed` and `destroy_failed` resources are
+decides what the next apply does with the entity: `created` and `updated`
+entities are read and then left alone, updated or replaced as their
+provider's `Changed` answers, `failed` and `destroy_failed` entities are
 replaced: destroyed and created again. `destroyed` is
-never saved: a destroyed resource leaves the state. See
-[State & Persistence](state.md#resource-statuses).
+never saved: a destroyed entity leaves the state. See
+[State & Persistence](state.md#entity-statuses).
 
 `types.GetMeta(resource any) (*Meta, error)` ([`types/resource_helpers.go`](../types/resource_helpers.go))
-is the canonical way engine code reads this off an arbitrary resource value —
+is the canonical way engine code reads this off an arbitrary entity value —
 it walks embedded fields by reflection, so it works uniformly whether the
-resource is a compiled-in Go struct or one dynamically built by
+entity is a compiled-in Go struct or one dynamically built by
 `schema.CreateInstanceFromSchema` (see [Plugin Architecture](plugins.md)).
 This is what lets `internal/parser` and `internal/catalog` operate on
-resources as `any` without knowing their concrete type.
+entities as `any` without knowing their concrete type.
 
 ## Where to go next
 
 - Writing or hosting a provider: [Plugin Architecture](plugins.md)
-- How HCL becomes provider calls, in what order: [Parser & Resource
+- How HCL becomes provider calls, in what order: [Parser & Entity
   Lifecycle](parser-lifecycle.md)
 - What gets persisted between runs: [State & Persistence](state.md)
 - How `module` blocks are resolved: [Module System](modules.md)

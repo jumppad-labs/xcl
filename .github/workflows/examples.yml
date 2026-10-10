@@ -1,0 +1,40 @@
+# Tests that every example works. It does not test the library: xcl's own
+# tests, in the Go workflow, do that, and none of them needs anything
+# installed. Each example is a Go module of its own, so each runs as its own
+# job, with that example's own tests. Some examples need more than xcl itself:
+# the plugin example and its Docker plugin create real Docker networks and
+# containers, using the Docker engine the runner already has.
+
+name: Examples
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  example:
+    name: ${{ matrix.example }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - example/configonly
+          - example/plugin
+          - example/plugin/plugins/docker
+          - example/prettylog
+          - example/remoteplugin
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: ${{ matrix.example }}/go.mod
+        cache-dependency-path: ${{ matrix.example }}/go.sum
+
+    - name: Build, vet and test
+      run: make test-example EXAMPLE=${{ matrix.example }}
