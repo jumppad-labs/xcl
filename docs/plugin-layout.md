@@ -229,7 +229,7 @@ publishes a GitHub release holding:
 
 `<name>` is the repository name and `<version>` the tag without its leading
 `v`. An application installs the release with the GitHub registry, see
-[Installing plugins from GitHub](../README.md#installing-plugins-from-github).
+[Installing plugins from GitHub](https://xcl.dev/github-registry/).
 
 ## Not covered by this layout
 

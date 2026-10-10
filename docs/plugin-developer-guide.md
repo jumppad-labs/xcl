@@ -507,7 +507,7 @@ plan names why the container is updated:
 ~ docker "container" "web" {}
 ```
 
-See [the plugin example](../README.md#plugins).
+See [the plugin example](https://xcl.dev/examples/plugins/).
 
 If you find yourself computing things in `Changed`, move that work into
 `Read`. An error from `Changed` fails the apply before anything is changed.

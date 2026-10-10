@@ -6,7 +6,7 @@ The `state` package **stores and retrieves entities**. That is all it does.
 
 It does not search a configuration, and it does not parse addresses. Asking a
 configuration what it declares is the job of `Config` — see
-[the querying section of the README](../README.md#querying-a-configuration) —
+[the `Find` functions](https://pkg.go.dev/github.com/jumppad-labs/xcl#Find) —
 and resolving an address is done there, against the types the `Config`'s catalog knows.
 The `state` package imports nothing address-related, which a test in
 `state/dependencies_test.go` guards.
@@ -161,7 +161,7 @@ with `xcl.ErrUnregisteredType`, and one that cannot be read at all with
 `xcl.ErrInvalidSavedData`.
 
 The text is for reading rather than for feeding back to xcl; see
-[Converting to configuration text](../README.md#converting-to-configuration-text).
+[Converting to configuration text](https://xcl.dev/configuration-text/).
 
 ## Sensitive values in state
 
