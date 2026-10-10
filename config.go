@@ -74,6 +74,23 @@ var (
 // detail names the plugin.
 var ErrPluginLoad = xclerrors.ErrPluginLoad
 
+// The errors below name the ways a remote registry, such as the GitHub
+// registry, can fail to install a plugin. They reach the caller inside a
+// PluginLoadError naming the plugin, check for them with errors.Is, and
+// recover the repository, version and platform with errors.As and
+// PluginInstallError.
+var (
+	// ErrPluginNotFound means the plugin's release, or its build for the
+	// current platform, does not exist, or the repository is private and no
+	// token was given.
+	ErrPluginNotFound = xclerrors.ErrPluginNotFound
+
+	// ErrPluginVerification means a downloaded or cached plugin failed
+	// verification: no checksums, a checksum mismatch, or a missing or
+	// untrusted signature when trusted keys were given.
+	ErrPluginVerification = xclerrors.ErrPluginVerification
+)
+
 // The errors below name every way turning an entity, or an entity's saved
 // data, into configuration text can fail. Check for them with errors.Is, and
 // recover the detail carried alongside each with errors.As.
@@ -126,6 +143,7 @@ type (
 	NotAnEntityError   = xclerrors.NotAnEntityError
 	NotUniqueError     = xclerrors.NotUniqueError
 	PluginLoadError    = xclerrors.PluginLoadError
+	PluginInstallError = xclerrors.PluginInstallError
 
 	// TypeNameClashError is returned when a block type is provided twice, it
 	// names both providers and their registries. NewConfig returns it for two

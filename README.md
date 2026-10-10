@@ -117,6 +117,22 @@ One registry can hold Go types and plugins together. `WithRegistry` is the
 one way a `Config` gets anything beyond the builtins, and the registry the one
 place types and plugins are registered.
 
+A plugin published as GitHub releases installs with one line from the GitHub
+registry, which downloads, verifies and caches the build for the current
+platform, see [Installing plugins from GitHub](#installing-plugins-from-github):
+
+```go
+gh := registry.NewGitHub()
+gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v1.2.0")
+```
+
+**Writing a plugin.** Start from the
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template), a
+GitHub template repository with one working resource that runs both
+in-process and as a separate program, tests against strict doubles and
+publishes signed releases the GitHub registry installs. It follows the
+standard [plugin layout](docs/plugin-layout.md) every xcl plugin uses.
+
 **Registration problems.** Registration returns no errors. Problems are
 reported in one of three places:
 
@@ -225,20 +241,33 @@ memory only, which is all a program that only reads its configuration needs.
 ### Plugins
 
 [`example/plugin`](./example/plugin) applies its configuration
-([`plugin/config`](./example/plugin/config)) through two plugins that do real
+([`plugin/config/full`](./example/plugin/config/full)) through two plugins that do real
 work, each laid out the way a plugin author would lay out their own project:
 
 - The Docker plugin
   ([`plugin/plugins/docker`](./example/plugin/plugins/docker)) is an external
-  plugin, a standalone program with its own `main` that xcl starts as a
-  separate process and calls over gRPC. It provides `docker "network"` and
-  `docker "container"`, defined with their providers in
-  [`plugin/plugins/docker/resources`](./example/plugin/plugins/docker/resources),
-  and creates real Docker networks and containers. Its providers hold a narrow
-  `Docker` interface over the Docker SDK, kept in its own `client` package
-  ([`plugin/plugins/docker/client`](./example/plugin/plugins/docker/client)),
-  which the real SDK client satisfies and a Mockery mock stands in for in
-  their unit tests.
+  plugin and a Go module of its own, laid out in the standard plugin layout
+  (see its [README](./example/plugin/plugins/docker/README.md)). Its
+  importable `Plugin` type is in the module's root package, and
+  [`plugin/plugins/docker/cmd/docker`](./example/plugin/plugins/docker/cmd/docker)
+  serves it as a standalone program that xcl starts as a separate process and
+  calls over gRPC. It provides `docker "network"` and `docker "container"`,
+  whose block types are in
+  [`plugin/plugins/docker/entities`](./example/plugin/plugins/docker/entities)
+  and whose providers are in
+  [`plugin/plugins/docker/providers`](./example/plugin/plugins/docker/providers),
+  and creates real Docker networks and containers. The Docker libraries are
+  imported only under `client/`: a narrow `Docker` interface over the Docker
+  SDK in
+  [`plugin/plugins/docker/client/docker`](./example/plugin/plugins/docker/client/docker),
+  and the container task layer the providers use in
+  [`plugin/plugins/docker/client/containers`](./example/plugin/plugins/docker/client/containers),
+  each with a Mockery mock beside it in `mocks/` that the unit tests use. The
+  plugin also carries a sample configuration
+  ([`examples/basic`](./example/plugin/plugins/docker/examples/basic)) and
+  end-to-end tests ([`e2e`](./example/plugin/plugins/docker/e2e)). The
+  application reads what it applied through the entity types alone, so its
+  build includes neither the providers nor the Docker libraries.
 - The template plugin
   ([`plugin/plugins/template`](./example/plugin/plugins/template)) is an
   in-process plugin, compiled into the program. It provides `template`, a
@@ -306,20 +335,20 @@ print only their output, so they give xcl no receiver.
 
 Run any of them from its directory with `make run`. For `plugin` this builds
 `xcl-docker` and the Docker plugin side by side into `build/`, then runs
-`apply ./config`, `status` and `destroy` in turn, and it has the extra Makefile
+`apply ./config/full`, `status` and `destroy` in turn, and it has the extra Makefile
 targets `build`, `replace`, `swap`, `rebuild-init`, `remove-network`,
 `generate` and `clean`; every example has `run` and `test`. The plugin tests
 build both binaries themselves.
 
-`./config` is the plugin example's whole configuration and applies on its
-own. Next to it, [`plugin/config-subnet`](./example/plugin/config-subnet) is
+`./config/full` is the plugin example's whole configuration and applies on its
+own. Next to it, [`plugin/config/alt-subnet`](./example/plugin/config/alt-subnet) is
 the same configuration with the network's address range widened from
 `10.42.0.0/24` to `10.42.0.0/23`. Docker cannot move a network to a new range
 in place, so the network's provider answers replace when its `subnet`
 changes. The container is not replaced with it: it is told the network is
 replaced and answers update, and its `Update` reattaches the running
 container to the new network, keeping its ID. `make replace` applies
-`./config`, then plans and applies `./config-subnet`, prints the state and
+`./config/full`, then plans and applies `./config/alt-subnet`, prints the state and
 destroys everything. The plan shows the replacement as `-/+` and the
 container's update with the dependency behind it:
 
@@ -344,33 +373,33 @@ The container's configuration is unchanged; it is updated only because its
 network is replaced. The template reads the container's address, which is
 only known once the container is on the new network, so it is updated; the
 `init` template, which reads only the network's name, is unchanged. Applying
-`./config-subnet` destroys the old network, which detaches the container,
+`./config/alt-subnet` destroys the old network, which detaches the container,
 creates the network on `10.42.0.0/23`, connects the same container to it and
 updates the template with the container's new address.
 
-Three more variants each have a Makefile target that applies `./config`,
+Three more variants each have a Makefile target that applies `./config/full`,
 then plans and applies the variant, prints the state and destroys
 everything:
 
-- `make swap` applies [`plugin/config-swap`](./example/plugin/config-swap),
+- `make swap` applies [`plugin/testdata/swap`](./example/plugin/testdata/swap),
   which adds a `backend` network and moves the container to it. The container
   is updated in place, disconnected from `app` and connected to `backend`
   with the same ID: `Diff: 1 to create, 2 to update, 0 to replace, 0 to
   delete, 2 unchanged.`
-- `make rebuild-init` applies [`plugin/config-init`](./example/plugin/config-init),
+- `make rebuild-init` applies [`plugin/config/modified-init`](./example/plugin/config/modified-init),
   which moves the init script's destination. The template cannot move its
   file in place, so it is replaced, and the container that mounts the script
   is replaced because it is: `Diff: 0 to create, 1 to update, 2 to replace,
   0 to delete, 1 unchanged.` Editing only the script's content, as
-  [`plugin/config-init-content`](./example/plugin/config-init-content) does,
+  [`plugin/testdata/init-content`](./example/plugin/testdata/init-content) does,
   renders the file again and leaves the container alone.
 - `make remove-network` applies
-  [`plugin/config-remove`](./example/plugin/config-remove), which removes the
+  [`plugin/config/no-network`](./example/plugin/config/no-network), which removes the
   network and every reference to it. The network is deleted, detaching the
   container, which is updated in place and keeps running with no network:
   `Diff: 0 to create, 3 to update, 0 to replace, 1 to delete, 0 unchanged.`
   Removing only the network block and leaving references to it, as
-  [`plugin/config-dangling`](./example/plugin/config-dangling) does, is
+  [`plugin/testdata/dangling`](./example/plugin/testdata/dangling) does, is
   rejected by validation before anything changes.
 
 Each example is a Go module of its own, pointed at this checkout with a
@@ -501,6 +530,62 @@ the operation is done, so a program never stops a plugin itself and nothing
 is left running between operations. The process starts afresh each time, so
 the plugin's `Init` runs again and it keeps nothing in memory from one
 operation to the next. In-process plugins load once and stay loaded.
+
+### Installing plugins from GitHub
+
+A plugin published as GitHub releases, laid out as the plugin template
+publishes them, installs with one line. The GitHub registry downloads the release's build
+for the platform the program runs on, checks it against the release's
+checksums, keeps it in a cache and starts it as an external plugin:
+
+```go
+gh := registry.NewGitHub()
+gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v1.2.0")
+
+c, err := xcl.NewConfig(xcl.WithRegistry(local), xcl.WithRegistry(gh))
+```
+
+The plugin is named after the repository, `xcl-plugin-docker`, and is
+installed when plugins load, not when it is registered. A GitHub registry
+wraps a local one, so `RegisterType` works on it too, and it can be given
+beside a local registry or any other.
+
+- **Pin an exact version.** The version is one exact release tag,
+  `v<major>.<minor>.<patch>` with an optional pre-release suffix such as
+  `v1.2.0-rc.1`. An empty version, a range such as `~1.2`, `latest`, a tag
+  without its `v` or a repository that is not `owner/repo` is a programmer
+  error and panics at `RegisterPlugin`, naming the plugin, before anything is
+  downloaded. Draft releases are never installed.
+- **Trust signing keys.** `registry.GitHubTrustedKeys(armored...)` takes
+  ASCII-armoured OpenPGP public keys. When any are given, a plugin is used
+  only when its release's checksums file is signed by one of them; a release
+  signed by another key, or not signed, is refused. Without keys, signatures
+  are not checked and unsigned releases install. A key that cannot be read
+  fails the load against the `github.com` registry.
+- **Private repositories.** Requests carry a GitHub token when there is one:
+  `registry.GitHubToken(token)`, otherwise `GITHUB_TOKEN`, then `GH_TOKEN`.
+  Public repositories need none. Without a token, a private repository's
+  release is reported as not found, saying it may need a token.
+- **The cache.** Plugins are kept under `~/.xcl/cache/plugins`, as
+  `github.com/<owner>/<repo>/<version>/<os>_<arch>/`, or under the directory
+  given with `registry.GitHubCacheDir(dir)`. Each entry holds the release's
+  archive, its checksums file, its signature when it has one, and the
+  extracted binary. A version already in the cache is used without contacting
+  GitHub, so applies work offline, and it is verified again, against the
+  checksums and the application's current trusted keys, every time the plugin
+  is started. An entry is written in one step, so a failed or interrupted
+  download leaves nothing usable. Old versions are never removed; delete them
+  by hand.
+
+A plugin that cannot be installed fails the first operation with a
+`*xcl.PluginLoadError` naming the plugin and the `github.com` registry. It
+wraps a `*xcl.PluginInstallError` naming the `Repository`, `Version` and
+`Platform`, which matches `xcl.ErrPluginNotFound` when the release, or its
+build for this platform, does not exist (or the repository is private and no
+token was given), and `xcl.ErrPluginVerification` when the release has no
+checksums file, a file does not match its checksum, or a signature is missing
+or untrusted. The release layout the registry installs, archive, checksums
+and signature names, is described in [docs/plugins.md](./docs/plugins.md).
 
 ### Querying a configuration
 

@@ -54,3 +54,55 @@ func TestReexportedPluginLoadErrorMatchesErrPluginLoadThroughAWrap(t *testing.T)
 
 	require.ErrorIs(t, wrapped, ErrPluginLoad)
 }
+
+func TestReexportedPluginInstallErrorIsRecoverableThroughAWrap(t *testing.T) {
+	wrapped := fmt.Errorf("installing plugins: %w", &xclerrors.PluginInstallError{
+		Repository: "o/r",
+		Version:    "v1.0.0",
+		Platform:   "linux/amd64",
+		Err:        fmt.Errorf("no build: %w", xclerrors.ErrPluginNotFound),
+	})
+
+	var installErr *PluginInstallError
+	require.True(t, errors.As(wrapped, &installErr))
+	require.Equal(t, "o/r", installErr.Repository)
+	require.Equal(t, "v1.0.0", installErr.Version)
+	require.Equal(t, "linux/amd64", installErr.Platform)
+}
+
+func TestReexportedErrPluginNotFoundMatchesThroughAWrap(t *testing.T) {
+	wrapped := fmt.Errorf("installing plugins: %w", &xclerrors.PluginInstallError{
+		Repository: "o/r",
+		Err:        fmt.Errorf("no build: %w", xclerrors.ErrPluginNotFound),
+	})
+
+	require.ErrorIs(t, wrapped, ErrPluginNotFound)
+}
+
+func TestReexportedErrPluginVerificationMatchesThroughAWrap(t *testing.T) {
+	wrapped := fmt.Errorf("installing plugins: %w", &xclerrors.PluginInstallError{
+		Repository: "o/r",
+		Err:        fmt.Errorf("checksum mismatch: %w", xclerrors.ErrPluginVerification),
+	})
+
+	require.ErrorIs(t, wrapped, ErrPluginVerification)
+}
+
+func TestReexportedErrPluginNotFoundDoesNotMatchAVerificationFailure(t *testing.T) {
+	wrapped := fmt.Errorf("installing plugins: %w", &xclerrors.PluginInstallError{
+		Repository: "o/r",
+		Err:        fmt.Errorf("checksum mismatch: %w", xclerrors.ErrPluginVerification),
+	})
+
+	require.NotErrorIs(t, wrapped, ErrPluginNotFound)
+}
+
+func TestReexportedErrPluginNotFoundMatchesThroughAPluginLoadError(t *testing.T) {
+	install := &xclerrors.PluginInstallError{
+		Repository: "o/r",
+		Err:        fmt.Errorf("no build: %w", xclerrors.ErrPluginNotFound),
+	}
+	wrapped := fmt.Errorf("validating configuration: %w", &xclerrors.PluginLoadError{Registry: "github", Err: install})
+
+	require.ErrorIs(t, wrapped, ErrPluginNotFound)
+}

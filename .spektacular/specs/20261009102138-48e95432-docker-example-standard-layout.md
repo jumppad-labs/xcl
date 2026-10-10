@@ -34,13 +34,13 @@ The Docker plugin example predates the standard plugin layout: its entity types 
 -->
 ## Requirements
 
-- [ ] **Entity types stand alone**
+- [x] **Entity types stand alone**
   The plugin example's application reads the example's resources from state using only the plugin's entity types, without depending on the plugin's providers or on the Docker libraries.
-- [ ] **Consistent file order**
+- [x] **Consistent file order**
   In the plugin example, every file follows the file order the standard layout defines.
-- [ ] **The plugin example follows the standard**
+- [x] **The plugin example follows the standard**
   The Docker plugin example is rebuilt so each part a plugin holds is where the standard plugin layout puts it.
-- [ ] **Documentation reflects the example's layout**
+- [x] **Documentation reflects the example's layout**
   The project's guides, README and the documentation site's plugin example page show the example's new file locations and code.
 
 <!--
@@ -73,15 +73,15 @@ The Docker plugin example predates the standard plugin layout: its entity types 
 -->
 ## Acceptance Criteria
 
-- [ ] **Reading state needs only the entity types**
+- [x] **Reading state needs only the entity types**
   The plugin example's application reads the example's resources from state without its build including the Docker providers or the Docker libraries they use.
-- [ ] **Files list public members first**
+- [x] **Files list public members first**
   In the plugin example, every source file shows its exported types and methods before any unexported helper, and provider methods appear in the lifecycle order the standard layout defines.
-- [ ] **The plugin example matches the standard layout**
+- [x] **The plugin example matches the standard layout**
   Every location the standard layout names for a plugin is where the plugin example keeps that part.
-- [ ] **The plugin example behaves as before**
+- [x] **The plugin example behaves as before**
   After the rebuild, the plugin example's scenario tests (network swap, subnet rebuild, init-script rebuild and content edit, network removal, dangling reference) pass unchanged, as do its unit tests.
-- [ ] **The documentation shows the new layout**
+- [x] **The documentation shows the new layout**
   The guides, README and the documentation site's plugin example page quote only file locations that exist in the rebuilt example, and the site builds.
 
 <!--

@@ -1,21 +1,18 @@
 # Builds and runs xcl-docker, the plugin example. The in-process template
 # plugin (plugins/template/) is compiled into xcl-docker. The external Docker
-# plugin (plugins/docker/) is a standalone program, compiled to its own binary
-# next to xcl-docker, which starts it as a separate process. Applying needs a
+# plugin (plugins/docker/) is a module of its own with its own Makefile; its
+# entry point, plugins/docker/cmd/docker, is compiled to its own binary next
+# to xcl-docker, which starts it as a separate process. Applying needs a
 # Docker engine.
 
 BUILD_DIR := build
 XCL_DOCKER := $(BUILD_DIR)/xcl-docker
 DOCKER_PLUGIN := $(BUILD_DIR)/docker-plugin
-CONFIG_DIR := ./config
-SUBNET_DIR := ./config-subnet
-SWAP_DIR := ./config-swap
-INIT_DIR := ./config-init
-REMOVE_DIR := ./config-remove
-
-# MOCKERY is the pinned Mockery release that generates the Docker client mock,
-# run through go run so it needs no install
-MOCKERY := go run github.com/vektra/mockery/v3@v3.8.0
+CONFIG_DIR := ./config/full
+SUBNET_DIR := ./config/alt-subnet
+SWAP_DIR := ./testdata/swap
+INIT_DIR := ./config/modified-init
+REMOVE_DIR := ./config/no-network
 
 .PHONY: build run replace swap rebuild-init remove-network test generate clean
 
@@ -23,7 +20,7 @@ MOCKERY := go run github.com/vektra/mockery/v3@v3.8.0
 # finds the plugin
 build:
 	go build -o $(XCL_DOCKER) .
-	go build -o $(DOCKER_PLUGIN) ./plugins/docker
+	go -C plugins/docker build -o ../../$(DOCKER_PLUGIN) ./cmd/docker
 
 # Build, then apply the example configuration, print the saved state and
 # destroy it again, each a separate run of xcl-docker
@@ -33,7 +30,7 @@ run: build
 	$(XCL_DOCKER) destroy
 
 # Build, apply the example configuration, then show and apply the address
-# range change in config-subnet, which replaces the network and updates the
+# range change in config/alt-subnet, which replaces the network and updates the
 # container attached to it in place, reattaching it to the new network, and
 # updates the template, then destroy everything again
 replace: build
@@ -43,7 +40,7 @@ replace: build
 	$(XCL_DOCKER) status
 	$(XCL_DOCKER) destroy
 
-# Build, apply the example configuration, then show and apply config-swap,
+# Build, apply the example configuration, then show and apply testdata/swap,
 # which adds a backend network and moves the running container to it in
 # place, then destroy everything again
 swap: build
@@ -53,7 +50,7 @@ swap: build
 	$(XCL_DOCKER) status
 	$(XCL_DOCKER) destroy
 
-# Build, apply the example configuration, then show and apply config-init,
+# Build, apply the example configuration, then show and apply config/modified-init,
 # which moves the init script so its template is replaced, and the container
 # that mounts it with it, then destroy everything again
 rebuild-init: build
@@ -63,7 +60,7 @@ rebuild-init: build
 	$(XCL_DOCKER) status
 	$(XCL_DOCKER) destroy
 
-# Build, apply the example configuration, then show and apply config-remove,
+# Build, apply the example configuration, then show and apply config/no-network,
 # which removes the network and every reference to it, leaving the container
 # running with no network, then destroy everything again
 remove-network: build
@@ -73,14 +70,16 @@ remove-network: build
 	$(XCL_DOCKER) status
 	$(XCL_DOCKER) destroy
 
-# Run the example tests, they build the binaries themselves. The tests
-# that need a Docker engine skip when none is reachable.
+# Run the example tests and the Docker plugin's tests, they build the
+# binaries themselves. The tests that need a Docker engine skip when none is
+# reachable.
 test:
 	go test -v ./...
+	$(MAKE) -C plugins/docker test
 
-# Regenerate the mock of the Docker client interface, plugins/docker/client/mocks
+# Regenerate the Docker plugin's client mocks, plugins/docker/client/*/mocks
 generate:
-	$(MOCKERY)
+	$(MAKE) -C plugins/docker generate
 
 # Remove the built binaries, the rendered template and the saved state
 clean:

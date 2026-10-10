@@ -17,8 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client"
-	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/resources"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/client/docker"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/entities"
+	"github.com/jumppad-labs/xcl/example/plugin/plugins/docker/providers"
 	"github.com/jumppad-labs/xcl/example/plugin/plugins/template"
 )
 
@@ -35,7 +36,8 @@ func TestMain(m *testing.M) {
 
 	dockerPlugin = filepath.Join(buildDir, "docker-plugin")
 
-	build := exec.Command("go", "build", "-o", dockerPlugin, "./plugins/docker")
+	build := exec.Command("go", "build", "-o", dockerPlugin, "./cmd/docker")
+	build.Dir = filepath.Join("plugins", "docker")
 	build.Stdout = os.Stdout
 	build.Stderr = os.Stderr
 
@@ -55,7 +57,7 @@ func TestMain(m *testing.M) {
 func requireDocker(t *testing.T) {
 	t.Helper()
 
-	if err := client.Ping(context.Background()); err != nil {
+	if err := pingDocker(context.Background()); err != nil {
 		t.Skip(err.Error())
 	}
 }
@@ -77,7 +79,7 @@ func applyExampleWithState(t *testing.T, stateDir string) *xcl.Config {
 
 	t.Setenv("HCL_VAR_output_dir", t.TempDir())
 
-	return applyExampleDir(t, "./config", stateDir)
+	return applyExampleDir(t, "./config/full", stateDir)
 }
 
 // applyExampleDir applies the configuration in configDir in a new Config
@@ -107,13 +109,13 @@ func applyExampleDir(t *testing.T, configDir, stateDir string) *xcl.Config {
 }
 
 // applySubnetChange applies the example's main configuration, then the
-// address range change in config-subnet to the same state, and returns the
+// address range change in config/alt-subnet to the same state, and returns the
 // Config of each apply
 func applySubnetChange(t *testing.T, stateDir string) (*xcl.Config, *xcl.Config) {
 	t.Helper()
 
 	first := applyExampleWithState(t, stateDir)
-	changed := applyExampleDir(t, "./config-subnet", stateDir)
+	changed := applyExampleDir(t, "./config/alt-subnet", stateDir)
 
 	return first, changed
 }
@@ -134,10 +136,10 @@ func loadExample(t *testing.T, stateDir string) *xcl.Config {
 
 // newDockerClient returns a real Docker client, used to look at what the
 // example created
-func newDockerClient(t *testing.T) client.Docker {
+func newDockerClient(t *testing.T) docker.Docker {
 	t.Helper()
 
-	dockerClient, err := client.New()
+	dockerClient, err := docker.New()
 	require.NoError(t, err)
 
 	return dockerClient
@@ -146,7 +148,7 @@ func newDockerClient(t *testing.T) client.Docker {
 func TestApplyCreatesTheDockerNetwork(t *testing.T) {
 	c := applyExample(t)
 
-	networks, err := xcl.FindByType[resources.Network](c, "docker", "network")
+	networks, err := xcl.FindByType[entities.Network](c, "docker", "network")
 	require.NoError(t, err)
 	require.Len(t, networks, 1)
 
@@ -156,13 +158,13 @@ func TestApplyCreatesTheDockerNetwork(t *testing.T) {
 
 	inspect, err := newDockerClient(t).NetworkInspect(context.Background(), app.DockerID, network.InspectOptions{})
 	require.NoError(t, err)
-	require.Equal(t, resources.CreatedByValue, inspect.Labels[resources.LabelCreatedBy])
+	require.Equal(t, providers.CreatedByValue, inspect.Labels[providers.LabelCreatedBy])
 }
 
 func TestApplyCreatesTheDockerContainerOnTheNetwork(t *testing.T) {
 	c := applyExample(t)
 
-	web, err := xcl.Find[resources.Container](c, "docker.container.web")
+	web, err := xcl.Find[entities.Container](c, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.DockerID)
 	require.NotEmpty(t, web.IPAddress)
@@ -178,7 +180,7 @@ func TestApplyCreatesTheDockerContainerOnTheNetwork(t *testing.T) {
 func TestApplyRendersTheTemplateWithTheContainerAddress(t *testing.T) {
 	c := applyExample(t)
 
-	web, err := xcl.Find[resources.Container](c, "docker.container.web")
+	web, err := xcl.Find[entities.Container](c, "docker.container.web")
 	require.NoError(t, err)
 
 	welcome, err := xcl.Find[template.Template](c, "template.welcome")
@@ -206,7 +208,7 @@ func TestApplyRendersAnExecutableInitScript(t *testing.T) {
 func TestApplyMountsTheInitScriptReadOnlyIntoTheContainer(t *testing.T) {
 	c := applyExample(t)
 
-	web, err := xcl.Find[resources.Container](c, "docker.container.web")
+	web, err := xcl.Find[entities.Container](c, "docker.container.web")
 	require.NoError(t, err)
 
 	initScript, err := xcl.Find[template.Template](c, "template.init")
@@ -246,7 +248,7 @@ func TestApplyFailsForAMissingDockerPlugin(t *testing.T) {
 	c, err := newConfig(nil, missing, t.TempDir())
 	require.NoError(t, err)
 
-	err = apply(c, "./config")
+	err = apply(c, "./config/full")
 	require.Error(t, err)
 	require.ErrorIs(t, err, xcl.ErrPluginLoad)
 	require.Contains(t, err.Error(), "from registry local failed to load")
@@ -269,10 +271,10 @@ func TestDestroyRemovesTheRenderedTemplate(t *testing.T) {
 func TestDestroyRemovesTheDockerResources(t *testing.T) {
 	c := applyExample(t)
 
-	app, err := xcl.Find[resources.Network](c, "docker.network.app")
+	app, err := xcl.Find[entities.Network](c, "docker.network.app")
 	require.NoError(t, err)
 
-	web, err := xcl.Find[resources.Container](c, "docker.container.web")
+	web, err := xcl.Find[entities.Container](c, "docker.container.web")
 	require.NoError(t, err)
 
 	err = destroy(c)
@@ -292,10 +294,10 @@ func TestDestroyRemovesTheDockerResources(t *testing.T) {
 func TestStatusPrintsTheAppliedResourcesAsATree(t *testing.T) {
 	c := applyExample(t)
 
-	app, err := xcl.Find[resources.Network](c, "docker.network.app")
+	app, err := xcl.Find[entities.Network](c, "docker.network.app")
 	require.NoError(t, err)
 
-	web, err := xcl.Find[resources.Container](c, "docker.container.web")
+	web, err := xcl.Find[entities.Container](c, "docker.container.web")
 	require.NoError(t, err)
 
 	out := &bytes.Buffer{}
@@ -315,7 +317,7 @@ func TestStatusReportsWhatApplySaved(t *testing.T) {
 	stateDir := t.TempDir()
 	applied := applyExampleWithState(t, stateDir)
 
-	web, err := xcl.Find[resources.Container](applied, "docker.container.web")
+	web, err := xcl.Find[entities.Container](applied, "docker.container.web")
 	require.NoError(t, err)
 
 	c := loadExample(t, stateDir)
@@ -345,7 +347,7 @@ func TestInspectPrintsTheContainerAsConfiguration(t *testing.T) {
 	stateDir := t.TempDir()
 	applied := applyExampleWithState(t, stateDir)
 
-	web, err := xcl.Find[resources.Container](applied, "docker.container.web")
+	web, err := xcl.Find[entities.Container](applied, "docker.container.web")
 	require.NoError(t, err)
 
 	c := loadExample(t, stateDir)
@@ -387,7 +389,7 @@ func TestDestroyInALaterRunRemovesWhatApplySaved(t *testing.T) {
 	stateDir := t.TempDir()
 	applied := applyExampleWithState(t, stateDir)
 
-	web, err := xcl.Find[resources.Container](applied, "docker.container.web")
+	web, err := xcl.Find[entities.Container](applied, "docker.container.web")
 	require.NoError(t, err)
 
 	c, err := newConfig(nil, dockerPlugin, stateDir)
@@ -444,7 +446,7 @@ func TestRunApplyWithoutAPathFails(t *testing.T) {
 func TestSubnetChangeReplacesTheNetworkWithTheNewRange(t *testing.T) {
 	_, changed := applySubnetChange(t, t.TempDir())
 
-	app, err := xcl.Find[resources.Network](changed, "docker.network.app")
+	app, err := xcl.Find[entities.Network](changed, "docker.network.app")
 	require.NoError(t, err)
 	require.Equal(t, "10.42.0.0/23", app.Subnet)
 
@@ -457,7 +459,7 @@ func TestSubnetChangeReplacesTheNetworkWithTheNewRange(t *testing.T) {
 func TestSubnetChangeRemovesTheOldNetwork(t *testing.T) {
 	first, _ := applySubnetChange(t, t.TempDir())
 
-	old, err := xcl.Find[resources.Network](first, "docker.network.app")
+	old, err := xcl.Find[entities.Network](first, "docker.network.app")
 	require.NoError(t, err)
 
 	_, err = newDockerClient(t).NetworkInspect(context.Background(), old.DockerID, network.InspectOptions{})
@@ -468,16 +470,16 @@ func TestSubnetChangeRemovesTheOldNetwork(t *testing.T) {
 func TestSubnetChangeKeepsTheContainerAttached(t *testing.T) {
 	first, changed := applySubnetChange(t, t.TempDir())
 
-	old, err := xcl.Find[resources.Container](first, "docker.container.web")
+	old, err := xcl.Find[entities.Container](first, "docker.container.web")
 	require.NoError(t, err)
 
 	// the container is updated in place, not replaced
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.DockerID)
 	require.Equal(t, old.DockerID, web.DockerID)
 
-	app, err := xcl.Find[resources.Network](changed, "docker.network.app")
+	app, err := xcl.Find[entities.Network](changed, "docker.network.app")
 	require.NoError(t, err)
 
 	inspect, err := newDockerClient(t).ContainerInspect(context.Background(), web.DockerID)
@@ -493,7 +495,7 @@ func TestSubnetChangeKeepsTheContainerAttached(t *testing.T) {
 func TestSubnetChangeRendersTemplateWithNewAddress(t *testing.T) {
 	_, changed := applySubnetChange(t, t.TempDir())
 
-	web, err := xcl.Find[resources.Container](changed, "docker.container.web")
+	web, err := xcl.Find[entities.Container](changed, "docker.container.web")
 	require.NoError(t, err)
 	require.NotEmpty(t, web.IPAddress)
 
@@ -516,7 +518,7 @@ func TestPlanAfterSubnetChangeReportsNoChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	out := &bytes.Buffer{}
-	err = plan(out, c, "./config-subnet")
+	err = plan(out, c, "./config/alt-subnet")
 	require.NoError(t, err)
 
 	require.Equal(t, "Diff: no changes, 4 unchanged.\n", out.String())

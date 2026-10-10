@@ -23,7 +23,8 @@ func buildExample(t *testing.T) string {
 	output, err := build.CombinedOutput()
 	require.NoError(t, err, string(output))
 
-	buildPlugin := exec.Command("go", "build", "-o", filepath.Join(buildDir, dockerPluginName), "./plugins/docker")
+	buildPlugin := exec.Command("go", "build", "-o", filepath.Join(buildDir, dockerPluginName), "./cmd/docker")
+	buildPlugin.Dir = filepath.Join("plugins", "docker")
 	output, err = buildPlugin.CombinedOutput()
 	require.NoError(t, err, string(output))
 
@@ -56,7 +57,7 @@ func TestSmokeApplyStatusDestroyShareTheSavedState(t *testing.T) {
 	env := []string{"HCL_VAR_output_dir=" + t.TempDir()}
 	stateDir := t.TempDir()
 
-	stdout, stderr, err := runExample(t, binary, env, "apply", "--state", stateDir, "./config")
+	stdout, stderr, err := runExample(t, binary, env, "apply", "--state", stateDir, "./config/full")
 	t.Cleanup(func() {
 		// remove what apply made even when a later step fails
 		runExample(t, binary, env, "destroy", "--state", stateDir)
@@ -97,7 +98,7 @@ func TestSmokeApplyFailsForMissingPlugin(t *testing.T) {
 	binary := buildExample(t)
 	env := []string{"HCL_VAR_output_dir=" + t.TempDir()}
 
-	_, stderr, err := runExample(t, binary, env, "apply", "--state", t.TempDir(), "--plugin", "/nonexistent/docker-plugin", "./config")
+	_, stderr, err := runExample(t, binary, env, "apply", "--state", t.TempDir(), "--plugin", "/nonexistent/docker-plugin", "./config/full")
 	require.Error(t, err)
 	require.Contains(t, stderr, "error:")
 	require.Contains(t, stderr, "make build")
@@ -107,7 +108,7 @@ func TestSmokeApplyFailsWithoutDocker(t *testing.T) {
 	binary := buildExample(t)
 	socket := "unix://" + filepath.Join(t.TempDir(), "none.sock")
 
-	_, stderr, err := runExample(t, binary, []string{"DOCKER_HOST=" + socket}, "apply", "--state", t.TempDir(), "./config")
+	_, stderr, err := runExample(t, binary, []string{"DOCKER_HOST=" + socket}, "apply", "--state", t.TempDir(), "./config/full")
 	require.Error(t, err)
 	require.Contains(t, stderr, "no Docker engine reachable")
 }

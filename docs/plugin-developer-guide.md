@@ -9,6 +9,9 @@ The reference implementation is the example provider in
 with its resource type in
 [`resource.go`](../plugins/example/pkg/person/resource.go) next to it. For how
 providers are hosted and registered, see [Plugin Architecture](plugins.md).
+For where a plugin's entity types, providers and clients live, see
+[Plugin Layout](plugin-layout.md); to start a plugin of your own, use the
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template).
 
 ## The contract
 
@@ -411,7 +414,7 @@ type: a setting the real system cannot change in place, a dependency whose
 replacement leaves the resource broken, or two values that differ as text
 but mean the same thing. Answer what you know and defer to the embedded
 `DefaultChanged` for the rest. The Docker container in the plugin example
-([`example/plugin/plugins/docker/resources/container.go`](../example/plugin/plugins/docker/resources/container.go))
+([`example/plugin/plugins/docker/providers/container.go`](../example/plugin/plugins/docker/providers/container.go))
 does both, deciding only from what it is told:
 
 ```go
@@ -424,7 +427,7 @@ var replaceSettings = []entity.Path{
 	entity.Path{}.Attribute("init_script"),
 }
 
-func (p *containerProvider) Changed(ctx context.Context, old *Container, new *Container, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
+func (p *containerProvider) Changed(ctx context.Context, old *entities.Container, new *entities.Container, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
 	for _, change := range changes {
 		for _, setting := range replaceSettings {
 			if change.Within(setting) {
@@ -466,14 +469,29 @@ template rendering new content to the same file, is left to `DefaultChanged`,
 which leaves the container alone.
 
 The network it is attached to
-([`network.go`](../example/plugin/plugins/docker/resources/network.go))
-cannot move to a new address range in place, so it answers replace when its
-subnet changes:
+([`providers/network.go`](../example/plugin/plugins/docker/providers/network.go))
+cannot move to a new address range in place, so it answers replace for a
+change within its subnet, the one setting in its replace list, and update for
+any other change:
 
 ```go
-func (p *networkProvider) Changed(ctx context.Context, old *Network, new *Network, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
-	if old.Subnet != new.Subnet {
-		return entity.Replace, nil
+// networkReplaceSettings are the settings Docker fixes when it creates a
+// network, a change to any of them needs a new network
+var networkReplaceSettings = []entity.Path{
+	entity.Path{}.Attribute("subnet"),
+}
+
+func (p *networkProvider) Changed(ctx context.Context, old *entities.Network, new *entities.Network, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
+	for _, change := range changes {
+		for _, setting := range networkReplaceSettings {
+			if change.Within(setting) {
+				return entity.Replace, nil
+			}
+		}
+	}
+
+	if len(changes) > 0 {
+		return entity.Update, nil
 	}
 
 	return p.DefaultChanged.Changed(ctx, old, new, changes, dependencies)
@@ -517,13 +535,15 @@ Put each change's `Before` back to rebuild what the resource looked like
 after the last apply, without asking the real system. The Docker container
 does this to move a running container between networks in place. It rebuilds
 the previous `network` blocks from the changes within `network`
-([`attachments.go`](../example/plugin/plugins/docker/resources/attachments.go)),
+([`providers/attachments.go`](../example/plugin/plugins/docker/providers/attachments.go)),
 disconnects the networks that went away or whose aliases changed, connects
 the new ones, connects again the networks whose dependency was replaced, and
-reads the new address once if anything moved:
+reads the new address once if anything moved. Every Docker call goes through
+the plugin's container task layer, `containers.Tasks`, so the provider never
+imports a Docker library:
 
 ```go
-func (p *containerProvider) Update(ctx context.Context, c *Container, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Container, error) {
+func (p *containerProvider) Update(ctx context.Context, c *entities.Container, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*entities.Container, error) {
 	previous, err := previousAttachments(c.Networks, changes)
 	if err != nil {
 		return nil, fmt.Errorf("unable to work out the previous networks of container %s: %w", c.Meta.Name, err)
@@ -538,8 +558,8 @@ func (p *containerProvider) Update(ctx context.Context, c *Container, changes []
 		}
 
 		// a network that was removed or rebuilt has already detached it
-		err := p.client.NetworkDisconnect(ctx, attachment.Name, c.DockerID, true)
-		if err != nil && !dockerclient.IsErrNotFound(err) {
+		err := p.tasks.DisconnectNetwork(ctx, attachment.Name, c.DockerID)
+		if err != nil && !errors.Is(err, containers.ErrNotFound) {
 			return nil, fmt.Errorf("unable to disconnect container %s from network %s: %w", c.Meta.Name, attachment.Name, err)
 		}
 
@@ -584,23 +604,23 @@ func (p *containerProvider) Update(ctx context.Context, c *Container, changes []
 		return c, nil
 	}
 
-	inspect, err := p.client.ContainerInspect(ctx, c.DockerID)
+	addresses, err := p.tasks.ContainerAddresses(ctx, c.DockerID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to inspect container %s: %w", c.Meta.Name, err)
 	}
 
-	c.IPAddress = firstAddress(c, inspect)
+	c.IPAddress = firstAddress(c, addresses)
 
 	return c, nil
 }
 ```
 
 The hot swap has a companion in the network's `Destroy`
-([`network.go`](../example/plugin/plugins/docker/resources/network.go)).
+([`providers/network.go`](../example/plugin/plugins/docker/providers/network.go)).
 Docker refuses to remove a network that still has containers attached, and a
 replaced network is destroyed before its dependents are updated, so `Destroy`
-inspects the network and force-disconnects every attached container before
-removing it. The container's `Update` then attaches it to the network that
+asks the task layer which containers are attached and force-disconnects each
+before removing it. The container's `Update` then attaches it to the network that
 replaces it, which is why it connects again to every replaced network.
 
 The init script is the other half of the container's rules. A replaced
@@ -854,6 +874,11 @@ resource. See
 [Parser & Resource Lifecycle](parser-lifecycle.md#events-parseroptionsemit).
 
 ## The example provider
+
+For a whole plugin laid out as [Plugin Layout](plugin-layout.md) describes,
+with an explicit `Changed`, an `Update` that acts only on the changes it is
+given and strict-double unit tests, see the
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template).
 
 [`plugins/example/pkg/person/provider.go`](../plugins/example/pkg/person/provider.go)
 follows everything in this guide:

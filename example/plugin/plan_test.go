@@ -17,7 +17,7 @@ import (
 func writeChangedConfig(t *testing.T) string {
 	t.Helper()
 
-	original, err := os.ReadFile("./config/main.xcl")
+	original, err := os.ReadFile("./config/full/main.xcl")
 	require.NoError(t, err)
 
 	changed := strings.Replace(string(original), "Welcome to the", "Hello from the", 1)
@@ -38,7 +38,7 @@ func TestPlanWithTheAppliedConfigurationReportsNoChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	out := &bytes.Buffer{}
-	err = plan(out, c, "./config")
+	err = plan(out, c, "./config/full")
 	require.NoError(t, err)
 
 	require.Equal(t, "Diff: no changes, 4 unchanged.\n", out.String())
@@ -80,7 +80,7 @@ func TestPlanLeavesTheSavedStateUnchanged(t *testing.T) {
 	require.NoError(t, err)
 
 	out := &bytes.Buffer{}
-	err = plan(out, again, "./config")
+	err = plan(out, again, "./config/full")
 	require.NoError(t, err)
 
 	require.Equal(t, "Diff: no changes, 4 unchanged.\n", out.String())
@@ -94,7 +94,7 @@ func TestPlanOfSubnetChangeReplacesNetworkAndUpdatesContainer(t *testing.T) {
 	require.NoError(t, err)
 
 	out := &bytes.Buffer{}
-	err = plan(out, c, "./config-subnet")
+	err = plan(out, c, "./config/alt-subnet")
 	require.NoError(t, err)
 
 	// out is not a terminal, so the diff is plain

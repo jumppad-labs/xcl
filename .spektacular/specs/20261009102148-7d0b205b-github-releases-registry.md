@@ -18,23 +18,23 @@ Applications that use xcl plugins today have to build or ship each plugin binary
 
 ## Requirements
 
-- [ ] **Install a plugin from a GitHub release**
+- [x] **Install a plugin from a GitHub release**
   Application authors can declare a plugin by GitHub repository and exact version, and xcl uses that release's plugin as an external plugin when the configuration is applied, planned or destroyed.
-- [ ] **The right build for the current platform**
+- [x] **The right build for the current platform**
   xcl picks the release's build for the operating system and architecture it is running on, supporting Linux, macOS and Windows on amd64 and arm64.
-- [ ] **A clear error when there is no build**
+- [x] **A clear error when there is no build**
   When the release, or a build for the current platform, doesn't exist, xcl reports which repository, version and platform it was looking for, and nothing is applied.
-- [ ] **Downloads are checked**
+- [x] **Downloads are checked**
   xcl verifies every downloaded plugin against the release's published checksums before using it, and refuses a plugin that doesn't match.
-- [ ] **Signatures checked against keys the application chooses**
+- [x] **Signatures checked against keys the application chooses**
   An application can supply the public keys it trusts. When it does, a plugin is used only if its release carries a signature that verifies against one of those keys. When it supplies none, unsigned releases install normally.
-- [ ] **Private repositories**
+- [x] **Private repositories**
   A plugin can be installed from a private repository when a GitHub token is available to the application. Public repositories need no token.
-- [ ] **Downloads are kept and reused**
+- [x] **Downloads are kept and reused**
   A verified plugin is kept in a cache, and the application can choose where the cache is. A version already in the cache is used without contacting GitHub again, so applies work offline.
-- [ ] **Works alongside the other registries**
+- [x] **Works alongside the other registries**
   The GitHub registry can be used together with the local registry in the same application, each providing plugins to the same configuration.
-- [ ] **Documentation shows how to install from GitHub**
+- [x] **Documentation shows how to install from GitHub**
   The project's guides, README and the documentation site explain how to install a plugin from GitHub releases. They cover pinning a version, trusting keys, private repositories and the cache.
 
 ## Constraints
@@ -50,31 +50,31 @@ Applications that use xcl plugins today have to build or ship each plugin binary
 
 ## Acceptance Criteria
 
-- [ ] **A published plugin installs and applies**
+- [x] **A published plugin installs and applies**
   An application that declares a plugin by repository and version, with an empty cache and network access, applies a configuration using that plugin's resources; the next plan reports no changes.
-- [ ] **The current platform's build is used**
+- [x] **The current platform's build is used**
   On each of linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64 and windows/arm64, the plugin kept in the cache and started is the release's build named for that platform.
-- [ ] **A missing build is reported clearly**
+- [x] **A missing build is reported clearly**
   Declaring a version that has no release, or a release with no build for the current platform, fails before anything is applied, with an error naming the repository, version and platform.
-- [ ] **A tampered download is refused**
+- [x] **A tampered download is refused**
   When a downloaded plugin doesn't match the release's checksums, xcl refuses to start it, reports the mismatch, and keeps nothing in the cache.
-- [ ] **A signature from an untrusted key is refused**
+- [x] **A signature from an untrusted key is refused**
   With a trusted key supplied, a release signed with a different key, or not signed at all, is refused with an error naming the plugin, and nothing is kept in the cache; a release signed with the trusted key installs.
-- [ ] **Unsigned releases install without keys**
+- [x] **Unsigned releases install without keys**
   With no trusted key supplied, an unsigned release with valid checksums installs and applies.
-- [ ] **A private repository installs with a token**
+- [x] **A private repository installs with a token**
   A plugin from a private repository installs when a GitHub token is available, and, without a token, fails with an error naming the repository and saying it was not found or needs a token.
-- [ ] **A non-exact version is rejected**
+- [x] **A non-exact version is rejected**
   Declaring a plugin with a version range, "latest" or no version fails before anything is downloaded, with an error naming the plugin.
-- [ ] **A release without checksums is refused**
+- [x] **A release without checksums is refused**
   A release that publishes builds but no checksums file is refused with an error naming the plugin and version, and nothing is kept in the cache.
-- [ ] **A changed cached plugin is refused**
+- [x] **A changed cached plugin is refused**
   When a cached plugin's file no longer matches its release's checksums, or no longer verifies against the application's current trusted keys, it is refused before it runs.
-- [ ] **A cached version works offline**
+- [x] **A cached version works offline**
   After a version has been installed once, applying the same configuration with no network access succeeds, using the cached plugin. A different cache location chosen by the application is where the plugin is kept.
-- [ ] **The GitHub and local registries work together**
+- [x] **The GitHub and local registries work together**
   One application uses a plugin from the local registry and a plugin from the GitHub registry in the same configuration, and both apply.
-- [ ] **The documentation covers installing from GitHub**
+- [x] **The documentation covers installing from GitHub**
   The guides and README describe installing from GitHub releases, and the documentation site has a page covering version pinning, trusted keys, private repositories and the cache; the site builds.
 
 ## Technical Approach

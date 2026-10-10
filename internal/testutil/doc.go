@@ -1,4 +1,7 @@
-// Package testutil holds the test helpers shared by more than one package.
+// Package testutil holds the test helpers shared by more than one package,
+// among them a fake GitHub plugin release served from a local HTTP server
+// (NewFakeGitHubRelease) and the fixture plugin binary it packs
+// (BuildFixturePlugin).
 //
 // Go only compiles a _test.go file into its own package's tests, so a helper
 // two packages need has to live in an ordinary file. Only _test.go files may

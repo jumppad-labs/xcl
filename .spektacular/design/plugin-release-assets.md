@@ -51,4 +51,4 @@ How an xcl plugin's GitHub release is laid out. The plugin template's release au
 
 ## Producing it
 
-GoReleaser produces this layout with its default naming for archives and checksums, plus a `signs` step that runs GPG over the checksums. The template's release automation uses it, with the signing key held as a repository secret. Any other tool producing the same names and formats works too.
+The template produces this layout without a release tool. `make dist VERSION=vX.Y.Z` builds each supported platform with `CGO_ENABLED=0 go build -trimpath`, packs each binary at the root of its `.tar.gz` (or `.zip` for `windows`), and writes the checksums file with `sha256sum`. On a pushed version tag, the release workflow runs `make dist`, imports the signing key from a repository secret with `gpg --batch --import`, writes the armoured detached signature over the checksums file with `gpg --armor --detach-sign`, and publishes every file with `gh release create`. It fails before publishing when the key is missing. Any other tool producing the same names and formats works too.

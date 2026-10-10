@@ -18,6 +18,12 @@ not at end users writing `.xcl` config.
   and then acts: replaced and removed resources are destroyed children first,
   then `Create`/`Update` run in dependency order; and how `Config.Destroy`
   destroys children first.
+- [Plugin Layout](plugin-layout.md) — the standard layout every plugin
+  uses: where entity types, providers, backend clients and their test
+  doubles, and the entry points live, file order, the explicit `Changed` and
+  told-only `Update`, and the test shape. The
+  [plugin template](https://github.com/jumppad-labs/xcl-plugin-template) is
+  its worked example and the place to start a new plugin.
 - [Plugin Developer Guide](plugin-developer-guide.md) — the provider contract
   (`Create`/`Read`/`Changed`/`Update`/`Destroy`), what `old` and `new` are,
   how `Changed` answers an `entity.Change` (no change, update or replace)
