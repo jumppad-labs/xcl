@@ -47,3 +47,5 @@ repos:
       location: ../../xcl-vscode/.spektacular
     - name: xcl-plugin-template
       location: /home/nicj/code/github.com/jumppad-labs/xcl-plugin-template/.spektacular
+    - name: xcl-plugin-docker
+      location: ../../xcl-plugin-docker/.spektacular

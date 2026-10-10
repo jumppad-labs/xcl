@@ -40,3 +40,10 @@ Part of epic 20261009092551-82db0140-plugin-template ("Plugin standard and distr
 - registry DONE + merged. Template worktrees created + child started.
 - Q (plugin-template): human task 'publish first signed release' — A: defer until after merge (option 1); release listed as first manual check in test plan.
 - plugin-template DONE + merged. Epic implement complete.
+
+# Repo add: xcl-plugin-docker (2026-10-10)
+- User created xcl-plugin-docker from the xcl-plugin-template GitHub template to test the end-to-end process; code at /home/nicj/code/github.com/jumppad-labs/xcl-plugin-docker.
+- (xcl-plugin-template registry metadata still stale: says GoReleaser; not fixed — user chose to add the new repo instead.)
+- Name agreed: xcl-plugin-docker. User handed over description/role/tags. Purpose: maintained as an example remote plugin (Docker), installed via the GitHub releases registry.
+- User confirmed registration (reusing the template-copied .spektacular folder, metadata to be replaced). Flagged: template's changelog record copied in; template ships its .spektacular folder.
+- xcl-plugin-docker registered; repo.yaml metadata now Docker example. Template changelog record still present (offered deletion).
