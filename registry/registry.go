@@ -7,7 +7,9 @@
 // The package ships the local registry, NewLocal, which holds Go types
 // declared with RegisterType, plugins compiled into the program, plugin
 // binaries and directories of plugin binaries, and the two ways of starting a
-// plugin it needs: InProcess and Executable. Third parties write registries
+// plugin it needs: InProcess and Executable. It also ships the GitHub
+// registry, NewGitHub, which installs plugins from GitHub releases into a
+// local cache, verifies them and starts them as plugin binaries. Third parties write registries
 // and plugin starters of their own against the same interfaces.
 package registry
 

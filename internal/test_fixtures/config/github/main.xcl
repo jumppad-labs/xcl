@@ -1,0 +1,9 @@
+# widget is provided by a plugin installed from a GitHub release, so applying
+# this needs the GitHub registry
+widget "app" {
+  size = 1
+
+  part {
+    name = "a"
+  }
+}

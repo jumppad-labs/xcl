@@ -333,6 +333,53 @@ for executables named like the registry's pattern, `xcl-plugin-*` unless the
 registry was created with `registry.NewLocal(registry.PluginPattern("acme-plugin-*"))`.
 A directory that does not exist provides no plugins.
 
+The GitHub registry, [`registry/github.go`](../registry/github.go), installs
+plugins from GitHub releases. It is a download-and-cache wrapper on a local
+registry: `registry.NewGitHub(options...)` holds an unexported `*Local`, and
+`RegisterPlugin("owner/repo", "v1.2.0")` adds a plugin to it, so `Plugins`,
+`RegisterType` and `Types` are the local registry's, while `Name()` is
+`github.com`. Options are fixed when it is created:
+`registry.GitHubCacheDir(dir)` (default `~/.xcl/cache/plugins`),
+`registry.GitHubTrustedKeys(armored...)`, `registry.GitHubToken(token)`
+(otherwise `GITHUB_TOKEN`, then `GH_TOKEN`) and `registry.GitHubAPIURL(url)`,
+for tests. A repository that is not `owner/repo`, or a version that is not one
+exact release tag, panics at `RegisterPlugin`.
+
+`Plugins` does no network work. Each plugin it returns, named after the
+repository, does its work in `Start`
+([`registry/github_install.go`](../registry/github_install.go)): it finds the
+cache entry `<cache>/github.com/<owner>/<repo>/<tag>/<os>_<arch>/`, and on a
+miss reads the release by tag through the REST API, downloads the platform's
+archive, the checksums file and, when the release has one, the signature
+through the asset endpoint (which serves private repositories with a token)
+into a `.install-*` directory beside the entry, verifies the archive, extracts
+the binary and renames the directory into place, so a failed or interrupted
+install leaves nothing usable. On a hit or a fresh install alike it then
+verifies the entry offline
+([`registry/github_verify.go`](../registry/github_verify.go)): the detached
+signature over the checksums file against the registry's current trusted keys
+when any are given, the archive against its line in the checksums file, and
+the binary against the archive's copy. Only then does it return
+`registry.Executable(binary).Start(emit)`, the ordinary external-plugin host,
+so every start of the plugin is verified and the catalog restarts it as any
+other. Because the work happens in `Start`, every failure reaches the
+application as a `*xcl.PluginLoadError` naming the plugin and `github.com`,
+wrapping a `*xcl.PluginInstallError` (`Repository`, `Version`, `Platform`)
+that matches `xcl.ErrPluginNotFound` or `xcl.ErrPluginVerification`. Cache
+hits, downloads and verification are reported as `load` log events.
+
+The release layout it installs is fixed by the plugin release asset contract,
+encoded in [`registry/github_assets.go`](../registry/github_assets.go): the tag
+is `v<major>.<minor>.<patch>` with an optional pre-release suffix; each of
+linux, darwin and windows on amd64 and arm64 has an archive
+`<name>_<version>_<os>_<arch>.tar.gz` (`.zip` on windows), `<version>` being
+the tag without its `v`, holding the binary `<name>` (`<name>.exe` on windows)
+at its root; `<name>_<version>_checksums.txt` lists every archive's SHA-256 in
+`sha256sum` format and is required; and `<name>_<version>_checksums.txt.sig`,
+optional, is an ASCII-armoured detached OpenPGP signature over the checksums
+file. `<name>` is the repository name. Signatures are checked with
+`github.com/ProtonMail/go-crypto`.
+
 A `Config` is given registries with `xcl.WithRegistry(local)`, any number of
 times; it is the one way in for types and plugins alike. `NewConfig` builds
 the `Config`'s own catalog,
