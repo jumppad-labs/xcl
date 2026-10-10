@@ -10,10 +10,10 @@
     "register",
     "finished"
   ],
-  "created_at": "2026-10-10T13:44:51.940898504Z",
-  "updated_at": "2026-10-10T13:46:48.444021458Z",
+  "created_at": "2026-10-10T14:50:09.033086995Z",
+  "updated_at": "2026-10-10T14:51:02.867050116Z",
   "data": {
-    "description": "An xcl plugin for Docker, created from the xcl-plugin-template GitHub template and maintained as the example remote plugin, published as signed GitHub releases and installed through xcl's GitHub releases registry.",
+    "description": "GitHub template repository for new xcl plugins, built to the standard plugin layout, with CI and signed releases built with make dist, gpg and gh.",
     "evidence": {
       "identity": "xcl-plugin-template",
       "languages": [
@@ -25,7 +25,6 @@
       "readme": "A GitHub template for writing an [xcl](https://github.com/jumppad-labs/xcl) plugin. It is a complete, working plugin with one resource, `notes \"note\"`, which writes a note to a file. Unchanged, it builds, passes its unit and end-to-end tests and applies its sample configuration, with nothing else running. The same plugin can be registered inside an application or run as a separate plugin program.",
       "summary": "",
       "top_level": [
-        "build/",
         "client/",
         "cmd/",
         "e2e/",
@@ -40,24 +39,23 @@
         "plugin.go",
         "plugin_test.go"
       ],
-      "top_level_line": "build/, client/, cmd/, e2e/, entities/, examples/, providers/, LICENSE, Makefile, README.md, go.mod, go.sum, plugin.go, plugin_test.go"
+      "top_level_line": "client/, cmd/, e2e/, entities/, examples/, providers/, LICENSE, Makefile, README.md, go.mod, go.sum, plugin.go, plugin_test.go"
     },
-    "location": "/home/nicj/code/github.com/jumppad-labs/xcl-plugin-docker",
-    "name": "xcl-plugin-docker",
-    "placement": "inside",
+    "location": "/home/nicj/code/github.com/jumppad-labs/xcl-plugin-template",
+    "name": "xcl-plugin-template",
+    "placement": "project",
     "registration": {
-      "footprint": "unchanged",
+      "footprint": "created",
       "metadata_note": "",
       "registered": true
     },
-    "role": "example remote plugin",
+    "role": "plugin template",
     "tags": [
       "go",
       "xcl",
       "plugin",
-      "docker",
-      "example",
-      "github-releases"
+      "template",
+      "releases"
     ]
   }
 }

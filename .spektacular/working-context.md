@@ -47,3 +47,11 @@ Part of epic 20261009092551-82db0140-plugin-template ("Plugin standard and distr
 - Name agreed: xcl-plugin-docker. User handed over description/role/tags. Purpose: maintained as an example remote plugin (Docker), installed via the GitHub releases registry.
 - User confirmed registration (reusing the template-copied .spektacular folder, metadata to be replaced). Flagged: template's changelog record copied in; template ships its .spektacular folder.
 - xcl-plugin-docker registered; repo.yaml metadata now Docker example. Template changelog record still present (offered deletion).
+
+# Template footprint move (2026-10-10)
+- User chose: move xcl-plugin-template's Spektacular files out of the template repo into the xcl project (placement "project"), so repos made from the template don't inherit .spektacular/. User OKs removing the folder from the template repo by hand (CLI can't delete repo-scoped changelog records).
+- Template changelog record staged at .spektacular/tmp/xcl-plugin-template/changelog.out to rewrite into the new footprint.
+- Also fix stale metadata (GoReleaser -> make dist + gpg + gh).
+- Name kept xcl-plugin-template; metadata accepted, GoReleaser removed.
+- User confirmed template re-registration (placement project).
+- Template footprint moved to xcl/repos/xcl-plugin-template/.spektacular; changelog record rewritten there (identical); template repo's .spektacular git rm'd (uncommitted).

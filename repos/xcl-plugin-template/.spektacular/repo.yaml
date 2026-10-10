@@ -1,0 +1,22 @@
+schema: 2
+written_by: dev
+description: GitHub template repository for new xcl plugins, built to the standard plugin layout, with CI and signed releases built with make dist, gpg and gh.
+role: plugin template
+tags:
+    - go
+    - xcl
+    - plugin
+    - template
+    - releases
+source:
+    provider: file
+    config:
+        location: /home/nicj/code/github.com/jumppad-labs/xcl-plugin-template
+knowledge:
+    provider: file
+    config:
+        location: knowledge
+changelog:
+    provider: file
+    config:
+        directory: changelog
