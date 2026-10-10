@@ -1,16 +1,20 @@
-# HCL Configuration Parser
+# XCL Configuration Parser
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/jumppad-labs/xcl.svg)](https://pkg.go.dev/github.com/jumppad-labs/xcl)
 
-This package allows you to process configuration files written using the HashiCorp Configuration Language (HCL).
-It has full resource linking where a parameter in one configuration stanza can reference a parameter in another stanza.
-Variable support, and Modules allowing configuration to be loaded from local or remote sources.
+XCL is a superset of the HashiCorp Configuration Language (HCL). Any HCL file is valid XCL, and XCL adds:
+
+- **Interpolation**: a parameter in one configuration block can reference a parameter in another, including values
+  that are only known once the referenced resource has been created.
+- **Graph based processing**: references between blocks build a directed acyclic graph, so every resource is
+  processed in dependency order and a value is always set before a dependent resource reads it.
+- **Plugins**: resource types and their providers come from plugins, compiled into your application or run as
+  separate programs, and installed from local paths or signed GitHub releases.
+
+It also supports variables, and modules that load configuration from local or remote sources.
 
 The project aims to provide a simple API allowing you to define resources as Go structs without needing to fully understand
-the HashiCorp HCL2 library. 
-
-HCLConfig has a full AcyclicGraph that allows you to process configuration with strict dependencies. This ensures
-that a parameter from one configuration has been set before the value is interpolated in a dependent resource.
+the HashiCorp HCL2 library.
 
 Parsing is a two step approach, first the parser reads the HCL configuration from the supplied files, at this stage a 
 graph is computed based on any references inside the configuration. For example given the following two resources.
