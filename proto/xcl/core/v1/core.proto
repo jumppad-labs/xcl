@@ -1,0 +1,299 @@
+// CoreService is the message API of the xcl engine for a host written in
+// another language. It is not an RPC interface: a binding loads libxcl into
+// its own process and passes each serialised request through the one C
+// function xcl_call, naming the method. The service block is the
+// machine-readable list of methods; nothing generates a server from it.
+//
+// Field numbers, method names and error codes are part of the ABI contract:
+// they are added and never renamed or reused. Numbers reserved below belong
+// to the host-provider parts of the design, which a later release adds with
+// the numbers the design gives them.
+syntax = "proto3";
+
+package xcl.core.v1;
+
+option go_package = "github.com/jumppad-labs/xcl/coreservice/proto;corepb";
+
+service CoreService {
+  // GetVersion reports the engine's version and the C ABI version. It takes
+  // handle 0.
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
+
+  // CreateConfig is xcl.NewConfig: it takes handle 0 and returns the handle
+  // of the configuration it created.
+  rpc CreateConfig(CreateConfigRequest) returns (CreateConfigResponse);
+
+  // Operations start work on the handle and return at once. The host polls
+  // until it receives an OperationFinished task for the operation.
+  rpc StartValidate(StartValidateRequest) returns (StartOperationResponse);
+  rpc StartApply(StartApplyRequest) returns (StartOperationResponse);
+  rpc StartDiff(StartDiffRequest) returns (StartOperationResponse);
+  rpc StartDestroy(StartDestroyRequest) returns (StartOperationResponse);
+  rpc StartLoad(StartLoadRequest) returns (StartOperationResponse);
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+
+  // The host side of an operation: tasks are taken with Poll and answered
+  // with Complete.
+  rpc Poll(PollRequest) returns (PollResponse);
+  rpc Complete(CompleteRequest) returns (CompleteResponse);
+
+  // Lookups, between operations.
+  rpc Entities(EntitiesRequest) returns (EntitiesResponse);
+  rpc Find(FindRequest) returns (EntityResponse);
+  rpc FindByType(FindByTypeRequest) returns (EntitiesResponse);
+  rpc FindOne(FindByTypeRequest) returns (EntityResponse);
+  rpc Outputs(OutputsRequest) returns (OutputsResponse);
+  rpc EncodeSavedEntity(EncodeSavedEntityRequest) returns (EncodeSavedEntityResponse);
+}
+
+// Error is every application error, crossing as one message. code is stable
+// across releases and is what a binding switches on to pick an exception
+// class; message is for people.
+message Error {
+  string code = 1;
+  string message = 2;
+  // details carry the fields the Go detail type carries, by name: address,
+  // type, plugin, registry, repository, version, platform, count, ...
+  map<string, string> details = 3;
+  // causes are the wrapped errors, in order, for an error that collects
+  // several, such as a configuration that fails validation in three places.
+  repeated Error causes = 4;
+}
+
+message GetVersionRequest {}
+
+message GetVersionResponse {
+  // version is the engine's version, the xcl tag the library was built from.
+  string version = 1;
+  // abi_version is the C ABI version the library implements.
+  uint32 abi_version = 2;
+}
+
+// CreateConfigRequest is the whole of xcl.NewConfig(opts...): every option
+// has a field, and every registry is described rather than referenced.
+message CreateConfigRequest {
+  repeated Registry registries = 1;          // WithRegistry, in order
+  StateStore state_store = 2;                // WithStateStore / WithStatePath
+  Mask state_mask = 3;                       // WithStateMask
+  bool events = 4;                           // WithEventHandler: deliver events through Poll
+  int32 event_buffer_size = 5;               // WithEventBufferSize, 0 is the default
+  EventDataLevel event_data = 6;             // WithEventData
+  Mask event_mask = 7;                       // WithEventMask; unset keeps redaction
+  bool no_event_mask = 8;                    // WithNoEventMask
+  bytes variables_json = 9;                  // WithVariables, a JSON object
+}
+
+message CreateConfigResponse {
+  uint64 handle = 1;
+}
+
+message Registry {
+  oneof kind {
+    LocalRegistry local = 1;
+    GitHubRegistry github = 2;
+  }
+}
+
+message LocalRegistry {
+  string plugin_pattern = 1;                 // registry.PluginPattern, empty keeps the default
+  repeated DeclaredType types = 2;           // registry.TypeFromSchema + RegisterType
+  repeated string external_plugins = 3;      // RegisterExternalPlugin
+  repeated string plugin_directories = 4;    // RegisterPluginDirectory
+  repeated DeclaredFunction functions = 5;   // host-language functions, RegisterFunction
+}
+
+// DeclaredType is a config-only block type the host defines, as a schema v1
+// document.
+message DeclaredType {
+  string type = 1;
+  string subtype = 2;
+  bytes schema = 3;                          // schema v1 JSON
+  reserved 4, 5;                             // provided, implements: host providers, later
+}
+
+// DeclaredFunction is a function the host offers to configuration. The core
+// builds the function from its signature, and each call reaches the host as
+// a FunctionTask.
+message DeclaredFunction {
+  string name = 1;
+  bytes signature = 2;                       // plugins.FunctionSignature JSON
+}
+
+message GitHubRegistry {
+  repeated GitHubPlugin plugins = 1;         // RegisterPlugin("owner/repo", "vX.Y.Z")
+  string cache_dir = 2;                      // GitHubCacheDir
+  repeated string trusted_keys = 3;          // GitHubTrustedKeys, armoured
+  string token = 4;                          // GitHubToken
+  string api_url = 5;                        // GitHubAPIURL
+  repeated DeclaredType types = 6;           // RegisterType on the GitHub registry
+}
+
+message GitHubPlugin {
+  string repository = 1;
+  string version = 2;
+}
+
+message StateStore {
+  oneof kind {
+    string path = 1;                         // WithStatePath(dir)
+    bool host = 2;                           // the host implements the store, see StateTask
+  }
+}
+
+message Mask {
+  oneof kind {
+    bytes aes256gcm_key = 1;                 // mask.EncryptAES256GCM
+    bytes hmac_sha256_key = 2;               // mask.HashHMACSHA256
+    bool redact = 3;                         // mask.Redact
+    bool omit = 4;                           // mask.Omit
+  }
+}
+
+enum EventDataLevel {
+  EVENT_DATA_NONE = 0;
+  EVENT_DATA_RAW = 1;
+  EVENT_DATA_PROCESSED = 2;
+}
+
+message StartValidateRequest {
+  repeated string paths = 1;
+}
+
+message StartApplyRequest {
+  repeated string paths = 1;
+}
+
+message StartDiffRequest {
+  repeated string paths = 1;
+  bool reveal_sensitive = 2;
+}
+
+message StartDestroyRequest {}
+
+message StartLoadRequest {}
+
+message StartOperationResponse {
+  uint64 operation_id = 1;
+}
+
+message CancelRequest {
+  uint64 operation_id = 1;
+}
+
+message CancelResponse {}
+
+message PollRequest {
+  // wait_ms is how long Poll may block waiting for a task. 0 returns at
+  // once. A Poll that times out returns no task and no error.
+  uint32 wait_ms = 1;
+}
+
+message PollResponse {
+  oneof task {
+    StateTask state = 2;
+    Event event = 3;
+    OperationFinished finished = 4;
+    FunctionTask function = 5;
+  }
+  reserved 1;                                // provider: host providers, later
+}
+
+// StateTask is one call on the host's state store, when the configuration
+// was created with StateStore.host.
+message StateTask {
+  uint64 task_id = 1;
+  uint64 operation_id = 2;
+  enum Kind {
+    LOAD = 0;
+    SAVE = 1;
+    EXISTS = 2;
+    CLEAR = 3;
+  }
+  Kind kind = 3;
+  repeated bytes entities = 4;               // SAVE: each entity's JSON record, real sensitive values
+}
+
+// FunctionTask is one call of a host-language function from configuration.
+// The host answers with Complete, naming the task id.
+message FunctionTask {
+  uint64 task_id = 1;
+  uint64 operation_id = 2;
+  string name = 3;
+  bytes args = 4;                            // a JSON array, one element per argument
+}
+
+// Event is events.Event field for field.
+message Event {
+  int64 time_unix_nano = 1;
+  string source = 2;                         // "core" or the plugin's name
+  string operation = 3;
+  string phase = 4;
+  string resource_type = 5;
+  string resource_id = 6;
+  string file = 7;
+  int64 duration_nano = 8;
+  Error error = 9;
+  bytes data = 10;                           // the entity, masked by the event masker
+  bytes meta_json = 11;                      // Meta as a JSON object
+}
+
+message OperationFinished {
+  uint64 operation_id = 1;
+  Error error = 2;                           // unset on success
+  bytes diff_json = 3;                       // StartDiff: json.Marshal of the diff.Diff
+}
+
+message CompleteRequest {
+  uint64 task_id = 1;
+  oneof result {
+    StateResult state = 3;
+    FunctionResult function = 4;
+  }
+  reserved 2;                                // provider: host providers, later
+}
+
+message CompleteResponse {}
+
+message StateResult {
+  repeated bytes entities = 1;               // LOAD
+  bool exists = 2;                           // EXISTS
+  Error error = 3;
+}
+
+message FunctionResult {
+  bytes result = 1;                          // a JSON value of the declared return type
+  Error error = 2;                           // the function failed; message is the host's
+}
+
+message EntitiesRequest {}
+
+message EntitiesResponse {
+  repeated bytes entities = 1;               // JSON, sensitive values as the marker
+}
+
+message FindRequest {
+  string address = 1;
+}
+
+message EntityResponse {
+  bytes entity = 1;
+}
+
+message FindByTypeRequest {
+  repeated string path = 1;                  // FindByType / FindOne segments
+}
+
+message OutputsRequest {}
+
+message OutputsResponse {
+  bytes outputs_json = 1;                    // {"output.name": value, ...}
+}
+
+message EncodeSavedEntityRequest {
+  bytes entity = 1;
+  bool highlight = 2;
+}
+
+message EncodeSavedEntityResponse {
+  bytes text = 1;
+}

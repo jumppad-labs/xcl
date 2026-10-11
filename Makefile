@@ -18,7 +18,19 @@ mocks-clean:
 # Install tools and generate mocks
 setup-mocks: install-mockery mocks
 
-.PHONY: protos install-mockery mocks mocks-clean setup-mocks
+# Generate the Go message types of the CoreService protocol, proto/xcl/core/v1,
+# into coreservice/proto with buf. buf-lint and buf-breaking keep the
+# protocol's names consistent and its fields and methods stable.
+core-protos:
+	buf generate
+
+buf-lint:
+	buf lint
+
+buf-breaking:
+	buf breaking --against '.git#branch=main'
+
+.PHONY: protos install-mockery mocks mocks-clean setup-mocks core-protos buf-lint buf-breaking
 # Install and start a real plugin release from github.com. Set
 # XCL_GITHUB_LIVE_PLUGIN=owner/repo@vX.Y.Z, optionally XCL_GITHUB_LIVE_KEY to
 # the path of an armoured public key to trust, and GITHUB_TOKEN or GH_TOKEN

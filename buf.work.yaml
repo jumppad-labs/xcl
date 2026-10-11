@@ -1,0 +1,5 @@
+# The buf workspace: the CoreService protocol lives in proto/, see
+# proto/buf.yaml. make core-protos generates its Go types.
+version: v1
+directories:
+  - proto

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
@@ -202,7 +203,10 @@ type Config struct {
 	eventMask       mask.Masker         // Masks sensitive values in event data, mask.Redact() by default
 	eventMaskOff    bool                // Event data carries real sensitive values, set by WithNoEventMask
 
-	addresses *resources.AddressParser // resolves addresses against the known types
+	// addresses resolves addresses against the known types. It is kept once
+	// the registry's plugins have loaded, and read without a lock, so that
+	// lookups may run concurrently between operations
+	addresses atomic.Pointer[resources.AddressParser]
 }
 
 // addressParser returns a parser that resolves addresses against the types the
@@ -211,9 +215,13 @@ type Config struct {
 //
 // The parser is not kept until the registry's plugins have loaded, the types
 // they provide are not known before then.
+//
+// Lookups may run concurrently, so the parser is published atomically once
+// built. Two lookups that race to build it keep whichever was published
+// first; both resolve the same types.
 func (c *Config) addressParser() *resources.AddressParser {
-	if c.addresses != nil {
-		return c.addresses
+	if kept := c.addresses.Load(); kept != nil {
+		return kept
 	}
 
 	var known []types.TypeInfo
@@ -223,7 +231,9 @@ func (c *Config) addressParser() *resources.AddressParser {
 
 	addresses := resources.NewAddressParser(known)
 	if c.catalog == nil || c.catalog.Loaded() {
-		c.addresses = addresses
+		if !c.addresses.CompareAndSwap(nil, addresses) {
+			return c.addresses.Load()
+		}
 	}
 
 	return addresses
