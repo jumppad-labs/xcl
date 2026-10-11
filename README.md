@@ -191,7 +191,7 @@ Each example under [`example`](./example) is a Go module of its own, and runs wi
 
 ## Other languages
 
-The engine is available to Python as the `xcl` package, `pip install xcl`,
+The engine is available to Python as the `xcl-lang` package, `pip install xcl-lang`, imported as `xcl`,
 from [jumppad-labs/xcl-python](https://github.com/jumppad-labs/xcl-python):
 the same engine, built as a shared library and bundled in the wheel, with a
 synchronous and an asyncio API. Go users are unaffected: the Go library
