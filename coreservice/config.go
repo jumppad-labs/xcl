@@ -2,11 +2,13 @@ package coreservice
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/jumppad-labs/xcl"
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
+	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/mask"
 	"github.com/jumppad-labs/xcl/registry"
@@ -65,6 +67,13 @@ func buildOptions(req *corepb.CreateConfigRequest) ([]xcl.ConfigOption, *configu
 	for i, r := range req.GetRegistries() {
 		built, err := buildRegistry(r, conf)
 		if err != nil {
+			// a function that cannot be built keeps its own code, the
+			// rest of a registry message is the request's problem
+			var invalidFunction *xclerrors.InvalidFunctionError
+			if errors.As(err, &invalidFunction) {
+				return nil, nil, err
+			}
+
 			return nil, nil, invalidArgument(fmt.Sprintf("registry %d: %s", i, err), "registry", fmt.Sprint(i))
 		}
 
@@ -273,10 +282,4 @@ func buildMask(m *corepb.Mask) (mask.Masker, error) {
 	default:
 		return nil, fmt.Errorf("a mask must be aes256gcm_key, hmac_sha256_key, redact or omit")
 	}
-}
-
-// makeHostFunction builds the Go func a declared host function is offered to
-// configuration as. Host functions are added by a later task.
-func makeHostFunction(_ *configuration, declared *corepb.DeclaredFunction) (registry.Function, error) {
-	return registry.Function{}, fmt.Errorf("function %s: host functions are not supported yet", declared.GetName())
 }

@@ -337,8 +337,10 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
 	progress, errs := p.walkWith(ctx, currentState, previousState, functions, &resourceLifecycle{mode: walkApply, recorder: record})
 
 	// a cancelled walk skipped the resources it had not reached, keep only
-	// the progress it made
-	if len(errs) == 0 && ctx.Err() != nil {
+	// the progress it made. The cancellation is always reported, beside any
+	// error the walk hit on the way, so a caller can tell a stopped apply
+	// from a failed one with errors.Is(err, context.Canceled)
+	if ctx.Err() != nil {
 		errs = append(errs, fmt.Errorf("apply stopped before every resource was reached: %w", ctx.Err()))
 	}
 
@@ -438,7 +440,8 @@ func (p *Parser) decide(ctx context.Context, operation string, options diff.Opti
 
 	_, errs := p.walkWith(ctx, currentState, previousState, p.getFunctions, lifecycle)
 
-	if len(errs) == 0 && ctx.Err() != nil {
+	// the cancellation is always reported, beside any error the walk hit
+	if ctx.Err() != nil {
 		errs = append(errs, fmt.Errorf("%s stopped before every resource was reached: %w", operation, ctx.Err()))
 	}
 

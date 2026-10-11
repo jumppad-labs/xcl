@@ -32,6 +32,11 @@ const widgetConfig = "widget \"app\" {\n  size = 1\n  part {\n    name = \"a\"\n
 type testClient struct {
 	t *testing.T
 	s *Service
+
+	// functions answers every function task drive polls, when set. A nil
+	// result leaves the task outstanding, which is how a test holds a call
+	// open.
+	functions func(*corepb.FunctionTask) *corepb.FunctionResult
 }
 
 func newTestClient(t *testing.T) *testClient {
@@ -149,6 +154,20 @@ func (c *testClient) drive(handle, opID uint64, store *fakeStore, onEvent func(*
 			c.ok(handle, "Complete", &corepb.CompleteRequest{
 				TaskId: task.State.GetTaskId(),
 				Result: &corepb.CompleteRequest_State{State: store.answer(task.State)},
+			}, &corepb.CompleteResponse{})
+
+		case *corepb.PollResponse_Function:
+			require.NotNil(c.t, c.functions, "function task %s arrived but the test has no function handler", task.Function.GetName())
+			require.Equal(c.t, opID, task.Function.GetOperationId())
+
+			result := c.functions(task.Function)
+			if result == nil {
+				continue
+			}
+
+			c.ok(handle, "Complete", &corepb.CompleteRequest{
+				TaskId: task.Function.GetTaskId(),
+				Result: &corepb.CompleteRequest_Function{Function: result},
 			}, &corepb.CompleteResponse{})
 
 		case *corepb.PollResponse_Finished:

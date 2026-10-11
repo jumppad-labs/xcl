@@ -195,20 +195,23 @@ func TestCreateConfigHostStateStoreAccepted(t *testing.T) {
 	require.NotZero(t, resp.GetHandle())
 }
 
-func TestCreateConfigHostFunctionIsInvalidArgument(t *testing.T) {
+func TestCreateConfigDeclaresHostFunction(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	c := newTestClient(t)
 
-	out := c.fail(0, "CreateConfig", &corepb.CreateConfigRequest{
+	resp := &corepb.CreateConfigResponse{}
+	c.ok(0, "CreateConfig", &corepb.CreateConfigRequest{
 		Registries: []*corepb.Registry{localRegistry(&corepb.LocalRegistry{
-			Functions: []*corepb.DeclaredFunction{{Name: "greet", Signature: []byte(`{}`)}},
+			Functions: []*corepb.DeclaredFunction{{
+				Name:      "slugify",
+				Signature: []byte(`{"params":[{"name":"title","type":"string"}],"return":"string"}`),
+			}},
 		})},
-	})
+		StateStore: statePath(t),
+	}, resp)
 
-	require.Equal(t, CodeInvalidArgument, out.GetCode())
-	require.Equal(t, "0", out.GetDetails()["registry"])
-	require.Contains(t, out.GetMessage(), "greet")
+	require.NotZero(t, resp.GetHandle())
 }
 
 func TestCreateConfigStateMaskRedactIsRefused(t *testing.T) {
