@@ -189,6 +189,14 @@ Each example under [`example`](./example) is a Go module of its own, and runs wi
 
 `make test-examples` builds, vets and tests every example.
 
+## Other languages
+
+The engine is available to Python as the `xcl` package, `pip install xcl`,
+from [jumppad-labs/xcl-python](https://github.com/jumppad-labs/xcl-python):
+the same engine, built as a shared library and bundled in the wheel, with a
+synchronous and an asyncio API. Go users are unaffected: the Go library
+needs no cgo, and nothing in it changes for the binding.
+
 ## Contributing
 
 [`docs/`](./docs) holds notes on how xcl is built inside: the parser and entity lifecycle, state, modules and

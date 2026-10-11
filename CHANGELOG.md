@@ -1,5 +1,21 @@
 # Changelog
 
+## 20261011130709-aa3eb933-python-support
+
+XCL runs from Python. The same engine Go programs use is built once as a C shared library, libxcl, and the new `xcl` package on PyPI drives it: a Python program defines entity types as dataclasses, registers Python functions, uses Go-compiled plugins from a path, a directory or the GitHub registry, passes variables, keeps state in a directory or in its own store, receives events, and validates, diffs, applies, loads and destroys configuration with the same results a Go program gets, through a synchronous API and an asyncio API over one poll loop. This is released as xcl v0.4.0, and every xcl release from here on publishes the Python package at the same version.
+
+The Go library gains a context-taking form of every operation: `ValidateContext`, `ApplyContext`, `DiffContext`, `DestroyContext` and `LoadContext` take the caller's context, and the existing methods pass a background one. Cancelling the context starts no further provider call, saves the progress made, and returns an error wrapping `context.Canceled`, which the parser now reports beside any other error of a cancelled walk. `Config` gains `FindEntitiesByType` and `FindOneEntity`, untyped lookups by type segments with exactly the errors `FindByType` and `FindOne` give, for a caller that has no Go type for what it asks about. An entity's `meta.links` are recorded in the order they were written rather than in map order, and the lazily built address parser is published atomically, so concurrent lookups no longer race.
+
+A block type can be declared from a language-neutral schema. Schema v1, a JSON document of a type's fields (attributes, nested blocks, lists of blocks and maps of named blocks with their optional name label, each optional, defaulted, sensitive or computed), is read by `internal/schema` beside the legacy plugin schema, which plugins keep sending under protocol 1, and `registry.TypeFromSchema` turns a document into a `registry.Type` a registry declares like a hand-written one.
+
+The `coreservice` package implements the CoreService protocol defined in `proto/xcl/core/v1/core.proto` and generated with buf: `Service.Call(handle, method, request)` dispatches every method by name, `CreateConfig` maps every configuration option and both kinds of registry, the lookups return entities as JSON with sensitive values as the marker, and every error crosses with a stable code and its details. Operations run under a cancellable context and post their events, state-store calls, host function calls and end as one ordered stream of tasks a host polls and completes, so a host may implement the state store and offer functions to configuration that behave exactly as Go application functions. The package needs no cgo and is built by the existing `CGO_ENABLED=0` jobs.
+
+The nested module `bindings/libxcl` exports the four C functions of the ABI, `xcl_abi_version`, `xcl_call`, `xcl_free` and `xcl_release`, over the core service; `make libxcl` builds it for the local platform, stamped with a version, and CI builds and smoke-tests it through the ABI. Tagging a release builds it for Linux x86-64 and arm64 (glibc 2.28 and musl), macOS x86-64 and arm64 and Windows x86-64 and arm64, attaches `libxcl_<version>_<os>_<arch>` archives with a checksums file signed by the jumppad-labs release key to the GitHub release, and dispatches the xcl-python release. Fixture plugins and a parity program under `bindings/libxcl` let any binding be compared with the Go API on a shared set of fixtures.
+
+**Breaking:**
+
+None.
+
 ## 20261011095738-fad05e41-language-surface
 
 XCL's language has a settled shape, and the library now does what its documentation says. This is released as xcl v0.3.0.
