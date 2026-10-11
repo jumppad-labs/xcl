@@ -1,13 +1,15 @@
-// Package registry defines where a Config gets its block types and plugins
-// from. A Registry declares plain Go types, which blocks are only decoded
-// into, and provides plugins, and a Plugin starts itself and returns the host
-// xcl talks to it through. A Config is given registries with xcl.WithRegistry
-// and uses every one, in the order given.
+// Package registry defines where a Config gets its block types, functions
+// and plugins from. A Registry declares plain Go types, which blocks are only
+// decoded into, offers Go functions that configuration can call, and provides
+// plugins, and a Plugin starts itself and returns the host xcl talks to it
+// through. A Config is given registries with xcl.WithRegistry and uses every
+// one, in the order given.
 //
 // The package ships the local registry, NewLocal, which holds Go types
-// declared with RegisterType, plugins compiled into the program, plugin
-// binaries and directories of plugin binaries, and the two ways of starting a
-// plugin it needs: InProcess and Executable. It also ships the GitHub
+// declared with RegisterType, functions registered with RegisterFunction,
+// plugins compiled into the program, plugin binaries and directories of
+// plugin binaries, and the two ways of starting a plugin it needs: InProcess
+// and Executable. It also ships the GitHub
 // registry, NewGitHub, which installs plugins from GitHub releases into a
 // local cache, verifies them and starts them as plugin binaries. Third parties write registries
 // and plugin starters of their own against the same interfaces.
@@ -21,8 +23,8 @@ import (
 	"github.com/jumppad-labs/xcl/plugins"
 )
 
-// Registry provides types and plugins to a Config. A Config uses every
-// registry given to it with xcl.WithRegistry, in that order.
+// Registry provides types, functions and plugins to a Config. A Config uses
+// every registry given to it with xcl.WithRegistry, in that order.
 type Registry interface {
 	// Name identifies the registry in events and errors, i.e. "local" or
 	// "registry.xcl.dev"
@@ -31,6 +33,12 @@ type Registry interface {
 	// Types returns the plain Go types this registry declares. It is read
 	// once, by NewConfig. A registry with no Go types returns nil.
 	Types() []Type
+
+	// Functions returns the Go functions this registry offers to
+	// configuration. It is read once, by NewConfig, which reports a function
+	// named like a builtin or like another application function. A registry
+	// with no functions returns nil.
+	Functions() []Function
 
 	// Plugins returns the plugins this registry provides, fetching them first
 	// if it needs to. It is called once per Config, when plugins load.
@@ -49,6 +57,22 @@ type Type struct {
 	// Prototype is a pointer to a struct embedding types.ResourceBase, blocks
 	// of the type are decoded into new values of its Go type
 	Prototype any
+}
+
+// Function is a Go func a registry offers to configuration under Name, so
+// that name = slugify("My App") calls it. Func takes string, bool and number
+// parameters, or slices and string-keyed maps of those, and returns a result
+// of such a type and an error, i.e. func(title string) (string, error). It is
+// called while configuration is read, so an entity only ever holds its
+// result.
+type Function struct {
+	// Name is the bare name configuration calls the function by, i.e.
+	// "slugify". Names are not namespaced, so one that a builtin or another
+	// function already uses is reported by NewConfig
+	Name string
+
+	// Func is the Go func
+	Func any
 }
 
 // Plugin is one plugin a registry provides, ready to start

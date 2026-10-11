@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -175,6 +176,42 @@ func (s *GRPCServer) Changed(ctx context.Context, req *proto.ChangedRequest) (*p
 	protoChange, err := toProtoChange(change)
 	return &proto.ChangedResponse{
 		Change: protoChange,
+		Error:  errorToString(err),
+	}, nil
+}
+
+// GetFunctions lists the functions the plugin's providers offer, with each
+// signature as JSON
+func (s *GRPCServer) GetFunctions(ctx context.Context, req *proto.GetFunctionsRequest) (*proto.GetFunctionsResponse, error) {
+	registered := s.plugin.GetFunctions()
+	protoFunctions := make([]*proto.RegisteredFunction, 0, len(registered))
+
+	for _, f := range registered {
+		signature, err := json.Marshal(f.Signature)
+		if err != nil {
+			return nil, fmt.Errorf("function %q: encoding its signature: %w", f.Name, err)
+		}
+
+		protoFunctions = append(protoFunctions, &proto.RegisteredFunction{
+			Name:      f.Name,
+			Signature: signature,
+		})
+	}
+
+	return &proto.GetFunctionsResponse{Functions: protoFunctions}, nil
+}
+
+// CallFunction calls one of the plugin's functions with JSON arguments. The
+// function's error travels in the response, as a provider's does
+func (s *GRPCServer) CallFunction(ctx context.Context, req *proto.CallFunctionRequest) (*proto.CallFunctionResponse, error) {
+	ctx, err := s.withLogger(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.plugin.CallFunction(ctx, req.Name, req.Args)
+	return &proto.CallFunctionResponse{
+		Result: result,
 		Error:  errorToString(err),
 	}, nil
 }

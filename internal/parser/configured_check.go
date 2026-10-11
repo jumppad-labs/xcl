@@ -137,7 +137,7 @@ func compareConfiguredBlocks(body *hclsyntax.Body, name string, before, after re
 			}
 
 			elementPath := fmt.Sprintf("%s[%v]", path, key.Interface())
-			compareConfiguredElement(nil, before.MapIndex(key), afterElement, elementPath, changed)
+			compareConfiguredElement(nestedBlockBodyByName(body, name, fmt.Sprint(key.Interface())), before.MapIndex(key), afterElement, elementPath, changed)
 		}
 	}
 }
@@ -178,6 +178,24 @@ func nestedBlockBody(body *hclsyntax.Body, blockType string, index int) *hclsynt
 		}
 
 		count++
+	}
+
+	return nil
+}
+
+// nestedBlockBodyByName returns the body of the nested block of blockType
+// whose name is name, the block collected under that key in a map of blocks,
+// or nil when there is none, which is the case for a map written as an
+// attribute
+func nestedBlockBodyByName(body *hclsyntax.Body, blockType, name string) *hclsyntax.Body {
+	if body == nil {
+		return nil
+	}
+
+	for _, block := range body.Blocks {
+		if block.Type == blockType && len(block.Labels) > 0 && block.Labels[0] == name {
+			return block.Body
+		}
 	}
 
 	return nil

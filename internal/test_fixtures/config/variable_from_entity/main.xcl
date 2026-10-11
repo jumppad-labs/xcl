@@ -1,0 +1,11 @@
+service "api" {
+  host = "api.local"
+}
+
+variable "url" {
+  default = "http://${service.api.host}"
+}
+
+gateway "edge" {
+  address = variable.url
+}

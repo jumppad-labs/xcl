@@ -164,16 +164,25 @@ func loadVariablesFromFile(ctx *hcl.EvalContext, path string) error {
 
 // setVariables allow variables to be set from a collection or environment variables
 // Precedence should be file, env, vars
+//
+// Only environment variables carrying variableEnvPrefix are read, and an
+// empty prefix reads none: without one every process environment variable
+// would become a variable. The value is everything after the first '=', so a
+// value containing '=' is kept whole.
 func setVariables(ctx *hcl.EvalContext, vars map[string]string, variableEnvPrefix string) {
 	// first any vars defined as environment variables
-	for _, e := range os.Environ() {
-		if strings.HasPrefix(e, variableEnvPrefix) {
-			parts := strings.Split(e, "=")
-
-			if len(parts) == 2 {
-				key := strings.Replace(parts[0], variableEnvPrefix, "", -1)
-				setContextVariable(ctx, key, valueFromString(parts[1]))
+	if variableEnvPrefix != "" {
+		for _, e := range os.Environ() {
+			if !strings.HasPrefix(e, variableEnvPrefix) {
+				continue
 			}
+
+			key, value, found := strings.Cut(strings.TrimPrefix(e, variableEnvPrefix), "=")
+			if !found || key == "" {
+				continue
+			}
+
+			setContextVariable(ctx, key, valueFromString(value))
 		}
 	}
 

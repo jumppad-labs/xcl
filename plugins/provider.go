@@ -120,7 +120,11 @@ type ResourceProvider[T any] interface {
 	// deciding it.
 	Changed(ctx context.Context, old T, new T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error)
 
-	// Functions returns the functions exposed by the provider that can be called
-	// by other providers.
+	// Functions returns the functions the provider offers to configuration,
+	// built with NewFunctions, or nil when it offers none. Configuration
+	// calls them by their bare names while it is read, so the provider only
+	// ever receives their results. A name a builtin, an application
+	// function or another plugin already uses is reported when the plugin
+	// loads.
 	Functions() ProviderFunctions
 }

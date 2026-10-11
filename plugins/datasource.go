@@ -28,8 +28,8 @@ type DataSourceProvider[T any] interface {
 	// and return promptly if the context is cancelled.
 	Refresh(ctx context.Context) (T, error)
 
-	// Functions returns the functions exposed by the provider that can be called
-	// by other providers.
+	// Functions returns the functions the provider offers to configuration,
+	// built with NewFunctions, or nil when it offers none.
 	Functions() ProviderFunctions
 }
 

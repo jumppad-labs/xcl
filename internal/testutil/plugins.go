@@ -15,13 +15,28 @@ import (
 // names
 const FixturePluginName = "xcl-plugin-widget"
 
-// fixturePlugin is the fixture plugin built once per test binary
-var fixturePlugin struct {
+// FunctionFixturePluginName is the file name of the fixture plugin binary
+// that offers the function greet and provides the block type greeting
+const FunctionFixturePluginName = "xcl-plugin-greeting"
+
+// FunctionClashFixturePluginName is the file name of the fixture plugin
+// binary that also offers greet, from the provider of the block type salute
+const FunctionClashFixturePluginName = "xcl-plugin-salute"
+
+// builtPlugin is one fixture plugin built once per test binary
+type builtPlugin struct {
 	once   sync.Once
 	path   string
 	output string
 	err    error
 }
+
+// fixturePlugins holds every fixture plugin built so far, keyed by the
+// package it is built from
+var (
+	fixturePluginsMu sync.Mutex
+	fixturePlugins   = map[string]*builtPlugin{}
+)
 
 // BuildFixturePlugin builds the self-contained external test plugin in
 // internal/test_fixtures/plugins/subtypeless, which provides the block type
@@ -32,23 +47,60 @@ var fixturePlugin struct {
 func BuildFixturePlugin(t testing.TB, moduleRoot string) string {
 	t.Helper()
 
-	fixturePlugin.once.Do(func() {
+	return buildFixturePlugin(t, moduleRoot, "./internal/test_fixtures/plugins/subtypeless", FixturePluginName)
+}
+
+// BuildFunctionFixturePlugin builds the external test plugin in
+// internal/test_fixtures/plugins/functions, which provides the block type
+// greeting and offers the function greet(name), and returns the path of the
+// binary, named FunctionFixturePluginName.
+func BuildFunctionFixturePlugin(t testing.TB, moduleRoot string) string {
+	t.Helper()
+
+	return buildFixturePlugin(t, moduleRoot, "./internal/test_fixtures/plugins/functions", FunctionFixturePluginName)
+}
+
+// BuildFunctionClashFixturePlugin builds the external test plugin in
+// internal/test_fixtures/plugins/functions_clash, which provides the block
+// type salute and also offers greet, and returns the path of the binary,
+// named FunctionClashFixturePluginName.
+func BuildFunctionClashFixturePlugin(t testing.TB, moduleRoot string) string {
+	t.Helper()
+
+	return buildFixturePlugin(t, moduleRoot, "./internal/test_fixtures/plugins/functions_clash", FunctionClashFixturePluginName)
+}
+
+// buildFixturePlugin builds the plugin main package at pkg, relative to
+// moduleRoot, into a binary called name under the OS temporary directory,
+// once per test binary, and returns its path
+func buildFixturePlugin(t testing.TB, moduleRoot, pkg, name string) string {
+	t.Helper()
+
+	fixturePluginsMu.Lock()
+	built, ok := fixturePlugins[pkg]
+	if !ok {
+		built = &builtPlugin{}
+		fixturePlugins[pkg] = built
+	}
+	fixturePluginsMu.Unlock()
+
+	built.once.Do(func() {
 		dir, err := os.MkdirTemp("", "xcl-fixture-plugin-*")
 		if err != nil {
-			fixturePlugin.err = err
+			built.err = err
 			return
 		}
 
-		path := filepath.Join(dir, FixturePluginName)
+		path := filepath.Join(dir, name)
 
-		build := exec.Command("go", "build", "-o", path, "./internal/test_fixtures/plugins/subtypeless")
+		build := exec.Command("go", "build", "-o", path, pkg)
 		build.Dir = moduleRoot
 
 		output, err := build.CombinedOutput()
-		fixturePlugin.path, fixturePlugin.output, fixturePlugin.err = path, string(output), err
+		built.path, built.output, built.err = path, string(output), err
 	})
 
-	require.NoError(t, fixturePlugin.err, "unable to build the fixture plugin: %s", fixturePlugin.output)
+	require.NoError(t, built.err, "unable to build the fixture plugin %s: %s", pkg, built.output)
 
-	return fixturePlugin.path
+	return built.path
 }

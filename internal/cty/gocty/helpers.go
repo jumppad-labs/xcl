@@ -68,6 +68,22 @@ func structTagIndicesWithAnon(st reflect.Type) map[string]int {
 	return ret
 }
 
+// optionalAttribute reports whether a struct field's `xcl` tag marks it
+// optional, so a value may leave the attribute out.
+func optionalAttribute(field reflect.StructField) bool {
+	tag, ok := field.Tag.Lookup(tags.Name)
+	if !ok {
+		return false
+	}
+
+	ft, err := tags.Parse(tag)
+	if err != nil {
+		return false
+	}
+
+	return ft.Kind == tags.KindOptional
+}
+
 // attributeName returns the cty attribute name for a struct field, which is the
 // name in its `xcl` tag. It returns an empty string when the field has no tag,
 // the tag has no name, or the tag is not valid.

@@ -41,7 +41,8 @@ any clients. The logger it is given is plugin scoped: it is for messages
 written outside a provider call, such as in `Init` itself. Don't keep it for
 the lifecycle methods; log from those through the call's context (see
 [Logging from a provider](#logging-from-a-provider)).
-`Functions` returns the functions the provider exposes to other providers.
+`Functions` returns the functions the provider offers to configuration, or
+nil when it offers none; see [Offering a function](#offering-a-function).
 The rest of this guide is about the lifecycle methods.
 
 ## The two copies of an entity
@@ -748,6 +749,73 @@ The warning points at a real problem. The changed value is what gets saved,
 so on the next apply the saved copy no longer matches the configuration,
 `Changed` reports a change, and xcl calls `Update`. A provider that rewrites
 a configured value causes an update on every apply.
+
+## Offering a function
+
+A provider can offer functions that configuration calls by their bare
+names, exactly as it calls a builtin such as `upper` or `format`:
+
+```hcl
+note "greeting" {
+  path = note_filename("My Greeting")
+}
+```
+
+A function is a plain Go func wrapped with `plugins.NewFunction`, and a
+provider returns the functions it offers from `Functions`, built with
+`plugins.NewFunctions`. The example offers one function, built once when
+the provider is created:
+
+```go
+// noteFilename turns a note's title into a safe file name
+func noteFilename(title string) (string, error) {
+    if title == "" {
+        return "", fmt.Errorf("a title is required")
+    }
+
+    return strings.ToLower(strings.ReplaceAll(title, " ", "-")) + ".md", nil
+}
+
+func NewNoteProvider() (*NoteProvider, error) {
+    filename, err := plugins.NewFunction(noteFilename)
+    if err != nil {
+        return nil, err
+    }
+
+    return &NoteProvider{
+        functions: plugins.NewFunctions(map[string]plugins.ProviderFunction{
+            "note_filename": filename,
+        }),
+    }, nil
+}
+
+func (p *NoteProvider) Functions() plugins.ProviderFunctions {
+    return p.functions
+}
+```
+
+The func takes `string`, `bool` and number parameters (every `int`, `uint`
+and `float` kind), or slices and string-keyed maps of those, and returns a
+result of such a type and an `error`. It is not variadic. A func of any
+other shape is refused by `NewFunction`, naming the problem. Configuration
+values are converted to the parameter types on the way in and the result
+back on the way out, so a tuple literal reaches a `[]string` parameter as a
+slice and a `map[string]int` result reads as a map.
+
+Functions are evaluated while the configuration is read, before any
+lifecycle call, so a provider only ever receives the result: `Create` is
+given `path = "my-greeting.md"`, never the call. The function runs inside
+the plugin, in process or over gRPC; the host sends the arguments as JSON
+and receives the result as JSON, and an error the func returns reaches the
+configuration author with its message. A function built with `NewFunction`
+does not receive the call's context, so one that needs to log, or to
+observe cancellation, implements `plugins.ProviderFunction` itself.
+
+Names are not namespaced. A name a builtin, an application function or
+another loaded plugin already uses is reported with a
+`*xcl.FunctionNameClashError` naming both sources when the plugin loads,
+and two providers of one plugin offering the same name fail the plugin's
+`Init`.
 
 ## Errors
 

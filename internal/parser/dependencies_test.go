@@ -158,3 +158,60 @@ func TestDependencyChangesLooksThroughVariables(t *testing.T) {
 		{Address: "resource.network.root", Change: entity.Update},
 	}, changes)
 }
+
+const (
+	forReferencesConfig         = "../test_fixtures/config/for_references/main.xcl"
+	forReferencesShadowedConfig = "../test_fixtures/config/for_references_shadowed/main.xcl"
+
+	forReferencesGatewayID = "gateway.edge"
+)
+
+// parseRegisteredForDependencies parses the configuration at path with the
+// registered service and gateway types, without walking it, so every entity
+// carries the links it was parsed with
+func parseRegisteredForDependencies(t *testing.T, path string) *State {
+	t.Helper()
+
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	current, _, err := p.parseAndValidate(path)
+	require.NoError(t, err)
+
+	return current
+}
+
+func TestForExpressionOverEntityIsADependency(t *testing.T) {
+	current := parseRegisteredForDependencies(t, forReferencesConfig)
+
+	meta := requireMeta(t, current.GetResources(), forReferencesGatewayID)
+
+	require.Contains(t, meta.Links, "service.api.listener")
+}
+
+func TestIndexExpressionReferenceIsADependency(t *testing.T) {
+	current := parseRegisteredForDependencies(t, forReferencesConfig)
+
+	meta := requireMeta(t, current.GetResources(), forReferencesGatewayID)
+
+	require.Contains(t, meta.Links, "service.api.listener")
+	require.Contains(t, meta.Links, "variable.index")
+}
+
+func TestParenthesisedReferenceIsADependency(t *testing.T) {
+	current := parseRegisteredForDependencies(t, forReferencesConfig)
+
+	meta := requireMeta(t, current.GetResources(), forReferencesGatewayID)
+
+	require.Contains(t, meta.Links, "service.api")
+}
+
+func TestForExpressionKeyAndValueNamesAreNotReferences(t *testing.T) {
+	current := parseRegisteredForDependencies(t, forReferencesShadowedConfig)
+
+	meta := requireMeta(t, current.GetResources(), forReferencesGatewayID)
+
+	// the for expression names its key variable and its value service, both
+	// of which are also the types of entities, neither is a reference
+	require.Equal(t, []string{"service.api.listener"}, meta.Links)
+}

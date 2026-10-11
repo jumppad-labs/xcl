@@ -109,3 +109,47 @@ func TestParseRecordsNothingForEntityWithoutReferences(t *testing.T) {
 
 	require.Nil(t, meta.References)
 }
+
+// namedBlocksConfig declares an app whose listener blocks are collected by
+// name, one of them set from a variable, and a gateway reading them
+const namedBlocksConfig = "../test_fixtures/config/named_blocks/main.xcl"
+
+// applyNamedBlocksFixture applies the named blocks fixture with the
+// registered types and returns every entity it produced
+func applyNamedBlocksFixture(t *testing.T) []any {
+	t.Helper()
+
+	path, err := filepath.Abs(namedBlocksConfig)
+	require.NoError(t, err)
+
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	st, err := p.Apply(context.Background(), path)
+	require.NoError(t, err)
+
+	return st.GetResources()
+}
+
+func TestParseRecordsReferenceInsideNamedBlockByName(t *testing.T) {
+	entities := applyNamedBlocksFixture(t)
+
+	app := requireMeta(t, entities, "app.web")
+
+	require.Equal(t, "variable.https_port", app.References[`listener["https"].port`])
+	require.Len(t, app.References, 1)
+	require.Equal(t, []string{"variable.https_port"}, app.Links)
+}
+
+func TestParseRecordsLinkToNamedBlock(t *testing.T) {
+	entities := applyNamedBlocksFixture(t)
+
+	gateway := requireMeta(t, entities, "gateway.edge")
+
+	require.Contains(t, gateway.Links, "app.web.listener.https.port")
+	require.Contains(t, gateway.Links, "app.web.listener")
+	require.Len(t, gateway.Links, 2)
+
+	require.Equal(t, "app.web.listener.https.port", gateway.References["port"])
+	require.Equal(t, "{ for name, l in app.web.listener : name => l.port }", gateway.References["ports"])
+}

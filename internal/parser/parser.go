@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/hashicorp/errwrap"
 	"github.com/jumppad-labs/xcl/diff"
@@ -125,21 +126,25 @@ type ParserOptions struct {
 	// for a configured value a provider changed. It may be called from
 	// several goroutines at once. A nil Emit is silent.
 	Emit events.Emit
-
-	CustomFunctions map[string]function.Function
 }
 
 // ConfigDirectory is the name of the directory, created in the users home
 // folder, that holds XCL's configuration and caches
 const ConfigDirectory = ".xclconfig"
 
+// DefaultVariableEnvPrefix is the prefix an environment variable carries to
+// override a variable: with a variable called 'foo', setting XCL_VAR_foo
+// overrides its default value. Environment variables without the prefix are
+// never read.
+const DefaultVariableEnvPrefix = "XCL_VAR_"
+
 // DefaultOptions returns a ParserOptions object with the
 // ModuleCache set to the default directory of $HOME/.xclconfig/cache
 // if the $HOME folder can not be determined, the cache is set to the
 // current folder
-// VariableEnvPrefix is set to 'HCL_VAR_', should a variable be defined
-// called 'foo' setting the environment variable 'HCL_VAR_foo' will override
-// any default value
+// VariableEnvPrefix is set to DefaultVariableEnvPrefix, 'XCL_VAR_', should a
+// variable be defined called 'foo' setting the environment variable
+// 'XCL_VAR_foo' will override any default value
 // Catalog is set to a catalog containing only the builtin resource types,
 // register types on it or replace it to use custom resource types
 func DefaultOptions() *ParserOptions {
@@ -152,7 +157,7 @@ func DefaultOptions() *ParserOptions {
 
 	return &ParserOptions{
 		ModuleCache:       cacheDir,
-		VariableEnvPrefix: "HCL_VAR_",
+		VariableEnvPrefix: DefaultVariableEnvPrefix,
 		Catalog:           catalog.New(),
 		// event data is redacted by default, as Config does
 		EventMask: mask.Redact(),
@@ -162,7 +167,6 @@ func DefaultOptions() *ParserOptions {
 // Parser can parse HCL configuration files
 type Parser struct {
 	options          ParserOptions
-	customFunctions  map[string]function.Function
 	stateStore       state.StateStore
 	catalog          *catalog.Catalog
 	providerResolver ProviderResolver
@@ -197,8 +201,7 @@ func NewParser(options *ParserOptions) *Parser {
 	}
 
 	p := &Parser{
-		options:         *o,
-		customFunctions: map[string]function.Function{},
+		options: *o,
 	}
 
 	// Parser should never create plugin registry or state store - these are owned by Config
@@ -215,10 +218,6 @@ func NewParser(options *ParserOptions) *Parser {
 	p.typeRegistry = o.TypeRegistry
 	if p.typeRegistry == nil && p.catalog != nil {
 		p.typeRegistry = p.catalog
-	}
-
-	if o.CustomFunctions != nil {
-		p.customFunctions = o.CustomFunctions
 	}
 
 	return p
@@ -1314,7 +1313,7 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 
 	// Process all attributes in the block
 	for _, a := range b.Body.Attributes {
-		refs, err := processExpr(a.Expr, p.isReferenceRoot)
+		refs, err := referencesIn(a.Expr, p.isReferenceRoot)
 		if err != nil {
 			return nil, errors.NewParserError(
 				b.Body.SrcRange.Filename,
@@ -1333,7 +1332,10 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 		}
 	}
 
-	// Process nested blocks recursively
+	// Process nested blocks recursively. The entity's Go type decides how a
+	// nested block is addressed: by name for a map of blocks, by position
+	// otherwise
+	entityType := dereference(reflect.TypeOf(resource))
 	blockIndex := map[string]int{}
 	for _, block := range b.Body.Blocks {
 		if _, ok := blockIndex[block.Type]; ok {
@@ -1343,8 +1345,9 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 		}
 
 		// Recursively get dependencies from nested blocks
-		prefix := fmt.Sprintf("%s[%d].", block.Type, blockIndex[block.Type])
-		cr, err := p.getDependentResourcesFromBlock(block, prefix, src, written)
+		fieldType := namedFieldType(entityType, block.Type)
+		prefix := nestedBlockPath("", block, blockIndex[block.Type], fieldType) + "."
+		cr, err := p.getDependentResourcesFromBlock(block, prefix, nestedBlockElement(fieldType), src, written)
 		if err != nil {
 			return nil, err
 		}
@@ -1401,15 +1404,17 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 }
 
 // getDependentResourcesFromBlock extracts dependencies from a nested block.
-// prefix is the block's path, i.e. "network[1].", and the text written for
-// each attribute holding a reference is recorded in written under prefix and
-// the attribute's name
-func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block, prefix string, src []byte, written map[string]string) ([]string, error) {
+// prefix is the block's path, i.e. "network[1]." or "listener[\"https\"].",
+// and the text written for each attribute holding a reference is recorded in
+// written under prefix and the attribute's name. elementType is the Go type
+// the block decodes into, which decides how its own nested blocks are
+// addressed; it may be nil
+func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block, prefix string, elementType reflect.Type, src []byte, written map[string]string) ([]string, error) {
 	references := []string{}
 
 	// Process attributes in the block
 	for _, a := range b.Body.Attributes {
-		refs, err := processExpr(a.Expr, p.isReferenceRoot)
+		refs, err := referencesIn(a.Expr, p.isReferenceRoot)
 		if err != nil {
 			return nil, fmt.Errorf("unable to process attribute %s: %w", a.Name, err)
 		}
@@ -1420,15 +1425,17 @@ func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block, prefix strin
 		}
 	}
 
-	// Process nested blocks recursively, numbering each by its position
-	// among the blocks of the same type
+	// Process nested blocks recursively, addressing each by its name in a
+	// map of blocks and by its position among the blocks of the same type
+	// otherwise
 	blockIndex := map[string]int{}
 	for _, block := range b.Body.Blocks {
 		index := blockIndex[block.Type]
 		blockIndex[block.Type] = index + 1
 
-		blockPrefix := fmt.Sprintf("%s%s[%d].", prefix, block.Type, index)
-		cr, err := p.getDependentResourcesFromBlock(block, blockPrefix, src, written)
+		fieldType := namedFieldType(elementType, block.Type)
+		blockPrefix := nestedBlockPath(prefix, block, index, fieldType) + "."
+		cr, err := p.getDependentResourcesFromBlock(block, blockPrefix, nestedBlockElement(fieldType), src, written)
 		if err != nil {
 			return nil, err
 		}
@@ -1436,6 +1443,44 @@ func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block, prefix strin
 	}
 
 	return references, nil
+}
+
+// nestedBlockPath returns the path of a nested block under prefix, as the
+// references recorded as written address it: its type followed by its name
+// in quotes when the field holding it is a map of blocks, i.e.
+// listener["https"], and by its position among the blocks of its type
+// otherwise, i.e. network[1]. A map block written without a name, which
+// decoding reports, is addressed by position so its attributes are still
+// recorded. fieldType is the Go field the block decodes into; it may be nil.
+func nestedBlockPath(prefix string, block *hclsyntax.Block, index int, fieldType reflect.Type) string {
+	path := prefix + block.Type
+
+	if name, named := mapBlockName(block, fieldType); named {
+		return fmt.Sprintf("%s[%q]", path, name)
+	}
+
+	return fmt.Sprintf("%s[%d]", path, index)
+}
+
+// mapBlockName returns the name a block is collected under when fieldType,
+// the Go field it decodes into, is a map of blocks and the block carries a
+// name. fieldType may be nil.
+func mapBlockName(block *hclsyntax.Block, fieldType reflect.Type) (string, bool) {
+	if fieldType == nil || fieldType.Kind() != reflect.Map || len(block.Labels) == 0 {
+		return "", false
+	}
+
+	return block.Labels[0], true
+}
+
+// nestedBlockElement returns the struct type a block field's blocks decode
+// into, or nil when the field is unknown or holds no struct
+func nestedBlockElement(fieldType reflect.Type) reflect.Type {
+	if fieldType == nil {
+		return nil
+	}
+
+	return blockElement(fieldType)
 }
 
 // processDisabled processes any expression for the disabled attribute
@@ -1531,20 +1576,30 @@ func (p *Parser) createBuiltinResource(resourceType, resourceName string) (any, 
 // in the given file
 type functionsForFile func(file string) map[string]function.Function
 
-// getFunctions returns all HCL functions (custom + builtins) for a resource
+// getFunctions returns every function configuration in file can call: the
+// builtins, which close over the file for file, dir and template_file, and
+// the functions the catalog holds, which are the application functions and,
+// once plugins have loaded, the plugin functions. The catalog refuses a name
+// a builtin uses, so a function it holds never shadows one
 // defined in file, builtins such as file() and dir() resolve relative paths
 // against the directory containing file
 func (p *Parser) getFunctions(file string) map[string]function.Function {
-	// Start with default built-in functions
 	funcs := functions.GetDefaultFunctions(file)
 
-	// Override with custom functions from parser options
-	for name, fn := range p.customFunctions {
-		funcs[name] = fn
+	if p.catalog != nil {
+		for name, fn := range p.catalog.Functions() {
+			if _, builtin := funcs[name]; builtin {
+				// the catalog checks every name against the builtins, so
+				// this is a programming error rather than a user's
+				panic(fmt.Sprintf("xcl: function %q is both a builtin and held by the catalog", name))
+			}
+
+			funcs[name] = fn
+		}
 	}
 
-	// every function, built-in or custom, keeps sensitive arguments out of
-	// its errors and marks what it derives from them
+	// every function, builtin, application or plugin, keeps sensitive
+	// arguments out of its errors and marks what it derives from them
 	return redactingFunctions(funcs)
 }
 

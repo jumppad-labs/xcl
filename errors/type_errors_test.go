@@ -96,3 +96,61 @@ func TestTypeFormErrorDetailIsRecoverableThroughAWrap(t *testing.T) {
 	require.Equal(t, "server", detail.Type)
 	require.True(t, detail.TakesSubtype)
 }
+
+// InvalidTypeError. A Go type with a field configuration cannot be decoded
+// into is reported where the type is declared, so the message has to name
+// the type, what provides it, the registry it came from and the field.
+
+func TestInvalidTypeErrorMessageNamesTheTypeProviderRegistryAndField(t *testing.T) {
+	err := &InvalidTypeError{
+		Type:     "resource.postgres",
+		Provider: "postgres",
+		Registry: "default",
+		Err:      errors.New("field Listener of main.Postgres cannot hold blocks"),
+	}
+
+	require.Equal(t, `type "resource.postgres" from postgres (registry default) cannot be decoded from configuration: field Listener of main.Postgres cannot hold blocks`, err.Error())
+}
+
+func TestInvalidTypeErrorMessageForADeclaredTypeWithoutARegistry(t *testing.T) {
+	err := &InvalidTypeError{
+		Type:     "resource.postgres",
+		Provider: "type *main.Postgres",
+		Err:      errors.New("field Listener of main.Postgres cannot hold blocks"),
+	}
+
+	require.Equal(t, `type "resource.postgres" from type *main.Postgres cannot be decoded from configuration: field Listener of main.Postgres cannot hold blocks`, err.Error())
+}
+
+func TestInvalidTypeErrorMessageWithoutAProvider(t *testing.T) {
+	err := &InvalidTypeError{
+		Type: "resource.postgres",
+		Err:  errors.New("field Listener of main.Postgres cannot hold blocks"),
+	}
+
+	require.Equal(t, `type "resource.postgres" cannot be decoded from configuration: field Listener of main.Postgres cannot hold blocks`, err.Error())
+}
+
+func TestInvalidTypeErrorUnwrapsTheFieldProblem(t *testing.T) {
+	problem := errors.New("field Listener of main.Postgres cannot hold blocks")
+	err := &InvalidTypeError{Type: "resource.postgres", Provider: "postgres", Err: problem}
+
+	require.Same(t, problem, errors.Unwrap(err))
+	require.ErrorIs(t, err, problem)
+}
+
+func TestInvalidTypeErrorDetailIsRecoverableThroughAWrap(t *testing.T) {
+	wrapped := fmt.Errorf("loading plugins: %w", &InvalidTypeError{
+		Type:     "resource.postgres",
+		Provider: "postgres",
+		Registry: "default",
+		Err:      errors.New("field Listener of main.Postgres cannot hold blocks"),
+	})
+
+	var detail *InvalidTypeError
+	require.True(t, errors.As(wrapped, &detail))
+	require.Equal(t, "resource.postgres", detail.Type)
+	require.Equal(t, "postgres", detail.Provider)
+	require.Equal(t, "default", detail.Registry)
+	require.ErrorContains(t, detail.Err, "Listener")
+}

@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/entity"
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -1312,4 +1314,379 @@ func TestUseStopsPluginsStartedBeforeAFailedLoad(t *testing.T) {
 
 	require.Len(t, c.GetPluginHosts(), 1)
 	require.Eventually(t, func() bool { return processesRunning(t, examplePlugin) == 0 }, defaultWait, pollInterval)
+}
+
+// A declared type with a field configuration cannot be decoded into is
+// returned where it is declared, as an *InvalidTypeError naming the type and
+// the field, rather than panicking later while a file is read.
+
+// BadBlockThing is a resource type whose block field is a string, which
+// cannot hold blocks
+type BadBlockThing struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Listener string `xcl:"listener,block"`
+}
+
+// VolumeBlock is a nested block collected by name
+type VolumeBlock struct {
+	Path string `xcl:"path"`
+}
+
+// MappedBlocksThing is a resource type that collects its blocks into a map
+type MappedBlocksThing struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Volumes map[string]VolumeBlock `xcl:"volume,block"`
+}
+
+func TestDeclareTypeRejectsStringBlockField(t *testing.T) {
+	c := New()
+
+	var err error
+	require.NotPanics(t, func() {
+		err = c.RegisterType(&BadBlockThing{}, "resource", "bad")
+	})
+	require.Error(t, err)
+
+	var invalid *xclerrors.InvalidTypeError
+	require.True(t, errors.As(err, &invalid))
+	require.Equal(t, "resource.bad", invalid.Type)
+	require.Equal(t, "type *catalog.BadBlockThing", invalid.Provider)
+	require.Empty(t, invalid.Registry)
+	require.ErrorContains(t, invalid.Err, "Listener")
+	require.ErrorContains(t, invalid.Err, "cannot hold blocks")
+
+	require.False(t, c.KnownType("resource", "bad"))
+}
+
+func TestDeclareTypeRejectsStringBlockFieldNamingTheRegistry(t *testing.T) {
+	c := New()
+
+	err := c.DeclareType(registry.Type{Type: "resource", Subtype: "bad", Prototype: &BadBlockThing{}}, "custom")
+	require.Error(t, err)
+
+	var invalid *xclerrors.InvalidTypeError
+	require.True(t, errors.As(err, &invalid))
+	require.Equal(t, "resource.bad", invalid.Type)
+	require.Equal(t, "type *catalog.BadBlockThing", invalid.Provider)
+	require.Equal(t, "custom", invalid.Registry)
+	require.ErrorContains(t, invalid.Err, "Listener")
+}
+
+func TestDeclareTypeAcceptsMapOfBlocks(t *testing.T) {
+	c := New()
+
+	require.NoError(t, c.RegisterType(&MappedBlocksThing{}, "resource", "mapped"))
+
+	require.True(t, c.IsRegisteredType("resource", "mapped"))
+}
+
+// DeclareFunction. An application function is offered to configuration under
+// a bare name, so the catalog has to refuse one that a builtin or another
+// function already uses, naming both sides, and one configuration cannot
+// call, naming the problem.
+
+func TestDeclareFunctionMakesTheFunctionAvailable(t *testing.T) {
+	c := New()
+
+	err := c.DeclareFunction(registry.Function{
+		Name: "slugify",
+		Func: func(title string) (string, error) {
+			return strings.ToLower(strings.ReplaceAll(title, " ", "-")), nil
+		},
+	}, "local")
+	require.NoError(t, err)
+
+	slugify, ok := c.Functions()["slugify"]
+	require.True(t, ok, "slugify should be available after being declared")
+
+	result, err := slugify.Call([]cty.Value{cty.StringVal("My App")})
+	require.NoError(t, err)
+	require.Equal(t, cty.StringVal("my-app"), result)
+}
+
+func TestDeclareFunctionClashesWithBuiltin(t *testing.T) {
+	c := New()
+
+	err := c.DeclareFunction(registry.Function{
+		Name: "upper",
+		Func: func(s string) (string, error) { return strings.ToUpper(s), nil },
+	}, "local")
+	require.EqualError(t, err,
+		`function "upper" is provided by both builtin and function func(string) (string, error) (registry local)`)
+
+	var clash *xclerrors.FunctionNameClashError
+	require.True(t, errors.As(err, &clash))
+	require.Equal(t, "upper", clash.Name)
+	require.Equal(t, "function func(string) (string, error)", clash.Provider)
+	require.Equal(t, "local", clash.Registry)
+	require.Equal(t, "builtin", clash.Existing)
+	require.Empty(t, clash.ExistingRegistry)
+
+	require.NotContains(t, c.Functions(), "upper")
+}
+
+func TestDeclareFunctionClashesWithDeclaredFunction(t *testing.T) {
+	c := New()
+
+	first := func(title string) (string, error) { return "first", nil }
+	second := func(title string) (string, error) { return "second", nil }
+
+	err := c.DeclareFunction(registry.Function{Name: "slugify", Func: first}, "first")
+	require.NoError(t, err)
+
+	err = c.DeclareFunction(registry.Function{Name: "slugify", Func: second}, "second")
+	require.EqualError(t, err,
+		`function "slugify" is provided by both function func(string) (string, error) (registry first) and function func(string) (string, error) (registry second)`)
+
+	var clash *xclerrors.FunctionNameClashError
+	require.True(t, errors.As(err, &clash))
+	require.Equal(t, "slugify", clash.Name)
+	require.Equal(t, "function func(string) (string, error)", clash.Provider)
+	require.Equal(t, "second", clash.Registry)
+	require.Equal(t, "function func(string) (string, error)", clash.Existing)
+	require.Equal(t, "first", clash.ExistingRegistry)
+}
+
+func TestDeclareFunctionClashKeepsTheFirstFunction(t *testing.T) {
+	c := New()
+
+	err := c.DeclareFunction(registry.Function{
+		Name: "slugify",
+		Func: func(title string) (string, error) { return "first", nil },
+	}, "first")
+	require.NoError(t, err)
+
+	err = c.DeclareFunction(registry.Function{
+		Name: "slugify",
+		Func: func(title string) (string, error) { return "second", nil },
+	}, "second")
+	require.Error(t, err)
+
+	result, err := c.Functions()["slugify"].Call([]cty.Value{cty.StringVal("x")})
+	require.NoError(t, err)
+	require.Equal(t, cty.StringVal("first"), result)
+}
+
+func TestDeclareFunctionRejectsUnsupportedSignature(t *testing.T) {
+	c := New()
+
+	err := c.DeclareFunction(registry.Function{
+		Name: "broken",
+		Func: func(s string) string { return s },
+	}, "local")
+
+	var invalid *xclerrors.InvalidFunctionError
+	require.True(t, errors.As(err, &invalid))
+	require.Equal(t, "broken", invalid.Name)
+	require.Equal(t, "local", invalid.Registry)
+	require.Contains(t, invalid.Err.Error(), "must return a result and an error")
+
+	require.NotContains(t, c.Functions(), "broken")
+}
+
+func TestDeclareFunctionRejectsEmptyName(t *testing.T) {
+	c := New()
+
+	err := c.DeclareFunction(registry.Function{
+		Name: "",
+		Func: func(s string) (string, error) { return s, nil },
+	}, "local")
+
+	var invalid *xclerrors.InvalidFunctionError
+	require.True(t, errors.As(err, &invalid))
+	require.Equal(t, "", invalid.Name)
+	require.Equal(t, "local", invalid.Registry)
+	require.Contains(t, invalid.Err.Error(), "must be named")
+
+	require.Empty(t, c.Functions())
+}
+
+func TestFunctionsReturnsACopy(t *testing.T) {
+	c := New()
+
+	err := c.DeclareFunction(registry.Function{
+		Name: "slugify",
+		Func: func(title string) (string, error) { return title, nil },
+	}, "local")
+	require.NoError(t, err)
+
+	all := c.Functions()
+	delete(all, "slugify")
+
+	require.Contains(t, c.Functions(), "slugify")
+}
+
+// Plugin functions. A loaded plugin's functions are offered to configuration
+// under their bare names, called through the plugin host, so a name a
+// builtin, an application function or an earlier plugin already uses is a
+// clash that fails the plugin's load, naming both sides.
+
+// functionThingProvider is a thingProvider that offers the functions in fns
+type functionThingProvider struct {
+	thingProvider
+
+	fns map[string]plugins.ProviderFunction
+}
+
+func (p *functionThingProvider) Functions() plugins.ProviderFunctions {
+	return plugins.NewFunctions(p.fns)
+}
+
+// upperPlugin is an in-process plugin that provides the resource type
+// "thing" and offers upper, the name of a builtin function
+type upperPlugin struct {
+	plugins.PluginBase
+}
+
+var _ plugins.Plugin = (*upperPlugin)(nil)
+
+func (p *upperPlugin) Init(log logger.Logger, state plugins.State) error {
+	upper, err := plugins.NewFunction(func(s string) (string, error) {
+		return strings.ToUpper(s), nil
+	})
+	if err != nil {
+		return err
+	}
+
+	provider := &functionThingProvider{fns: map[string]plugins.ProviderFunction{"upper": upper}}
+
+	return plugins.RegisterResourceProvider(&p.PluginBase, log, state, "resource", "thing", &Thing{}, provider)
+}
+
+// catalogModuleRoot is the path of the xcl module root from this package
+const catalogModuleRoot = "../.."
+
+// callGreet calls the function greet the catalog offers with name and
+// returns its result
+func callGreet(t *testing.T, c *Catalog, name string) cty.Value {
+	t.Helper()
+
+	greet, ok := c.Functions()["greet"]
+	require.True(t, ok, "greet should be offered, the functions are %v", c.Functions())
+
+	result, err := greet.Call([]cty.Value{cty.StringVal(name)})
+	require.NoError(t, err)
+
+	return result
+}
+
+func TestLoadAddsPluginFunctions(t *testing.T) {
+	greeting := testutil.BuildFunctionFixturePlugin(t, catalogModuleRoot)
+
+	c := New()
+	t.Cleanup(func() { stopHosts(c) })
+
+	local := registry.NewLocal()
+	local.RegisterExternalPlugin(greeting)
+	c.AddRegistry(local)
+
+	err := c.Load(nil)
+	require.NoError(t, err)
+
+	require.Len(t, c.GetPluginHosts(), 1)
+	require.Equal(t, cty.StringVal("hello Nic"), callGreet(t, c, "Nic"))
+}
+
+func TestLoadReportsPluginFunctionClashWithBuiltin(t *testing.T) {
+	c := New()
+	t.Cleanup(func() { stopHosts(c) })
+	c.AddRegistry(localWith(&upperPlugin{}))
+
+	err := c.Load(nil)
+	require.EqualError(t, err, `function "upper" is provided by both builtin and upperPlugin (registry local)`)
+
+	var clash *xclerrors.FunctionNameClashError
+	require.True(t, errors.As(err, &clash), "expected a *FunctionNameClashError, got %T: %v", err, err)
+	require.Equal(t, "upper", clash.Name)
+	require.Equal(t, "upperPlugin", clash.Provider)
+	require.Equal(t, "local", clash.Registry)
+	require.Equal(t, "builtin", clash.Existing)
+	require.Empty(t, clash.ExistingRegistry)
+
+	require.NotContains(t, c.Functions(), "upper")
+	require.Empty(t, c.GetPluginHosts())
+}
+
+func TestLoadReportsPluginFunctionClashWithApplicationFunction(t *testing.T) {
+	greeting := testutil.BuildFunctionFixturePlugin(t, catalogModuleRoot)
+
+	c := New()
+	t.Cleanup(func() { stopHosts(c) })
+
+	err := c.DeclareFunction(registry.Function{
+		Name: "greet",
+		Func: func(name string) (string, error) { return "application " + name, nil },
+	}, "local")
+	require.NoError(t, err)
+
+	local := registry.NewLocal()
+	local.RegisterExternalPlugin(greeting)
+	c.AddRegistry(local)
+
+	err = c.Load(nil)
+	require.EqualError(t, err,
+		`function "greet" is provided by both function func(string) (string, error) (registry local) and xcl-plugin-greeting (registry local)`)
+
+	var clash *xclerrors.FunctionNameClashError
+	require.True(t, errors.As(err, &clash), "expected a *FunctionNameClashError, got %T: %v", err, err)
+	require.Equal(t, "greet", clash.Name)
+	require.Equal(t, testutil.FunctionFixturePluginName, clash.Provider)
+	require.Equal(t, "local", clash.Registry)
+	require.Equal(t, "function func(string) (string, error)", clash.Existing)
+	require.Equal(t, "local", clash.ExistingRegistry)
+
+	// the plugin was refused, the application function is still the one
+	// offered
+	require.Empty(t, c.GetPluginHosts())
+	require.Equal(t, cty.StringVal("application Nic"), callGreet(t, c, "Nic"))
+}
+
+func TestLoadReportsFunctionClashBetweenPlugins(t *testing.T) {
+	greeting := testutil.BuildFunctionFixturePlugin(t, catalogModuleRoot)
+	salute := testutil.BuildFunctionClashFixturePlugin(t, catalogModuleRoot)
+
+	c := New()
+	t.Cleanup(func() { stopHosts(c) })
+
+	first := registry.NewLocal()
+	first.RegisterExternalPlugin(greeting)
+	c.AddRegistry(namedRegistry{Local: first, name: "first"})
+
+	second := registry.NewLocal()
+	second.RegisterExternalPlugin(salute)
+	c.AddRegistry(namedRegistry{Local: second, name: "second"})
+
+	err := c.Load(nil)
+	require.EqualError(t, err,
+		`function "greet" is provided by both xcl-plugin-greeting (registry first) and xcl-plugin-salute (registry second)`)
+
+	var clash *xclerrors.FunctionNameClashError
+	require.True(t, errors.As(err, &clash), "expected a *FunctionNameClashError, got %T: %v", err, err)
+	require.Equal(t, "greet", clash.Name)
+	require.Equal(t, testutil.FunctionClashFixturePluginName, clash.Provider)
+	require.Equal(t, "second", clash.Registry)
+	require.Equal(t, testutil.FunctionFixturePluginName, clash.Existing)
+	require.Equal(t, "first", clash.ExistingRegistry)
+}
+
+func TestLoadKeepsTheFirstPluginWhenASecondClashes(t *testing.T) {
+	greeting := testutil.BuildFunctionFixturePlugin(t, catalogModuleRoot)
+	salute := testutil.BuildFunctionClashFixturePlugin(t, catalogModuleRoot)
+
+	c := New()
+	t.Cleanup(func() { stopHosts(c) })
+
+	local := registry.NewLocal()
+	local.RegisterExternalPlugin(greeting)
+	local.RegisterExternalPlugin(salute)
+	c.AddRegistry(local)
+
+	err := c.Load(nil)
+	require.Error(t, err)
+
+	// only the first plugin loaded, and its greet is the one offered
+	require.Len(t, c.GetPluginHosts(), 1)
+	require.Equal(t, cty.StringVal("hello Nic"), callGreet(t, c, "Nic"))
 }

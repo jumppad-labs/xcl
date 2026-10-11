@@ -140,94 +140,8 @@ trim`,
 			0,
 		},
 
-		{
-			`%{ if true ~} hello %{~ endif }`,
-			nil,
-			cty.StringVal("hello"),
-			0,
-		},
-		{
-			`%{ if false ~} hello %{~ endif}`,
-			nil,
-			cty.StringVal(""),
-			0,
-		},
-		{
-			`%{ if true ~} hello %{~ else ~} goodbye %{~ endif }`,
-			nil,
-			cty.StringVal("hello"),
-			0,
-		},
-		{
-			`%{ if false ~} hello %{~ else ~} goodbye %{~ endif }`,
-			nil,
-			cty.StringVal("goodbye"),
-			0,
-		},
-		{
-			`%{ if true ~} %{~ if false ~} hello %{~ else ~} goodbye %{~ endif ~} %{~ endif }`,
-			nil,
-			cty.StringVal("goodbye"),
-			0,
-		},
-		{
-			`%{ if false ~} %{~ if false ~} hello %{~ else ~} goodbye %{~ endif ~} %{~ endif }`,
-			nil,
-			cty.StringVal(""),
-			0,
-		},
-		{
-			`%{ of true ~} hello %{~ endif}`,
-			nil,
-			cty.UnknownVal(cty.String).RefineNotNull(),
-			2, // "of" is not a valid control keyword, and "endif" is therefore also unexpected
-		},
-		{
-			`%{ for v in ["a", "b", "c"] }${v}%{ endfor }`,
-			nil,
-			cty.StringVal("abc"),
-			0,
-		},
-		{
-			`%{ for v in ["a", "b", "c"] } ${v} %{ endfor }`,
-			nil,
-			cty.StringVal(" a  b  c "),
-			0,
-		},
-		{
-			`%{ for v in ["a", "b", "c"] ~} ${v} %{~ endfor }`,
-			nil,
-			cty.StringVal("abc"),
-			0,
-		},
-		{
-			`%{ for v in [] }${v}%{ endfor }`,
-			nil,
-			cty.StringVal(""),
-			0,
-		},
-		{
-			`%{ for i, v in ["a", "b", "c"] }${i}${v}%{ endfor }`,
-			nil,
-			cty.StringVal("0a1b2c"),
-			0,
-		},
-		{
-			`%{ for k, v in {"A" = "a", "B" = "b", "C" = "c"} }${k}${v}%{ endfor }`,
-			nil,
-			cty.StringVal("AaBbCc"),
-			0,
-		},
-		{
-			`%{ for v in ["a", "b", "c"] }${v}${nl}%{ endfor }`,
-			&hcl.EvalContext{
-				Variables: map[string]cty.Value{
-					"nl": cty.StringVal("\n"),
-				},
-			},
-			cty.StringVal("a\nb\nc\n"),
-			0,
-		},
+		// %{ if } and %{ for } directives are rejected by the XCL parser, see
+		// template_directive_test.go for their coverage.
 		{
 			`\n`, // backslash escapes are not interpreted in template literals
 			nil,
@@ -270,24 +184,6 @@ trim`,
 			cty.StringVal(`hello %{ if true }world%{ endif }`),
 			0,
 		},
-		{
-			`hello $%{ if true }world%{ endif }`,
-			nil,
-			cty.StringVal("hello $world"),
-			0,
-		},
-		{
-			`%{ endif }`,
-			nil,
-			cty.UnknownVal(cty.String).RefineNotNull(),
-			1, // Unexpected endif directive
-		},
-		{
-			`%{ endfor }`,
-			nil,
-			cty.UnknownVal(cty.String).RefineNotNull(),
-			1, // Unexpected endfor directive
-		},
 		{ // can preserve a static prefix as a refinement of an unknown result
 			`test_${unknown}`,
 			&hcl.EvalContext{
@@ -319,16 +215,6 @@ trim`,
 			cty.UnknownVal(cty.String).Refine().NotNull().StringPrefixFull(strings.Repeat("_", 128)).NewValue(),
 			0,
 		},
-		{ // marks from uninterpolated values are ignored
-			`hello%{ if false } ${target}%{ endif }`,
-			&hcl.EvalContext{
-				Variables: map[string]cty.Value{
-					"target": cty.StringVal("world").Mark("sensitive"),
-				},
-			},
-			cty.StringVal("hello"),
-			0,
-		},
 		{ // marks from interpolated values are passed through
 			`${greeting} ${target}`,
 			&hcl.EvalContext{
@@ -350,48 +236,6 @@ trim`,
 				},
 			},
 			cty.StringVal(`Authenticate with "my voice is my passport"`).WithMarks(cty.NewValueMarks("sensitive")),
-			0,
-		},
-		{ // can loop over marked collections
-			`%{ for s in secrets }${s}%{ endfor }`,
-			&hcl.EvalContext{
-				Variables: map[string]cty.Value{
-					"secrets": cty.ListVal([]cty.Value{
-						cty.StringVal("foo"),
-						cty.StringVal("bar"),
-						cty.StringVal("baz"),
-					}).Mark("sensitive"),
-				},
-			},
-			cty.StringVal("foobarbaz").Mark("sensitive"),
-			0,
-		},
-		{ // marks on individual elements propagate to the result
-			`%{ for s in secrets }${s}%{ endfor }`,
-			&hcl.EvalContext{
-				Variables: map[string]cty.Value{
-					"secrets": cty.ListVal([]cty.Value{
-						cty.StringVal("foo"),
-						cty.StringVal("bar").Mark("sensitive"),
-						cty.StringVal("baz"),
-					}),
-				},
-			},
-			cty.StringVal("foobarbaz").Mark("sensitive"),
-			0,
-		},
-		{ // lots of marks!
-			`%{ for s in secrets }${s}%{ endfor }`,
-			&hcl.EvalContext{
-				Variables: map[string]cty.Value{
-					"secrets": cty.ListVal([]cty.Value{
-						cty.StringVal("foo").Mark("x"),
-						cty.StringVal("bar").Mark("y"),
-						cty.StringVal("baz").Mark("z"),
-					}).Mark("x"), // second instance of x
-				},
-			},
-			cty.StringVal("foobarbaz").WithMarks(cty.NewValueMarks("x", "y", "z")),
 			0,
 		},
 		{ // marks from unknown values are maintained

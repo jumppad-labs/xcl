@@ -140,6 +140,17 @@ func (h *DirectPluginHost) GetTypes() []RegisteredType {
 	return h.types
 }
 
+// GetFunctions returns the functions the plugin offers to configuration
+func (h *DirectPluginHost) GetFunctions() []RegisteredFunction {
+	return h.plugin.GetFunctions()
+}
+
+// CallFunction calls the plugin's function called name with JSON arguments,
+// with the call's logger naming the plugin as its source
+func (h *DirectPluginHost) CallFunction(ctx context.Context, name string, args []byte) ([]byte, error) {
+	return h.plugin.CallFunction(h.withSource(ctx), name, args)
+}
+
 // Validate validates the given entity data
 func (h *DirectPluginHost) Validate(ctx context.Context, entityType, entitySubType string, entityData []byte) error {
 	return h.plugin.Validate(h.withSource(ctx), entityType, entitySubType, entityData)

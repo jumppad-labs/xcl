@@ -34,14 +34,16 @@ The `Catalog` and the `StateStore` are the two pieces of long-lived state
 `Config` owns and passes into each new `Parser` via `ParserOptions`. The
 catalog is private; applications reach it only through `WithRegistry`. The
 public [`registry`](../registry) package defines where Go types and plugins
-come from: the `Registry` (`Name()`, `Types()`, `Plugins(ctx, emit)`), `Type`
-and `Plugin` types, and the local registry, `registry.NewLocal()`.
+come from: the `Registry` (`Name()`, `Types()`, `Functions()`,
+`Plugins(ctx, emit)`), `Type`, `Function` and `Plugin` types, and the local
+registry, `registry.NewLocal()`.
 
 ## Entry point
 
 ```go
 local := registry.NewLocal()
 local.RegisterType(&Server{}, "server")   // a plain Go type, no plugin
+local.RegisterFunction("slugify", slugify) // a Go func configuration can call
 local.RegisterPlugin(&MyPlugin{})         // an in-process plugin
 
 cfg, err := xcl.NewConfig(

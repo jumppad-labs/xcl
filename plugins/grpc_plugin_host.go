@@ -2,6 +2,7 @@ package plugins
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -13,7 +14,9 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/proto"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // GRPCPluginHost manages external plugin processes via gRPC and provides host services
@@ -24,6 +27,11 @@ type GRPCPluginHost struct {
 	plugin      PluginEntityProvider
 	cachedTypes []RegisteredType // cached types with adapters
 	typesCached bool             // flag to track if types have been cached
+
+	// cachedFunctions are the functions the plugin offers, read once as
+	// the types are
+	cachedFunctions []RegisteredFunction
+	functionsCached bool
 
 	// path is the plugin binary Start was given, Restart starts it again
 	path string
@@ -162,6 +170,57 @@ func (w *grpcPluginWrapper) callContext(ctx context.Context) (context.Context, f
 
 	id, done := w.calls.register(logger.WithSource(Logger(ctx), w.name))
 	return metadata.AppendToOutgoingContext(ctx, callIDKey, id), done
+}
+
+// GetFunctions lists the functions the plugin offers. A plugin built before
+// the function RPCs existed answers Unimplemented, which means it offers
+// none; any other failure also lists none, as GetTypes does
+func (w *grpcPluginWrapper) GetFunctions() []RegisteredFunction {
+	resp, err := w.client.GetFunctions(context.Background(), &proto.GetFunctionsRequest{})
+	if err != nil {
+		return nil
+	}
+
+	registered := make([]RegisteredFunction, 0, len(resp.Functions))
+	for _, f := range resp.Functions {
+		var signature FunctionSignature
+		if err := json.Unmarshal(f.Signature, &signature); err != nil {
+			// a signature the host cannot read is left out, the catalog
+			// reports a function it cannot build when it is called for
+			continue
+		}
+
+		registered = append(registered, RegisteredFunction{Name: f.Name, Signature: signature})
+	}
+
+	return registered
+}
+
+// CallFunction calls one of the plugin's functions, with the call's logger
+// registered so the function's log messages are routed as a provider call's
+// are. A plugin built before the function RPCs existed answers
+// Unimplemented, reported as the function not being offered
+func (w *grpcPluginWrapper) CallFunction(ctx context.Context, name string, args []byte) ([]byte, error) {
+	ctx, done := w.callContext(ctx)
+	defer done()
+
+	resp, err := w.client.CallFunction(ctx, &proto.CallFunctionRequest{
+		Name: name,
+		Args: args,
+	})
+	if err != nil {
+		if status.Code(err) == codes.Unimplemented {
+			return nil, fmt.Errorf("function %q is not offered by this plugin", name)
+		}
+
+		return nil, err
+	}
+
+	if resp.Error != "" {
+		return nil, errors.New(resp.Error)
+	}
+
+	return resp.Result, nil
 }
 
 func (w *grpcPluginWrapper) GetTypes() []RegisteredType {
@@ -373,6 +432,32 @@ func (h *GRPCPluginHost) GetTypes() []RegisteredType {
 
 	h.typesCached = true
 	return h.cachedTypes
+}
+
+// GetFunctions returns the functions the plugin offers to configuration,
+// read from the plugin once and cached as the types are
+func (h *GRPCPluginHost) GetFunctions() []RegisteredFunction {
+	if h.plugin == nil {
+		return nil
+	}
+
+	if h.functionsCached {
+		return h.cachedFunctions
+	}
+
+	h.cachedFunctions = h.plugin.GetFunctions()
+	h.functionsCached = true
+
+	return h.cachedFunctions
+}
+
+// CallFunction calls the plugin's function called name with JSON arguments
+func (h *GRPCPluginHost) CallFunction(ctx context.Context, name string, args []byte) ([]byte, error) {
+	if h.plugin == nil {
+		return nil, fmt.Errorf("plugin not initialized")
+	}
+
+	return h.plugin.CallFunction(ctx, name, args)
 }
 
 // Validate validates the given entity data

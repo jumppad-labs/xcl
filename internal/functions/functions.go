@@ -1,208 +1,272 @@
 package functions
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/infinytum/raymond/v2"
-	"github.com/jumppad-labs/xcl/internal/utils"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/cty/function"
 	"github.com/jumppad-labs/xcl/internal/cty/function/stdlib"
+	"github.com/jumppad-labs/xcl/internal/cty/gocty"
+	ctyjson "github.com/jumppad-labs/xcl/internal/cty/json"
+	"github.com/jumppad-labs/xcl/internal/utils"
 )
 
-func CreateCtyFunctionFromGoFunc(f any) (function.Function, error) {
-	// get the parameters
-	inParams := []function.Parameter{}
-	var outParam function.TypeFunc
+// Parameter is one parameter of a Go func offered to configuration: its
+// configuration type and the Go type it is decoded into.
+type Parameter struct {
+	Name   string
+	Type   cty.Type
+	GoType reflect.Type
+}
 
-	var outType reflect.Kind
-	inType := []reflect.Kind{}
+// Signature describes a Go func offered to configuration: the configuration
+// type of each parameter and of the result. It is the one description of a
+// func both the application and the plugin sides of functions are built
+// from, so a func behaves the same in process and over a plugin boundary.
+type Signature struct {
+	Params       []Parameter
+	Return       cty.Type
+	ReturnGoType reflect.Type
+}
 
-	rf := reflect.TypeOf(f)
+var errorInterface = reflect.TypeOf((*error)(nil)).Elem()
 
-	if rf.NumOut() != 2 {
-		return function.Function{}, fmt.Errorf("HCL functions must return two parameters, the result and an error i.e func(a,b int) (int, error)")
+// GoFuncSignature returns the signature of fn, a Go func that takes string,
+// bool and number parameters, or slices and string-keyed maps of those, and
+// returns a result of such a type and an error, i.e. func(a, b int) (int,
+// error). Anything else is returned as an error naming the problem.
+func GoFuncSignature(fn any) (Signature, error) {
+	rt := reflect.TypeOf(fn)
+	if rt == nil || rt.Kind() != reflect.Func {
+		return Signature{}, fmt.Errorf("a Go func is required, not %T", fn)
 	}
 
-	for i := 0; i < rf.NumIn(); i++ {
-		fp := rf.In(i)
+	if rt.IsVariadic() {
+		return Signature{}, fmt.Errorf("variadic functions are not supported, declare the parameter as a slice")
+	}
 
-		switch fp.Kind() {
-		case reflect.String:
-			appendParms(&inType, &inParams, fp.Name(), reflect.String, cty.String)
-		case reflect.Int16:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Int16, cty.Number)
-		case reflect.Int32:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Int32, cty.Number)
-		case reflect.Int64:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Int64, cty.Number)
-		case reflect.Int:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Int, cty.Number)
-		case reflect.Uint:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Uint, cty.Number)
-		case reflect.Uint16:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Uint16, cty.Number)
-		case reflect.Uint32:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Uint32, cty.Number)
-		case reflect.Uint64:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Uint64, cty.Number)
-		case reflect.Float32:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Float32, cty.Number)
-		case reflect.Float64:
-			appendParms(&inType, &inParams, fp.Name(), reflect.Float64, cty.Number)
-		default:
-			return function.Function{}, fmt.Errorf("type %v is not a valid cyt type, only primative types like string and basic numbers are supported", fp.Kind())
+	if rt.NumOut() != 2 || !rt.Out(1).Implements(errorInterface) {
+		return Signature{}, fmt.Errorf("functions must return a result and an error, i.e. func(a, b int) (int, error)")
+	}
+
+	sig := Signature{}
+
+	for i := 0; i < rt.NumIn(); i++ {
+		in := rt.In(i)
+
+		ty, err := configurationType(in)
+		if err != nil {
+			return Signature{}, fmt.Errorf("parameter %d: %w", i, err)
+		}
+
+		sig.Params = append(sig.Params, Parameter{
+			Name:   fmt.Sprintf("arg%d", i),
+			Type:   ty,
+			GoType: in,
+		})
+	}
+
+	ret, err := configurationType(rt.Out(0))
+	if err != nil {
+		return Signature{}, fmt.Errorf("result: %w", err)
+	}
+
+	sig.Return = ret
+	sig.ReturnGoType = rt.Out(0)
+
+	return sig, nil
+}
+
+// configurationType returns the configuration type a Go type is carried as:
+// a string, a bool, a number for every int, uint and float kind, a list for a
+// slice and a map for a string-keyed map, of those recursively.
+func configurationType(t reflect.Type) (cty.Type, error) {
+	switch t.Kind() {
+	case reflect.String:
+		return cty.String, nil
+	case reflect.Bool:
+		return cty.Bool, nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return cty.Number, nil
+	case reflect.Slice:
+		elem, err := configurationType(t.Elem())
+		if err != nil {
+			return cty.NilType, err
+		}
+
+		return cty.List(elem), nil
+	case reflect.Map:
+		if t.Key().Kind() != reflect.String {
+			return cty.NilType, fmt.Errorf("type %s is not supported, a map must have string keys", t)
+		}
+
+		elem, err := configurationType(t.Elem())
+		if err != nil {
+			return cty.NilType, err
+		}
+
+		return cty.Map(elem), nil
+	default:
+		return cty.NilType, fmt.Errorf("type %s is not supported, use string, bool, a number type, or a slice or string-keyed map of those", t)
+	}
+}
+
+// GoFunc is a Go func offered to configuration, with its signature. It is
+// called with configuration values in process, and with JSON arguments
+// across a plugin boundary, so the same func behaves the same either way.
+type GoFunc struct {
+	callable reflect.Value
+	sig      Signature
+}
+
+// NewGoFunc wraps fn, a Go func with a signature GoFuncSignature accepts.
+func NewGoFunc(fn any) (*GoFunc, error) {
+	sig, err := GoFuncSignature(fn)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GoFunc{callable: reflect.ValueOf(fn), sig: sig}, nil
+}
+
+// Signature returns the func's signature.
+func (g *GoFunc) Signature() Signature {
+	return g.sig
+}
+
+// Call calls the func with args, one configuration value per parameter,
+// converting each to the parameter's Go type and the result back to its
+// configuration type. An error the func returns is returned as it is.
+func (g *GoFunc) Call(args []cty.Value) (cty.Value, error) {
+	if len(args) != len(g.sig.Params) {
+		return cty.NilVal, fmt.Errorf("%d arguments given, %d expected", len(args), len(g.sig.Params))
+	}
+
+	in := make([]reflect.Value, len(args))
+	for i, arg := range args {
+		target := reflect.New(g.sig.Params[i].GoType)
+		if err := gocty.FromCtyValue(arg, target.Interface()); err != nil {
+			return cty.NilVal, fmt.Errorf("argument %d: %w", i, err)
+		}
+
+		in[i] = target.Elem()
+	}
+
+	out := g.callable.Call(in)
+
+	if callErr, _ := out[1].Interface().(error); callErr != nil {
+		return cty.NullVal(g.sig.Return), callErr
+	}
+
+	result, err := gocty.ToCtyValue(out[0].Interface(), g.sig.Return)
+	if err != nil {
+		return cty.NilVal, fmt.Errorf("result: %w", err)
+	}
+
+	return result, nil
+}
+
+// CallJSON calls the func with args, a JSON array holding one value per
+// parameter in the configuration form of its type, and returns the result
+// as JSON in the configuration form of its type. It is how a function is
+// called across a plugin boundary.
+func (g *GoFunc) CallJSON(args []byte) ([]byte, error) {
+	var raw []json.RawMessage
+	if err := json.Unmarshal(args, &raw); err != nil {
+		return nil, fmt.Errorf("arguments must be a JSON array: %w", err)
+	}
+
+	if len(raw) != len(g.sig.Params) {
+		return nil, fmt.Errorf("%d arguments given, %d expected", len(raw), len(g.sig.Params))
+	}
+
+	values := make([]cty.Value, len(raw))
+	for i, arg := range raw {
+		value, err := ctyjson.Unmarshal(arg, g.sig.Params[i].Type)
+		if err != nil {
+			return nil, fmt.Errorf("argument %d: %w", i, err)
+		}
+
+		values[i] = value
+	}
+
+	result, err := g.Call(values)
+	if err != nil {
+		return nil, err
+	}
+
+	encoded, err := ctyjson.Marshal(result, g.sig.Return)
+	if err != nil {
+		return nil, fmt.Errorf("result: %w", err)
+	}
+
+	return encoded, nil
+}
+
+// CreateCtyFunctionFromGoFunc turns fn, a Go func with a signature
+// GoFuncSignature accepts, into a function configuration can call. Each
+// argument is converted to the parameter's Go type and the result back to
+// its configuration type; an error fn returns is returned from the call.
+func CreateCtyFunctionFromGoFunc(fn any) (function.Function, error) {
+	goFunc, err := NewGoFunc(fn)
+	if err != nil {
+		return function.Function{}, err
+	}
+
+	return CtyFunctionFromSignature(goFunc.Signature(), goFunc.Call), nil
+}
+
+// CtyFunctionFromSignature builds a function configuration can call from a
+// signature and the implementation to call with the converted arguments. It
+// is shared by application functions, which call a Go func in process, and
+// plugin functions, which call across the plugin boundary.
+func CtyFunctionFromSignature(sig Signature, impl func(args []cty.Value) (cty.Value, error)) function.Function {
+	params := make([]function.Parameter, len(sig.Params))
+	for i, p := range sig.Params {
+		params[i] = function.Parameter{
+			Name:             p.Name,
+			Type:             p.Type,
+			AllowDynamicType: true,
 		}
 	}
 
-	outType = rf.Out(0).Kind()
-	switch outType {
-	case reflect.String:
-		outParam = function.StaticReturnType(cty.String)
-	case reflect.Int16:
-		fallthrough
-	case reflect.Int32:
-		fallthrough
-	case reflect.Int64:
-		fallthrough
-	case reflect.Uint16:
-		fallthrough
-	case reflect.Uint32:
-		fallthrough
-	case reflect.Uint64:
-		fallthrough
-	case reflect.Float32:
-		fallthrough
-	case reflect.Float64:
-		fallthrough
-	case reflect.Int:
-		fallthrough
-	case reflect.Uint:
-		outParam = function.StaticReturnType(cty.Number)
-	case reflect.Bool:
-		outParam = function.StaticReturnType(cty.Bool)
-	default:
-		return function.Function{}, fmt.Errorf("type %v is not a valid cyt type, only primative types like string and basic numbers are supported", rf.Out(0).Kind())
-	}
-
 	return function.New(&function.Spec{
-		Params: inParams,
+		Params: params,
+		Type:   function.StaticReturnType(sig.Return),
 		Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
-
-			// create the params
-			in := []reflect.Value{}
-			for i, a := range args {
-				switch a.Type() {
-				case cty.String:
-					in = append(in, reflect.ValueOf(a.AsString()))
-				case cty.Number:
-					bf := a.AsBigFloat()
-					switch inType[i] {
-					case reflect.Int16:
-						val, _ := bf.Int64()
-						in = append(in, reflect.ValueOf(int16(val)))
-					case reflect.Int32:
-						val, _ := bf.Int64()
-						in = append(in, reflect.ValueOf(int32(val)))
-					case reflect.Int64:
-						val, _ := bf.Int64()
-						in = append(in, reflect.ValueOf(int64(val)))
-					case reflect.Int:
-						val, _ := bf.Int64()
-						in = append(in, reflect.ValueOf(int(val)))
-					case reflect.Uint16:
-						val, _ := bf.Uint64()
-						in = append(in, reflect.ValueOf(uint16(val)))
-					case reflect.Uint32:
-						val, _ := bf.Uint64()
-						in = append(in, reflect.ValueOf(uint32(val)))
-					case reflect.Uint64:
-						val, _ := bf.Uint64()
-						in = append(in, reflect.ValueOf(uint64(val)))
-					case reflect.Uint:
-						val, _ := bf.Uint64()
-						in = append(in, reflect.ValueOf(uint(val)))
-					case reflect.Float32:
-						val, _ := bf.Float64()
-						in = append(in, reflect.ValueOf(float32(val)))
-					case reflect.Float64:
-						val, _ := bf.Float64()
-						in = append(in, reflect.ValueOf(float64(val)))
-					}
-				case cty.Bool:
-					in = append(in, reflect.ValueOf(a.True()))
-				}
-			}
-
-			out := reflect.ValueOf(f).Call(in)
-
-			switch retType {
-			case cty.String:
-				if out[1].Interface() == nil {
-					return cty.StringVal(out[0].String()), nil
-				} else {
-					return cty.StringVal(out[0].String()), out[1].Interface().(error)
-				}
-			case cty.Number:
-				switch outType {
-				case reflect.Int16:
-					fallthrough
-				case reflect.Int32:
-					fallthrough
-				case reflect.Int64:
-					fallthrough
-				case reflect.Int:
-					if out[1].Interface() == nil {
-						return cty.NumberIntVal(out[0].Int()), nil
-					} else {
-						return cty.NumberIntVal(out[0].Int()), out[1].Interface().(error)
-					}
-				case reflect.Uint16:
-					fallthrough
-				case reflect.Uint32:
-					fallthrough
-				case reflect.Uint64:
-					fallthrough
-				case reflect.Uint:
-					if out[1].Interface() == nil {
-						return cty.NumberUIntVal(out[0].Uint()), nil
-					} else {
-						return cty.NumberUIntVal(out[0].Uint()), out[1].Interface().(error)
-					}
-				case reflect.Float32:
-					fallthrough
-				case reflect.Float64:
-					if out[1].Interface() == nil {
-						return cty.NumberFloatVal(out[0].Float()), nil
-					} else {
-						return cty.NumberFloatVal(out[0].Float()), out[1].Interface().(error)
-					}
-				}
-			case cty.Bool:
-				if out[1].Interface() == nil {
-					return cty.BoolVal(out[0].Bool()), nil
-				} else {
-					return cty.BoolVal(out[0].Bool()), out[1].Interface().(error)
-				}
-			}
-
-			return cty.NullVal(retType), nil
+			return impl(args)
 		},
-		Type: outParam,
-	}), nil
+	})
 }
 
-func appendParms(inType *[]reflect.Kind, params *[]function.Parameter, name string, kind reflect.Kind, typ cty.Type) {
-	*inType = append(*inType, kind)
-	*params = append(*params, function.Parameter{
-		Name:             name,
-		Type:             typ,
-		AllowDynamicType: true,
+// builtinNames holds the names of the built-in functions, read once
+var (
+	builtinNamesOnce sync.Once
+	builtinNames     []string
+)
+
+// BuiltinNames returns the names of the built-in functions, sorted, so a
+// caller can refuse a function that would shadow one.
+func BuiltinNames() []string {
+	builtinNamesOnce.Do(func() {
+		for name := range GetDefaultFunctions("") {
+			builtinNames = append(builtinNames, name)
+		}
+
+		sort.Strings(builtinNames)
 	})
+
+	return append([]string{}, builtinNames...)
 }
 
 func GetDefaultFunctions(filePath string) map[string]function.Function {

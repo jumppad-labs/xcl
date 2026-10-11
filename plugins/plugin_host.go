@@ -13,6 +13,15 @@ type PluginHost interface {
 	// GetTypes returns the types handled by the plugin
 	GetTypes() []RegisteredType
 
+	// GetFunctions returns the functions the plugin offers to configuration,
+	// sorted by name. A plugin built before functions were added offers
+	// none
+	GetFunctions() []RegisteredFunction
+
+	// CallFunction calls the plugin's function called name with args, a JSON
+	// array holding one value per parameter, and returns its result as JSON
+	CallFunction(ctx context.Context, name string, args []byte) ([]byte, error)
+
 	// Validate validates the given entity data
 	Validate(ctx context.Context, entityType, entitySubType string, entityData []byte) error
 

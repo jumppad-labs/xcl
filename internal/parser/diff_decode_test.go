@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -8,8 +9,73 @@ import (
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
+	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 )
+
+// decodeWebAppSource is an app body whose listener blocks are collected by
+// name, the https listener's port only known once an apply has run
+const decodeWebAppSource = `
+image = "nginx:1.27"
+host  = "web.local"
+
+listener "http" {
+  port = 80
+}
+
+listener "https" {
+  port = variable.https_port
+}
+`
+
+// pendingVariableContext returns an evaluation context in which
+// variable.https_port is a number only known once an apply has run
+func pendingVariableContext() *hcl.EvalContext {
+	return &hcl.EvalContext{
+		Variables: map[string]cty.Value{
+			"variable": cty.ObjectVal(map[string]cty.Value{
+				"https_port": cty.UnknownVal(cty.Number),
+			}),
+		},
+	}
+}
+
+func TestKnownBodyRecordsUnknownPathsUnderNamedBlocks(t *testing.T) {
+	body := parseResourceBody(t, decodeWebAppSource)
+	unknown := []diff.Path{}
+
+	knownBody(body, pendingVariableContext(), diff.Path{}, reflect.TypeOf(registered.WebApp{}), &unknown)
+
+	require.Equal(t, []diff.Path{
+		diff.Path{}.Attribute("listener").Key("https").Attribute("port"),
+	}, unknown)
+	require.Equal(t, `listener["https"].port`, unknown[0].String())
+}
+
+func TestDecodeForDiffDecodesNamedBlocksWithPlaceholderForUnknown(t *testing.T) {
+	body := parseResourceBody(t, decodeWebAppSource)
+	app := &registered.WebApp{}
+
+	paths, diags := decodeForDiff(body, pendingVariableContext(), app)
+	require.False(t, diags.HasErrors(), diags.Error())
+
+	require.Equal(t, []string{`listener["https"].port`}, writtenPaths(paths))
+
+	require.Len(t, app.Listeners, 2)
+	require.Equal(t, 80, app.Listeners["http"].Port)
+	require.Equal(t, 0, app.Listeners["https"].Port)
+	require.Equal(t, "https", app.Listeners["https"].Name)
+}
+
+// writtenPaths returns the written form of every path
+func writtenPaths(paths []diff.Path) []string {
+	written := []string{}
+	for _, path := range paths {
+		written = append(written, path.String())
+	}
+
+	return written
+}
 
 // decodeContainerSource is a container body whose env map holds one value
 // only known once an apply has run, and whose first network block is named

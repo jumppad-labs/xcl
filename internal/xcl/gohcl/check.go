@@ -26,7 +26,7 @@ func CheckBody(body hcl.Body, val any) hcl.Diagnostics {
 	}
 
 	if ty.Kind() != reflect.Struct {
-		panic(fmt.Sprintf("given value must be struct, not %T", val))
+		return hcl.Diagnostics{unsupportedTargetDiagnostic(body, fmt.Errorf("%s cannot be decoded from a body: it is not a struct", ty))}
 	}
 
 	return checkBodyAgainstStruct(body, ty)
@@ -36,7 +36,10 @@ func CheckBody(body hcl.Body, val any) hcl.Diagnostics {
 // and nested blocks, collecting the unknown attributes and blocks decoding
 // would report
 func checkBodyAgainstStruct(body hcl.Body, ty reflect.Type) hcl.Diagnostics {
-	schema, partial := ImpliedBodySchema(reflect.New(ty).Interface())
+	schema, partial, err := impliedBodySchema(ty)
+	if err != nil {
+		return hcl.Diagnostics{unsupportedTargetDiagnostic(body, err)}
+	}
 
 	// Missing attributes are left for decoding to report, only unknown
 	// attributes and blocks are checked
@@ -85,7 +88,14 @@ func checkBodyAgainstStruct(body hcl.Body, ty reflect.Type) hcl.Diagnostics {
 		field := ty.Field(fieldIdx)
 
 		elemType := field.Type
-		if elemType.Kind() == reflect.Slice {
+		switch elemType.Kind() {
+		case reflect.Map:
+			// a map of blocks needs every block named, and once
+			diags = append(diags, checkBlockNames(typeName, blocks, true)...)
+			elemType = elemType.Elem()
+		case reflect.Slice:
+			// a list accepts unnamed blocks, but a name is used once
+			diags = append(diags, checkBlockNames(typeName, blocks, false)...)
 			elemType = elemType.Elem()
 		}
 		if elemType.Kind() == reflect.Ptr {
@@ -114,6 +124,6 @@ func checkBodyAgainstValueType(body hcl.Body, ty reflect.Type) hcl.Diagnostics {
 		_, diags := body.JustAttributes()
 		return diags
 	default:
-		panic(fmt.Sprintf("target value must be pointer to struct or map, not %s", ty.String()))
+		return hcl.Diagnostics{unsupportedTargetDiagnostic(body, fmt.Errorf("%s cannot be decoded from a body: it is not a struct or a map", ty))}
 	}
 }

@@ -13,7 +13,8 @@ of HCL (blocks, attributes and expressions) and adds what modern configuration n
   in-process or as separate programs, and installed from local paths or signed releases.
 
 It also has variables, outputs, modules, functions and state, so a configuration can be planned, applied, changed and
-destroyed.
+destroyed. Functions come built in, from the application embedding XCL, or from plugins, and are all called the same
+way from configuration.
 
 XCL starts from HCL's syntax but does not aim to be compatible with Terraform configuration or other HCL dialects.
 Where XCL can be clearer or do more, it will diverge.

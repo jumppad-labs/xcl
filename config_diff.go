@@ -39,15 +39,7 @@ func (c *Config) Diff(paths []string, options ...diff.Option) (*diff.Diff, error
 			return fmt.Errorf("at least one path is required")
 		}
 
-		p := parser.NewParser(&parser.ParserOptions{
-			EventData:  c.eventData,
-			StateStore: c.stateStore,
-			StateMask:  c.stateMask,
-			EventMask:  c.eventMask,
-			Catalog:    c.catalog,
-			Variables:  convertVariablesToStringMap(c.variables),
-			Emit:       emit,
-		})
+		p := parser.NewParser(c.parserOptions(emit))
 
 		found, err := p.Diff(ctx, diff.NewOptions(options...), paths...)
 		if err != nil {

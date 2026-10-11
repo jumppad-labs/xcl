@@ -1671,26 +1671,6 @@ EOT
 			0,
 		},
 		{
-			`
-<<EOT
-Foo
-%{for x in bars}${x}%{endfor}
-Baz
-EOT
-`,
-			&hcl.EvalContext{
-				Variables: map[string]cty.Value{
-					"bars": cty.ListVal([]cty.Value{
-						cty.StringVal("Bar"),
-						cty.StringVal("Bar"),
-						cty.StringVal("Bar"),
-					}),
-				},
-			},
-			cty.StringVal("Foo\nBarBarBar\nBaz\n"),
-			0,
-		},
-		{
 			`[
   <<EOT
   Foo

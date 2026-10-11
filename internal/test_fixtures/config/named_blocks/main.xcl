@@ -1,0 +1,21 @@
+variable "https_port" {
+  default = 443
+}
+
+app "web" {
+  image = "nginx:1.27"
+  host  = "web.local"
+
+  listener "http" {
+    port = 80
+  }
+
+  listener "https" {
+    port = variable.https_port
+  }
+}
+
+gateway "edge" {
+  port  = app.web.listener.https.port
+  ports = { for name, l in app.web.listener : name => l.port }
+}

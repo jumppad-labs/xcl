@@ -7,6 +7,7 @@ package catalog
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -15,9 +16,14 @@ import (
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/cty"
+	"github.com/jumppad-labs/xcl/internal/cty/function"
+	ctyjson "github.com/jumppad-labs/xcl/internal/cty/json"
 	"github.com/jumppad-labs/xcl/internal/declaration"
+	"github.com/jumppad-labs/xcl/internal/functions"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/schema"
+	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/types"
@@ -47,6 +53,13 @@ type Catalog struct {
 	// keyed by types.TypeKey, empty for a type registered without one
 	declaredBy map[string]string
 
+	// functions holds every function offered to configuration beyond the
+	// builtins, keyed by name: application functions declared by registries
+	// and, once plugins load, the functions their providers offer. The
+	// catalog is the one place that knows every function, so it is where a
+	// name offered twice is reported
+	functions map[string]catalogFunction
+
 	// registries are the registries plugins are loaded from, in the order
 	// they were added
 	registries []registry.Registry
@@ -68,6 +81,14 @@ type Catalog struct {
 	// by Use. External plugin processes run while it is above zero.
 	usersMu sync.Mutex
 	users   int
+}
+
+// catalogFunction is a function offered to configuration, with what provides
+// it and the registry that came from, for reporting a clash
+type catalogFunction struct {
+	fn       function.Function
+	provider string
+	registry string
 }
 
 // loadedHost is the host of a loaded plugin, with the plugin's name and the
@@ -95,7 +116,88 @@ func New() *Catalog {
 	return &Catalog{
 		typeInfo:   typeInfo,
 		declaredBy: map[string]string{},
+		functions:  map[string]catalogFunction{},
 	}
+}
+
+// DeclareFunction offers f, a Go func declared by the registry called
+// registryName, to configuration under f.Name. Configuration calls it by
+// that bare name, as it calls a builtin, and it is evaluated while
+// configuration is read.
+//
+// Nothing is registered when the function cannot be offered, and the problem
+// is returned instead: a name a builtin or another application function
+// already uses, as a *FunctionNameClashError naming both and their
+// registries, or a func whose signature cannot be called from configuration,
+// as an *InvalidFunctionError. A plugin offering the same name is reported
+// when plugins load.
+func (c *Catalog) DeclareFunction(f registry.Function, registryName string) error {
+	if f.Name == "" {
+		return &xclerrors.InvalidFunctionError{Name: f.Name, Registry: registryName, Err: fmt.Errorf("a function must be named")}
+	}
+
+	provider := describeGoFunc(f.Func)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if clash := c.checkFunctionName(f.Name); clash != nil {
+		clash.Provider = provider
+		clash.Registry = registryName
+		return clash
+	}
+
+	fn, err := functions.CreateCtyFunctionFromGoFunc(f.Func)
+	if err != nil {
+		return &xclerrors.InvalidFunctionError{Name: f.Name, Registry: registryName, Err: err}
+	}
+
+	c.functions[f.Name] = catalogFunction{fn: fn, provider: provider, registry: registryName}
+
+	return nil
+}
+
+// Functions returns every function offered to configuration beyond the
+// builtins, keyed by name: the application functions declared so far and,
+// once plugins have loaded, the plugin functions. The parser adds them to
+// the builtins for every file it evaluates.
+func (c *Catalog) Functions() map[string]function.Function {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	all := make(map[string]function.Function, len(c.functions))
+	for name, f := range c.functions {
+		all[name] = f.fn
+	}
+
+	return all
+}
+
+// checkFunctionName returns a *FunctionNameClashError, with Provider and
+// Registry left for the caller to fill in, when name is already a builtin
+// function or a function the catalog holds. mu must be held.
+func (c *Catalog) checkFunctionName(name string) *xclerrors.FunctionNameClashError {
+	for _, builtin := range functions.BuiltinNames() {
+		if builtin == name {
+			return &xclerrors.FunctionNameClashError{Name: name, Existing: "builtin"}
+		}
+	}
+
+	if existing, taken := c.functions[name]; taken {
+		return &xclerrors.FunctionNameClashError{
+			Name:             name,
+			Existing:         existing.provider,
+			ExistingRegistry: existing.registry,
+		}
+	}
+
+	return nil
+}
+
+// describeGoFunc names an application function by its Go type, i.e.
+// "function func(string) (string, error)"
+func describeGoFunc(fn any) string {
+	return fmt.Sprintf("function %T", fn)
 }
 
 // RegisterType registers a plain Go type as an entity type, without a plugin
@@ -134,11 +236,12 @@ func (c *Catalog) RegisterType(prototype any, name ...string) error {
 //
 // Nothing is registered when t does not fit with what the catalog already
 // holds, and the problem is returned instead: a malformed declaration, a
-// type and subtype that a builtin or another declared type already provides,
-// a *TypeNameClashError naming both and their registries, or a type keyword
-// in the other form from the one it already has, a *TypeFormError. A type
-// also provided by a plugin is accepted here, and the clash is reported when
-// plugins load.
+// field configuration cannot be decoded into, an *InvalidTypeError naming
+// the type and the field, a type and subtype that a builtin or another
+// declared type already provides, a *TypeNameClashError naming both and
+// their registries, or a type keyword in the other form from the one it
+// already has, a *TypeFormError. A type also provided by a plugin is
+// accepted here, and the clash is reported when plugins load.
 func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 	name := []string{t.Type}
 	if t.Subtype != "" {
@@ -150,6 +253,17 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 	}
 
 	key := types.TypeKey(t.Type, t.Subtype)
+
+	// a field configuration cannot be decoded into is reported here, where
+	// the type is declared, rather than while configuration is read
+	if err := gohcl.ValidateSchemaType(reflect.TypeOf(t.Prototype)); err != nil {
+		return &xclerrors.InvalidTypeError{
+			Type:     key,
+			Provider: describeGoType(t.Prototype),
+			Registry: registryName,
+			Err:      err,
+		}
+	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -397,8 +511,21 @@ func (c *Catalog) checkHostTypes(host plugins.PluginHost, plugin, registryName s
 			problems = append(problems, err)
 		}
 
-		if _, err := schema.CreateInstanceFromSchema(t.Schema, schema.KnownTypes()); err != nil {
+		instance, err := schema.CreateInstanceFromSchema(t.Schema, schema.KnownTypes())
+		if err != nil {
 			problems = append(problems, fmt.Errorf("plugin type %s cannot be rebuilt from its schema: %w", key, err))
+			continue
+		}
+
+		// a field configuration cannot be decoded into fails the load, so
+		// it is reported before any configuration is read
+		if err := gohcl.ValidateSchemaType(reflect.TypeOf(instance)); err != nil {
+			problems = append(problems, &xclerrors.InvalidTypeError{
+				Type:     key,
+				Provider: plugin,
+				Registry: registryName,
+				Err:      err,
+			})
 		}
 	}
 
@@ -704,9 +831,129 @@ func (c *Catalog) addHost(host plugins.PluginHost, plugin, registryName string) 
 		return err
 	}
 
+	offered, err := c.checkHostFunctions(host, plugin, registryName)
+	if err != nil {
+		return err
+	}
+
 	c.hosts = append(c.hosts, loadedHost{host: host, plugin: plugin, registry: registryName})
 
+	for name, f := range offered {
+		c.functions[name] = f
+	}
+
 	return nil
+}
+
+// checkHostFunctions checks every function a new plugin host offers against
+// the builtins, the application functions and the functions of plugins
+// already loaded, and against the other functions the same host offers, and
+// builds the function configuration calls for each one: its arguments travel
+// to the plugin as JSON and its result comes back the same way. plugin and
+// registryName name the plugin the host belongs to. It returns every problem
+// joined together, so nothing is added when one function clashes. mu must be
+// held.
+func (c *Catalog) checkHostFunctions(host plugins.PluginHost, plugin, registryName string) (map[string]catalogFunction, error) {
+	var problems []error
+	offered := map[string]catalogFunction{}
+
+	for _, f := range host.GetFunctions() {
+		if _, seen := offered[f.Name]; seen {
+			problems = append(problems, &xclerrors.FunctionNameClashError{
+				Name:             f.Name,
+				Provider:         plugin,
+				Registry:         registryName,
+				Existing:         plugin,
+				ExistingRegistry: registryName,
+			})
+			continue
+		}
+
+		if clash := c.checkFunctionName(f.Name); clash != nil {
+			clash.Provider = plugin
+			clash.Registry = registryName
+			problems = append(problems, clash)
+			continue
+		}
+
+		fn, err := pluginFunction(host, f)
+		if err != nil {
+			problems = append(problems, &xclerrors.InvalidFunctionError{Name: f.Name, Registry: registryName, Err: fmt.Errorf("plugin %s: %w", plugin, err)})
+			continue
+		}
+
+		offered[f.Name] = catalogFunction{fn: fn, provider: plugin, registry: registryName}
+	}
+
+	if len(problems) > 0 {
+		return nil, errors.Join(problems...)
+	}
+
+	return offered, nil
+}
+
+// pluginFunction builds the function configuration calls for f, a function
+// a plugin host offers. Each call marshals the arguments as a JSON array in
+// the configuration form of the parameter types, calls the host, and reads
+// the result back in the form of the return type. The eval context carries
+// no context, so the call runs under a background one.
+func pluginFunction(host plugins.PluginHost, f plugins.RegisteredFunction) (function.Function, error) {
+	if f.Signature.Variadic != nil {
+		return function.Function{}, fmt.Errorf("function %q: variadic functions are not supported", f.Name)
+	}
+
+	sig := functions.Signature{}
+
+	for i, p := range f.Signature.Params {
+		ty, err := ctyjson.UnmarshalType(p.Type)
+		if err != nil {
+			return function.Function{}, fmt.Errorf("function %q: parameter %d: %w", f.Name, i, err)
+		}
+
+		name := p.Name
+		if name == "" {
+			name = fmt.Sprintf("arg%d", i)
+		}
+
+		sig.Params = append(sig.Params, functions.Parameter{Name: name, Type: ty})
+	}
+
+	ret, err := ctyjson.UnmarshalType(f.Signature.Return)
+	if err != nil {
+		return function.Function{}, fmt.Errorf("function %q: result: %w", f.Name, err)
+	}
+
+	sig.Return = ret
+	name := f.Name
+
+	return functions.CtyFunctionFromSignature(sig, func(args []cty.Value) (cty.Value, error) {
+		encoded := make([]json.RawMessage, len(args))
+		for i, arg := range args {
+			buf, err := ctyjson.Marshal(arg, sig.Params[i].Type)
+			if err != nil {
+				return cty.NilVal, fmt.Errorf("argument %d: %w", i, err)
+			}
+
+			encoded[i] = buf
+		}
+
+		payload, err := json.Marshal(encoded)
+		if err != nil {
+			return cty.NilVal, err
+		}
+
+		result, err := host.CallFunction(context.Background(), name, payload)
+		if err != nil {
+			return cty.NilVal, err
+		}
+
+		value, err := ctyjson.Unmarshal(result, sig.Return)
+		if err != nil {
+			return cty.NilVal, fmt.Errorf("result: %w", err)
+		}
+
+		return value, nil
+	}), nil
 }
 
 // emitEvent emits e from xcl itself, a nil emit is silent

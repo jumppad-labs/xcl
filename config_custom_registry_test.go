@@ -58,6 +58,10 @@ func (r *customRegistry) Types() []registry.Type {
 	return r.types
 }
 
+func (r *customRegistry) Functions() []registry.Function {
+	return nil
+}
+
 func (r *customRegistry) Plugins(ctx context.Context, emit events.Emit) ([]registry.Plugin, error) {
 	if r.plugin == nil {
 		return nil, nil

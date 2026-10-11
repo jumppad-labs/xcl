@@ -66,3 +66,13 @@ to `github.com/jumppad-labs/xcl/internal/cty/...`.
   a `cty.Value` or a registered wrapper returns a path error ("value is
   sensitive and cannot be assigned to a field not declared sensitive") instead
   of panicking when the value is read.
+- `gocty/type_implied.go`, `gocty/helpers.go`: new `ImpliedConstraintType`,
+  which is `ImpliedType` for use as a conversion constraint: a struct becomes
+  `cty.ObjectWithOptionalAttrs`, with every attribute whose field is tagged
+  `optional` marked optional, flattened through embedded structs as
+  `ImpliedType` is. `ImpliedType` is unchanged, because a type with optional
+  attributes is only valid as a constraint.
+- `gocty/out.go`: `fromCtyObject` leaves a field tagged `optional` at its zero
+  value when the attribute's value is null, instead of failing because a
+  non-pointer field cannot hold null. The recursion into embedded structs now
+  returns its error instead of discarding it.

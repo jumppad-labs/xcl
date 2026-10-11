@@ -44,15 +44,15 @@ not at end users writing `.xcl` config.
 | `entity/` | `entity.Change`, `entity.DependencyChange` and `entity.PropertyChange`: the answer a provider's `Changed` gives, the dependency list and the changed settings `Changed` and `Update` are given; `entity.Path`, the location of a setting (`diff.Path` is an alias of it) |
 | `types/` | Shared entity metadata: `types.Meta`, `types.ResourceBase`, reflection helpers |
 | `plugins/` | Provider contract (`ProviderAdapter`) and hosting (in-process / gRPC) |
-| `registry/` | Public plugin sources: the `Registry` and `Plugin` interfaces, `InProcess`/`Executable` starters, and the local registry `NewLocal` (in-process plugins, plugin binaries, plugin directories) |
-| `internal/catalog/` | `Catalog` — the `Config`'s private set of declared types and registries; loads plugins on the first operation, checks type name clashes, aggregates plugin hosts, resolves types to adapters |
+| `registry/` | Public plugin sources: the `Registry` and `Plugin` interfaces, `InProcess`/`Executable` starters, and the local registry `NewLocal` (declared Go types, application functions, in-process plugins, plugin binaries, plugin directories) |
+| `internal/catalog/` | `Catalog` — the `Config`'s private set of declared types, functions and registries; loads plugins on the first operation, checks type and function name clashes, builds the callable for each plugin function, aggregates plugin hosts, resolves types to adapters |
 | `events/` | The one event shape (`events.Event`), the `Handler`/`Emit` types, the operation, phase and level constants, and `SlogHandler`, the adapter to `log/slog` |
 | `internal/eventstream/` | Delivers one operation's events: a bounded queue that emitters wait on only when it is full, drained into the application's receiver on the calling goroutine |
 | `internal/parser/` | HCL parsing, DAG construction, DAG walk, lifecycle calls, emitting parse, validate and lifecycle events |
 | `internal/resources/` | Built-in entity types: `module`, `output`, `variable`, `root` |
 | `internal/schema/` | Reflection-based JSON schema generation/instantiation (Go struct ⇄ schema ⇄ dynamic struct) |
 | `internal/modules/` | HTTP client for a Terraform-registry-style remote module API (not yet wired in) |
-| `internal/functions/` | Custom HCL functions available to config authors |
+| `internal/functions/` | The built-in functions available to config authors, and the Go func conversion shared by application and plugin functions |
 | `state/` | `StateStore` interface (exchanges plain entities), `FileStateStore`, state error types |
 | `errors/` | Structured error types (`ParserError`, `ConfigError`, `PluginLoadError`) |
 | `logger/` | The `Logger` interface providers log through; its one implementation, `logger.New`, turns every log call into a log event |
