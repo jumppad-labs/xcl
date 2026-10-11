@@ -1,13 +1,81 @@
 package coreservice
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
+	"github.com/jumppad-labs/xcl/diff"
 )
 
-// Operations are added by a later task: each Start* runs the operation on a
-// goroutine, the host polls for its tasks and completes them, and Cancel
-// cancels its context. Until then every operation method answers that it is
-// not available, and no operation is ever in progress.
+// operation is one Validate, Apply, Diff, Destroy or Load running on a
+// configuration.
+type operation struct {
+	id     uint64
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	// done is closed once the operation has returned and its finished task
+	// is queued
+	done chan struct{}
+}
+
+// start runs work as a new operation on its own goroutine, under a context
+// Cancel cancels, and returns its id. Its end is posted as an
+// OperationFinished task after every task the work posted, so the host sees
+// it last. At most one operation runs at a time; a second is refused.
+func (c *configuration) start(work func(ctx context.Context) (diffJSON []byte, err error)) (uint64, error) {
+	c.mu.Lock()
+
+	if c.inProgress != nil {
+		c.mu.Unlock()
+		return 0, operationInProgress("another operation")
+	}
+
+	c.nextOperation++
+
+	ctx, cancel := context.WithCancel(context.Background())
+	op := &operation{id: c.nextOperation, ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	c.inProgress = op
+
+	c.mu.Unlock()
+
+	go func() {
+		defer close(op.done)
+
+		diffJSON, err := work(op.ctx)
+		op.cancel()
+
+		c.queue.post(&corepb.PollResponse{Task: &corepb.PollResponse_Finished{Finished: &corepb.OperationFinished{
+			OperationId: op.id,
+			Error:       toProto(err),
+			DiffJson:    diffJSON,
+		}}})
+
+		c.mu.Lock()
+		if c.inProgress == op {
+			c.inProgress = nil
+		}
+		c.mu.Unlock()
+	}()
+
+	return op.id, nil
+}
+
+// current returns the operation in progress, or nil.
+func (c *configuration) current() *operation {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.inProgress
+}
+
+// running reports whether an operation is in progress.
+func (c *configuration) running() bool {
+	return c.current() != nil
+}
 
 // lookupAllowed refuses a lookup while an operation runs on the
 // configuration, since the entity slice is replaced when an operation ends.
@@ -19,43 +87,127 @@ func (c *configuration) lookupAllowed(what string) error {
 	return nil
 }
 
-// running reports whether an operation is in progress.
-func (c *configuration) running() bool {
-	return false
+// operationContext returns the context and id of the operation in progress,
+// which a task waits under, or an error when none is running.
+func (c *configuration) operationContext() (context.Context, uint64, error) {
+	op := c.current()
+	if op == nil {
+		return nil, 0, fmt.Errorf("no operation is in progress")
+	}
+
+	return op.ctx, op.id, nil
 }
 
-func notAvailable(what string) error {
-	return &codedError{code: CodeInternal, message: what + " is not available in this build"}
+// release cancels the operation in progress, waits for it to return so its
+// state is saved, and releases everything waiting on the queue.
+func (c *configuration) release() {
+	if op := c.current(); op != nil {
+		op.cancel()
+		<-op.done
+	}
+
+	c.queue.close()
 }
 
-func (s *Service) startValidate(_ *configuration, _ *corepb.StartValidateRequest) (*corepb.StartOperationResponse, error) {
-	return nil, notAvailable("StartValidate")
+func (s *Service) startValidate(conf *configuration, req *corepb.StartValidateRequest) (*corepb.StartOperationResponse, error) {
+	if len(req.GetPaths()) == 0 {
+		return nil, invalidArgument("at least one path is required", "argument", "paths")
+	}
+
+	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
+		return nil, conf.cfg.ValidateContext(ctx, req.GetPaths()...)
+	}))
 }
 
-func (s *Service) startApply(_ *configuration, _ *corepb.StartApplyRequest) (*corepb.StartOperationResponse, error) {
-	return nil, notAvailable("StartApply")
+func (s *Service) startApply(conf *configuration, req *corepb.StartApplyRequest) (*corepb.StartOperationResponse, error) {
+	if len(req.GetPaths()) == 0 {
+		return nil, invalidArgument("at least one path is required", "argument", "paths")
+	}
+
+	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
+		return nil, conf.cfg.ApplyContext(ctx, req.GetPaths()...)
+	}))
 }
 
-func (s *Service) startDiff(_ *configuration, _ *corepb.StartDiffRequest) (*corepb.StartOperationResponse, error) {
-	return nil, notAvailable("StartDiff")
+func (s *Service) startDiff(conf *configuration, req *corepb.StartDiffRequest) (*corepb.StartOperationResponse, error) {
+	if len(req.GetPaths()) == 0 {
+		return nil, invalidArgument("at least one path is required", "argument", "paths")
+	}
+
+	options := []diff.Option{}
+	if req.GetRevealSensitive() {
+		options = append(options, diff.RevealSensitive())
+	}
+
+	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
+		found, err := conf.cfg.DiffContext(ctx, req.GetPaths(), options...)
+		if err != nil {
+			return nil, err
+		}
+
+		return json.Marshal(found)
+	}))
 }
 
-func (s *Service) startDestroy(_ *configuration, _ *corepb.StartDestroyRequest) (*corepb.StartOperationResponse, error) {
-	return nil, notAvailable("StartDestroy")
+func (s *Service) startDestroy(conf *configuration, _ *corepb.StartDestroyRequest) (*corepb.StartOperationResponse, error) {
+	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
+		return nil, conf.cfg.DestroyContext(ctx)
+	}))
 }
 
-func (s *Service) startLoad(_ *configuration, _ *corepb.StartLoadRequest) (*corepb.StartOperationResponse, error) {
-	return nil, notAvailable("StartLoad")
+func (s *Service) startLoad(conf *configuration, _ *corepb.StartLoadRequest) (*corepb.StartOperationResponse, error) {
+	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
+		return nil, conf.cfg.LoadContext(ctx)
+	}))
 }
 
-func (s *Service) cancel(_ *configuration, _ *corepb.CancelRequest) (*corepb.CancelResponse, error) {
-	return nil, notAvailable("Cancel")
+// startResponse turns the result of start into the response.
+func startResponse(id uint64, err error) (*corepb.StartOperationResponse, error) {
+	if err != nil {
+		return nil, err
+	}
+
+	return &corepb.StartOperationResponse{OperationId: id}, nil
 }
 
-func (s *Service) poll(_ *configuration, _ *corepb.PollRequest) (*corepb.PollResponse, error) {
-	return nil, notAvailable("Poll")
+// cancel is Cancel: it cancels the named operation's context, so every task
+// waiting under it returns at once and the engine starts no further provider
+// call. The operation ends with the cancelled code, after saving the progress
+// made. Cancelling an operation that has already ended does nothing.
+func (s *Service) cancel(conf *configuration, req *corepb.CancelRequest) (*corepb.CancelResponse, error) {
+	id := req.GetOperationId()
+
+	conf.mu.Lock()
+	op := conf.inProgress
+	known := id != 0 && id <= conf.nextOperation
+	conf.mu.Unlock()
+
+	if !known {
+		return nil, invalidArgument(fmt.Sprintf("no operation %d was started", id), "operation_id", fmt.Sprint(id))
+	}
+
+	if op != nil && op.id == id {
+		op.cancel()
+	}
+
+	return &corepb.CancelResponse{}, nil
 }
 
-func (s *Service) complete(_ *configuration, _ *corepb.CompleteRequest) (*corepb.CompleteResponse, error) {
-	return nil, notAvailable("Complete")
+// poll is Poll: the next task, waited for up to wait_ms.
+func (s *Service) poll(conf *configuration, req *corepb.PollRequest) (*corepb.PollResponse, error) {
+	task := conf.queue.poll(time.Duration(req.GetWaitMs()) * time.Millisecond)
+	if task == nil {
+		return &corepb.PollResponse{}, nil
+	}
+
+	return task, nil
+}
+
+// complete is Complete: the host's answer to a task.
+func (s *Service) complete(conf *configuration, req *corepb.CompleteRequest) (*corepb.CompleteResponse, error) {
+	if err := conf.queue.complete(req); err != nil {
+		return nil, err
+	}
+
+	return &corepb.CompleteResponse{}, nil
 }

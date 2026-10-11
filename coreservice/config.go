@@ -3,6 +3,7 @@ package coreservice
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/jumppad-labs/xcl"
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
@@ -19,10 +20,19 @@ type configuration struct {
 	// events is true when the host asked for events, which are delivered
 	// through Poll
 	events bool
-}
 
-// release frees what the configuration owns.
-func (c *configuration) release() {}
+	// queue carries every task the host polls for
+	queue *taskQueue
+
+	mu sync.Mutex
+
+	// inProgress is the operation in progress, nil between operations
+	inProgress *operation
+
+	// nextOperation is the id of the last operation started; ids are never
+	// reused
+	nextOperation uint64
+}
 
 // createConfig is CreateConfig: it turns the request into xcl.NewConfig
 // options, creates the configuration and returns its handle.
@@ -45,8 +55,12 @@ func (s *Service) createConfig(_ *configuration, req *corepb.CreateConfigRequest
 // buildOptions maps every field of a CreateConfigRequest to its ConfigOption,
 // returning the options and the configuration they belong to.
 func buildOptions(req *corepb.CreateConfigRequest) ([]xcl.ConfigOption, *configuration, error) {
-	conf := &configuration{events: req.GetEvents()}
+	conf := &configuration{events: req.GetEvents(), queue: newTaskQueue()}
 	options := []xcl.ConfigOption{}
+
+	if conf.events {
+		options = append(options, xcl.WithEventHandler(conf.handleEvent))
+	}
 
 	for i, r := range req.GetRegistries() {
 		built, err := buildRegistry(r, conf)
@@ -63,7 +77,7 @@ func buildOptions(req *corepb.CreateConfigRequest) ([]xcl.ConfigOption, *configu
 		options = append(options, xcl.WithStatePath(store.Path))
 	case *corepb.StateStore_Host:
 		if store.Host {
-			return nil, nil, invalidArgument("a host state store is not supported yet", "state_store", "host")
+			options = append(options, xcl.WithStateStore(&hostStateStore{conf: conf}))
 		}
 	}
 

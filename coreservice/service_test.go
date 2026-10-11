@@ -5,12 +5,16 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
 )
+
+// driveTimeout bounds how long drive waits for an operation to finish
+const driveTimeout = 10 * time.Second
 
 // appSchema is a schema v1 document declaring the config-only block type app,
 // with a required image and an optional sensitive password
@@ -101,6 +105,110 @@ func (c *testClient) find(handle uint64, address string) []byte {
 	c.ok(handle, "Find", &corepb.FindRequest{Address: address}, resp)
 
 	return resp.GetEntity()
+}
+
+// start dispatches one of the Start methods and returns the id of the
+// operation it started
+func (c *testClient) start(handle uint64, method string, req proto.Message) uint64 {
+	c.t.Helper()
+
+	resp := &corepb.StartOperationResponse{}
+	c.ok(handle, method, req, resp)
+	require.NotZero(c.t, resp.GetOperationId())
+
+	return resp.GetOperationId()
+}
+
+// drive polls the configuration behind handle the way a host does until the
+// operation opID finishes, and returns its finished task. Every event is
+// passed to onEvent when it is set, every state task is answered by store,
+// which must be set when one arrives. The test fails when the operation does
+// not finish within driveTimeout.
+func (c *testClient) drive(handle, opID uint64, store *fakeStore, onEvent func(*corepb.Event)) *corepb.OperationFinished {
+	c.t.Helper()
+
+	deadline := time.Now().Add(driveTimeout)
+
+	for time.Now().Before(deadline) {
+		resp := &corepb.PollResponse{}
+		c.ok(handle, "Poll", &corepb.PollRequest{WaitMs: 200}, resp)
+
+		switch task := resp.GetTask().(type) {
+		case nil:
+			continue
+
+		case *corepb.PollResponse_Event:
+			if onEvent != nil {
+				onEvent(task.Event)
+			}
+
+		case *corepb.PollResponse_State:
+			require.NotNil(c.t, store, "a %s state task arrived but the test has no host store", task.State.GetKind())
+			require.Equal(c.t, opID, task.State.GetOperationId())
+
+			c.ok(handle, "Complete", &corepb.CompleteRequest{
+				TaskId: task.State.GetTaskId(),
+				Result: &corepb.CompleteRequest_State{State: store.answer(task.State)},
+			}, &corepb.CompleteResponse{})
+
+		case *corepb.PollResponse_Finished:
+			require.Equal(c.t, opID, task.Finished.GetOperationId())
+
+			return task.Finished
+
+		default:
+			c.t.Fatalf("unexpected task %T", task)
+		}
+	}
+
+	c.t.Fatalf("operation %d did not finish within %s", opID, driveTimeout)
+
+	return nil
+}
+
+// fakeStore is the state store a host implements: it keeps the records the
+// engine last saved and records the kind of every task it answered
+type fakeStore struct {
+	saved [][]byte
+	kinds []corepb.StateTask_Kind
+
+	// failWith, when set, is the message every task is answered with as an
+	// error instead of a result
+	failWith string
+}
+
+// answer is the host's result for one state task
+func (f *fakeStore) answer(task *corepb.StateTask) *corepb.StateResult {
+	f.kinds = append(f.kinds, task.GetKind())
+
+	if f.failWith != "" {
+		return &corepb.StateResult{Error: &corepb.Error{Code: CodeInternal, Message: f.failWith}}
+	}
+
+	switch task.GetKind() {
+	case corepb.StateTask_EXISTS:
+		return &corepb.StateResult{Exists: len(f.saved) > 0}
+	case corepb.StateTask_LOAD:
+		return &corepb.StateResult{Entities: f.saved}
+	case corepb.StateTask_SAVE:
+		f.saved = task.GetEntities()
+	case corepb.StateTask_CLEAR:
+		f.saved = nil
+	}
+
+	return &corepb.StateResult{}
+}
+
+// count returns how many tasks of kind the store answered
+func (f *fakeStore) count(kind corepb.StateTask_Kind) int {
+	n := 0
+	for _, k := range f.kinds {
+		if k == kind {
+			n++
+		}
+	}
+
+	return n
 }
 
 // errorMessage is the message of the Error in body, for a failure message

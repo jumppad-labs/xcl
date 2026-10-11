@@ -182,17 +182,17 @@ func TestCreateConfigStatePathWritesState(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, state.StateFileName))
 }
 
-func TestCreateConfigHostStateStoreIsInvalidArgument(t *testing.T) {
+func TestCreateConfigHostStateStoreAccepted(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	c := newTestClient(t)
 
-	out := c.fail(0, "CreateConfig", &corepb.CreateConfigRequest{
+	resp := &corepb.CreateConfigResponse{}
+	c.ok(0, "CreateConfig", &corepb.CreateConfigRequest{
 		StateStore: &corepb.StateStore{Kind: &corepb.StateStore_Host{Host: true}},
-	})
+	}, resp)
 
-	require.Equal(t, CodeInvalidArgument, out.GetCode())
-	require.Equal(t, "host", out.GetDetails()["state_store"])
+	require.NotZero(t, resp.GetHandle())
 }
 
 func TestCreateConfigHostFunctionIsInvalidArgument(t *testing.T) {
