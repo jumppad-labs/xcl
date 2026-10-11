@@ -16,6 +16,7 @@ specs:
       depends_on:
         - 20261011095738-fad05e41-language-surface
         - 20261011130709-aa3eb933-python-support
+        - 20261010160411-19b965db-language-reference
 ---
 
 # Epic: 20261010160411-19b965db-language-reference

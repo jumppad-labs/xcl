@@ -8,130 +8,153 @@ closed_date: "2026-10-11"
 
 ## Alternatives considered and rejected
 
-- **Split the guide into several pages (one per step: config, types, apply, state, queries).** Rejected: the spec asks for a *short* guide that goes top to bottom from an empty program to a working one; every existing guide on the site is one MDX page (`xcl-website:src/pages/*.mdx`, 149-583 lines each). One page keeps the walkthrough copyable in one read.
-- **A new top-level nav item ("Go") instead of a Guides child.** Rejected: the nav has three top-level items and hides the first on small screens (`xcl-website:src/components/Nav.astro:56`); adding a fourth crowds mobile. Putting the guide first in the Guides dropdown also makes the "Guides" label itself open it, since a dropdown head links to `children[0].href` (`Nav.astro:72`).
-- **Build the guide around a plugin (Docker or template) so apply/destroy do visible work.** Rejected: a plugin needs Docker or an external binary, so a reader could not run the guide "with only the code it shows". Registered (configuration-only) types are applied, saved to state, loaded back, found and destroyed without any provider (`xcl:config.go:425-438` Destroy doc, `xcl:config.go:478-489` Load doc), which covers every acceptance step. Plugins are linked out to instead.
-- **Create new "state" and "plugins" topic pages so the spec's named link targets exist literally.** Rejected: the spec's non-goals rule out rewriting topic pages and the requirement is to link to *existing* pages. No `/state/` or `/plugins/` page exists today; the nearest existing pages are `/state-masking/`, `/examples/plugins/`, `/plugin-template/` and `/github-registry/`. The guide itself becomes the home of "keeping state, apply and destroy".
-- **Copy the old README "State and Destroy", "Querying a configuration" and "Lifecycle Callbacks" sections verbatim.** Rejected: "Lifecycle Callbacks" (`Processable`/`Process() error`, `ParseCallback`, `Config.Process`) no longer exists in the code (grep of non-test Go for `Processable|ParseCallback|Process() error` finds nothing); the old querying section uses addresses like `resource.postgres.main` in places that are stale. The sections are raw material only.
-- **Automated doc tests for the guide's code.** Rejected by spec non-goal and by knowledge `xcl:conventions/testing-and-mocking.md` (no tests that read website pages). A scratch program built during implementation and discarded is allowed as a hand check.
+- **One "Using XCL" page with Go|Python tabs.** Rejected: the spec constraint says each guide shows only its own language, with no tabs. The site-wide tab component belongs to the sibling spec `20261010160411-19b965db-language-reference`.
+- **Guides under a new `/guides/` path (`/guides/go/`, `/guides/python/`).** Rejected: every existing page is a flat slug at the site root (`xcl-website:src/pages/*.mdx`) apart from `examples/`, and the site has no redirects (`xcl-website` knowledge `gotchas/no-redirects-on-page-removal.md`), so the slug is chosen once and should match the page titles the spec names: `/using-xcl-with-go/`, `/using-xcl-with-python/`.
+- **A new top-level nav item per guide.** Rejected: the nav already has a `Guides` dropdown whose label links to its first child (`xcl-website:src/components/Nav.astro:22-36,59-70`). Putting both guides first in it makes the label open the Go guide and keeps the bar short on phones (`max-sm` rules at `Nav.astro:51`).
+- **A plugin in the Go guide.** Rejected: Go applications can declare types with `registry.Local.RegisterType` and need no plugin (`xcl:registry/local.go:75-106`). A plugin would need Docker and a release download, adding failure modes to an "empty program to working" walkthrough. The guide links to the registries and plugin pages instead.
+- **No Go plugin in the Python guide.** Rejected: the spec acceptance criterion requires the Python program to use a Go plugin. Python apps cannot write providers (python-support plan, Out of Scope).
+- **The plugin template's `notes` plugin for the Python guide.** Rejected: it is a GitHub template repository, not the published example remote plugin. `xcl-plugin-docker` is the registered "example remote plugin, published as signed GitHub releases", and the python-support README uses it too.
+- **The method form of lookups (`c.Find[T](...)`) in the Go guide.** Rejected: it needs Go 1.27 and xcl supports Go 1.25.0 (`xcl:go.mod:3`); every runnable example uses the function form (xcl knowledge `architecture/ux-flow.md`).
+- **Copying the removed README sections.** Rejected: `Lifecycle Callbacks` (Processable, ParseCallback, `Config.Process`) describes API that no longer exists (`git show bdba483^:README.md` lines 2061-2268; no such symbols in `xcl:*.go`). Only "Querying a configuration" and "State and Destroy" (lines 600-842) are raw material, rechecked against the code.
+- **Linking the PyPI page as the Python "generated API docs".** Rejected: PyPI shows the README, not generated API docs. No hosted Python API reference exists: python-support ships docstrings and `PARITY.md` only. This plan adds pdoc-generated docs published to the xcl-python GitHub Pages site.
 
 ## Chosen approach — evidence
 
-- One new MDX page in xcl-website following the existing guide layout: frontmatter `layout: ../layouts/Shell.astro`, `title: "<Name> - xcl"`, `description`; imports `Hero`, `Prose`, `CtaBanner`, `Button` (`xcl-website:src/pages/registries.mdx:1-14`, `state-masking.mdx:1-12`). Code blocks use `title="main.go"` / `title="main.xcl"` with Expressive Code (`astro.config.mjs:9`).
-- Nav entry pattern: `xcl-website:src/components/Nav.astro:8-31` (array of `{label, href}` children under "Guides").
-- Home page link points: "What is XCL?" section and the `CtaBanner` at the bottom (`xcl-website:src/pages/index.mdx:30-125, 245-255`).
-- README link point: the "Documentation" list (`xcl:README.md`, section "## Documentation").
-- Public API at the latest tag v0.2.1 (no exported Go API changes between v0.2.1 and HEAD: `git diff --stat v0.2.1 HEAD -- '*.go'` touches only `internal/parser/lifecycle.go` and example code):
-  - `xcl.NewConfig(opts ...ConfigOption) (*Config, error)` (`config.go:227`)
-  - `xcl.WithRegistry`, `xcl.WithStatePath`, `xcl.WithStateStore`, `xcl.WithVariables`, `xcl.WithEventHandler` (`options.go:22,37,50,106,126`)
-  - `registry.NewLocal()`, `(*Local).RegisterType(prototype any, name ...string)` (`registry/local.go:60,90`)
-  - `(*Config).Validate(paths...)`, `Apply(paths...)`, `Destroy()`, `Load()` (`config.go:337,371,438,489`); `Entities()`, `EntityCount()`, `Outputs()` (`config.go:262,282,309`); `Diff` (`config_diff.go:34`, link out only)
-  - `xcl.Find[T]`, `xcl.As[T]`, `xcl.FindByType[T]`, `xcl.FindOne[T]`, `xcl.All[T]` (`query.go:29,62,180,190,351`); method forms only under `//go:build go1.27` (`query_methods_go127.go:1`); module is `go 1.25.0` (`go.mod:3`)
-  - `xcl.Decode` / `(*Config).Decode` (`decode.go:35,41`) — mention only; the Go-type mapping belongs to the language reference
-  - `types.ResourceBase` holds `DependsOn`, `Disabled`, `Meta` (`types/resource.go:82-92`), embedded with `xcl:",remain"` (`xcl-website:index.mdx` resources.go sample)
-  - `errors.ConfigError` in package `github.com/jumppad-labs/xcl/errors` (`errors/config_error.go:6`); query sentinels such as `ErrNotFound` (`errors/query_errors.go:28`), re-exported on `xcl` per the README and `errors_reexport_test.go`
-  - `xcl.ErrEmptyConfiguration` (`config.go:26`)
-- Behaviour to describe: without a state option nothing is persisted (`options.go:44-49`); `Apply` destroys removed blocks first and saves state (`config.go:357-370`); `Destroy` needs no configuration and registered types never reach a provider (`config.go:425-438`); `Load` reads saved state so lookups answer from it, and succeeds with nothing when no state exists (`config.go:478-489`).
+- `xcl-website:src/components/Nav.astro:22-36`: an existing `Guides` dropdown; the label links to `item.children[0].href` (`:61`).
+- `xcl-website:src/pages/index.mdx:220-226`: the closing `CtaBanner` with a primary and a secondary `Button`. This is where the home page links to the guides; they are also listed in the "Documentation" section the language-reference spec adds after "Two examples", after its Language reference entry.
+- `xcl-website:src/pages/state-masking.mdx`: the page pattern: front matter with `layout`, `title "<Title> - xcl"` and `description`; `Hero` with a heading and sub; `Prose` body; closing `CtaBanner`.
+- `xcl-website:src/config/site.ts`: shared links, including `goReferenceURL = https://pkg.go.dev/github.com/jumppad-labs/xcl`. The Python reference URL is added beside it.
+- `xcl-website:README.md:35-43`: the page table, which gains rows for the two guides.
+- `xcl-website:ec.config.mjs`: expressive-code with Shiki, which highlights `go`, `python`, `hcl` and `bash` fences.
+- `xcl:README.md:166-177`: the Documentation list, which gains the two guides.
+- `xcl:CHANGELOG.md:1-11`: entries are `## <spec name>`, prose, then `**Breaking:**` and `None.`.
+- Go API in the release: `xcl:query.go:29,62,180,190,351` (`Find`, `As`, `FindByType`, `FindOne`, `All`); `xcl:config.go:227,262,309,337,371,438,489` (`NewConfig`, `Entities`, `Outputs`, `Validate`, `Apply`, `Destroy`, `Load`); `xcl:options.go:22,50,106,126` (`WithRegistry`, `WithStatePath`, `WithEventHandler`, `WithVariables`); sentinels at `xcl:config.go:42-68`. Additive in the release: `RegisterFunction` (language-surface), `ApplyContext` and the other context forms, and `FindEntitiesByType`/`FindOneEntity` (python-support).
+- Python API: python-support plan "Python public API": `@xcl.entity`, `xcl.Resource`, `LocalRegistry.register_type/register_function`, `GitHubRegistry(...).register_plugin`, `xcl.Config(registries=, state_path=, variables=, on_event=)` as a context manager, `validate/apply/diff/destroy/load`, `find/find_by_type/find_one/all/outputs`, `xcl.aio.Config` with the same names, awaitable; exceptions `xcl.Error`, `NotFoundError`, `NotUniqueError` and `ConfigError` (with causes carrying file and line); `ForkedProcessError`.
+- `xcl-plugin-docker:examples/basic/*.xcl`: the `docker "network"` / `docker "container"` configuration the Python guide adapts.
 
 ## Files examined
 
-- xcl:README.md — current overview; Quick start, registration problems and a Documentation list linking xcl.dev pages; target for the guide link.
-- xcl:README.md@bdba483^ (lines 446-842, 2061-2290) — removed sections: configuration-only types, querying, outputs, lookup errors, two spellings, State and Destroy, Lifecycle Callbacks (stale).
-- xcl:config.go:215-520 — NewConfig, Entities, FindResource, Validate, Apply, Destroy, Load and their doc comments.
-- xcl:options.go:22-180 — config options.
-- xcl:query.go — Find/As/FindByType/FindOne/All signatures.
-- xcl:query_methods_go127.go:1 — method form gated by go1.27.
-- xcl:decode.go:35-41 — Decode function and method.
-- xcl:registry/local.go:45-155 — local registry API.
-- xcl:types/resource.go:82-92 — ResourceBase fields.
-- xcl:errors/config_error.go, errors/query_errors.go — ConfigError and query sentinels.
-- xcl:example/configonly/main.go — complete config-only program shape to model the guide's program on.
-- xcl:CHANGELOG.md — per-spec sections headed by spec name, ending with a `**Breaking:**` list; docs-only specs (plugin template) also get an entry.
-- xcl-website:src/components/Nav.astro — nav items; Guides dropdown; dropdown head links to first child.
-- xcl-website:src/pages/index.mdx — home page; hero, "What is XCL?", features grid, CtaBanner.
-- xcl-website:src/pages/registries.mdx, state-masking.mdx — guide page template.
-- xcl-website:src/config/site.ts — shared URLs incl. `goReferenceURL` (pkg.go.dev) and `examplesURL`.
-- xcl-website:README.md — Pages table listing page sources (kept up to date per page added).
-- xcl-website:astro.config.mjs — no redirects; Expressive Code before MDX.
+- xcl-website:src/components/Nav.astro:1-110 — nav items array; the `Guides` dropdown; the label links to its first child; the first item is hidden on small screens.
+- xcl-website:src/pages/index.mdx:1-226 — hero install block (`go get`), the Go snippets, the feature cards (stale `HCL_VAR_` and "Around sixty" are fixed by language-surface), the closing CtaBanner.
+- xcl-website:src/components/sections/CtaBanner.astro — heading, body or body slot, button slot.
+- xcl-website:src/pages/state-masking.mdx — page template to copy.
+- xcl-website:src/pages/{registries,events,github-registry,plugin-template}.mdx, examples/plugins.mdx — the topic pages the guides link to; no single "state" page exists, and state is covered by `/state-masking/` (plus the guide's own section).
+- xcl-website:src/config/site.ts — `goReferenceURL`.
+- xcl-website:README.md:35-45 — page table.
+- xcl-website:ec.config.mjs — code block config.
+- xcl:README.md:160-199 — Documentation and Examples lists.
+- xcl:CHANGELOG.md:1-40 — entry format.
+- xcl:registry/local.go:75-106 — `RegisterType(prototype any, name ...string)`, which panics on a malformed declaration.
+- xcl:query.go — the typed lookups; function form only below Go 1.27.
+- xcl:config.go:20-170 — re-exported sentinels and detail types.
+- xcl:options.go — config options.
+- xcl:go.mod:3 — go 1.25.0.
+- xcl git `bdba483^:README.md`:600-842 — the old "Querying a configuration" and "State and Destroy" text, accurate in substance against `query.go`/`config.go`; :2061-2268 "Lifecycle Callbacks", stale.
+- xcl-plugin-docker:entities/{container,network}.go, examples/basic — plugin entity fields; tags v0.1.0-v0.2.0 today, with a newer release made by language-surface.
 
 ## External references
 
-- pkg.go.dev/github.com/jumppad-labs/xcl — the generated API docs the guide links to (`goReferenceURL` in `site.ts`).
-- Astro MDX pages (`src/pages/*.mdx` file-based routing) — slug `using-xcl-with-go.mdx` serves `/using-xcl-with-go/`.
+- pdoc (https://pdoc.dev) — generates HTML API docs from Python docstrings and type hints with no configuration. It suits a package whose docstrings are complete (python-support enforces this with a test).
+- GitHub Pages with `actions/upload-pages-artifact` + `actions/deploy-pages` — hosts the generated docs at `https://jumppad-labs.github.io/xcl-python/` with no extra infrastructure.
+- pkg.go.dev for `github.com/jumppad-labs/xcl` — the Go generated API docs, already linked as `goReferenceURL`.
 
 ## Prior plans / specs consulted
 
-- Epic 20261010160411-19b965db-language-reference — this spec and the language reference spec; no dependency between them.
-- Spec 20261010160411-19b965db-language-reference (sibling, planned in parallel) — owns files and blocks, struct tags / config-to-Go-type mapping, meta, references, variables/locals/outputs, modules, functions, expressions. The guide must not duplicate those; it shows one entity type with plain tags and points onward.
-- Knowledge xcl:architecture/ux-flow.md — intended user flow (NewConfig → Apply → query → Validate → Destroy); some addresses there use the old `resource.` form, checked against code instead.
-- Knowledge xcl:architecture/config-is-the-public-query-surface.md — `Config` is the only public query surface; the guide must not show `state.State` find methods.
-- Knowledge xcl:learnings/state-save-and-load-points.md — state saved after Apply and during Destroy.
-- Knowledge xcl-website:gotchas/no-redirects-on-page-removal.md — no redirects; choose the slug once.
-- Knowledge xcl:glossary/entity.md — an entity is anything a configuration declares.
+- `20261011095738-fad05e41-language-surface` (final plan) — `registry.Local.RegisterFunction(name, fn)`, `XCL_VAR_`, named-block maps (`map[string]T` with `xcl:"listener,block"`), released as v0.3.0. Its Out of Scope says this guide is written elsewhere (here).
+- `20261011130709-aa3eb933-python-support` (final plan and context) — the Python API, the context-taking Go operations, `FindEntitiesByType`/`FindOneEntity`, and the release v0.4.0 with matching `pip install xcl==0.4.0`. Python docs on xcl.dev are left to the epic's docs specs (this one and language-reference). The package README uses the Docker plugin through `GitHubRegistry`.
+- `20261010160411-19b965db-language-reference` (spec only, planned in parallel) — owns the reference pages, the Go/Python type mapping, the site-wide tab component, and adding Python to existing pages. Its "No Go-only examples" criterion must exempt these per-language guides, which our spec forbids from having tabs.
+- The previous Go-only plan for this spec (deleted; known only from the orchestrator's brief) — slug, the function-form lookups, dropping Lifecycle Callbacks, the Guides dropdown and the CtaBanner, all reused.
 
 ## Open assumptions
 
-- The latest tagged release at publication is v0.2.1 (or a later tag with the same public API). If a new tag changes any API the guide uses, STOP and re-check every example.
-- (Verified during planning) `xcl.ErrNotFound` is re-exported on package `xcl` (`config.go:42`), and `errors.ConfigError` holds its problems in `Errors []error` (`errors/config_error.go:6-11`).
-- A registered type with no provider is saved to state by `Apply` with `WithStatePath` and read back by `Load` into the same Go type. Verify with the scratch program.
-- The language reference page's URL is decided by the sibling plan; the guide links to it only if it exists in xcl-website when this spec is implemented.
+- The release containing language-surface and python-support is v0.4.0, and the Python package is `xcl==0.4.0`. If the tag differs, use the actual tag. If either feature set is missing from the tag, STOP and ask.
+- A Docker plugin release built against xcl ≥ v0.3.0 exists on `jumppad-labs/xcl-plugin-docker` when the guide is written; the implementer pins the latest such tag. If none loads under v0.4.0, STOP and ask.
+- The jumppad-labs signing public key is published somewhere a reader can fetch it (for `trusted_keys`). If not, the guide shows the registry without keys and links the GitHub registry page's signing section.
+- pdoc renders the `xcl` package (cffi-backed, lazy engine load) without loading libxcl, since `import xcl` does not load the engine (python-support acceptance criterion).
+- The sibling language-reference plan publishes its reference under a slug the guides can link to; until then the guides link the type-mapping sentence to wherever that plan lands. The implementer resolves the actual URL at implementation time.
 
 ## Drafting assumptions
 
-### Chosen direction: one guide page built on registered types (architecture)
-- **Decision**: A single MDX page `xcl-website:src/pages/using-xcl-with-go.mdx` at `/using-xcl-with-go/`, building one program on two registered types with no plugin; linked first under the Guides dropdown, from the home page ("What is XCL?" and the CtaBanner) and from the xcl README Documentation list. Lookups shown in function form; method form mentioned for Go 1.27.
-- **Rationale**: Matches every existing guide's single-page shape, runs with only the code shown, and keeps mobile nav uncluttered.
-- **Rejected**: Multi-page guide; top-level nav item; plugin-based walkthrough; new state/plugins pages.
+### Slugs and files (discovery)
+- **Decision**: `src/pages/using-xcl-with-go.mdx` at `/using-xcl-with-go/` and `src/pages/using-xcl-with-python.mdx` at `/using-xcl-with-python/`.
+- **Rationale**: the slugs match the page titles the spec names and follow the site's flat slugs. The site has no redirects, so a slug is chosen once.
+- **Rejected**: `/guides/go/` (a new path convention for two pages).
+
+### Python generated API docs via pdoc on GitHub Pages (discovery)
+- **Decision**: add pdoc-generated Python API docs to xcl-python, published to GitHub Pages on each release, and link them from the Python guide as its "generated API docs".
+- **Rationale**: the spec requires each guide to link its language's generated API docs, and none exist for Python (python-support ships docstrings only). pdoc needs no configuration, and the docstrings are already enforced.
+- **Rejected**: linking PyPI (README, not API docs); generating into xcl.dev (couples the site build to a Python toolchain).
+
+### The Python guide uses the Docker plugin from the GitHub registry (discovery)
+- **Decision**: the Python guide's Go plugin is `jumppad-labs/xcl-plugin-docker` through `xcl.GitHubRegistry`, with a Docker engine as a stated prerequisite.
+- **Rationale**: it is the published example remote plugin, and the python-support README uses the same path.
+- **Rejected**: the plugin template (a template repository); a local plugin path (needs a Go build, which Python readers may not have).
+
+### Chosen direction: two standalone per-language pages (architecture)
+- **Decision**: two MDX pages on the existing page pattern; both first in the `Guides` dropdown; the home page's closing CtaBanner points at both; the xcl README and the website README list both; pdoc-generated Python API docs on xcl-python's GitHub Pages.
+- **Rationale**: this is the only option meeting the no-tabs, own-language and xcl.dev constraints together. It reuses existing nav and banner patterns.
+- **Rejected**: one tabbed page (breaks a constraint); README walkthroughs in the language repos (the site is the home of the docs).
+
+### The Go guide uses registered types, no plugin, and the v0.4.0 additions (architecture)
+- **Decision**: the Go guide registers types and one application function, and uses no plugin. It uses `ApplyContext` with `signal.NotifyContext`, the function-form lookups, the untyped `FindEntitiesByType`, `Load` and `Destroy`.
+- **Rationale**: the program runs with nothing else installed. The spec asks for current behaviour of the release containing both dependency specs. The function form works on Go 1.25.
+- **Rejected**: a Docker plugin in the Go guide (adds Docker as a prerequisite); method-form lookups (need Go 1.27).
+
+### The Python asyncio example uses only the standard library (architecture)
+- **Decision**: the asyncio section shows an `asyncio` program in which a ticker or a minimal `asyncio.start_server` handler keeps running while `await config.apply(...)` runs. Web frameworks are named in prose only.
+- **Rationale**: the example runs after `pip install xcl` with nothing else, and readers of any framework can map it.
+- **Rejected**: a FastAPI/aiohttp example (an extra dependency to verify and pin).
 
 ### Conventions selected (architecture)
-- **Decision**: Apply testing-and-mocking (no file-inspecting tests), never-modify-dependencies, code-style. Drop database, logging, patterns-and-architecture, project-structure, shared errors/test helpers, state/graph test conventions.
-- **Rationale**: Only these bear on a documentation change whose code lives on a web page.
-- **Rejected**: Listing all conventions.
+- **Decision**: apply no-repository-file tests, the entity glossary, code style for snippets, the root error re-exports and public-packages-only. Drop the testing, database, dependency and architecture conventions.
+- **Rationale**: the work is documentation plus one CI workflow; no library code changes.
+- **Rejected**: listing every convention.
 
-### Slug and title (architecture)
-- **Decision**: Slug `/using-xcl-with-go/`, nav label and page heading "Using XCL with Go".
-- **Rationale**: Matches the spec's name for the guide; the site has no redirects, so the slug is chosen once to be descriptive.
-- **Rejected**: `/go/` (too terse, could clash with a future per-language section).
+### The Python package README links to the guide and the API docs (components)
+- **Decision**: the xcl-python README gains links to the generated API docs and the xcl.dev Python guide.
+- **Rationale**: readers often arrive from PyPI. This is a two-line change in the repo that hosts the docs workflow.
+- **Rejected**: leaving the README untouched (the docs site would be discoverable only from xcl.dev).
 
-### xcl CHANGELOG entry (architecture)
-- **Decision**: Add a `## 20261011084948-c995ed25-using-xcl-with-go` section to xcl `CHANGELOG.md`, ending with `**Breaking:**` None.
-- **Rationale**: The plugin-template spec, also mostly documentation, got an entry in the same format.
-- **Rejected**: No entry (breaks the per-spec record).
+### Example names and values (data_structures)
+- **Decision**: both guides use `database "postgres" "main"`, `app "web"`, a `slugify` application function, a variable `environment` and an output `database_location`. The Python guide adds `docker "network" "guide"` (subnet `10.74.0.0/24`) and `docker "container" "guide"`.
+- **Rationale**: these are the site's running examples, and the spec's `slugify` precedent in language-surface. A distinct subnet and name avoid clashing with the Docker plugin's own samples (`10.73.0.0/24`).
+- **Rejected**: a new domain example (readers would meet two vocabularies across the site).
 
-### Link targets for "plugins" and "state" (discovery)
-- **Decision**: No `/plugins/` or `/state/` page exists on xcl.dev. The guide links "plugins" to `/examples/plugins/`, `/plugin-template/` and `/github-registry/`, and "state" to `/state-masking/` plus the `state` package on pkg.go.dev; the guide itself is the home of keeping state, apply and destroy.
-- **Rationale**: The spec requires links to existing pages that open, and forbids rewriting topic pages; these are the nearest existing pages.
-- **Rejected**: Creating new state/plugins pages (out of scope); linking to `docs/state.md` in the xcl repo (contributor internals, not user docs).
+### Python API docs URL (data_structures)
+- **Decision**: `https://jumppad-labs.github.io/xcl-python/`, the default GitHub Pages URL for the repository.
+- **Rationale**: it needs no DNS or custom domain setup.
+- **Rejected**: a custom subdomain of xcl.dev (DNS work outside the repos).
 
-### Guide is built on registered types, no plugin (discovery)
-- **Decision**: The guide's program registers two plain Go types (`database "postgres"` and `app`) with `RegisterType`; no plugin.
-- **Rationale**: Runs with only the code shown, and still covers apply, state, load, find and destroy.
-- **Rejected**: A plugin-based walkthrough (needs Docker or a binary).
+### Describing references in strings without the forbidden word (implementation_detail)
+- **Decision**: call `"${variable.environment}"` "a reference in a string", or say the value is "built from" a reference.
+- **Rationale**: the spec bans "interpolation". This is also the sibling spec's wording ("references in strings").
+- **Rejected**: "string templating" (template directives are rejected by the language, so the term misleads).
 
-### Language reference link is conditional (discovery)
-- **Decision**: Link to the sibling language reference only if its page exists in xcl-website when this spec is implemented.
-- **Rationale**: The two specs have no dependency; the reference URL is not decided yet.
-- **Rejected**: Hard-coding a guessed URL.
+### No link checker or snippet test (testing_approach)
+- **Decision**: rely on the existing site build plus manual reviews, and add no automated link or snippet checks.
+- **Rationale**: the spec non-goal and the knowledge convention forbid tests that read pages.
+- **Rejected**: a CI link checker over `dist/` (a test that reads pages).
 
-### Example types: plain fields, json tags, no sensitive or computed fields (data_structures)
-- **Decision**: The guide's `PostgreSQL` and `App` types use plain `xcl:"name"` tags with matching `json` tags, and no `types.Sensitive`, `optional`, `computed` or nested blocks.
-- **Rationale**: Keeps the guide on the core workflow; tag options are the language reference's subject. `json` tags match the site's existing samples and how entities are saved to state.
-- **Rejected**: Reusing the home page sample with `Sensitive` and `computed` fields (computed values need a provider, which the guide does not have).
+### The cross-plan release gate is recorded in context, not as a dependency (tasks)
+- **Decision**: the guide tasks name python-support's release task (`75d985e2-…`) as a precondition in their summaries and in context, not under **Depends on**.
+- **Rationale**: the CLI accepts dependencies only within this plan.
+- **Rejected**: a duplicate human "cut the release" task here (it would tag twice).
 
-### No human tasks (tasks)
-- **Decision**: All three tasks are agent tasks; publishing happens through the site's existing deploy on merge to main, and the hand checks are manual items in the Testing Approach.
-- **Rationale**: No secrets, releases or out-of-repo actions are needed.
-- **Rejected**: A human "publish the site" task (deploy is automatic) or a human "check the guide" task (reviews are never tasks).
+### The home page's closing banner is repurposed for the guides (tasks)
+- **Decision**: the banner becomes "Start building with XCL", with Go (primary) and Python (secondary) buttons. The examples stay linked from the hero and the "Two examples" section.
+- **Rationale**: it puts the guides at the end of the page, where a reader decides what to do next, without adding a new section.
+- **Rejected**: changing the hero buttons (the sibling reference spec is likelier to edit the hero); adding a third banner (clutter).
 
-### Home page CtaBanner gets the guide as its primary button (tasks)
-- **Decision**: Add a "Using XCL with Go →" primary button first in the closing CtaBanner and demote "Configuration only →" to secondary; add one linking sentence to "What is XCL?". Hero left unchanged.
-- **Rationale**: Two visible home-page links without redesigning the hero.
-- **Rejected**: Changing the hero's primary "See an example" button.
+### The Go config lookup error type is imported under an alias (tasks)
+- **Decision**: the Go guide matches validation failures with `*xclerrors.ConfigError` from `github.com/jumppad-labs/xcl/errors`, since the root package does not re-export `ConfigError`.
+- **Rationale**: the guides document current behaviour. Adding a re-export is a library change, and the spec says gaps are reported, not fixed.
+- **Rejected**: adding `xcl.ConfigError` (out of scope; reported as a gap instead).
 
 ## Rehydration cues
 
 - `spektacular spec file read 20261011084948-c995ed25-using-xcl-with-go`
-- `git -C /home/nicj/code/github.com/jumppad-labs/xcl show bdba483^:README.md | sed -n '446,842p'`
-- Read `/home/nicj/code/github.com/jumppad-labs/xcl/config.go` (NewConfig..Load) and `query.go`.
-- Read `/home/nicj/code/github.com/jumppad-labs/xcl-website/src/components/Nav.astro`, `src/pages/index.mdx`, `src/pages/registries.mdx`.
+- `spektacular plan file read 20261011130709-aa3eb933-python-support plan` (sections "Python public API", Milestone 2-3 acceptance criteria) and `... context` ("Python classes describe entity types", "The synchronous API…", "The asyncio API…").
+- `spektacular plan file read 20261011095738-fad05e41-language-surface plan` ("Data Structures & Interfaces").
+- `git -C /home/nicj/code/github.com/jumppad-labs/xcl show bdba483^:README.md | sed -n 600,842p`
+- Read `xcl-website:src/components/Nav.astro`, `src/pages/index.mdx`, `src/pages/state-masking.mdx`, `src/config/site.ts`.
 - `spektacular knowledge read --data '{"tier":"repo","name":"xcl","path":"architecture/ux-flow.md"}'`
