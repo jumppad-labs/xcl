@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 
 	"github.com/hashicorp/errwrap"
 	"github.com/jumppad-labs/xcl/diff"
@@ -1314,8 +1315,19 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 	references := []string{}
 	written := map[string]string{}
 
-	// Process all attributes in the block
+	// Process all attributes in the block, in the order they were written:
+	// the body holds them in a map, and the links an entity records are
+	// visible to callers, so they must not follow the map's random order
+	attributes := make([]*hclsyntax.Attribute, 0, len(b.Body.Attributes))
 	for _, a := range b.Body.Attributes {
+		attributes = append(attributes, a)
+	}
+
+	sort.Slice(attributes, func(i, j int) bool {
+		return attributes[i].SrcRange.Start.Byte < attributes[j].SrcRange.Start.Byte
+	})
+
+	for _, a := range attributes {
 		refs, err := referencesIn(a.Expr, p.isReferenceRoot)
 		if err != nil {
 			return nil, errors.NewParserError(
