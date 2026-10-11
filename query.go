@@ -214,6 +214,30 @@ func (c *Config) entitiesOf(want reflect.Type, path ...string) ([]any, error) {
 		return nil, err
 	}
 
+	stored, err := c.entitiesByType(path)
+	if err != nil {
+		return nil, err
+	}
+
+	found := make([]any, 0, len(stored))
+
+	for _, e := range stored {
+		typed, err := asType(e, want)
+		if err != nil {
+			return nil, err
+		}
+
+		found = append(found, typed)
+	}
+
+	return found, nil
+}
+
+// entitiesByType is the type and subtype scan shared by the typed and the
+// untyped lookups: the same segment rules, the same errors, and each entity
+// returned as the Config stores it. Nothing matching gives an empty, non-nil
+// result.
+func (c *Config) entitiesByType(path []string) ([]any, error) {
 	if len(path) == 0 {
 		return nil, &xclerrors.NotTypeableError{Segments: path, Use: "All"}
 	}
@@ -238,12 +262,7 @@ func (c *Config) entitiesOf(want reflect.Type, path ...string) ([]any, error) {
 			continue
 		}
 
-		typed, err := asType(e, want)
-		if err != nil {
-			return nil, err
-		}
-
-		found = append(found, typed)
+		found = append(found, e)
 	}
 
 	return found, nil
