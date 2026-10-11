@@ -223,3 +223,18 @@ func TestGitHubRegisterPluginPanicMakesNoRequest(t *testing.T) {
 	require.NotEmpty(t, message)
 	require.Equal(t, int32(0), requests.Load())
 }
+
+func TestGitHubFunctionsIsNilWithNothingRegistered(t *testing.T) {
+	require.Nil(t, NewGitHub().Functions())
+}
+
+func TestGitHubRegisterFunctionDelegatesToLocal(t *testing.T) {
+	gh := NewGitHub()
+	gh.RegisterFunction("slugify", func(title string) (string, error) { return title, nil })
+
+	registered := gh.Functions()
+
+	require.Len(t, registered, 1)
+	require.Equal(t, "slugify", registered[0].Name)
+	require.NotNil(t, registered[0].Func)
+}

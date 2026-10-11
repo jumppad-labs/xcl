@@ -321,13 +321,15 @@ logger, and registering only records:
 ```go
 local := registry.NewLocal()
 local.RegisterType(&resources.Deployment{}, "deployment")
+local.RegisterFunction("slugify", slugify)
 local.RegisterPlugin(&template.TemplatePlugin{})
 local.RegisterExternalPlugin("./bin/xcl-plugin-docker")
 local.RegisterPluginDirectory("~/.xcl/plugins")
 ```
 
-`RegisterType` declares a plain Go type, `RegisterPlugin` is for in-process
-plugins, `RegisterExternalPlugin` for a
+`RegisterType` declares a plain Go type, `RegisterFunction` offers a Go func
+to configuration (see [Application functions](#application-functions)),
+`RegisterPlugin` is for in-process plugins, `RegisterExternalPlugin` for a
 gRPC plugin binary, and `RegisterPluginDirectory` for a directory to search
 for executables named like the registry's pattern, `xcl-plugin-*` unless the
 registry was created with `registry.NewLocal(registry.PluginPattern("acme-plugin-*"))`.
@@ -337,8 +339,8 @@ The GitHub registry, [`registry/github.go`](../registry/github.go), installs
 plugins from GitHub releases. It is a download-and-cache wrapper on a local
 registry: `registry.NewGitHub(options...)` holds an unexported `*Local`, and
 `RegisterPlugin("owner/repo", "v1.2.0")` adds a plugin to it, so `Plugins`,
-`RegisterType` and `Types` are the local registry's, while `Name()` is
-`github.com`. Options are fixed when it is created:
+`RegisterType`, `Types`, `RegisterFunction` and `Functions` are the local
+registry's, while `Name()` is `github.com`. Options are fixed when it is created:
 `registry.GitHubCacheDir(dir)` (default `~/.xcl/cache/plugins`),
 `registry.GitHubTrustedKeys(armored...)`, `registry.GitHubToken(token)`
 (otherwise `GITHUB_TOKEN`, then `GH_TOKEN`) and `registry.GitHubAPIURL(url)`,
@@ -587,6 +589,37 @@ The type is the keyword a block leads with and the subtype its first label.
 A type keyword takes a subtype for every registration or for none, so the
 parser knows from the keyword alone how many labels a block has, and an
 address such as `server.big.web` is read by position.
+
+## Application functions
+
+An application offers a function to configuration the same way it declares
+a type, on its registry, with `RegisterFunction(name string, fn any)`:
+
+```go
+local := registry.NewLocal()
+local.RegisterType(&Server{}, "server")
+local.RegisterFunction("slugify", func(title string) (string, error) {
+    return strings.ToLower(strings.ReplaceAll(title, " ", "-")), nil
+})
+
+c, err := xcl.NewConfig(xcl.WithRegistry(local))
+```
+
+Configuration then calls `slugify("My App")` by that bare name, as it calls
+a builtin, and the entity holds the result. The func takes `string`, `bool`
+and number parameters, or slices and string-keyed maps of those, and returns
+a result of such a type and an `error`. The registry's `Functions()` lists
+what was registered; `NewConfig` reads it after `Types()`, converts each
+func, and returns a `*xcl.InvalidFunctionError` for one it cannot call from
+configuration, or a `*xcl.FunctionNameClashError` naming both sources when
+the name is a builtin's or another application function's. A plugin
+offering the same name is reported, with the same error, when plugins load
+on the first operation. Every function, builtin, application or plugin, is
+evaluated while the configuration is read and keeps sensitive arguments out
+of its errors, marking its result sensitive when an argument was.
+
+A plugin's providers offer functions the same way through their `Functions`
+method; see [Offering a function](plugin-developer-guide.md#offering-a-function).
 
 `CreateEntity` builds declared types with `reflect.New`, like builtins, so
 blocks decode into the developer's own type and state reload returns that

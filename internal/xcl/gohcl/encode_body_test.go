@@ -602,3 +602,27 @@ func TestEncodeBodyDoesNotPassUnmarkedValuesToTheCallback(t *testing.T) {
 	require.Equal(t, 0, calls)
 	require.Contains(t, string(f.Bytes()), `plain = "visible"`)
 }
+
+func TestEncodeMapOfBlocksWritesNames(t *testing.T) {
+	app := mapApp{
+		Listeners: map[string]mapListener{
+			"https": {Port: 443},
+			"http":  {Port: 80},
+		},
+	}
+
+	f := hclwrite.NewEmptyFile()
+	err := EncodeBody(&app, f.Body(), EncodeOptions{})
+	require.NoError(t, err)
+
+	expected := `listener "http" {
+  port = 80
+}
+
+listener "https" {
+  port = 443
+}
+`
+
+	require.Equal(t, expected, string(f.Bytes()))
+}

@@ -77,14 +77,14 @@ func applyExample(t *testing.T) *xcl.Config {
 func applyExampleWithState(t *testing.T, stateDir string) *xcl.Config {
 	t.Helper()
 
-	t.Setenv("HCL_VAR_output_dir", t.TempDir())
+	t.Setenv("XCL_VAR_output_dir", t.TempDir())
 
 	return applyExampleDir(t, "./config/full", stateDir)
 }
 
 // applyExampleDir applies the configuration in configDir in a new Config
 // keeping its state in stateDir, as a separate run of the program would. The
-// rendered template goes wherever HCL_VAR_output_dir already points, so a test
+// rendered template goes wherever XCL_VAR_output_dir already points, so a test
 // applying two configurations to the same state sets it once. What was
 // applied is destroyed when the test ends.
 func applyExampleDir(t *testing.T, configDir, stateDir string) *xcl.Config {
@@ -241,7 +241,7 @@ func TestApplyFindsTheResourcesOfBothPlugins(t *testing.T) {
 }
 
 func TestApplyFailsForAMissingDockerPlugin(t *testing.T) {
-	t.Setenv("HCL_VAR_output_dir", t.TempDir())
+	t.Setenv("XCL_VAR_output_dir", t.TempDir())
 
 	missing := filepath.Join(t.TempDir(), "docker-plugin")
 

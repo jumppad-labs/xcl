@@ -143,3 +143,51 @@ Import paths were rewritten from `github.com/hashicorp/hcl/v2/...` to
   replaced part is rebuilt as an object or tuple, which are written the same
   way. `EncodeIntoBody` and `EncodeAsBlock` keep their signatures and write
   marked values unmarked.
+- `gohcl/decode.go`: `DecodeExpression` converts the expression's value
+  against `gocty.ImpliedConstraintType` rather than `gocty.ImpliedType`, so an
+  object or map value written as an attribute may leave out the attributes
+  whose Go fields are tagged `optional`, as a block may leave out those
+  attributes. The constraint fills a missing optional attribute with null,
+  which `gocty` leaves at the field's zero value.
+- `hclsyntax/parser_template.go`: template directives rejected. `%{ if }`,
+  `%{ for }`, `%{ else }`, `%{ endif }` and `%{ endfor }` are no longer parsed
+  into template control tokens; each `%{ … }` sequence is reported as an error
+  at the directive ("Template directives are not supported", pointing to
+  functions such as `format`, `join` and `template_file`) and skipped, so the
+  rest of the string is still parsed. Interpolation `${ }` and the `%%{`
+  escape are unchanged, the lexer is unchanged, and the `templateParser`'s
+  if/for handling remains but is never reached.
+- `schema.go`, `hclsyntax/structure.go`: `BlockHeaderSchema.LabelsOptional`,
+  which lets a block of the type carry either none of its labels or all of
+  them. `hclsyntax` accepts a block with no labels for such a type; a block
+  with some but not all labels is still reported as missing the rest.
+- `json/structure.go`: JSON carries labels as the keys of enclosing objects,
+  so it cannot say whether an optional label is present. For a block type
+  whose labels are optional, a JSON array holds blocks without labels and a
+  JSON object holds blocks keyed by them. XCL does not read JSON
+  configuration; the rule keeps the fork's own JSON-bodied tests meaningful.
+- `gohcl/schema.go`, `gohcl/decode.go`, `gohcl/check.go`, `gohcl/encode.go`:
+  named blocks collected by name. A `map[string]T` block field is accepted
+  (it panicked before), with string keys required. A map field, and a slice
+  field whose element has at most one `label` field, takes one optional name
+  label (the element's label field, or "name"). Decoding collects map blocks
+  by name, reporting a block without a name ("A name is required") at the
+  block and a repeated name ("Duplicate <type> name") at the second block's
+  name; a slice accepts named and unnamed blocks, keeps the name when the
+  element has a label field, drops it otherwise, and reports a repeated name
+  the same way. `CheckBody` follows map elements and reports the same name
+  problems without decoding, so validation catches them. Encoding writes a
+  map of blocks as one block per entry in key order, with the key as the
+  name.
+- `gohcl/schema.go`, `gohcl/decode.go`, `gohcl/check.go`: panics replaced by
+  diagnostics, and `ValidateSchemaType`. `impliedBodySchema` and
+  `fieldTagsOf` return the problem with a Go type (a malformed tag, a second
+  remain or body field, a block field that cannot hold blocks, a map of
+  blocks without string keys); the exported `ImpliedBodySchema` keeps
+  panicking for callers that pass validated types. The decoder and checker
+  report an unsupported target type, an unexported tagged field, a label
+  field that is not a string and an attribute type with no configuration form
+  as "Unsupported decode target" diagnostics at the body, attribute or label
+  concerned, instead of panicking. `ValidateSchemaType` checks a struct type,
+  and its block element types, for every such problem without decoding, so a
+  caller can reject a Go type where it is declared.

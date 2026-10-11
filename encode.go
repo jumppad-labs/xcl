@@ -294,8 +294,12 @@ func trimBookkeeping(entity any, body *hclwrite.Body) {
 }
 
 // referencePathSegment matches one segment of a recorded reference's path, a
-// nested block written as <type>[<index>]
+// nested block in a list written as <type>[<index>]
 var referencePathSegment = regexp.MustCompile(`^(.+)\[(\d+)\]$`)
+
+// referencePathNamedSegment matches a nested block in a map of blocks, written
+// as <type>["<name>"]
+var referencePathNamedSegment = regexp.MustCompile(`^(.+?)\[("(?:[^"\\]|\\.)*")\]$`)
 
 // showReferences replaces the value of each attribute the entity recorded a
 // reference for with the text the user wrote. It runs after the resolved text
@@ -340,35 +344,11 @@ func showReferences(meta *types.Meta, body *hclwrite.Body, opts encodeOptions) {
 // nested blocks it sits in, i.e. "network[1].name". It returns nil when the
 // text holds no such block.
 func findReferenceBody(body *hclwrite.Body, path string) (*hclwrite.Body, string) {
-	segments := strings.Split(path, ".")
+	segments := splitReferencePath(path)
 
 	current := body
 	for _, segment := range segments[:len(segments)-1] {
-		match := referencePathSegment.FindStringSubmatch(segment)
-		if match == nil {
-			return nil, ""
-		}
-
-		index, err := strconv.Atoi(match[2])
-		if err != nil {
-			return nil, ""
-		}
-
-		var found *hclwrite.Block
-		position := 0
-		for _, block := range current.Blocks() {
-			if block.Type() != match[1] {
-				continue
-			}
-
-			if position == index {
-				found = block
-				break
-			}
-
-			position++
-		}
-
+		found := findReferenceBlock(current, segment)
 		if found == nil {
 			return nil, ""
 		}
@@ -377,6 +357,85 @@ func findReferenceBody(body *hclwrite.Body, path string) (*hclwrite.Body, string
 	}
 
 	return current, segments[len(segments)-1]
+}
+
+// findReferenceBlock returns the nested block of body that a path segment
+// names: the block of the type at the position among the blocks of its
+// type, for <type>[<index>], or the block of the type carrying the name as
+// its label, for <type>["<name>"]. It returns nil when there is none.
+func findReferenceBlock(body *hclwrite.Body, segment string) *hclwrite.Block {
+	if match := referencePathNamedSegment.FindStringSubmatch(segment); match != nil {
+		name, err := strconv.Unquote(match[2])
+		if err != nil {
+			return nil
+		}
+
+		for _, block := range body.Blocks() {
+			if block.Type() != match[1] {
+				continue
+			}
+
+			if labels := block.Labels(); len(labels) > 0 && labels[0] == name {
+				return block
+			}
+		}
+
+		return nil
+	}
+
+	match := referencePathSegment.FindStringSubmatch(segment)
+	if match == nil {
+		return nil
+	}
+
+	index, err := strconv.Atoi(match[2])
+	if err != nil {
+		return nil
+	}
+
+	position := 0
+	for _, block := range body.Blocks() {
+		if block.Type() != match[1] {
+			continue
+		}
+
+		if position == index {
+			return block
+		}
+
+		position++
+	}
+
+	return nil
+}
+
+// splitReferencePath splits a recorded reference's path on the dots between
+// its segments, leaving a dot inside a quoted block name where it is
+func splitReferencePath(path string) []string {
+	segments := []string{}
+	var current strings.Builder
+	quoted := false
+
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+
+		switch {
+		case quoted && c == '\\' && i+1 < len(path):
+			current.WriteByte(c)
+			i++
+			current.WriteByte(path[i])
+		case c == '"':
+			quoted = !quoted
+			current.WriteByte(c)
+		case c == '.' && !quoted:
+			segments = append(segments, current.String())
+			current.Reset()
+		default:
+			current.WriteByte(c)
+		}
+	}
+
+	return append(segments, current.String())
 }
 
 // holdsSensitiveMarker reports whether the written value of attribute holds

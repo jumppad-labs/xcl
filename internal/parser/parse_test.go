@@ -237,11 +237,7 @@ func TestLoadsVariablesInEnvVarOverridingVariableDefaults(t *testing.T) {
 
 	p, _ := setupParser(t)
 
-	os.Setenv("HCL_VAR_cpu_resources", "1000")
-
-	t.Cleanup(func() {
-		os.Unsetenv("HCL_VAR_cpu_resources")
-	})
+	t.Setenv("XCL_VAR_cpu_resources", "1000")
 
 	c, err := p.Apply(context.Background(), filepath.Join(absoluteFolderPath, "container.xcl"))
 	require.NoError(t, err)

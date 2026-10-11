@@ -145,3 +145,77 @@ func TestImpliedType(t *testing.T) {
 		})
 	}
 }
+
+func TestImpliedTypeKeepsOptionalAttributesRequired(t *testing.T) {
+	ty, err := ImpliedType(optionalEndpoint{})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if !ty.IsObjectType() {
+		t.Fatalf("wrong type %#v; want an object type", ty)
+	}
+
+	if len(ty.OptionalAttributes()) != 0 {
+		t.Errorf("ImpliedType marked attributes optional: %#v; want none", ty.OptionalAttributes())
+	}
+
+	want := cty.Object(map[string]cty.Type{
+		"port": cty.Number,
+		"tls":  cty.Bool,
+	})
+	if !ty.Equals(want) {
+		t.Errorf("wrong type %#v; want %#v", ty, want)
+	}
+}
+
+func TestImpliedConstraintTypeMarksOptionalAttributes(t *testing.T) {
+	ty, err := ImpliedConstraintType(optionalEndpoint{})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if !ty.IsObjectType() {
+		t.Fatalf("wrong type %#v; want an object type", ty)
+	}
+
+	atys := ty.AttributeTypes()
+	if _, ok := atys["port"]; !ok {
+		t.Errorf("attribute types %#v are missing port", atys)
+	}
+	if _, ok := atys["tls"]; !ok {
+		t.Errorf("attribute types %#v are missing tls", atys)
+	}
+
+	optional := ty.OptionalAttributes()
+	if _, ok := optional["tls"]; !ok {
+		t.Errorf("optional attributes %#v are missing tls", optional)
+	}
+	if _, ok := optional["port"]; ok {
+		t.Errorf("optional attributes %#v wrongly include port", optional)
+	}
+}
+
+func TestImpliedConstraintTypeMarksOptionalAttributesInsideMap(t *testing.T) {
+	ty, err := ImpliedConstraintType(map[string]optionalEndpoint{})
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if !ty.IsMapType() {
+		t.Fatalf("wrong type %#v; want a map type", ty)
+	}
+
+	ety := ty.ElementType()
+	if !ety.IsObjectType() {
+		t.Fatalf("wrong element type %#v; want an object type", ety)
+	}
+
+	optional := ety.OptionalAttributes()
+	if _, ok := optional["tls"]; !ok {
+		t.Errorf("element optional attributes %#v are missing tls", optional)
+	}
+	if _, ok := optional["port"]; ok {
+		t.Errorf("element optional attributes %#v wrongly include port", optional)
+	}
+}

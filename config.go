@@ -156,6 +156,25 @@ type (
 	// when plugins load for a plugin's type
 	TypeFormError = xclerrors.TypeFormError
 
+	// InvalidTypeError is returned when a Go type has a field configuration
+	// cannot be decoded into, such as a block field that is a string: by
+	// NewConfig for a declared Go type, and when plugins load for a plugin's
+	// type. It names the type, its provider and the field, and is never a
+	// panic
+	InvalidTypeError = xclerrors.InvalidTypeError
+
+	// FunctionNameClashError is returned when a function name is offered
+	// twice, it names both providers and their registries. NewConfig returns
+	// it for an application function named like a builtin or like another
+	// application function, and the first operation that loads plugins for
+	// a clash involving a plugin
+	FunctionNameClashError = xclerrors.FunctionNameClashError
+
+	// InvalidFunctionError is returned by NewConfig for an application
+	// function whose signature cannot be called from configuration, naming
+	// the function and its registry
+	InvalidFunctionError = xclerrors.InvalidFunctionError
+
 	InvalidDecodeTargetError = xclerrors.InvalidDecodeTargetError
 
 	UnregisteredTypeError = xclerrors.UnregisteredTypeError
@@ -217,12 +236,15 @@ func (c *Config) addressParser() *resources.AddressParser {
 //
 // Options may be given in any order: NewConfig collects every option first,
 // then builds the Config's own catalog from the registries added with
-// WithRegistry, reading each registry's Types in the order the registries
-// were given. A declared Go type that duplicates another, in one registry or
-// across two, is returned as a *TypeNameClashError naming both and their
-// registries, one with a builtin name as a *TypeNameClashError naming
-// "builtin", and one that uses its type keyword in both forms as a
-// *TypeFormError. Plugins are not loaded here, they load on the first
+// WithRegistry, reading each registry's Types and Functions in the order the
+// registries were given. A declared Go type that duplicates another, in one
+// registry or across two, is returned as a *TypeNameClashError naming both
+// and their registries, one with a builtin name as a *TypeNameClashError
+// naming "builtin", and one that uses its type keyword in both forms as a
+// *TypeFormError. An application function named like a builtin or like
+// another application function is returned as a *FunctionNameClashError, and
+// one whose signature cannot be called from configuration as an
+// *InvalidFunctionError. Plugins are not loaded here, they load on the first
 // operation that needs them.
 func NewConfig(opts ...ConfigOption) (*Config, error) {
 	c := &Config{
@@ -242,6 +264,12 @@ func NewConfig(opts ...ConfigOption) (*Config, error) {
 	for _, r := range c.registries {
 		for _, declared := range r.Types() {
 			if err := c.catalog.DeclareType(declared, r.Name()); err != nil {
+				return nil, err
+			}
+		}
+
+		for _, declared := range r.Functions() {
+			if err := c.catalog.DeclareFunction(declared, r.Name()); err != nil {
 				return nil, err
 			}
 		}
@@ -340,16 +368,7 @@ func (c *Config) Validate(paths ...string) error {
 			return fmt.Errorf("at least one path is required")
 		}
 
-		// Create parser with StateStore
-		p := parser.NewParser(&parser.ParserOptions{
-			EventData:  c.eventData,
-			StateStore: c.stateStore,
-			StateMask:  c.stateMask,
-			EventMask:  c.eventMask,
-			Catalog:    c.catalog,
-			Variables:  convertVariablesToStringMap(c.variables),
-			Emit:       emit,
-		})
+		p := parser.NewParser(c.parserOptions(emit))
 
 		// Validate without resolving: no decode, no DAG walk, no plugins
 		return p.Validate(ctx, paths...)
@@ -374,16 +393,7 @@ func (c *Config) Apply(paths ...string) error {
 			return fmt.Errorf("at least one path is required")
 		}
 
-		// Create parser with StateStore
-		p := parser.NewParser(&parser.ParserOptions{
-			EventData:  c.eventData,
-			StateStore: c.stateStore,
-			StateMask:  c.stateMask,
-			EventMask:  c.eventMask,
-			Catalog:    c.catalog,
-			Variables:  convertVariablesToStringMap(c.variables),
-			Emit:       emit,
-		})
+		p := parser.NewParser(c.parserOptions(emit))
 
 		// Parser manages State independently (loads from store, parses,
 		// returns new state). A failed or cancelled apply returns the
@@ -456,16 +466,8 @@ func (c *Config) Destroy() error {
 			return nil
 		}
 
-		// Create parser with StateStore, destroy saves through it after
-		// every resource
-		p := parser.NewParser(&parser.ParserOptions{
-			EventData:  c.eventData,
-			StateStore: c.stateStore,
-			StateMask:  c.stateMask,
-			EventMask:  c.eventMask,
-			Catalog:    c.catalog,
-			Emit:       emit,
-		})
+		// destroy saves through the parser's state store after every resource
+		p := parser.NewParser(c.parserOptions(emit))
 
 		remaining, err := p.Destroy(ctx, saved)
 		if remaining != nil {
@@ -511,6 +513,25 @@ func (c *Config) Load() error {
 
 		return nil
 	})
+}
+
+// parserOptions builds the options every operation's parser is created with,
+// so Validate, Apply, Diff and Destroy read configuration and variables the
+// same way. Variables are overridden from the environment only through
+// parser.DefaultVariableEnvPrefix, XCL_VAR_<name>; other environment
+// variables are never read. emit receives the parser's events for the
+// operation being run.
+func (c *Config) parserOptions(emit events.Emit) *parser.ParserOptions {
+	return &parser.ParserOptions{
+		EventData:         c.eventData,
+		StateStore:        c.stateStore,
+		StateMask:         c.stateMask,
+		EventMask:         c.eventMask,
+		Catalog:           c.catalog,
+		Variables:         convertVariablesToStringMap(c.variables),
+		VariableEnvPrefix: parser.DefaultVariableEnvPrefix,
+		Emit:              emit,
+	}
 }
 
 // convertVariablesToStringMap converts map[string]any to map[string]string

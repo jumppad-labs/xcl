@@ -1,0 +1,16 @@
+service "api" {
+  host = "api.local"
+
+  listener "http" {
+    port = 80
+  }
+
+  listener "https" {
+    port = 443
+    tls  = true
+  }
+}
+
+gateway "edge" {
+  ports = { for variable, service in service.api.listener : service.name => service.port }
+}

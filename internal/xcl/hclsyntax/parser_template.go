@@ -475,173 +475,41 @@ Token:
 			})
 
 		case TokenTemplateControl:
-			// if the opener is %{~ then we want to eat any trailing whitespace
-			// in the preceding literal token, assuming it is indeed a literal
-			// token.
-			if canTrimPrev && len(next.Bytes) == 3 && next.Bytes[2] == '~' && len(parts) > 0 {
-				prevExpr := parts[len(parts)-1]
-				if lexpr, ok := prevExpr.(*templateLiteralToken); ok {
-					lexpr.Val = strings.TrimRightFunc(lexpr.Val, unicode.IsSpace)
-				}
-			}
+			// XCL has no string templating: a %{ directive (if, for, else,
+			// endif, endfor) is an error at the directive, pointing to
+			// functions instead. The sequence is skipped up to its closing
+			// brace so the rest of the string is still parsed, and the
+			// parser's recovery flag is restored so a later directive is
+			// reported too. Interpolation, ${ }, and the %%{ escape are
+			// unaffected, the lexer is unchanged.
 			p.PushIncludeNewlines(false)
-
-			kw := p.Peek()
-			if kw.Type != TokenIdent {
-				if !p.recovery {
-					diags = append(diags, &hcl.Diagnostic{
-						Severity: hcl.DiagError,
-						Summary:  "Invalid template directive",
-						Detail:   "A template directive keyword (\"if\", \"for\", etc) is expected at the beginning of a %{ sequence.",
-						Subject:  &kw.Range,
-						Context:  hcl.RangeBetween(next.Range, kw.Range).Ptr(),
-					})
-				}
-				p.recover(TokenTemplateSeqEnd)
-				p.PopIncludeNewlines()
-				continue Token
-			}
-			p.Read() // eat keyword token
-
-			switch {
-
-			case ifKeyword.TokenMatches(kw):
-				condExpr, exprDiags := p.ParseExpression()
-				diags = append(diags, exprDiags...)
-				parts = append(parts, &templateIfToken{
-					CondExpr: condExpr,
-					SrcRange: hcl.RangeBetween(next.Range, p.NextRange()),
-				})
-
-			case elseKeyword.TokenMatches(kw):
-				parts = append(parts, &templateEndCtrlToken{
-					Type:     templateElse,
-					SrcRange: hcl.RangeBetween(next.Range, p.NextRange()),
-				})
-
-			case endifKeyword.TokenMatches(kw):
-				parts = append(parts, &templateEndCtrlToken{
-					Type:     templateEndIf,
-					SrcRange: hcl.RangeBetween(next.Range, p.NextRange()),
-				})
-
-			case forKeyword.TokenMatches(kw):
-				var keyName, valName string
-				if p.Peek().Type != TokenIdent {
-					if !p.recovery {
-						diags = append(diags, &hcl.Diagnostic{
-							Severity: hcl.DiagError,
-							Summary:  "Invalid 'for' directive",
-							Detail:   "For directive requires variable name after 'for'.",
-							Subject:  p.Peek().Range.Ptr(),
-						})
-					}
-					p.recover(TokenTemplateSeqEnd)
-					p.PopIncludeNewlines()
-					continue Token
-				}
-
-				valName = string(p.Read().Bytes)
-
-				if p.Peek().Type == TokenComma {
-					// What we just read was actually the key, then.
-					keyName = valName
-					p.Read() // eat comma
-
-					if p.Peek().Type != TokenIdent {
-						if !p.recovery {
-							diags = append(diags, &hcl.Diagnostic{
-								Severity: hcl.DiagError,
-								Summary:  "Invalid 'for' directive",
-								Detail:   "For directive requires value variable name after comma.",
-								Subject:  p.Peek().Range.Ptr(),
-							})
-						}
-						p.recover(TokenTemplateSeqEnd)
-						p.PopIncludeNewlines()
-						continue Token
-					}
-
-					valName = string(p.Read().Bytes)
-				}
-
-				if !inKeyword.TokenMatches(p.Peek()) {
-					if !p.recovery {
-						diags = append(diags, &hcl.Diagnostic{
-							Severity: hcl.DiagError,
-							Summary:  "Invalid 'for' directive",
-							Detail:   "For directive requires 'in' keyword after names.",
-							Subject:  p.Peek().Range.Ptr(),
-						})
-					}
-					p.recover(TokenTemplateSeqEnd)
-					p.PopIncludeNewlines()
-					continue Token
-				}
-				p.Read() // eat 'in' keyword
-
-				collExpr, collDiags := p.ParseExpression()
-				diags = append(diags, collDiags...)
-				parts = append(parts, &templateForToken{
-					KeyVar:   keyName,
-					ValVar:   valName,
-					CollExpr: collExpr,
-
-					SrcRange: hcl.RangeBetween(next.Range, p.NextRange()),
-				})
-
-			case endforKeyword.TokenMatches(kw):
-				parts = append(parts, &templateEndCtrlToken{
-					Type:     templateEndFor,
-					SrcRange: hcl.RangeBetween(next.Range, p.NextRange()),
-				})
-
-			default:
-				if !p.recovery {
-					suggestions := []string{"if", "for", "else", "endif", "endfor"}
-					given := string(kw.Bytes)
-					suggestion := nameSuggestion(given, suggestions)
-					if suggestion != "" {
-						suggestion = fmt.Sprintf(" Did you mean %q?", suggestion)
-					}
-
-					diags = append(diags, &hcl.Diagnostic{
-						Severity: hcl.DiagError,
-						Summary:  "Invalid template control keyword",
-						Detail:   fmt.Sprintf("%q is not a valid template control keyword.%s", given, suggestion),
-						Subject:  &kw.Range,
-						Context:  hcl.RangeBetween(next.Range, kw.Range).Ptr(),
-					})
-				}
-				p.recover(TokenTemplateSeqEnd)
-				p.PopIncludeNewlines()
-				continue Token
-
-			}
-
-			close := p.Peek()
-			if close.Type != TokenTemplateSeqEnd {
-				if !p.recovery {
-					diags = append(diags, &hcl.Diagnostic{
-						Severity: hcl.DiagError,
-						Summary:  fmt.Sprintf("Extra characters in %s marker", kw.Bytes),
-						Detail:   "Expected a closing brace to end the sequence, but found extra characters.",
-						Subject:  &close.Range,
-						Context:  hcl.RangeBetween(startRange, close.Range).Ptr(),
-					})
-				}
-				p.recover(TokenTemplateSeqEnd)
-			} else {
-				p.Read() // eat closing brace
-
-				// If the closer is ~} then we want to eat any leading
-				// whitespace on the next token, if it turns out to be a
-				// literal token.
-				if len(close.Bytes) == 2 && close.Bytes[0] == '~' {
-					ltrimNext = true
-				}
-			}
+			recovering := p.recovery
+			close := p.recover(TokenTemplateSeqEnd)
+			p.recovery = recovering
 			p.PopIncludeNewlines()
+
+			if !p.recovery {
+				subject := next.Range
+				if close.Type == TokenTemplateSeqEnd {
+					subject = hcl.RangeBetween(next.Range, close.Range)
+				}
+
+				diags = append(diags, &hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "Template directives are not supported",
+					Detail:   "XCL has no string templating. Use a function such as format, join or template_file, or a conditional expression inside ${ }, to build the string.",
+					Subject:  &subject,
+				})
+			}
+
+			if close.Type != TokenTemplateSeqEnd {
+				// the directive ran to the end of the input, so the string
+				// is unterminated, which the default branch reports
+				endRange = close.Range
+				break Token
+			}
+
+			continue Token
 
 		default:
 			if !p.recovery {

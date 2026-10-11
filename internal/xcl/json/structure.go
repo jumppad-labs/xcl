@@ -136,7 +136,17 @@ func (b *body) PartialContent(schema *hcl.BodySchema) (*hcl.BodyContent, hcl.Bod
 
 		} else if blockS, defined := blockSchemas[attrName]; defined {
 			bv := jsonAttr.Value
-			blockDiags := b.unpackBlock(bv, blockS.Type, &jsonAttr.NameRange, blockS.LabelNames, nil, nil, &content.Blocks)
+
+			// JSON carries a block's labels as the keys of enclosing
+			// objects, so it cannot say whether a label is present. For a
+			// block type whose labels are optional, an array holds blocks
+			// without labels and an object holds blocks keyed by them.
+			labelNames := blockS.LabelNames
+			if _, isArray := bv.(*arrayVal); isArray && blockS.LabelsOptional {
+				labelNames = nil
+			}
+
+			blockDiags := b.unpackBlock(bv, blockS.Type, &jsonAttr.NameRange, labelNames, nil, nil, &content.Blocks)
 			diags = append(diags, blockDiags...)
 			usedNames[attrName] = struct{}{}
 		}

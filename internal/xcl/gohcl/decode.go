@@ -48,12 +48,29 @@ func decodeBodyToValue(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) h
 	case reflect.Map:
 		return decodeBodyToMap(body, ctx, val)
 	default:
-		panic(fmt.Sprintf("target value must be pointer to struct or map, not %s", et.String()))
+		return hcl.Diagnostics{unsupportedTargetDiagnostic(body, fmt.Errorf("%s cannot be decoded from a body: it is not a struct or a map", et))}
+	}
+}
+
+// unsupportedTargetDiagnostic reports a Go type configuration cannot be
+// decoded into, at the body it was to be decoded from. The type is the
+// program's, not the author's, so the problem is reported rather than
+// panicked, and a caller registering types can catch it earlier with
+// ValidateSchemaType.
+func unsupportedTargetDiagnostic(body hcl.Body, err error) *hcl.Diagnostic {
+	return &hcl.Diagnostic{
+		Severity: hcl.DiagError,
+		Summary:  "Unsupported decode target",
+		Detail:   err.Error(),
+		Subject:  body.MissingItemRange().Ptr(),
 	}
 }
 
 func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) hcl.Diagnostics {
-	schema, partial := ImpliedBodySchema(val.Interface())
+	schema, partial, err := impliedBodySchema(val.Type())
+	if err != nil {
+		return hcl.Diagnostics{unsupportedTargetDiagnostic(body, err)}
+	}
 
 	var content *hcl.BodyContent
 	var leftovers hcl.Body
@@ -119,6 +136,18 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 			continue
 		}
 
+		// an unexported field cannot be set, and taking its address to
+		// decode into would panic
+		if field.PkgPath != "" {
+			diags = append(diags, &hcl.Diagnostic{
+				Severity: hcl.DiagError,
+				Summary:  "Unsupported decode target",
+				Detail:   fmt.Sprintf("Attribute %q: field %s of %s is unexported, so xcl cannot set it from configuration.", name, field.Name, val.Type()),
+				Subject:  &attr.Range,
+			})
+			continue
+		}
+
 		switch {
 		case attrType.AssignableTo(field.Type):
 			fieldV.Set(reflect.ValueOf(attr))
@@ -139,9 +168,14 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 
 		ty := field.Type
 		isSlice := false
+		isMap := false
 		isPtr := false
-		if ty.Kind() == reflect.Slice {
+		switch ty.Kind() {
+		case reflect.Slice:
 			isSlice = true
+			ty = ty.Elem()
+		case reflect.Map:
+			isMap = true
 			ty = ty.Elem()
 		}
 		if ty.Kind() == reflect.Ptr {
@@ -149,7 +183,7 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 			ty = ty.Elem()
 		}
 
-		if len(blocks) > 1 && !isSlice {
+		if len(blocks) > 1 && !isSlice && !isMap {
 			diags = append(diags, &hcl.Diagnostic{
 				Severity: hcl.DiagError,
 				Summary:  fmt.Sprintf("Duplicate %s block", typeName),
@@ -163,7 +197,7 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 		}
 
 		if len(blocks) == 0 {
-			if isSlice || isPtr {
+			if isSlice || isMap || isPtr {
 				if val.Field(fieldIdx).IsNil() {
 					val.Field(fieldIdx).Set(reflect.Zero(field.Type))
 				}
@@ -180,6 +214,9 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 
 		switch {
 
+		case isMap:
+			diags = append(diags, decodeBlocksToMap(blocks, ctx, val.Field(fieldIdx), ty, isPtr, typeName)...)
+
 		case isSlice:
 			elemType := ty
 			if isPtr {
@@ -190,7 +227,18 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 				sli = reflect.MakeSlice(reflect.SliceOf(elemType), len(blocks), len(blocks))
 			}
 
+			// a name is optional in a list, but two blocks cannot share one
+			named := map[string]*hcl.Block{}
+
 			for i, block := range blocks {
+				if len(block.Labels) > 0 {
+					if first, seen := named[block.Labels[0]]; seen {
+						diags = append(diags, duplicateBlockNameDiagnostic(typeName, first, block))
+					} else {
+						named[block.Labels[0]] = block
+					}
+				}
+
 				if isPtr {
 					if i >= sli.Len() {
 						sli = reflect.Append(sli, reflect.New(ty))
@@ -261,13 +309,130 @@ func decodeBodyToMap(body hcl.Body, ctx *hcl.EvalContext, v reflect.Value) hcl.D
 	return diags
 }
 
+// decodeBlocksToMap collects blocks into the map field, keyed by each block's
+// name. A block without a name, and a second block with a name already used,
+// are reported at the block. The element's label field, when it has one, is
+// set to the key.
+func decodeBlocksToMap(blocks hcl.Blocks, ctx *hcl.EvalContext, field reflect.Value, ty reflect.Type, isPtr bool, typeName string) hcl.Diagnostics {
+	var diags hcl.Diagnostics
+
+	collected := field
+	if collected.IsNil() {
+		collected = reflect.MakeMap(field.Type())
+	}
+
+	named := map[string]*hcl.Block{}
+
+	for _, block := range blocks {
+		if len(block.Labels) == 0 {
+			diags = append(diags, missingBlockNameDiagnostic(typeName, block))
+			continue
+		}
+
+		name := block.Labels[0]
+		if first, seen := named[name]; seen {
+			diags = append(diags, duplicateBlockNameDiagnostic(typeName, first, block))
+			continue
+		}
+		named[name] = block
+
+		elem := reflect.New(ty)
+		diags = append(diags, decodeBlockToValue(block, ctx, elem.Elem())...)
+
+		if isPtr {
+			collected.SetMapIndex(reflect.ValueOf(name), elem)
+		} else {
+			collected.SetMapIndex(reflect.ValueOf(name), elem.Elem())
+		}
+	}
+
+	field.Set(collected)
+
+	return diags
+}
+
+// missingBlockNameDiagnostic reports a block collected by name that carries
+// none, at the block.
+func missingBlockNameDiagnostic(typeName string, block *hcl.Block) *hcl.Diagnostic {
+	return &hcl.Diagnostic{
+		Severity: hcl.DiagError,
+		Summary:  "A name is required",
+		Detail: fmt.Sprintf(
+			"%s blocks are collected by name, so each one needs a name, e.g. %s \"http\" { ... }.",
+			typeName, typeName,
+		),
+		Subject: &block.DefRange,
+	}
+}
+
+// checkBlockNames reports the name problems decoding the blocks of one type
+// would find: a block without a name when named is set, as for a map of
+// blocks, and a second block carrying a name already used, for maps and
+// lists alike. It is shared by the decoder and CheckBody, so validation
+// reports them without decoding.
+func checkBlockNames(typeName string, blocks hcl.Blocks, named bool) hcl.Diagnostics {
+	var diags hcl.Diagnostics
+	seen := map[string]*hcl.Block{}
+
+	for _, block := range blocks {
+		if len(block.Labels) == 0 {
+			if named {
+				diags = append(diags, missingBlockNameDiagnostic(typeName, block))
+			}
+			continue
+		}
+
+		if first, dup := seen[block.Labels[0]]; dup {
+			diags = append(diags, duplicateBlockNameDiagnostic(typeName, first, block))
+			continue
+		}
+		seen[block.Labels[0]] = block
+	}
+
+	return diags
+}
+
+// duplicateBlockNameDiagnostic reports second, which carries the name first
+// already took, at its name.
+func duplicateBlockNameDiagnostic(typeName string, first, second *hcl.Block) *hcl.Diagnostic {
+	return &hcl.Diagnostic{
+		Severity: hcl.DiagError,
+		Summary:  fmt.Sprintf("Duplicate %s name", typeName),
+		Detail: fmt.Sprintf(
+			"A %s named %q was already defined at %s. Each %s needs its own name.",
+			typeName, second.Labels[0], first.DefRange.String(), typeName,
+		),
+		Subject: second.LabelRanges[0].Ptr(),
+	}
+}
+
 func decodeBlockToValue(block *hcl.Block, ctx *hcl.EvalContext, v reflect.Value) hcl.Diagnostics {
 	diags := decodeBodyToValue(block.Body, ctx, v)
 
 	if len(block.Labels) > 0 {
-		blockTags := getFieldTags(v.Type())
+		blockTags, err := fieldTagsOf(v.Type())
+		if err != nil {
+			return append(diags, unsupportedTargetDiagnostic(block.Body, err))
+		}
+
 		for li, lv := range block.Labels {
+			// a name accepted for an element with no label field is dropped
+			if li >= len(blockTags.Labels) {
+				break
+			}
+
 			lfieldIdx := blockTags.Labels[li].FieldIndex
+			labelField := v.Type().Field(lfieldIdx)
+			if labelField.Type.Kind() != reflect.String || labelField.PkgPath != "" {
+				diags = append(diags, &hcl.Diagnostic{
+					Severity: hcl.DiagError,
+					Summary:  "Unsupported decode target",
+					Detail:   fmt.Sprintf("Label %q: field %s of %s cannot hold a label, a label field must be an exported string, not %s.", lv, labelField.Name, v.Type(), labelField.Type),
+					Subject:  block.LabelRanges[li].Ptr(),
+				})
+				continue
+			}
+
 			v.Field(lfieldIdx).Set(reflect.ValueOf(lv))
 		}
 	}
@@ -292,9 +457,20 @@ func decodeBlockToValue(block *hcl.Block, ctx *hcl.EvalContext, v reflect.Value)
 func DecodeExpression(expr hcl.Expression, ctx *hcl.EvalContext, val interface{}) hcl.Diagnostics {
 	srcVal, diags := expr.Value(ctx)
 
-	convTy, err := gocty.ImpliedType(val)
+	// The value is converted against a constraint rather than the plain
+	// implied type, so an object or map value may leave out the attributes
+	// whose fields are tagged optional, as a block may leave out their
+	// attributes. The constraint fills them with null, which decoding leaves
+	// at the field's zero value.
+	convTy, err := gocty.ImpliedConstraintType(val)
 	if err != nil {
-		panic(fmt.Sprintf("unsuitable DecodeExpression target: %s", err))
+		return append(diags, &hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "Unsupported decode target",
+			Detail:   fmt.Sprintf("The value cannot be decoded into %T, which has no configuration form: %s.", val, err),
+			Subject:  expr.StartRange().Ptr(),
+			Context:  expr.Range().Ptr(),
+		})
 	}
 
 	srcVal, err = convert.Convert(srcVal, convTy)

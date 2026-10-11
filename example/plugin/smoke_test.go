@@ -54,7 +54,7 @@ func TestSmokeApplyStatusDestroyShareTheSavedState(t *testing.T) {
 	requireDocker(t)
 
 	binary := buildExample(t)
-	env := []string{"HCL_VAR_output_dir=" + t.TempDir()}
+	env := []string{"XCL_VAR_output_dir=" + t.TempDir()}
 	stateDir := t.TempDir()
 
 	stdout, stderr, err := runExample(t, binary, env, "apply", "--state", stateDir, "./config/full")
@@ -96,7 +96,7 @@ func TestSmokeApplyFailsForMissingPlugin(t *testing.T) {
 	requireDocker(t)
 
 	binary := buildExample(t)
-	env := []string{"HCL_VAR_output_dir=" + t.TempDir()}
+	env := []string{"XCL_VAR_output_dir=" + t.TempDir()}
 
 	_, stderr, err := runExample(t, binary, env, "apply", "--state", t.TempDir(), "--plugin", "/nonexistent/docker-plugin", "./config/full")
 	require.Error(t, err)

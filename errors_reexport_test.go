@@ -106,3 +106,53 @@ func TestReexportedErrPluginNotFoundMatchesThroughAPluginLoadError(t *testing.T)
 
 	require.ErrorIs(t, wrapped, ErrPluginNotFound)
 }
+
+func TestReexportedInvalidTypeErrorIsRecoverableThroughAWrap(t *testing.T) {
+	problem := errors.New("field Listener of main.Postgres cannot hold blocks")
+	wrapped := fmt.Errorf("validating configuration: %w", &xclerrors.InvalidTypeError{
+		Type:     "resource.postgres",
+		Provider: "postgres",
+		Registry: "default",
+		Err:      problem,
+	})
+
+	var invalid *InvalidTypeError
+	require.True(t, errors.As(wrapped, &invalid))
+	require.Equal(t, "resource.postgres", invalid.Type)
+	require.Equal(t, "postgres", invalid.Provider)
+	require.Equal(t, "default", invalid.Registry)
+	require.ErrorIs(t, wrapped, problem)
+}
+
+func TestReexportedFunctionNameClashErrorIsRecoverableThroughAWrap(t *testing.T) {
+	wrapped := fmt.Errorf("creating config: %w", &xclerrors.FunctionNameClashError{
+		Name:             "slugify",
+		Provider:         "function func(string) (string, error)",
+		Registry:         "second",
+		Existing:         "function func(string) (string, error)",
+		ExistingRegistry: "first",
+	})
+
+	var clash *FunctionNameClashError
+	require.True(t, errors.As(wrapped, &clash))
+	require.Equal(t, "slugify", clash.Name)
+	require.Equal(t, "function func(string) (string, error)", clash.Provider)
+	require.Equal(t, "second", clash.Registry)
+	require.Equal(t, "function func(string) (string, error)", clash.Existing)
+	require.Equal(t, "first", clash.ExistingRegistry)
+}
+
+func TestReexportedInvalidFunctionErrorIsRecoverableThroughAWrap(t *testing.T) {
+	problem := errors.New("functions must return a result and an error")
+	wrapped := fmt.Errorf("creating config: %w", &xclerrors.InvalidFunctionError{
+		Name:     "broken",
+		Registry: "local",
+		Err:      problem,
+	})
+
+	var invalid *InvalidFunctionError
+	require.True(t, errors.As(wrapped, &invalid))
+	require.Equal(t, "broken", invalid.Name)
+	require.Equal(t, "local", invalid.Registry)
+	require.ErrorIs(t, wrapped, problem)
+}

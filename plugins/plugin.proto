@@ -11,6 +11,12 @@ service PluginService {
   rpc Read(ReadRequest) returns (ReadResponse);
   rpc Update(UpdateRequest) returns (UpdateResponse);
   rpc Changed(ChangedRequest) returns (ChangedResponse);
+
+  // Functions a plugin's providers offer to configuration. Both calls are
+  // additive to protocol version 1: a plugin built before they existed
+  // answers Unimplemented, which the host reads as offering no functions.
+  rpc GetFunctions(GetFunctionsRequest) returns (GetFunctionsResponse);
+  rpc CallFunction(CallFunctionRequest) returns (CallFunctionResponse);
 }
 
 // Host callback service (run in host process) - consolidated logger and state
@@ -153,6 +159,33 @@ message ChangedResponse {
   reserved 1;
   string error = 2;
   Change change = 3;
+}
+
+// Function messages
+message GetFunctionsRequest {}
+
+// RegisteredFunction is a function the plugin offers: its bare name and its
+// signature as JSON, see plugins.FunctionSignature
+message RegisteredFunction {
+  string name = 1;
+  bytes signature = 2;
+}
+
+message GetFunctionsResponse {
+  repeated RegisteredFunction functions = 1;
+}
+
+// CallFunctionRequest calls the function called name with args, a JSON array
+// holding one value per parameter
+message CallFunctionRequest {
+  string name = 1;
+  bytes args = 2;
+}
+
+// CallFunctionResponse carries the result as JSON, or the function's error
+message CallFunctionResponse {
+  bytes result = 1;
+  string error = 2;
 }
 
 // Logger service messages

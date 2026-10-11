@@ -1,5 +1,6 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
+// Modifications Copyright (c) Jumppad Labs
 
 package hcl
 
@@ -8,6 +9,12 @@ package hcl
 type BlockHeaderSchema struct {
 	Type       string
 	LabelNames []string
+
+	// LabelsOptional allows a block of this type to carry either no labels
+	// or all of LabelNames. A block with some but not all of them is still
+	// an error. A block collected into a list or a map by its name uses it,
+	// so the name may be left off.
+	LabelsOptional bool
 }
 
 // AttributeSchema represents the requirements for an attribute, and is used

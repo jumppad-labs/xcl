@@ -24,19 +24,32 @@ import (
 func ImpliedType(gv interface{}) (cty.Type, error) {
 	rt := reflect.TypeOf(gv)
 	var path cty.Path
-	return impliedType(rt, path)
+	return impliedType(rt, path, false)
 }
 
-func impliedType(rt reflect.Type, path cty.Path) (cty.Type, error) {
+// ImpliedConstraintType is ImpliedType for use as a conversion constraint: a
+// struct becomes an object type whose attributes tagged optional are optional,
+// so a value converted against it may leave them out and gets null in their
+// place. A type with optional attributes is only valid as a constraint, never
+// as the type of a value, so ToCtyValue takes ImpliedType instead.
+func ImpliedConstraintType(gv interface{}) (cty.Type, error) {
+	rt := reflect.TypeOf(gv)
+	var path cty.Path
+	return impliedType(rt, path, true)
+}
+
+// impliedType returns the cty type for rt. When constraint is set, struct
+// attributes tagged optional are marked optional in the object type.
+func impliedType(rt reflect.Type, path cty.Path, constraint bool) (cty.Type, error) {
 	// A registered wrapper type converts as its inner type.
 	if _, inner, ok := wrapperFor(rt); ok {
-		return impliedType(inner, path)
+		return impliedType(inner, path, constraint)
 	}
 
 	switch rt.Kind() {
 
 	case reflect.Ptr:
-		return impliedType(rt.Elem(), path)
+		return impliedType(rt.Elem(), path, constraint)
 
 	// Primitive types
 	case reflect.Bool:
@@ -53,7 +66,7 @@ func impliedType(rt reflect.Type, path cty.Path) (cty.Type, error) {
 	// Collection types
 	case reflect.Slice:
 		path := append(path, cty.IndexStep{Key: cty.UnknownVal(cty.Number)})
-		ety, err := impliedType(rt.Elem(), path)
+		ety, err := impliedType(rt.Elem(), path, constraint)
 		if err != nil {
 			return cty.NilType, err
 		}
@@ -63,7 +76,7 @@ func impliedType(rt reflect.Type, path cty.Path) (cty.Type, error) {
 			return cty.NilType, path.NewErrorf("no cty.Type for %s (must have string keys)", rt)
 		}
 		path := append(path, cty.IndexStep{Key: cty.UnknownVal(cty.String)})
-		ety, err := impliedType(rt.Elem(), path)
+		ety, err := impliedType(rt.Elem(), path, constraint)
 		if err != nil {
 			return cty.NilType, err
 		}
@@ -71,14 +84,14 @@ func impliedType(rt reflect.Type, path cty.Path) (cty.Type, error) {
 
 	// Structural types
 	case reflect.Struct:
-		return impliedStructType(rt, path)
+		return impliedStructType(rt, path, constraint)
 
 	default:
 		return cty.NilType, path.NewErrorf("no cty.Type for %s", rt)
 	}
 }
 
-func impliedStructType(rt reflect.Type, path cty.Path) (cty.Type, error) {
+func impliedStructType(rt reflect.Type, path cty.Path, constraint bool) (cty.Type, error) {
 	if valueType.AssignableTo(rt) {
 		// Special case: cty.Value represents cty.DynamicPseudoType, for
 		// type conformance checking.
@@ -92,6 +105,10 @@ func impliedStructType(rt reflect.Type, path cty.Path) (cty.Type, error) {
 
 	atys := make(map[string]cty.Type, len(fieldIdxs))
 
+	// optional collects, for a constraint, the attributes whose field is
+	// tagged optional
+	var optional []string
+
 	{
 		// Temporary extension of path for attributes
 		path := append(path, nil)
@@ -99,13 +116,17 @@ func impliedStructType(rt reflect.Type, path cty.Path) (cty.Type, error) {
 		for k, fi := range fieldIdxs {
 			path[len(path)-1] = cty.GetAttrStep{Name: k}
 
-			ft := rt.Field(fi).Type
-			aty, err := impliedType(ft, path)
+			field := rt.Field(fi)
+			aty, err := impliedType(field.Type, path, constraint)
 			if err != nil {
 				return cty.NilType, err
 			}
 
 			atys[k] = aty
+
+			if constraint && optionalAttribute(field) {
+				optional = append(optional, k)
+			}
 		}
 	}
 
@@ -114,7 +135,7 @@ func impliedStructType(rt reflect.Type, path cty.Path) (cty.Type, error) {
 	for i := 0; i < ct; i++ {
 		field := rt.Field(i)
 		if field.Anonymous {
-			anon, err := impliedStructType(field.Type, path)
+			anon, err := impliedStructType(field.Type, path, constraint)
 			if err != nil {
 				return cty.NilType, err
 			}
@@ -122,7 +143,15 @@ func impliedStructType(rt reflect.Type, path cty.Path) (cty.Type, error) {
 			for k, v := range anon.AttributeTypes() {
 				atys[k] = v
 			}
+
+			for k := range anon.OptionalAttributes() {
+				optional = append(optional, k)
+			}
 		}
+	}
+
+	if len(optional) > 0 {
+		return cty.ObjectWithOptionalAttrs(atys, optional), nil
 	}
 
 	return cty.Object(atys), nil

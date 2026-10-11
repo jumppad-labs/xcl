@@ -602,6 +602,26 @@ func (e *bodyEncoder) encodeBlock(field reflect.StructField, fieldVal reflect.Va
 		return nil
 	}
 
+	// a map of blocks is written as one block per entry, in key order, with
+	// the key as the block's name
+	if fieldTy.Kind() == reflect.Map {
+		keys := fieldVal.MapKeys()
+		sort.Slice(keys, func(i, j int) bool { return keys[i].String() < keys[j].String() })
+
+		for _, key := range keys {
+			elemVal, ok := resolveValue(fieldVal.MapIndex(key))
+			if !ok {
+				continue
+			}
+
+			if err := e.appendNamedBlock(elemVal, name, key.String(), fmt.Sprintf("%s[%q]", path, key.String())); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
 	if !isSeq {
 		return e.appendBlock(fieldVal, name, path)
 	}
@@ -622,6 +642,13 @@ func (e *bodyEncoder) encodeBlock(field reflect.StructField, fieldVal reflect.Va
 
 // appendBlock encodes one struct value as a block and adds it to the body
 func (e *bodyEncoder) appendBlock(rv reflect.Value, name, path string) error {
+	return e.appendNamedBlock(rv, name, "", path)
+}
+
+// appendNamedBlock encodes one struct value as a block and adds it to the
+// body. When label is given it is written as the block's single label, as
+// the key of a map entry is, whatever the element's label field holds.
+func (e *bodyEncoder) appendNamedBlock(rv reflect.Value, name, label, path string) error {
 	ty := rv.Type()
 	if ty.Kind() != reflect.Struct {
 		return fmt.Errorf("%s: cannot encode %s as a block, it is not a struct", path, ty.Kind())
@@ -630,6 +657,10 @@ func (e *bodyEncoder) appendBlock(rv reflect.Value, name, path string) error {
 	block, err := encodeAsBlock(rv, ty, name, e.options, path)
 	if err != nil {
 		return err
+	}
+
+	if label != "" {
+		block.SetLabels([]string{label})
 	}
 
 	if e.wroteAny {

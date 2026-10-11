@@ -2,8 +2,8 @@
 # by the in-process plugin in e2e/fixtures/inprocess, app and ingress by the
 # external plugin in e2e/fixtures/externalplugin.
 #
-# Variables can be overridden with environment variables prefixed HCL_VAR_,
-# i.e. HCL_VAR_db_username.
+# Variables can be overridden with environment variables prefixed XCL_VAR_,
+# i.e. XCL_VAR_db_username.
 variable "db_username" {
   default = "admin"
 }

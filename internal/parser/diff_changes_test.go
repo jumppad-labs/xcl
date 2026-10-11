@@ -2,14 +2,101 @@ package parser
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
+	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/types"
 )
+
+// namedBlocksAppSource declares an app with two named listener blocks
+const namedBlocksAppSource = `
+app "web" {
+  image = "nginx:1.27"
+  host  = "web.local"
+
+  listener "http" {
+    port = 80
+  }
+
+  listener "https" {
+    port = 443
+  }
+}
+`
+
+// namedBlocksAppChangedSource is namedBlocksAppSource with the https
+// listener's port changed and nothing else
+const namedBlocksAppChangedSource = `
+app "web" {
+  image = "nginx:1.27"
+  host  = "web.local"
+
+  listener "http" {
+    port = 80
+  }
+
+  listener "https" {
+    port = 8443
+  }
+}
+`
+
+// applyWebApp writes source to a file and applies it through the registered
+// harness, returning the app.web it produced
+func applyWebApp(t *testing.T, h *registeredHarness, source string) *registered.WebApp {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "main.xcl")
+	err := os.WriteFile(path, []byte(source), 0644)
+	require.NoError(t, err)
+
+	st := h.applyAndSave(t, path)
+
+	entity, err := findByID(st.GetResources(), "app.web")
+	require.NoError(t, err)
+
+	app, ok := entity.(*registered.WebApp)
+	require.True(t, ok, "expected *registered.WebApp, got %T", entity)
+
+	return app
+}
+
+func TestResourceChangesOfSameNamedBlocksHasNoChanges(t *testing.T) {
+	h := setupRegisteredTypes(t)
+
+	saved := applyWebApp(t, h, namedBlocksAppSource)
+	configured := applyWebApp(t, h, namedBlocksAppSource)
+
+	changes := resourceChanges(diff.ActionUpdate, saved, configured, nil, nil, false)
+
+	require.Empty(t, changes)
+}
+
+func TestResourceChangesOfOneChangedNamedBlockNamesOnlyThatBlock(t *testing.T) {
+	h := setupRegisteredTypes(t)
+
+	saved := applyWebApp(t, h, namedBlocksAppSource)
+	configured := applyWebApp(t, h, namedBlocksAppChangedSource)
+
+	changes := resourceChanges(diff.ActionUpdate, saved, configured, nil, nil, false)
+
+	require.Len(t, changes, 1)
+	require.Equal(t, `listener["https"].port`, changes[0].Path.String())
+	require.Equal(t, 443, changes[0].Before)
+	require.Equal(t, 8443, changes[0].After)
+	require.False(t, changes[0].Unknown)
+	require.False(t, changes[0].Sensitive)
+
+	for _, change := range changes {
+		require.NotContains(t, change.Path.String(), `listener["http"]`)
+	}
+}
 
 // changesLogin is a block holding a sensitive leaf, so a test can add or
 // remove a whole value that contains a secret

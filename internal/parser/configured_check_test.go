@@ -176,6 +176,70 @@ network {
 	require.Empty(t, changed)
 }
 
+// webAppType is the type whose listener blocks are collected by name
+var webAppType = reflect.TypeOf(&registered.WebApp{})
+
+func TestChangedConfiguredValuesReportsNamedBlockFieldByName(t *testing.T) {
+	body := parseResourceBody(t, `
+listener "http" {
+  port = 80
+}
+
+listener "https" {
+  port = 443
+}
+`)
+
+	before := &registered.WebApp{}
+	before.Listeners = map[string]registered.Listener{
+		"http":  {Name: "http", Port: 80},
+		"https": {Name: "https", Port: 443},
+	}
+
+	after := &registered.WebApp{}
+	after.Listeners = map[string]registered.Listener{
+		"http":  {Name: "http", Port: 80},
+		"https": {Name: "https", Port: 8443},
+	}
+
+	changed := changedConfiguredValues(body, webAppType, toJSON(t, before), toJSON(t, after))
+
+	// compareConfiguredBlocks writes a map element's key bare, without the
+	// quotes a diff.Path renders it with
+	require.Equal(t, []string{"listener[https].port"}, changed)
+}
+
+// TestChangedConfiguredValuesPairsNamedBlocksByName writes the listeners in
+// the other order from the map's keys, so a pairing by position would compare
+// the https listener's body against the http element
+func TestChangedConfiguredValuesPairsNamedBlocksByName(t *testing.T) {
+	body := parseResourceBody(t, `
+listener "https" {
+  port = resource.config.main.https_port
+}
+
+listener "http" {
+  port = 80
+}
+`)
+
+	before := &registered.WebApp{}
+	before.Listeners = map[string]registered.Listener{
+		"http":  {Name: "http", Port: 80},
+		"https": {Name: "https", Port: 443},
+	}
+
+	after := &registered.WebApp{}
+	after.Listeners = map[string]registered.Listener{
+		"http":  {Name: "http", Port: 80},
+		"https": {Name: "https", Port: 8443},
+	}
+
+	changed := changedConfiguredValues(body, webAppType, toJSON(t, before), toJSON(t, after))
+
+	require.Empty(t, changed)
+}
+
 func TestChangedConfiguredValuesReportsAddedListElementOnce(t *testing.T) {
 	body := parseResourceBody(t, `
 network {

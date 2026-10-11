@@ -72,11 +72,21 @@ func knownBody(body *hclsyntax.Body, ctx *hcl.EvalContext, path diff.Path, entit
 		fieldType := namedFieldType(entityType, block.Type)
 
 		// a list of blocks is indexed by the block's position among the
-		// blocks of its type
+		// blocks of its type, a map of blocks by the block's name
 		elementType := fieldType
-		if fieldType != nil && (fieldType.Kind() == reflect.Slice || fieldType.Kind() == reflect.Array) {
-			blockPath = blockPath.Index(occurrences[block.Type])
-			elementType = fieldType.Elem()
+		if fieldType != nil {
+			switch fieldType.Kind() {
+			case reflect.Slice, reflect.Array:
+				blockPath = blockPath.Index(occurrences[block.Type])
+				elementType = fieldType.Elem()
+			case reflect.Map:
+				if len(block.Labels) > 0 {
+					blockPath = blockPath.Key(block.Labels[0])
+				} else {
+					blockPath = blockPath.Index(occurrences[block.Type])
+				}
+				elementType = fieldType.Elem()
+			}
 		}
 		occurrences[block.Type]++
 

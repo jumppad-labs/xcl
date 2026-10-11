@@ -2,8 +2,8 @@
 # types in e2e/fixtures/kube. No plugin and no provider is involved: the blocks
 # are decoded into Go structs and the references between them are resolved.
 #
-# Variables can be overridden with environment variables prefixed HCL_VAR_,
-# i.e. HCL_VAR_image_tag.
+# Variables can be overridden with environment variables prefixed XCL_VAR_,
+# i.e. XCL_VAR_image_tag.
 variable "image_tag" {
   default = "1.2.0"
 }

@@ -3,8 +3,10 @@ package plugins
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jumppad-labs/xcl/entity"
+	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/types"
@@ -48,6 +50,15 @@ type PluginEntityProvider interface {
 	// GetTypes returns the types handled by the plugin.
 	GetTypes() []RegisteredType
 
+	// GetFunctions returns the functions the plugin's providers offer to
+	// configuration, sorted by name.
+	GetFunctions() []RegisteredFunction
+
+	// CallFunction calls the function called name with args, a JSON array
+	// holding one value per parameter, and returns its result as JSON. The
+	// function's own error is returned with its message.
+	CallFunction(ctx context.Context, name string, args []byte) ([]byte, error)
+
 	// every lifecycle method takes the provider call's context, which
 	// carries the call's logger, see logger.Logger
 	Validate(ctx context.Context, entityType, entitySubType string, entityData []byte) error
@@ -84,7 +95,13 @@ func RegisterResourceProvider[T any](p *PluginBase, logger logger.Logger, state 
 		return err
 	}
 
-	return p.RegisterType(typeName, subTypeName, resourceInstance, adapter)
+	if err := p.RegisterType(typeName, subTypeName, resourceInstance, adapter); err != nil {
+		return err
+	}
+
+	// the provider's functions are offered to configuration under their
+	// bare names; two providers of one plugin cannot offer the same name
+	return p.registerProviderFunctions(adapter.name, provider.Functions())
 }
 
 // Plugin is a private interface that defines the contract between XCL
@@ -100,6 +117,17 @@ type Plugin interface {
 type PluginBase struct {
 	state           State // state functions passed to the plugin via Init
 	registeredTypes []RegisteredType
+
+	// functions are the functions the plugin's providers offer, keyed by
+	// name, with the provider each came from
+	functions map[string]pluginFunction
+}
+
+// pluginFunction is a function a provider of the plugin offers, with the
+// name of the provider, for reporting a name two providers both offer
+type pluginFunction struct {
+	fn       ProviderFunction
+	provider string
 }
 
 // SetState sets the state for the plugin base
@@ -141,6 +169,64 @@ func (p *PluginBase) getRegisteredType(entityType, entitySubType string) *Regist
 // GetTypes returns all registered types
 func (p *PluginBase) GetTypes() []RegisteredType {
 	return p.registeredTypes
+}
+
+// registerProviderFunctions records the functions a provider offers, named
+// provider, so the plugin can list and call them. A nil fns offers none. A
+// name another provider of the plugin already offers is returned as a
+// *FunctionNameClashError naming both providers.
+func (p *PluginBase) registerProviderFunctions(provider string, fns ProviderFunctions) error {
+	if fns == nil {
+		return nil
+	}
+
+	offered, err := fns.List()
+	if err != nil {
+		return fmt.Errorf("provider %s: listing its functions: %w", provider, err)
+	}
+
+	if p.functions == nil {
+		p.functions = map[string]pluginFunction{}
+	}
+
+	for _, name := range sortedFunctionNames(offered) {
+		if existing, taken := p.functions[name]; taken {
+			return &xclerrors.FunctionNameClashError{
+				Name:     name,
+				Provider: "provider " + provider,
+				Existing: "provider " + existing.provider,
+			}
+		}
+
+		p.functions[name] = pluginFunction{fn: offered[name], provider: provider}
+	}
+
+	return nil
+}
+
+// GetFunctions returns the functions the plugin's providers offer, sorted by
+// name
+func (p *PluginBase) GetFunctions() []RegisteredFunction {
+	registered := make([]RegisteredFunction, 0, len(p.functions))
+	for _, name := range sortedFunctionNames(p.functions) {
+		registered = append(registered, RegisteredFunction{
+			Name:      name,
+			Signature: p.functions[name].fn.Signature(),
+		})
+	}
+
+	return registered
+}
+
+// CallFunction calls the function called name with args, a JSON array
+// holding one value per parameter, and returns its result as JSON
+func (p *PluginBase) CallFunction(ctx context.Context, name string, args []byte) ([]byte, error) {
+	fn, ok := p.functions[name]
+	if !ok {
+		return nil, fmt.Errorf("function %q is not offered by this plugin", name)
+	}
+
+	return fn.fn.Call(ctx, args)
 }
 
 // lifecycle methods

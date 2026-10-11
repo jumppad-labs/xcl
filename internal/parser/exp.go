@@ -8,144 +8,48 @@ import (
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 )
 
-// processAttribute extracts the resources out of the HCL
-// attribute like a function or resource parameter so we can determine
-// which attributes are lazy evaluated due to dependency on another resource.
-// Attributes can be nested, therefore this function needs to return an array of
-// attributes
+// referencesIn returns the entity references an expression holds, in the
+// order they are written, so the resource can be linked to each one before it
+// is evaluated. Every node of the expression is walked, so a reference is
+// found wherever it sits: inside a template, a function call, an object or
+// tuple, a conditional, an operator, a splat, an index expression, a
+// parenthesised expression, a relative traversal or a for expression. The key
+// and value names a for expression declares are local to it and are never
+// references, so they are ignored.
+//
 // examples:
 // something = resource.mine.attr
 // something = resource.mine.array.0.attr
 // something = env(resource.mine.attr)
 // something = "${resource.mine.attr}"
 // something = "testing/${resource.mine.attr}"
-// something = "testing/${env(resource.mine.attr)}"
 // something = resource.mine.attr == "abc" ? resource.mine.attr : "abc"
+// something = { for name, l in app.web.listener : name => l.port }
 //
 // isRoot reports whether a traversal's root names something a reference can
 // point at: a builtin keyword, "resource", or the type of a known entity, i.e.
 // server in server.big.web.address
-func processExpr(expr hclsyntax.Expression, isRoot func(string) bool) ([]string, error) {
-	resources := []string{}
+func referencesIn(expr hclsyntax.Expression, isRoot func(string) bool) ([]string, error) {
+	references := []string{}
 
-	switch ex := expr.(type) {
-	// a template is a mix of functions, scope expressions and literals
-	// we need to check each part
-	case *hclsyntax.TemplateExpr:
-		for _, v := range ex.Parts {
-			res, err := processExpr(v, isRoot)
-			if err != nil {
-				return nil, err
-			}
-
-			resources = append(resources, res...)
+	for _, traversal := range hclsyntax.Variables(expr) {
+		scope := &hclsyntax.ScopeTraversalExpr{
+			Traversal: traversal,
+			SrcRange:  traversal.SourceRange(),
 		}
-	case *hclsyntax.TemplateWrapExpr:
-		res, err := processExpr(ex.Wrapped, isRoot)
+
+		reference, err := processScopeTraversal(scope, isRoot)
 		if err != nil {
 			return nil, err
 		}
 
-		resources = append(resources, res...)
-
-	// function call expressions are user defined functions
-	// myfunction(resource.container.base.name)
-	case *hclsyntax.FunctionCallExpr:
-		for _, v := range ex.Args {
-			res, err := processExpr(v, isRoot)
-			if err != nil {
-				return nil, err
-			}
-
-			resources = append(resources, res...)
+		// only a traversal rooted at an entity is a reference
+		if reference != "" {
+			references = append(references, reference)
 		}
-	// a function can contain args that may also have an expression
-	case *hclsyntax.ScopeTraversalExpr:
-		ref, err := processScopeTraversal(ex, isRoot)
-		if err != nil {
-			return nil, err
-		}
-
-		// only add if a resource has been returned
-		if ref != "" {
-			resources = append(resources, ref)
-		}
-
-	case *hclsyntax.ObjectConsExpr:
-		for _, v := range ex.Items {
-			res, err := processExpr(v.ValueExpr, isRoot)
-			if err != nil {
-				return nil, err
-			}
-
-			resources = append(resources, res...)
-		}
-	case *hclsyntax.TupleConsExpr:
-		for _, v := range ex.Exprs {
-			res, err := processExpr(v, isRoot)
-			if err != nil {
-				return nil, err
-			}
-
-			resources = append(resources, res...)
-		}
-	// conditional expressions are like if statements
-	// resource.container.base.name == "hello" ? "this" : "that"
-	case *hclsyntax.ConditionalExpr:
-		conditions, err := processExpr(ex.Condition, isRoot)
-		if err != nil {
-			return nil, err
-		}
-		resources = append(resources, conditions...)
-
-		trueResults, err := processExpr(ex.TrueResult, isRoot)
-		if err != nil {
-			return nil, err
-		}
-		resources = append(resources, trueResults...)
-
-		falseResults, err := processExpr(ex.FalseResult, isRoot)
-		if err != nil {
-			return nil, err
-		}
-		resources = append(resources, falseResults...)
-	// binary expressions are two part comparisons
-	// resource.container.base.name == "hello"
-	// resource.container.base.name != "hello"
-	// resource.container.base.name > 3
-	case *hclsyntax.BinaryOpExpr:
-		lhs, err := processExpr(ex.LHS, isRoot)
-		if err != nil {
-			return nil, err
-		}
-		resources = append(resources, lhs...)
-
-		rhs, err := processExpr(ex.RHS, isRoot)
-		if err != nil {
-			return nil, err
-		}
-		resources = append(resources, rhs...)
-	case *hclsyntax.SplatExpr:
-		ref, err := processExpr(ex.Source, isRoot)
-		if err != nil {
-			return nil, err
-		}
-
-		// only add if a resource has been returned
-		if len(ref) > 0 {
-			resources = append(resources, ref...)
-		}
-	// unary expressions are single operand operations
-	// disabled = !variable.enabled
-	case *hclsyntax.UnaryOpExpr:
-		val, err := processExpr(ex.Val, isRoot)
-		if err != nil {
-			return nil, err
-		}
-		resources = append(resources, val...)
 	}
 
-	return resources, nil
+	return references, nil
 }
 
 func processScopeTraversal(expr *hclsyntax.ScopeTraversalExpr, isRoot func(string) bool) (string, error) {

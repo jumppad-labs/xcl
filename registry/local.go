@@ -26,7 +26,10 @@ type Local struct {
 	mu      sync.Mutex
 	pattern string
 	types   []Type
-	entries []localEntry
+
+	// functions are the Go functions registered with RegisterFunction
+	functions []Function
+	entries   []localEntry
 }
 
 // localEntry is one registration, either a plugin or a directory to search
@@ -114,6 +117,49 @@ func (l *Local) Types() []Type {
 	}
 
 	return append([]Type{}, l.types...)
+}
+
+// RegisterFunction offers fn, a plain Go func, to configuration under name,
+// beside the types declared with RegisterType:
+//
+//	local.RegisterFunction("slugify", func(title string) (string, error) { ... })
+//
+// Configuration then calls it as slugify("My App"), and the entity holds the
+// result. fn takes string, bool and number parameters, or slices and
+// string-keyed maps of those, and returns a result of such a type and an
+// error.
+//
+// A registration that is wrong on every run is a programmer error and panics
+// here: an empty name or a nil fn. A func whose signature cannot be called
+// from configuration, and a name that a builtin or another function already
+// uses, in this registry or another, are returned by xcl.NewConfig. A plugin
+// offering the same name is reported when plugins load.
+func (l *Local) RegisterFunction(name string, fn any) {
+	if name == "" {
+		panic(fmt.Sprintf("xcl: registry %s: a function must be named", LocalName))
+	}
+
+	if fn == nil {
+		panic(fmt.Sprintf("xcl: registry %s: function %q must not be nil", LocalName, name))
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.functions = append(l.functions, Function{Name: name, Func: fn})
+}
+
+// Functions returns the functions registered with RegisterFunction, in the
+// order they were registered, or nil when none were
+func (l *Local) Functions() []Function {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if len(l.functions) == 0 {
+		return nil
+	}
+
+	return append([]Function{}, l.functions...)
 }
 
 // RegisterPlugin registers p, a plugin compiled into the program. A nil p is

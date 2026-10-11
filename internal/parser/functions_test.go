@@ -6,22 +6,21 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jumppad-labs/xcl/internal/cty/function"
-	"github.com/jumppad-labs/xcl/internal/functions"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
+	"github.com/jumppad-labs/xcl/registry"
 	"github.com/stretchr/testify/require"
 )
 
-// constantNumberOptions returns parser options with a custom function
-// constant_number that always returns 42
+// constantNumberOptions returns parser options whose catalog holds an
+// application function constant_number that always returns 42
 func constantNumberOptions(t *testing.T) *ParserOptions {
-	constantNumber, err := functions.CreateCtyFunctionFromGoFunc(func() (int, error) { return 42, nil })
-	require.NoError(t, err)
-
 	o := testOptions(t)
-	o.CustomFunctions = map[string]function.Function{
-		"constant_number": constantNumber,
-	}
+
+	err := o.Catalog.DeclareFunction(registry.Function{
+		Name: "constant_number",
+		Func: func() (int, error) { return 42, nil },
+	}, "test")
+	require.NoError(t, err)
 
 	return o
 }

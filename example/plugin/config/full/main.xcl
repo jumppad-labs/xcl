@@ -2,8 +2,8 @@
 # the external Docker plugin, the template block from the in-process template
 # plugin.
 #
-# Variables can be overridden with environment variables prefixed HCL_VAR_,
-# i.e. HCL_VAR_output_dir.
+# Variables can be overridden with environment variables prefixed XCL_VAR_,
+# i.e. XCL_VAR_output_dir.
 
 # output_dir is where the rendered templates are written
 variable "output_dir" {

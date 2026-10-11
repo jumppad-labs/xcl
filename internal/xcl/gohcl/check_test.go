@@ -175,3 +175,83 @@ port     = var.undefined + 1
 	diags := CheckBody(body, &checkDatabase{})
 	require.False(t, diags.HasErrors(), diags.Error())
 }
+
+func TestCheckBodyAcceptsKnownAttributesInsideMapBlocks(t *testing.T) {
+	body := parseCheckBody(t, `
+listener "http" {
+  port = 80
+}
+`)
+
+	diags := CheckBody(body, &mapApp{})
+	require.False(t, diags.HasErrors(), diags.Error())
+}
+
+func TestCheckBodyRejectsUnknownAttributeInsideMapBlock(t *testing.T) {
+	body := parseCheckBody(t, `
+listener "http" {
+  nope = 1
+}
+`)
+
+	diags := CheckBody(body, &mapApp{})
+	require.True(t, diags.HasErrors())
+	require.Contains(t, diags.Error(), "nope")
+}
+
+func TestCheckBodyRejectsUnnamedBlockIntoMapAtTheBlock(t *testing.T) {
+	body := parseCheckBody(t, `
+listener {
+  port = 80
+}
+`)
+
+	diags := CheckBody(body, &mapApp{})
+	require.True(t, diags.HasErrors())
+	require.Equal(t, "A name is required", diags[0].Summary)
+	require.Equal(t, 2, diags[0].Subject.Start.Line)
+}
+
+func TestCheckBodyRejectsDuplicateBlockNameAtTheSecondBlock(t *testing.T) {
+	body := parseCheckBody(t, `
+listener "http" {
+  port = 80
+}
+
+listener "http" {
+  port = 8080
+}
+`)
+
+	diags := CheckBody(body, &mapApp{})
+	require.True(t, diags.HasErrors())
+	require.Equal(t, "Duplicate listener name", diags[0].Summary)
+	require.Equal(t, 6, diags[0].Subject.Start.Line)
+}
+
+func TestCheckBodyRejectsDuplicateBlockNameInList(t *testing.T) {
+	body := parseCheckBody(t, `
+listener "http" {
+  port = 80
+}
+
+listener "http" {
+  port = 8080
+}
+`)
+
+	diags := CheckBody(body, &listApp{})
+	require.True(t, diags.HasErrors())
+	require.Equal(t, "Duplicate listener name", diags[0].Summary)
+}
+
+func TestCheckBodyAcceptsUnnamedBlockInList(t *testing.T) {
+	body := parseCheckBody(t, `
+listener {
+  port = 80
+}
+`)
+
+	diags := CheckBody(body, &listApp{})
+	require.False(t, diags.HasErrors(), diags.Error())
+}
