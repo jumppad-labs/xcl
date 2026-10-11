@@ -90,3 +90,36 @@ jobs:
           echo "== $example"
           (cd "$example" && go build -v ./... && go vet ./...) || exit 1
         done
+
+    # The shared library is a module of its own, built with cgo, and must
+    # compile on the minimum supported Go too
+    - name: Build and vet libxcl
+      run: cd bindings/libxcl && CGO_ENABLED=1 go build -v ./... && go vet ./...
+
+  # libxcl is the engine built as a C shared library, from the nested module
+  # bindings/libxcl, which is the only place cgo is used. The root module's
+  # CGO_ENABLED=0 builds above are the guard that keeps it that way. This
+  # job builds the library for the runner's platform and runs the smoke test
+  # that calls through the four exported C functions.
+  libxcl:
+    name: Build and smoke-test libxcl
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.27.0'
+
+    - name: Build the shared library
+      run: make libxcl LIBXCL_VERSION=v0.0.0-ci
+
+    - name: Check the exported symbols
+      run: |
+        nm -D --defined-only bindings/libxcl/build/libxcl.so | awk '$2 == "T" && $3 ~ /^xcl_/ {print $3}' | sort > exported.txt
+        printf 'xcl_abi_version\nxcl_call\nxcl_free\nxcl_release\n' > expected.txt
+        diff expected.txt exported.txt
+
+    - name: Smoke-test through the C ABI
+      run: make test-libxcl LIBXCL_VERSION=v0.0.0-ci

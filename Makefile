@@ -31,6 +31,34 @@ buf-breaking:
 	buf breaking --against '.git#branch=main'
 
 .PHONY: protos install-mockery mocks mocks-clean setup-mocks core-protos buf-lint buf-breaking
+
+# libxcl is the engine built as a C shared library from the nested module
+# bindings/libxcl, for a language binding to load. LIBXCL_VERSION is stamped
+# into the library as the version GetVersion reports, a release sets it to the
+# tag. LIBXCL_OUT is the library's path; the default extension follows GOOS.
+# CC, GOOS and GOARCH pass through for cross builds, e.g.
+# make libxcl CC="zig cc -target x86_64-linux-gnu.2.28" LIBXCL_VERSION=v1.0.0
+LIBXCL_VERSION ?= dev
+LIBXCL_GOOS ?= $(shell go env GOOS)
+ifeq ($(LIBXCL_GOOS),windows)
+LIBXCL_EXT := dll
+else ifeq ($(LIBXCL_GOOS),darwin)
+LIBXCL_EXT := dylib
+else
+LIBXCL_EXT := so
+endif
+LIBXCL_OUT ?= $(CURDIR)/bindings/libxcl/build/libxcl.$(LIBXCL_EXT)
+LIBXCL_LDFLAGS := -s -w -X github.com/jumppad-labs/xcl/coreservice.Version=$(LIBXCL_VERSION)
+
+libxcl:
+	cd bindings/libxcl && CGO_ENABLED=1 go build -buildmode=c-shared -trimpath -ldflags="$(LIBXCL_LDFLAGS)" -o "$(LIBXCL_OUT)" .
+
+# test-libxcl runs the nested module's smoke test through the C ABI, with
+# the library's version stamped exactly as the libxcl target stamps it
+test-libxcl:
+	cd bindings/libxcl && CGO_ENABLED=1 go test -count=1 -ldflags="-X github.com/jumppad-labs/xcl/coreservice.Version=$(LIBXCL_VERSION)" ./...
+
+.PHONY: libxcl test-libxcl
 # Install and start a real plugin release from github.com. Set
 # XCL_GITHUB_LIVE_PLUGIN=owner/repo@vX.Y.Z, optionally XCL_GITHUB_LIVE_KEY to
 # the path of an armoured public key to trust, and GITHUB_TOKEN or GH_TOKEN
