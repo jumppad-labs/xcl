@@ -160,7 +160,8 @@ jobs:
           path: dist/windows_arm64
           if-no-files-found: error
 
-  # macOS is built on GitHub's own runners with the Xcode toolchain
+  # macOS is built on GitHub's arm64 runner with the Xcode toolchain; the
+  # x86-64 dylib is cross-compiled there, as the Intel runners are retired
   build-macos:
     name: Build ${{ matrix.target.name }}
     needs: settings
@@ -169,7 +170,7 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - { name: darwin_amd64, runner: macos-13,     goarch: amd64 }
+          - { name: darwin_amd64, runner: macos-latest, goarch: amd64 }
           - { name: darwin_arm64, runner: macos-latest, goarch: arm64 }
     env:
       MACOSX_DEPLOYMENT_TARGET: '11.0'
