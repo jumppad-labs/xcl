@@ -1,0 +1,14 @@
+{
+  "kind": "plan",
+  "current_step": "discovery",
+  "completed_steps": [
+    "new",
+    "overview"
+  ],
+  "created_at": "2026-10-11T09:02:18.743481707Z",
+  "updated_at": "2026-10-11T09:02:25.665366147Z",
+  "data": {
+    "name": "20261010160411-19b965db-language-reference",
+    "orchestrated": true
+  }
+}

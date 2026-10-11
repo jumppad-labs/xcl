@@ -6,6 +6,7 @@ spec: 20261009092551-82db0140-plugin-template
 specs:
     - 20261009092551-82db0140-plugin-template
     - 20261009102138-48e95432-docker-example-standard-layout
+    - 20261011095738-fad05e41-language-surface
 ---
 
 # Standard xcl plugin layout

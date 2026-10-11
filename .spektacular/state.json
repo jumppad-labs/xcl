@@ -15,10 +15,9 @@
     "split",
     "finished"
   ],
-  "created_at": "2026-10-09T10:21:48.934508147Z",
-  "updated_at": "2026-10-09T10:36:10.599822249Z",
+  "created_at": "2026-10-11T13:07:09.973717286Z",
+  "updated_at": "2026-10-11T14:02:19.752909901Z",
   "data": {
-    "epic": "20261009092551-82db0140-plugin-template",
-    "name": "20261009102148-7d0b205b-github-releases-registry"
+    "name": "20261011130709-aa3eb933-python-support"
   }
 }
