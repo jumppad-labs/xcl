@@ -1,5 +1,15 @@
 # Changelog
 
+## 20261010160411-19b965db-language-reference
+
+xcl.dev has a language reference. Eight pages under [xcl.dev/language](https://xcl.dev/language/) describe XCL itself as released in v0.3.0 and v0.4.0: the files it reads, entities and their labels, addresses and built-in fields, each shape of attribute and block beside the Go struct and the Python dataclass that receive it, references and processing order, expressions, variables and outputs, modules, and every built-in function with an example, plus application and plugin functions and how name clashes are reported. The reference is in the site's navigation, linked from the home page, and is the first item of this README's Documentation list.
+
+Across the site, every code example that shows application code now offers Go and Python tabs, written against the `xcl-lang` package; choosing a language switches every example on the page and is remembered on the next page. Where Python has no form of a Go capability yet, such as a custom registry, a custom masker, `EncodeEntity` or a custom highlight renderer, the Python tab says so and names what Python offers. The plugin authoring pages state that plugins are written in Go for now and can be used from Go and Python applications.
+
+**Breaking:**
+
+None.
+
 ## 20261011130709-aa3eb933-python-support
 
 XCL runs from Python. The same engine Go programs use is built once as a C shared library, libxcl, and the new Python package, `xcl-lang` on PyPI and imported as `xcl`, drives it: a Python program defines entity types as dataclasses, registers Python functions, uses Go-compiled plugins from a path, a directory or the GitHub registry, passes variables, keeps state in a directory or in its own store, receives events, and validates, diffs, applies, loads and destroys configuration with the same results a Go program gets, through a synchronous API and an asyncio API over one poll loop. This is released as xcl v0.4.0, and every xcl release from here on publishes the Python package at the same version.

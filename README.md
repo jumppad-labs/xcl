@@ -168,6 +168,7 @@ reported in one of three places:
 
 The documentation lives at **[xcl.dev](https://xcl.dev)**:
 
+- [Language reference](https://xcl.dev/language/): files, entities, attributes and blocks, references, expressions, variables, modules and functions, with Go and Python types
 - [Registries](https://xcl.dev/registries/): declaring Go types and registering plugins
 - [Installing plugins from GitHub](https://xcl.dev/github-registry/) and the
   [plugin template](https://xcl.dev/plugin-template/)
