@@ -1,0 +1,12 @@
+app "missing" {
+}
+
+app "computed" {
+  image    = "nginx"
+  endpoint = "http://set-by-config"
+}
+
+app "unknown" {
+  image  = "nginx"
+  colour = "blue"
+}

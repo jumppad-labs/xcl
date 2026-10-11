@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
@@ -202,7 +203,10 @@ type Config struct {
 	eventMask       mask.Masker         // Masks sensitive values in event data, mask.Redact() by default
 	eventMaskOff    bool                // Event data carries real sensitive values, set by WithNoEventMask
 
-	addresses *resources.AddressParser // resolves addresses against the known types
+	// addresses resolves addresses against the known types. It is kept once
+	// the registry's plugins have loaded, and read without a lock, so that
+	// lookups may run concurrently between operations
+	addresses atomic.Pointer[resources.AddressParser]
 }
 
 // addressParser returns a parser that resolves addresses against the types the
@@ -211,9 +215,13 @@ type Config struct {
 //
 // The parser is not kept until the registry's plugins have loaded, the types
 // they provide are not known before then.
+//
+// Lookups may run concurrently, so the parser is published atomically once
+// built. Two lookups that race to build it keep whichever was published
+// first; both resolve the same types.
 func (c *Config) addressParser() *resources.AddressParser {
-	if c.addresses != nil {
-		return c.addresses
+	if kept := c.addresses.Load(); kept != nil {
+		return kept
 	}
 
 	var known []types.TypeInfo
@@ -223,7 +231,9 @@ func (c *Config) addressParser() *resources.AddressParser {
 
 	addresses := resources.NewAddressParser(known)
 	if c.catalog == nil || c.catalog.Loaded() {
-		c.addresses = addresses
+		if !c.addresses.CompareAndSwap(nil, addresses) {
+			return c.addresses.Load()
+		}
 	}
 
 	return addresses
@@ -363,9 +373,22 @@ func (c *Config) Outputs() map[string]any {
 //   - DAG has no cycles
 //   - Resource dependencies are valid
 func (c *Config) Validate(paths ...string) error {
-	return c.run(events.OperationValidate, func(ctx context.Context, emit events.Emit) error {
+	return c.ValidateContext(context.Background(), paths...)
+}
+
+// ValidateContext is Validate under the caller's context. Validate calls no
+// provider, so ctx is observed only before the parse starts: a ctx that is
+// already cancelled returns an error wrapping context.Canceled, or
+// context.DeadlineExceeded when a deadline passed, and a validation that was
+// already running finishes as it would have.
+func (c *Config) ValidateContext(ctx context.Context, paths ...string) error {
+	return c.run(ctx, events.OperationValidate, func(ctx context.Context, emit events.Emit) error {
 		if len(paths) == 0 {
 			return fmt.Errorf("at least one path is required")
+		}
+
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("validate stopped before the configuration was read: %w", err)
 		}
 
 		p := parser.NewParser(c.parserOptions(emit))
@@ -388,7 +411,19 @@ func (c *Config) Validate(paths ...string) error {
 // it declares no blocks, which returns ErrEmptyConfiguration: use Destroy to
 // remove everything.
 func (c *Config) Apply(paths ...string) error {
-	return c.run(events.OperationApply, func(ctx context.Context, emit events.Emit) error {
+	return c.ApplyContext(context.Background(), paths...)
+}
+
+// ApplyContext is Apply under the caller's context, so the caller can stop an
+// apply that is in progress. Cancelling ctx starts no further provider call:
+// a call already running finishes, the progress made is saved to the state
+// store exactly as it is after a failed provider call, and ApplyContext
+// returns an error that wraps context.Canceled, or context.DeadlineExceeded
+// when a deadline passed. A ctx that is already cancelled stops the apply
+// before any provider is called. The next apply resumes from the saved
+// progress.
+func (c *Config) ApplyContext(ctx context.Context, paths ...string) error {
+	return c.run(ctx, events.OperationApply, func(ctx context.Context, emit events.Emit) error {
 		if len(paths) == 0 {
 			return fmt.Errorf("at least one path is required")
 		}
@@ -446,7 +481,17 @@ func (c *Config) Apply(paths ...string) error {
 // named in the returned error; calling Destroy again retries it. When nothing
 // has been saved Destroy succeeds and writes nothing.
 func (c *Config) Destroy() error {
-	return c.run(events.OperationDestroy, func(ctx context.Context, emit events.Emit) error {
+	return c.DestroyContext(context.Background())
+}
+
+// DestroyContext is Destroy under the caller's context, so the caller can stop
+// a destroy that is in progress. Cancelling ctx starts no further provider
+// call: a destroy already running finishes and is saved, the resources not
+// yet reached stay in the state, and DestroyContext returns an error that
+// wraps context.Canceled, or context.DeadlineExceeded when a deadline passed.
+// Calling Destroy again removes what remains.
+func (c *Config) DestroyContext(ctx context.Context) error {
+	return c.run(ctx, events.OperationDestroy, func(ctx context.Context, emit events.Emit) error {
 		saved := c.entities
 
 		if c.stateStore != nil {
@@ -489,7 +534,20 @@ func (c *Config) Destroy() error {
 // the Config holds nothing. Without a state store there is nothing to read,
 // Load succeeds and keeps what the Config already holds.
 func (c *Config) Load() error {
-	return c.run(events.OperationLoadState, func(ctx context.Context, emit events.Emit) error {
+	return c.LoadContext(context.Background())
+}
+
+// LoadContext is Load under the caller's context. Load calls no provider, so
+// ctx is observed only before the state is read: a ctx that is already
+// cancelled returns an error wrapping context.Canceled, or
+// context.DeadlineExceeded when a deadline passed, and leaves what the Config
+// holds untouched.
+func (c *Config) LoadContext(ctx context.Context) error {
+	return c.run(ctx, events.OperationLoadState, func(ctx context.Context, emit events.Emit) error {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("load stopped before the state was read: %w", err)
+		}
+
 		if c.stateStore == nil {
 			return nil
 		}
@@ -544,8 +602,10 @@ func convertVariablesToStringMap(vars map[string]any) map[string]string {
 	return result
 }
 
-// run runs the work of one Validate, Apply, Diff or Destroy and delivers its
-// events.
+// run runs the work of one Validate, Apply, Diff, Destroy or Load under ctx
+// and delivers its events. ctx is the caller's: cancelling it stops the work
+// from starting new provider calls, and the error the work returns wraps the
+// context's error.
 //
 // Without an event handler the work runs directly with a nil emit, so xcl is
 // silent and nothing extra is started. With one, the work runs on a worker
@@ -565,11 +625,11 @@ func convertVariablesToStringMap(vars map[string]any) map[string]string {
 //
 // A panic raised by a provider on a worker goroutine is not handled here, it
 // behaves as it does without a handler.
-func (c *Config) run(operation string, work func(ctx context.Context, emit events.Emit) error) error {
+func (c *Config) run(ctx context.Context, operation string, work func(ctx context.Context, emit events.Emit) error) error {
 	work = c.withPlugins(work)
 
 	if c.eventHandler == nil {
-		return work(context.Background(), nil)
+		return work(ctx, nil)
 	}
 
 	size := c.eventBufferSize
@@ -585,7 +645,7 @@ func (c *Config) run(operation string, work func(ctx context.Context, emit event
 		stream.Emit(e.WithEntityDecoder(c.decodeEventEntity))
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	started := time.Now()

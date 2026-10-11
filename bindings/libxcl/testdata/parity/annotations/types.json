@@ -1,0 +1,18 @@
+[
+  {"schema_version": 1, "type": "app", "fields": [
+    {"name": "image", "type": "string"},
+    {"name": "replicas", "type": "number", "format": "int", "optional": true, "default": 2},
+    {"name": "region", "type": "string", "optional": true, "default": "eu"},
+    {"name": "password", "type": "string", "optional": true, "sensitive": true},
+    {"name": "endpoint", "type": "string", "computed": true},
+    {"name": "health", "kind": "block", "optional": true, "type": {"object": [
+      {"name": "path", "type": "string"}
+    ]}},
+    {"name": "volume", "kind": "block", "repeated": true, "label": "name", "type": {"object": [
+      {"name": "source", "type": "string"}
+    ]}},
+    {"name": "listener", "kind": "block", "label": "name", "type": {"map": {"object": [
+      {"name": "port", "type": "number", "format": "int"}
+    ]}}}
+  ]}
+]

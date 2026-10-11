@@ -1,0 +1,12 @@
+variable "region" {
+  default = "eu"
+}
+
+variable "replicas" {
+  default = 2
+}
+
+app "web" {
+  region   = variable.region
+  replicas = variable.replicas
+}

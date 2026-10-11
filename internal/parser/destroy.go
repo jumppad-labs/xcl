@@ -99,6 +99,11 @@ func (d *destroyer) destroy(targets []any) error {
 		ce.AppendError(e)
 	}
 
+	// the cancellation is always reported, beside any error the walk hit
+	if d.ctx.Err() != nil {
+		ce.AppendError(fmt.Errorf("destroy stopped before every resource was reached: %w", d.ctx.Err()))
+	}
+
 	return ce
 }
 

@@ -1,0 +1,14 @@
+variable "tmp" {
+  default = ""
+}
+
+resource "recording" "first" {
+  log   = "${variable.tmp}/recording.log"
+  value = "one"
+}
+
+resource "recording" "second" {
+  log   = "${variable.tmp}/recording.log"
+  value = "two"
+  input = resource.recording.first.output
+}

@@ -1,0 +1,6 @@
+[
+  {"schema_version": 1, "type": "app", "fields": [
+    {"name": "region", "type": "string"},
+    {"name": "ports", "type": {"list": "number"}, "format": "int", "optional": true}
+  ]}
+]

@@ -23,3 +23,5 @@ example/prettylog/prettylog
 # spektacular debug logs
 .spektacular/debug/
 .spektacular/tmp/
+# libxcl built for the local platform by make libxcl
+bindings/libxcl/build/

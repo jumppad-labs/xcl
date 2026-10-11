@@ -32,9 +32,19 @@ import (
 // the same events and logging as Apply. Sensitive values are left out of the
 // result unless diff.RevealSensitive is given.
 func (c *Config) Diff(paths []string, options ...diff.Option) (*diff.Diff, error) {
+	return c.DiffContext(context.Background(), paths, options...)
+}
+
+// DiffContext is Diff under the caller's context, so the caller can stop a
+// diff that is in progress. Cancelling ctx starts no further provider read or
+// comparison; a call already running finishes, and DiffContext returns no diff
+// and an error that wraps context.Canceled, or context.DeadlineExceeded when
+// a deadline passed. A ctx that is already cancelled stops the diff before
+// any provider is called.
+func (c *Config) DiffContext(ctx context.Context, paths []string, options ...diff.Option) (*diff.Diff, error) {
 	var result *diff.Diff
 
-	err := c.run(events.OperationDiff, func(ctx context.Context, emit events.Emit) error {
+	err := c.run(ctx, events.OperationDiff, func(ctx context.Context, emit events.Emit) error {
 		if len(paths) == 0 {
 			return fmt.Errorf("at least one path is required")
 		}

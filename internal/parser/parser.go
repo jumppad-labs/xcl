@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 
 	"github.com/hashicorp/errwrap"
 	"github.com/jumppad-labs/xcl/diff"
@@ -337,8 +338,10 @@ func (p *Parser) Apply(ctx context.Context, paths ...string) (*State, error) {
 	progress, errs := p.walkWith(ctx, currentState, previousState, functions, &resourceLifecycle{mode: walkApply, recorder: record})
 
 	// a cancelled walk skipped the resources it had not reached, keep only
-	// the progress it made
-	if len(errs) == 0 && ctx.Err() != nil {
+	// the progress it made. The cancellation is always reported, beside any
+	// error the walk hit on the way, so a caller can tell a stopped apply
+	// from a failed one with errors.Is(err, context.Canceled)
+	if ctx.Err() != nil {
 		errs = append(errs, fmt.Errorf("apply stopped before every resource was reached: %w", ctx.Err()))
 	}
 
@@ -438,7 +441,8 @@ func (p *Parser) decide(ctx context.Context, operation string, options diff.Opti
 
 	_, errs := p.walkWith(ctx, currentState, previousState, p.getFunctions, lifecycle)
 
-	if len(errs) == 0 && ctx.Err() != nil {
+	// the cancellation is always reported, beside any error the walk hit
+	if ctx.Err() != nil {
 		errs = append(errs, fmt.Errorf("%s stopped before every resource was reached: %w", operation, ctx.Err()))
 	}
 
@@ -1311,8 +1315,19 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 	references := []string{}
 	written := map[string]string{}
 
-	// Process all attributes in the block
+	// Process all attributes in the block, in the order they were written:
+	// the body holds them in a map, and the links an entity records are
+	// visible to callers, so they must not follow the map's random order
+	attributes := make([]*hclsyntax.Attribute, 0, len(b.Body.Attributes))
 	for _, a := range b.Body.Attributes {
+		attributes = append(attributes, a)
+	}
+
+	sort.Slice(attributes, func(i, j int) bool {
+		return attributes[i].SrcRange.Start.Byte < attributes[j].SrcRange.Start.Byte
+	})
+
+	for _, a := range attributes {
 		refs, err := referencesIn(a.Expr, p.isReferenceRoot)
 		if err != nil {
 			return nil, errors.NewParserError(

@@ -1,0 +1,14 @@
+service "api" {
+  port    = 9090
+  ratio   = 0.5
+  enabled = true
+  tags    = ["a", "b"]
+  labels = {
+    team = "core"
+  }
+}
+
+service "web" {
+  port     = 80
+  upstream = service.api.meta.name
+}
