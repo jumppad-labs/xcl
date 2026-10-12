@@ -532,7 +532,7 @@ Values: `Sensitive[T]` (masked `repr`/`str`, `reveal()`), `Computed[T]`, `Entity
 
 **Validation point**: The root-package, schema and coreservice test suites pass with the race detector. The `CGO_ENABLED=0` cross builds of the root module, now including coreservice, still pass. CI builds `libxcl` with cgo and its smoke test calls through the C ABI. `buf lint` passes on the new protos.
 
-#### - [ ] Task: Operations take a context and stop when it is cancelled
+#### - [x] Task: Operations take a context and stop when it is cancelled
 **Id:** cb40a3bf-11de-40c8-a007-f76ad82b3cec
 **Repo:** xcl
 **Depends on:** none
@@ -543,12 +543,12 @@ The five operations gain context-taking forms, so a caller can stop an operation
 *Technical detail:* [context.md#task-operations-take-a-context-and-stop-when-it-is-cancelled](./context.md#task-operations-take-a-context-and-stop-when-it-is-cancelled)
 
 **Acceptance criteria**:
-- [ ] Cancelling the context during an apply makes it return an error that matches `context.Canceled`.
-- [ ] After a cancelled apply, no provider call starts, and the entities already applied are in saved state.
-- [ ] Every existing operation behaves exactly as before when called without a context.
-- [ ] A context that is already cancelled stops an operation before any provider call.
+- [x] Cancelling the context during an apply makes it return an error that matches `context.Canceled`.
+- [x] After a cancelled apply, no provider call starts, and the entities already applied are in saved state.
+- [x] Every existing operation behaves exactly as before when called without a context.
+- [x] A context that is already cancelled stops an operation before any provider call.
 
-#### - [ ] Task: Entities can be looked up by type without a Go type
+#### - [x] Task: Entities can be looked up by type without a Go type
 **Id:** a4e7390e-ef84-4001-a968-feff2d778554
 **Repo:** xcl
 **Depends on:** none
@@ -559,12 +559,12 @@ The five operations gain context-taking forms, so a caller can stop an operation
 *Technical detail:* [context.md#task-entities-can-be-looked-up-by-type-without-a-go-type](./context.md#task-entities-can-be-looked-up-by-type-without-a-go-type)
 
 **Acceptance criteria**:
-- [ ] Looking up `database`, `postgres` returns every entity of that type and subtype, matching `FindByType` for the registered Go type.
-- [ ] An unknown type, and a type that needs a subtype but was given none, return the same errors as `FindByType`.
-- [ ] Looking up exactly one entity returns it. Finding none returns a not-found error, and finding several returns a not-unique error with the count.
-- [ ] Plugin-provided entities are returned by the untyped lookups.
+- [x] Looking up `database`, `postgres` returns every entity of that type and subtype, matching `FindByType` for the registered Go type.
+- [x] An unknown type, and a type that needs a subtype but was given none, return the same errors as `FindByType`.
+- [x] Looking up exactly one entity returns it. Finding none returns a not-found error, and finding several returns a not-unique error with the count.
+- [x] Plugin-provided entities are returned by the untyped lookups.
 
-#### - [ ] Task: Block types can be declared from a language-neutral schema
+#### - [x] Task: Block types can be declared from a language-neutral schema
 **Id:** d2d86531-20de-4554-aaa1-d36112ed247c
 **Repo:** xcl
 **Depends on:** none
@@ -580,14 +580,14 @@ The registry gains a public way to declare a type from such a schema. The existi
 *Technical detail:* [context.md#task-block-types-can-be-declared-from-a-language-neutral-schema](./context.md#task-block-types-can-be-declared-from-a-language-neutral-schema)
 
 **Acceptance criteria**:
-- [ ] A type declared from a schema decodes `app "web" { image = "nginx" }` and is found at `app.web` with `image` set.
-- [ ] Optional fields take their default, a required field missing is a validation error at the block, and a computed field cannot be set in configuration.
-- [ ] A sensitive field is masked in events and state.
-- [ ] Two `volume` blocks become a list of two in order, and two `listener "…"` blocks become a map keyed by name.
-- [ ] A schema marking an unsupported shape as sensitive, or an unknown field type, is refused with an error naming the field.
-- [ ] Plugins sending the existing schema form still load and decode as before.
+- [x] A type declared from a schema decodes `app "web" { image = "nginx" }` and is found at `app.web` with `image` set.
+- [x] Optional fields take their default, a required field missing is a validation error at the block, and a computed field cannot be set in configuration.
+- [x] A sensitive field is masked in events and state.
+- [x] Two `volume` blocks become a list of two in order, and two `listener "…"` blocks become a map keyed by name.
+- [x] A schema marking an unsupported shape as sensitive, or an unknown field type, is refused with an error naming the field.
+- [x] Plugins sending the existing schema form still load and decode as before.
 
-#### - [ ] Task: The core service answers configuration and lookup calls
+#### - [x] Task: The core service answers configuration and lookup calls
 **Id:** 845a37c8-a730-4709-9a1b-8ee28bd52ded
 **Repo:** xcl
 **Depends on:**
@@ -607,14 +607,14 @@ Every root-module error maps to a stable code with its details. This is the foun
 *Technical detail:* [context.md#task-the-core-service-answers-configuration-and-lookup-calls](./context.md#task-the-core-service-answers-configuration-and-lookup-calls)
 
 **Acceptance criteria**:
-- [ ] Every method in the service definition has a handler, and an unknown method, unparsable bytes, an unknown handle or a wrong use of handle 0 each give their own status.
-- [ ] Creating a configuration with a schema-declared type, external plugins, a GitHub registry, state, masks, events and variables gives the same behaviour as the equivalent Go options.
-- [ ] Lookups return entities as JSON with sensitive values shown as the marker, and outputs as a JSON object.
-- [ ] Each root-module error comes back as its documented code with its details. A configuration error lists every problem with its file and line.
-- [ ] `GetVersion` reports the version the library was built with.
-- [ ] The root module still builds with cgo disabled, including this package.
+- [x] Every method in the service definition has a handler, and an unknown method, unparsable bytes, an unknown handle or a wrong use of handle 0 each give their own status.
+- [x] Creating a configuration with a schema-declared type, external plugins, a GitHub registry, state, masks, events and variables gives the same behaviour as the equivalent Go options.
+- [x] Lookups return entities as JSON with sensitive values shown as the marker, and outputs as a JSON object.
+- [x] Each root-module error comes back as its documented code with its details. A configuration error lists every problem with its file and line.
+- [x] `GetVersion` reports the version the library was built with.
+- [x] The root module still builds with cgo disabled, including this package.
 
-#### - [ ] Task: Operations run through the poll loop and can be cancelled
+#### - [x] Task: Operations run through the poll loop and can be cancelled
 **Id:** b5492df1-0bd4-488f-9c98-9104399dab53
 **Repo:** xcl
 **Depends on:**
@@ -634,14 +634,14 @@ While an operation runs, lookups are refused, so a host never reads half-applied
 *Technical detail:* [context.md#task-operations-run-through-the-poll-loop-and-can-be-cancelled](./context.md#task-operations-run-through-the-poll-loop-and-can-be-cancelled)
 
 **Acceptance criteria**:
-- [ ] An apply started through the service ends with a finished task. Its entities and outputs then match a Go apply of the same configuration.
-- [ ] With events on, every event of the operation is delivered before the finished task, in order, with sensitive data masked as configured.
-- [ ] A host state store receives the state on apply and serves it back on load. With a state mask, sensitive values it receives are encrypted.
-- [ ] A diff's finished task carries the diff, which matches the Go diff for the same configuration.
-- [ ] Cancelling a running apply ends it with the cancelled code, saves progress, and starts no provider call afterwards.
-- [ ] A second operation, or a lookup, on a handle with an operation running is refused with `operation_in_progress`.
+- [x] An apply started through the service ends with a finished task. Its entities and outputs then match a Go apply of the same configuration.
+- [x] With events on, every event of the operation is delivered before the finished task, in order, with sensitive data masked as configured.
+- [x] A host state store receives the state on apply and serves it back on load. With a state mask, sensitive values it receives are encrypted.
+- [x] A diff's finished task carries the diff, which matches the Go diff for the same configuration.
+- [x] Cancelling a running apply ends it with the cancelled code, saves progress, and starts no provider call afterwards.
+- [x] A second operation, or a lookup, on a handle with an operation running is refused with `operation_in_progress`.
 
-#### - [ ] Task: Host-language functions are callable from configuration
+#### - [x] Task: Host-language functions are callable from configuration
 **Id:** c52e2bcb-98fd-48e9-8b14-10f749acc548
 **Repo:** xcl
 **Depends on:**
@@ -653,14 +653,14 @@ A host declares functions by name and signature when it creates a configuration.
 *Technical detail:* [context.md#task-host-language-functions-are-callable-from-configuration](./context.md#task-host-language-functions-are-callable-from-configuration)
 
 **Acceptance criteria**:
-- [ ] With `slugify` declared by the host, `name = slugify("My App")` applies, and the entity holds what the host returned.
-- [ ] A host function that returns an error fails the apply with that message at the call's position.
-- [ ] Declaring a function named `upper`, or two functions with one name, fails configuration creation with the function name clash code naming both sources.
-- [ ] A signature using an unsupported type fails configuration creation with the invalid function code.
-- [ ] A sensitive argument reaches the host unmarked, and the result is marked sensitive in the entity.
-- [ ] Cancelling an operation while a function task is outstanding ends the operation promptly.
+- [x] With `slugify` declared by the host, `name = slugify("My App")` applies, and the entity holds what the host returned.
+- [x] A host function that returns an error fails the apply with that message at the call's position.
+- [x] Declaring a function named `upper`, or two functions with one name, fails configuration creation with the function name clash code naming both sources.
+- [x] A signature using an unsupported type fails configuration creation with the invalid function code.
+- [x] A sensitive argument reaches the host unmarked, and the result is marked sensitive in the entity.
+- [x] Cancelling an operation while a function task is outstanding ends the operation promptly.
 
-#### - [ ] Task: The engine is built as a C shared library
+#### - [x] Task: The engine is built as a C shared library
 **Id:** ea672f25-b833-4738-81d5-1c14aa2811a7
 **Repo:** xcl
 **Depends on:**
@@ -672,10 +672,10 @@ A new nested Go module, `bindings/libxcl`, exports the four C functions from the
 *Technical detail:* [context.md#task-the-engine-is-built-as-a-c-shared-library](./context.md#task-the-engine-is-built-as-a-c-shared-library)
 
 **Acceptance criteria**:
-- [ ] Building the library produces a shared object exporting exactly the four design functions.
-- [ ] A smoke test loads the library, reads the ABI version, gets the stamped version, creates and validates a configuration, and releases it, freeing every response.
-- [ ] CI builds and smoke-tests the library on every change, and the root module's cgo-free builds still pass.
-- [ ] A make target builds the library for the local platform with a chosen version.
+- [x] Building the library produces a shared object exporting exactly the four design functions.
+- [x] A smoke test loads the library, reads the ABI version, gets the stamped version, creates and validates a configuration, and releases it, freeing every response.
+- [x] CI builds and smoke-tests the library on every change, and the root module's cgo-free builds still pass.
+- [x] A make target builds the library for the local platform with a chosen version.
 
 ### Milestone 2: A Python program can configure, apply and query with XCL
 
@@ -697,7 +697,7 @@ At this stage the package is installed from source with a locally built engine.
 
 **Validation point**: The xcl-python unit and integration suites pass against a locally built `libxcl` on Linux, with the Docker plugin tests running against a real engine. The Go–Python parity suite passes.
 
-#### - [ ] Task: Go fixture plugins and the Go side of the parity check
+#### - [x] Task: Go fixture plugins and the Go side of the parity check
 **Id:** 856330ba-2549-4926-bed4-cda65274ee2a
 **Repo:** xcl
 **Depends on:** none
@@ -712,12 +712,12 @@ The parity check needs a shared set of fixture configurations and a Go program t
 *Technical detail:* [context.md#task-go-fixture-plugins-and-the-go-side-of-the-parity-check](./context.md#task-go-fixture-plugins-and-the-go-side-of-the-parity-check)
 
 **Acceptance criteria**:
-- [ ] The slow plugin's create takes a configurable time, and the recording plugin appends every lifecycle call it starts to a file named in its configuration.
-- [ ] The parity program, given a fixture directory, writes one JSON record covering validation, diff, apply, outputs, state, load in a new process, and destroy.
-- [ ] Records contain no temp paths or timestamps, so two runs of the same fixture are identical.
-- [ ] The fixtures cover registered types with every annotation kind, an application function, variables, outputs, a sensitive value, a plugin entity and an invalid configuration.
+- [x] The slow plugin's create takes a configurable time, and the recording plugin appends every lifecycle call it starts to a file named in its configuration.
+- [x] The parity program, given a fixture directory, writes one JSON record covering validation, diff, apply, outputs, state, load in a new process, and destroy.
+- [x] Records contain no temp paths or timestamps, so two runs of the same fixture are identical.
+- [x] The fixtures cover registered types with every annotation kind, an application function, variables, outputs, a sensitive value, a plugin entity and an invalid configuration.
 
-#### - [ ] Task: Create the GitHub repository jumppad-labs/xcl-python and connect the registered local directory to it
+#### - [x] Task: Create the GitHub repository jumppad-labs/xcl-python and connect the registered local directory to it
 **Id:** e67db340-e5f6-425c-a374-2da571323cd8
 **Repo:** xcl-python
 **Depends on:** none
@@ -728,10 +728,10 @@ The Python package lives in its own repository. It is already registered with th
 *Technical detail:* [context.md#task-create-the-github-repository-jumppad-labsxcl-python-and-connect-the-registered-local-directory-to-it](./context.md#task-create-the-github-repository-jumppad-labsxcl-python-and-connect-the-registered-local-directory-to-it)
 
 **Acceptance criteria**:
-- [ ] `jumppad-labs/xcl-python` exists on GitHub with an Apache-2.0 licence, matching xcl's.
-- [ ] The registered local directory is a git repository whose `origin` is that GitHub repository, and it keeps its Spektacular footprint.
+- [x] `jumppad-labs/xcl-python` exists on GitHub with an Apache-2.0 licence, matching xcl's.
+- [x] The registered local directory is a git repository whose `origin` is that GitHub repository, and it keeps its Spektacular footprint.
 
-#### - [ ] Task: The Python package loads the engine safely
+#### - [x] Task: The Python package loads the engine safely
 **Id:** 0a526314-639b-4aba-9c65-f67ea9343e6c
 **Repo:** xcl-python
 **Depends on:**
@@ -749,14 +749,14 @@ It adds the bottom two layers of the SDK. The transport loads the library lazily
 *Technical detail:* [context.md#task-the-python-package-loads-the-engine-safely](./context.md#task-the-python-package-loads-the-engine-safely)
 
 **Acceptance criteria**:
-- [ ] `import xcl` does not load the engine; the first call does.
-- [ ] An engine whose version differs from the package's raises an error naming both versions, and so does a different ABI version.
-- [ ] In a child forked after the parent used XCL, any call raises the fork error. The error names the `spawn` start method and creating the configuration after the fork.
-- [ ] A child forked from a parent that only imported XCL works normally.
-- [ ] Each error code raises its own exception class, carrying the message, details and causes. An unknown code raises the base `xcl.Error`.
-- [ ] Unit tests run against a fake transport with no engine.
+- [x] `import xcl` does not load the engine; the first call does.
+- [x] An engine whose version differs from the package's raises an error naming both versions, and so does a different ABI version.
+- [x] In a child forked after the parent used XCL, any call raises the fork error. The error names the `spawn` start method and creating the configuration after the fork.
+- [x] A child forked from a parent that only imported XCL works normally.
+- [x] Each error code raises its own exception class, carrying the message, details and causes. An unknown code raises the base `xcl.Error`.
+- [x] Unit tests run against a fake transport with no engine.
 
-#### - [ ] Task: Python classes describe entity types
+#### - [x] Task: Python classes describe entity types
 **Id:** 62cb1d61-f657-4571-8f13-4abc97c68eaa
 **Repo:** xcl-python
 **Depends on:**
@@ -774,14 +774,14 @@ This task derives the schema v1 document from those annotations and turns entity
 *Technical detail:* [context.md#task-python-classes-describe-entity-types](./context.md#task-python-classes-describe-entity-types)
 
 **Acceptance criteria**:
-- [ ] Each annotation form produces the schema field the design and the named-block extension describe.
-- [ ] An annotation with no configuration form, or a sensitive type the engine cannot hold, is refused at registration with an error naming the field.
-- [ ] Entity JSON hydrates into the registered class, nested blocks included. A dict of named blocks becomes a dict keyed by name.
-- [ ] An entity of an unregistered type becomes an `xcl.Entity` whose address and attributes are readable by name.
-- [ ] `Sensitive` values print as `(sensitive)` and reveal their value only through `reveal()`. A looked-up sensitive value reveals `None`.
-- [ ] A function annotated `(str) -> str`, or with lists, dicts, bools and numbers, produces the signature JSON the engine expects. An unsupported annotation is refused.
+- [x] Each annotation form produces the schema field the design and the named-block extension describe.
+- [x] An annotation with no configuration form, or a sensitive type the engine cannot hold, is refused at registration with an error naming the field.
+- [x] Entity JSON hydrates into the registered class, nested blocks included. A dict of named blocks becomes a dict keyed by name.
+- [x] An entity of an unregistered type becomes an `xcl.Entity` whose address and attributes are readable by name.
+- [x] `Sensitive` values print as `(sensitive)` and reveal their value only through `reveal()`. A looked-up sensitive value reveals `None`.
+- [x] A function annotated `(str) -> str`, or with lists, dicts, bools and numbers, produces the signature JSON the engine expects. An unsupported annotation is refused.
 
-#### - [ ] Task: The synchronous API runs every operation and lookup
+#### - [x] Task: The synchronous API runs every operation and lookup
 **Id:** bb272fd2-e209-4895-9941-dd58e7b5a03c
 **Repo:** xcl-python
 **Depends on:**
@@ -799,16 +799,16 @@ The poll engine runs on the calling thread with the GIL released while it waits.
 *Technical detail:* [context.md#task-the-synchronous-api-runs-every-operation-and-lookup](./context.md#task-the-synchronous-api-runs-every-operation-and-lookup)
 
 **Acceptance criteria**:
-- [ ] With a class registered as `app`, `app "web" { image = "nginx" }` validates and applies, and `find(App, "app.web")` returns an `App` with `image == "nginx"`. A `database`/`postgres` class is found at `database.postgres.main`.
-- [ ] Each annotation rule from the spec holds: required, optional default, sensitive masked, computed not settable, nested block, list of two volumes in order, dict of named listeners.
-- [ ] Passing `region = "us"` as a variable makes an entity using `variable.region` hold `"us"`.
-- [ ] After apply, outputs come back as a dict. A diff after changing one attribute reports its old and new values.
-- [ ] With a state directory, an apply writes state there and a load in a new process reads it back. A custom store object receives the state on apply and serves a later load in a new process, with sensitive values encrypted when a state mask is set.
-- [ ] An event handler receives a start and finish event for each entity, with sensitive event data redacted.
-- [ ] A missing address raises the not-found exception, several entities for `find_one` raise the not-unique exception, and invalid configuration raises the config exception listing each problem's file and line.
-- [ ] While a synchronous apply runs a slow plugin operation, a second Python thread keeps making progress.
+- [x] With a class registered as `app`, `app "web" { image = "nginx" }` validates and applies, and `find(App, "app.web")` returns an `App` with `image == "nginx"`. A `database`/`postgres` class is found at `database.postgres.main`.
+- [x] Each annotation rule from the spec holds: required, optional default, sensitive masked, computed not settable, nested block, list of two volumes in order, dict of named listeners.
+- [x] Passing `region = "us"` as a variable makes an entity using `variable.region` hold `"us"`.
+- [x] After apply, outputs come back as a dict. A diff after changing one attribute reports its old and new values.
+- [x] With a state directory, an apply writes state there and a load in a new process reads it back. A custom store object receives the state on apply and serves a later load in a new process, with sensitive values encrypted when a state mask is set.
+- [x] An event handler receives a start and finish event for each entity, with sensitive event data redacted.
+- [x] A missing address raises the not-found exception, several entities for `find_one` raise the not-unique exception, and invalid configuration raises the config exception listing each problem's file and line.
+- [x] While a synchronous apply runs a slow plugin operation, a second Python thread keeps making progress.
 
-#### - [ ] Task: Python functions are callable from configuration
+#### - [x] Task: Python functions are callable from configuration
 **Id:** dec2616c-3368-48ce-bcd8-f866594eae04
 **Repo:** xcl-python
 **Depends on:**
@@ -821,12 +821,12 @@ A developer registers a Python function on a local registry, and configuration c
 *Technical detail:* [context.md#task-python-functions-are-callable-from-configuration](./context.md#task-python-functions-are-callable-from-configuration)
 
 **Acceptance criteria**:
-- [ ] With `slugify` registered, `name = slugify("My App")` applies and the entity holds `"my-app"`.
-- [ ] A function that raises fails the apply with a config exception naming the call's file and line and the raised message.
-- [ ] Registering a function named like a built-in, or two with one name, raises the function name clash exception when the configuration is created.
-- [ ] A sensitive argument reaches the function as a plain value, and the result is held as sensitive.
+- [x] With `slugify` registered, `name = slugify("My App")` applies and the entity holds `"my-app"`.
+- [x] A function that raises fails the apply with a config exception naming the call's file and line and the raised message.
+- [x] Registering a function named like a built-in, or two with one name, raises the function name clash exception when the configuration is created.
+- [x] A sensitive argument reaches the function as a plain value, and the result is held as sensitive.
 
-#### - [ ] Task: Go plugins are usable from Python
+#### - [x] Task: Go plugins are usable from Python
 **Id:** 3a49f297-bb1a-4703-8a05-f412ff8c8657
 **Repo:** xcl-python
 **Depends on:**
@@ -838,12 +838,12 @@ A Python program uses the Docker example plugin, loaded three ways: from a binar
 *Technical detail:* [context.md#task-go-plugins-are-usable-from-python](./context.md#task-go-plugins-are-usable-from-python)
 
 **Acceptance criteria**:
-- [ ] Configuration whose entities are handled by the Docker plugin applies when the plugin is loaded from a path, from a plugin directory and from the GitHub registry.
-- [ ] A release whose checksums file was tampered with is refused with the plugin verification exception.
-- [ ] Docker plugin entities, with no Python class registered, are returned with their address and attributes readable by name.
-- [ ] The tests skip with a clear reason when no Docker engine is reachable.
+- [x] Configuration whose entities are handled by the Docker plugin applies when the plugin is loaded from a path, from a plugin directory and from the GitHub registry.
+- [x] A release whose checksums file was tampered with is refused with the plugin verification exception.
+- [x] Docker plugin entities, with no Python class registered, are returned with their address and attributes readable by name.
+- [x] The tests skip with a clear reason when no Docker engine is reachable.
 
-#### - [ ] Task: Python gives the same results as Go on the parity fixtures
+#### - [x] Task: Python gives the same results as Go on the parity fixtures
 **Id:** 19083e6a-248a-41de-bf95-f2fa311af6a5
 **Repo:** xcl-python
 **Depends on:**
@@ -856,9 +856,9 @@ The Python side of the parity check runs each shared fixture through the Python 
 *Technical detail:* [context.md#task-python-gives-the-same-results-as-go-on-the-parity-fixtures](./context.md#task-python-gives-the-same-results-as-go-on-the-parity-fixtures)
 
 **Acceptance criteria**:
-- [ ] For every fixture, Python and Go give the same validation errors, the same diff, the same entities and outputs after apply, and the same state contents.
-- [ ] A load in a new process reads back the same entities in both, and a destroy removes every entity and empties the state in both.
-- [ ] A difference fails the test with the fixture name and the first differing field.
+- [x] For every fixture, Python and Go give the same validation errors, the same diff, the same entities and outputs after apply, and the same state contents.
+- [x] A load in a new process reads back the same entities in both, and a destroy removes every entity and empties the state in both.
+- [x] A difference fails the test with the fixture name and the first differing field.
 
 ### Milestone 3: Asynchronous Python services can use XCL without blocking
 
@@ -874,7 +874,7 @@ The Python side of the parity check runs each shared fixture through the Python 
 - cancellation ends the apply promptly, and the recording plugin shows no operation started after it;
 - sync and async expose the same operations and lookups.
 
-#### - [ ] Task: The asyncio API never blocks and can be cancelled
+#### - [x] Task: The asyncio API never blocks and can be cancelled
 **Id:** 0b6f8555-7035-4bf4-9890-4592a0d105d8
 **Repo:** xcl-python
 **Depends on:**
@@ -886,12 +886,12 @@ The Python side of the parity check runs each shared fixture through the Python 
 *Technical detail:* [context.md#task-the-asyncio-api-never-blocks-and-can-be-cancelled](./context.md#task-the-asyncio-api-never-blocks-and-can-be-cancelled)
 
 **Acceptance criteria**:
-- [ ] A registered `async def` function is awaited and its result filled in.
-- [ ] An async event handler and an async custom state store work through apply and load.
-- [ ] While an asyncio apply runs a slow plugin operation, other coroutines on the same event loop keep running.
-- [ ] An asyncio HTTP server on the same loop keeps answering requests within a short bound during a long apply.
-- [ ] Cancelling an asyncio apply mid-way ends it promptly with a cancellation error, and the recording plugin shows no operation started after the cancel.
-- [ ] `xcl.Config` and `xcl.aio.Config` expose the same operations and lookups, with every async one awaitable.
+- [x] A registered `async def` function is awaited and its result filled in.
+- [x] An async event handler and an async custom state store work through apply and load.
+- [x] While an asyncio apply runs a slow plugin operation, other coroutines on the same event loop keep running.
+- [x] An asyncio HTTP server on the same loop keeps answering requests within a short bound during a long apply.
+- [x] Cancelling an asyncio apply mid-way ends it promptly with a cancellation error, and the recording plugin shows no operation started after the cancel.
+- [x] `xcl.Config` and `xcl.aio.Config` expose the same operations and lookups, with every async one awaitable.
 
 ### Milestone 4: Every XCL release ships a matching Python package on PyPI
 
@@ -907,7 +907,7 @@ The Python side of the parity check runs each shared fixture through the Python 
 - The post-publish install check passes on every platform.
 - The manual reviews in the Testing Approach are carried into the implementation test plan.
 
-#### - [ ] Task: Tagging xcl publishes signed engine builds for eight platforms
+#### - [x] Task: Tagging xcl publishes signed engine builds for eight platforms
 **Id:** 7f6c4f43-6836-4b73-8a38-ec2caf9de9a6
 **Repo:** xcl
 **Depends on:**
@@ -928,7 +928,7 @@ xcl gets its first release workflow. When a version tag is pushed, it does the f
 - [ ] The workflow triggers the xcl-python release with the tag once the assets are attached.
 - [ ] A manual run of the workflow without publishing builds all eight targets, so the matrix can be checked before a real release.
 
-#### - [ ] Task: Add the release signing key and dispatch token to xcl
+#### - [x] Task: Add the release signing key and dispatch token to xcl
 **Id:** 15487d49-c3a6-46a5-aeed-4e4eaaecd57d
 **Repo:** xcl
 **Depends on:**
@@ -940,10 +940,10 @@ The release workflow signs the checksums with the jumppad-labs release key and t
 *Technical detail:* [context.md#task-add-the-release-signing-key-and-dispatch-token-to-xcl](./context.md#task-add-the-release-signing-key-and-dispatch-token-to-xcl)
 
 **Acceptance criteria**:
-- [ ] The xcl repository has the signing key, passphrase and dispatch token secrets the workflow names.
+- [x] The xcl repository has the signing key, passphrase and dispatch token secrets the workflow names.
 - [ ] A manual dry run of the release workflow signs the checksums file with the key the plugin registry trusts.
 
-#### - [ ] Task: xcl-python is tested on every platform and released from the xcl tag
+#### - [x] Task: xcl-python is tested on every platform and released from the xcl tag
 **Id:** 53b3da1c-4b2c-48c4-97ed-3a1cd96312bb
 **Repo:** xcl-python
 **Depends on:**
@@ -969,7 +969,7 @@ The release workflow signs the checksums with the jumppad-labs release key and t
 - [ ] The release refuses to publish when the archive signature does not verify or the parity suite fails.
 - [ ] After publishing, `pip install xcl==<version>` and `python -c "import xcl; xcl.Config().close()"` succeed on each platform with no Go or C compiler, and the engine reports the tag.
 
-#### - [ ] Task: Set up the PyPI project and trusted publishing
+#### - [x] Task: Set up the PyPI project and trusted publishing
 **Id:** fe0be452-82c1-43e5-8ca6-99af0f2bace0
 **Repo:** xcl-python
 **Depends on:**
@@ -981,10 +981,10 @@ Publishing uses PyPI Trusted Publishing, so no API token is stored. A person mak
 *Technical detail:* [context.md#task-set-up-the-pypi-project-and-trusted-publishing](./context.md#task-set-up-the-pypi-project-and-trusted-publishing)
 
 **Acceptance criteria**:
-- [ ] The `xcl` project on PyPI is owned by jumppad-labs and lists xcl-python's release workflow and `pypi` environment as a trusted publisher.
-- [ ] The xcl-python repository has a `pypi` environment that the release job uses.
+- [x] The `xcl` project on PyPI is owned by jumppad-labs and lists xcl-python's release workflow and `pypi` environment as a trusted publisher.
+- [x] The xcl-python repository has a `pypi` environment that the release job uses.
 
-#### - [ ] Task: The Python package is documented
+#### - [x] Task: The Python package is documented
 **Id:** b4542c17-081c-40b2-8d65-9624f545f22e
 **Repo:** xcl-python
 **Depends on:**
@@ -1002,12 +1002,12 @@ It also gives every public class and function a docstring, and adds a parity lis
 *Technical detail:* [context.md#task-the-python-package-is-documented](./context.md#task-the-python-package-is-documented)
 
 **Acceptance criteria**:
-- [ ] The README covers install, synchronous getting started against the Docker plugin, and an asynchronous section, in that order, and the package metadata uses it as the PyPI description.
-- [ ] Every public name in the package has a docstring, which a test checks by importing the package.
-- [ ] The parity list names every Go operation and lookup with its sync and async equivalent, or why it does not apply.
-- [ ] The README states the supported platforms and Python versions, and the fork limitation with its two ways out.
+- [x] The README covers install, synchronous getting started against the Docker plugin, and an asynchronous section, in that order, and the package metadata uses it as the PyPI description.
+- [x] Every public name in the package has a docstring, which a test checks by importing the package.
+- [x] The parity list names every Go operation and lookup with its sync and async equivalent, or why it does not apply.
+- [x] The README states the supported platforms and Python versions, and the fork limitation with its two ways out.
 
-#### - [ ] Task: Record the Python support in the xcl changelog
+#### - [x] Task: Record the Python support in the xcl changelog
 **Id:** 494e66eb-3adf-4dc0-a90b-57b4145c42ec
 **Repo:** xcl
 **Depends on:**
@@ -1028,10 +1028,10 @@ The xcl README gains a short pointer to the Python package.
 *Technical detail:* [context.md#task-record-the-python-support-in-the-xcl-changelog](./context.md#task-record-the-python-support-in-the-xcl-changelog)
 
 **Acceptance criteria**:
-- [ ] The changelog has a `## 20261011130709-aa3eb933-python-support` entry, in prose, followed by **Breaking:** None.
-- [ ] The xcl README says the engine is available to Python as `pip install xcl` and links the xcl-python repository.
+- [x] The changelog has a `## 20261011130709-aa3eb933-python-support` entry, in prose, followed by **Breaking:** None.
+- [x] The xcl README says the engine is available to Python as `pip install xcl` and links the xcl-python repository.
 
-#### - [ ] Task: Cut the first xcl release with Python support
+#### - [x] Task: Cut the first xcl release with Python support
 **Id:** 75d985e2-10fa-4cdc-896f-afe9d9d2df79
 **Repo:** xcl
 **Depends on:**
@@ -1073,3 +1073,384 @@ No other questions remain open. Every design choice is settled in the architectu
 - No `max_workers` thread pool for the synchronous API, and no Python `decode`/`EncodeEntity` equivalents (recorded in `PARITY.md` as not applicable).
 - No support for platforms beyond the eight targets, or for running another Go-built extension in the same process (design hazards: documented as unsupported).
 - No change to xcl's existing Go API beyond the additive context operations, untyped lookups and `registry.TypeFromSchema`.
+
+## Changelog
+
+### 2026-10-11 — Task: Operations take a context and stop when it is cancelled
+
+**What was done**: Added `ValidateContext`, `ApplyContext`, `DiffContext`, `DestroyContext` and `LoadContext` to `Config`; the existing five operations are now one-line wrappers that pass `context.Background()`. `run` takes the caller's context and, with an event handler, derives its cancellable child from it instead of from `context.Background()`, so cancelling the caller's context stops new provider calls through the parser's existing cancellation path and the progress made is saved as before. `ValidateContext` and `LoadContext` check `ctx.Err()` before reading, because neither path reaches a provider.
+
+**Deviations**: None of substance. The plan's fallback of wrapping `ctx.Err()` in `ApplyContext` was not needed: the parser already appends an error wrapping `ctx.Err()` to its `ConfigError`, whose `Unwrap() []error` makes `errors.Is(err, context.Canceled)` hold. The destroy cancellation test uses a pre-cancelled context rather than cancelling from an event handler, because at `Config` level events are delivered on a separate goroutine and a handler-driven cancel races the walker.
+
+**Files changed**:
+- `xcl: config.go`
+- `xcl: config_diff.go`
+- `xcl: config_context_test.go`
+
+**Discoveries**: `parser.Validate` ignores its context entirely, so a context-aware validate has to check the context itself. `state.NewFileStateStore` creates an empty state file up front, so `Exists()` is true before any apply; tests assert on loaded records instead. Language-surface's `GoFuncSignature` rejects variadic funcs (per its changelog record), which settles the plan's open question: host functions declared variadic will be refused with `invalid_function`.
+### 2026-10-11 — Task: Entities can be looked up by type without a Go type
+
+**What was done**: Added `Config.FindEntitiesByType(path ...string) ([]any, error)` and `Config.FindOneEntity(path ...string) (any, error)` in `query_untyped.go`. The type and subtype scan behind `FindByType`/`FindOne` was split out of `entitiesOf` into `entitiesByType`, which both the typed and the untyped lookups use, so they share the segment rules and the `NotTypeable`, `UnknownType`, `NotFound` and `NotUnique` errors exactly.
+
+**Deviations**: None. Plugin-provided entities come back as the schema-built struct the Config stores (not the plugin's own Go type), which is the "as stored" contract and what the core service's JSON lookups need.
+
+**Files changed**:
+- `xcl: query.go`
+- `xcl: query_untyped.go`
+- `xcl: query_untyped_test.go`
+
+**Discoveries**: None beyond the above.
+### 2026-10-11 — Task: Block types can be declared from a language-neutral schema
+
+**What was done**: Added the schema v1 reader in `internal/schema/v1.go` (`SchemaV1`, `FieldV1`, `IsV1`, `ParseV1`, `BuildTypeV1`), which builds a `reflect.StructOf` type embedding `types.ResourceBase` with the `xcl`, `json` and `default` tags the parser already reads: attributes (string, number as int or float64, bool, any, list, map, object), nested, optional, repeated and named-map blocks, the `label` element field, optional, default, sensitive (limited to `KnownTypes`) and computed fields. `CreateInstanceFromSchema` sniffs `schema_version: 1` and routes to it, leaving the legacy path untouched. `registry.TypeFromSchema(doc)` is the public way to declare such a type.
+
+**Deviations**: Two points of existing xcl behaviour, applying to hand-written types as much as to schema types, shape how two criteria are met. (1) `Config.Validate` deliberately leaves missing required attributes to decoding (`gohcl.CheckBody` clears `Required`), so "a required field missing is a validation error at the block" is met by `Apply`/`Diff` reporting a `*errors.ParserError` positioned at the block's file and line; `Validate` alone returns nil. Recorded as an assumption: the spec's "fails validation at the block's position" is read as this positioned configuration error, which is what a Go program gets too. (2) "A sensitive field is masked in state" holds with a reversible state mask (AES); without one, xcl keeps real sensitive values in state by design, and `mask.Redact()` is refused as a state mask. Events redact by default and lookups show the marker.
+
+**Files changed**:
+- `xcl: internal/schema/v1.go`
+- `xcl: internal/schema/v1_test.go`
+- `xcl: internal/schema/deserialize.go`
+- `xcl: registry/schema.go`
+- `xcl: registry/schema_test.go`
+- `xcl: config_schema_types_test.go`
+
+**Discoveries**: An optional nested block is built as a pointer to the element struct so it may be left out; a required one is the struct itself. The list label field is filled only when a block gives a name, while a map block always fills it from the key. A string default is written as its own text in the `default` tag and anything else as JSON, which `creasty/defaults` parses.
+### 2026-10-11 — Task: The core service answers configuration and lookup calls
+
+**What was done**: Added `proto/xcl/core/v1/core.proto`, the CoreService protocol, generated into `coreservice/proto` with buf (`make core-protos`, `buf lint`, `buf breaking` in CI), and the `coreservice` package: `Service` with `Call`/`Release` and the six statuses, a hand-written dispatch table held to the service descriptor by a test, `GetVersion` (link-time `Version`, `ABIVersion` 1), `CreateConfig` mapping every option (local registries with schema-declared types, external plugins and plugin directories; GitHub registries with every option; state path; AES, HMAC, redact and omit masks; event buffer, data level and mask; variables), the lookups (`Entities`, `Find`, `FindByType`, `FindOne`, `Outputs`, `EncodeSavedEntity` with optional ANSI highlighting) returning JSON with the sensitive marker, and the error mapper for every documented code with its details and the config error's positioned causes. The operation methods have handlers that answer "not available" until the next task.
+
+**Deviations**: Handles are a `uint64` from the service's own never-reused table rather than `runtime/cgo.Handle`: `runtime/cgo` does not link under `CGO_ENABLED=0`, so the design's handle mechanism would break the design's own cgo-free guard; every stated property of a handle (process-wide, any thread, `-3` after release) holds. The local buf 1.27 only reads v1 config, so the module is `proto/buf.yaml` with a root `buf.work.yaml`; CI pins buf 1.50.0, which reads both. Lint excepts the rules the design's shared request/response messages and enum value names would trip. The `provider` code is detected from the parser's "<step> failed for <address>: " message, as no structured provider error exists. `state_store.host` and `functions` answer `invalid_argument` until their tasks. A real data race was found and fixed in the root package: `Config.addressParser` cached the address parser without synchronisation, so concurrent `FindResource` calls raced; the cache is now an `atomic.Pointer`.
+
+**Files changed**:
+- `xcl: proto/xcl/core/v1/core.proto`
+- `xcl: proto/buf.yaml`
+- `xcl: buf.work.yaml`
+- `xcl: buf.gen.yaml`
+- `xcl: Makefile`
+- `xcl: .github/workflows/go.yml`
+- `xcl: coreservice/proto/core.pb.go`
+- `xcl: coreservice/service.go`
+- `xcl: coreservice/version.go`
+- `xcl: coreservice/config.go`
+- `xcl: coreservice/lookups.go`
+- `xcl: coreservice/errors.go`
+- `xcl: coreservice/operations.go`
+- `xcl: coreservice/service_test.go`
+- `xcl: coreservice/config_test.go`
+- `xcl: coreservice/lookups_test.go`
+- `xcl: coreservice/errors_test.go`
+- `xcl: config.go`
+- `xcl: config_plugin_loading_test.go`
+
+**Discoveries**: `runtime/cgo.Handle` cannot be used by a package that must build with cgo disabled. `Config.addressParser`'s lazy cache was unsynchronised, a latent race for any Go program looking entities up from several goroutines. `configuration.release()` is a no-op until the operations task, so external plugin processes started by a configuration are only stopped when the process exits; the operations task must stop them on release. `mask.Redact()` is refused as a state mask (`mask_not_reversible`).
+### 2026-10-11 — Task: Operations run through the poll loop and can be cancelled
+
+**What was done**: Added the operation side of the core service. `coreservice/queue.go` is the per-configuration task queue: one ordered stream of event, state, function and finished tasks, with `run` (post and wait under the operation's context), `post` (no completion), `poll` (wait up to `wait_ms`) and `complete`. `operations.go` starts each of the five operations on a goroutine under a cancellable context, posts `OperationFinished` as its last task (with the diff as JSON for a diff), refuses a second operation or a lookup while one runs, implements `Cancel`, `Poll` and `Complete`, and `release` cancels and waits. `events.go` installs the event handler that posts each event as a task, `state_store.go` is the host state store whose four methods are state tasks, and `config.go` wires both from `CreateConfig`.
+
+**Deviations**: A provider that fails during a lifecycle step reaches the host inside the apply's positioned config error, so the `provider` code with `step` and `address` is now detected from the positioned cause's message as well as from a bare error; the cause also keeps `file`, `line`, `column` and `summary`. Destroy with a host store never sends `CLEAR`: the engine saves after each removed record, ending with an empty save, which the tests pin. `Event.resource_type` is "<type>.<name>" as `events.Event` defines it. The design's per-call debug logging through the event logger was not added: outside an operation there is no event stream to carry it, and inside one it would only log the host's own `Poll` and `Complete` calls.
+
+**Files changed**:
+- `xcl: coreservice/queue.go`
+- `xcl: coreservice/operations.go`
+- `xcl: coreservice/events.go`
+- `xcl: coreservice/state_store.go`
+- `xcl: coreservice/config.go`
+- `xcl: coreservice/errors.go`
+- `xcl: coreservice/service_test.go`
+- `xcl: coreservice/operations_test.go`
+- `xcl: coreservice/queue_test.go`
+- `xcl: coreservice/config_test.go`
+
+**Discoveries**: `diff.Diff` cannot be unmarshalled from its own JSON because `entity.Path` has `MarshalJSON` but no `UnmarshalJSON`; a host decodes `diff_json` into its own shape. A config-only registered type is left out of diffs, so diff tests need a provider-backed type. An apply with events on delivers, in order: apply/start, the state EXISTS task, parse/success, EXISTS again, log, create/success, SAVE, log, apply/success, then finished.
+### 2026-10-11 — Task: Host-language functions are callable from configuration
+
+**What was done**: `coreservice/functions.go` builds a real Go func for each `DeclaredFunction` with `reflect.FuncOf`/`reflect.MakeFunc` from its `FunctionSignature` (string, bool, number as float64, list and set as a slice, map as a string-keyed map), and the host registry offers it through `Functions()`, so the catalog converts, clash-checks and redacts it exactly as a Go application function. A call encodes its arguments as a JSON array, posts a `FunctionTask` under the running operation's context and decodes the host's `FunctionResult` into the declared return type; a host error fails the call with its message. An unsupported type, a variadic signature, a missing return, malformed signature JSON or an empty name fails `CreateConfig` with `invalid_function`, and a clash with a builtin or another function with `function_name_clash` from `NewConfig`.
+
+**Deviations**: The plan allowed `invalid_argument` for a malformed signature; the acceptance criterion's `invalid_function` is used for every unusable declaration, and `CreateConfig` lets an `InvalidFunctionError` through with its own code rather than wrapping it. Variadic functions are refused rather than built, because language-surface's Go-func conversion rejects them, as the plan's open question anticipated. A root-module fix was needed for cancellation: the parser only reported `context.Canceled` when the walk had no other error, so cancelling with a function task outstanding (whose decode error reads "context canceled") returned a plain config error; `parser.Apply`, `Diff` and `Destroy` now always append the cancellation beside the walk's errors, so `errors.Is(err, context.Canceled)` holds for Go callers and the host sees `cancelled`.
+
+**Files changed**:
+- `xcl: coreservice/functions.go`
+- `xcl: coreservice/config.go`
+- `xcl: coreservice/functions_test.go`
+- `xcl: coreservice/service_test.go`
+- `xcl: coreservice/config_test.go`
+- `xcl: internal/parser/parser.go`
+- `xcl: internal/parser/destroy.go`
+
+**Discoveries**: A function is evaluated on every pass that decodes the configuration (parse, decide and apply), so a host sees several tasks per call site and must answer each; tests assert on arguments seen, not on counts. HCL turns a function's error into a diagnostic, so the identity of the Go error is lost below the parser; anything a caller must match with `errors.Is` has to be appended by the parser itself.
+### 2026-10-11 — Task: The engine is built as a C shared library
+
+**What was done**: Added the nested module `bindings/libxcl`, the only place cgo is used, with `go.mod` replacing the root module from the checkout during development. `main.go` exports the design's four functions over `coreservice.New()`: `xcl_abi_version`, `xcl_call` (copies the request with `C.GoBytes`, returns the response in `C.CBytes` memory), `xcl_free` and `xcl_release`; `xcl.h` documents the ABI. `callers.go` wraps the exports through C-typed values for `smoke_test.go`, which checks the ABI version, the stamped engine version, creating a configuration, one validate through the poll loop, release, an application error and the negative statuses. The `Makefile` gains `libxcl` (c-shared build, `-trimpath -ldflags "-s -w -X coreservice.Version=$(LIBXCL_VERSION)"`, output `LIBXCL_OUT` with the extension per `GOOS`, `CC`/`GOOS`/`GOARCH` passing through) and `test-libxcl`. CI gains a `libxcl` job that builds the library, checks that exactly the four symbols are exported and runs the smoke test, and the minimum-Go job builds and vets the nested module.
+
+**Deviations**: The smoke test was written in the main context together with the library, before the workflow reached this task, since the library and its test are a few dozen lines that only prove bytes cross the boundary. The test calls the exported functions directly within the package through thin C-typed wrappers rather than `dlopen`ing the built library, the second of the two forms the plan allowed; the exported-symbol check in CI covers the built artifact. The nested module's `go.mod` lists the root module's dependencies as indirect requirements, which `go mod tidy` needs beside the `replace`.
+
+**Files changed**:
+- `xcl: bindings/libxcl/go.mod`
+- `xcl: bindings/libxcl/go.sum`
+- `xcl: bindings/libxcl/main.go`
+- `xcl: bindings/libxcl/xcl.h`
+- `xcl: bindings/libxcl/callers.go`
+- `xcl: bindings/libxcl/smoke_test.go`
+- `xcl: Makefile`
+- `xcl: .github/workflows/go.yml`
+- `xcl: .gitignore`
+
+**Discoveries**: A `_test.go` file cannot `import "C"`, so any test of exported cgo functions needs a non-test helper file. The stripped library is about 22 MB on linux/amd64 with gcc 16, in line with the design's measurement. `go build -buildmode=c-shared` writes a header beside the library, which the `build/` directory is ignored for.
+### 2026-10-11 — Task: Go fixture plugins and the Go side of the parity check
+
+**What was done**: Added two external fixture plugins under `bindings/libxcl/testdata/plugins`: `slow` (`resource "slow"`, whose create, update and destroy take `delay_ms`) and `recording` (`resource "recording"`, which appends a `{step, address, time}` JSON line to the block's `log` file before each lifecycle call, then waits `delay_ms`). Added the seven parity fixtures under `bindings/libxcl/testdata/parity` (`basic_types`, `annotations`, `functions`, `variables`, `outputs`, `plugin_entities`, `invalid`), each with the schema v1 `types.json` both sides register, `main.xcl`, and where needed `changed/main.xcl` and `variables.json`, with a README. Added `bindings/libxcl/cmd/parity`, which runs a fixture through the Go API and writes one normalised JSON record covering validate, diff, apply, entities, outputs, state, the changed diff, load in a new process (it execs itself with `-load`) and destroy, with temp and fixture paths replaced by `<tmp>` and `<fixture>`.
+
+**Deviations**: `meta.links` was nondeterministic: the parser walked a block's attributes in map order, so an entity with two references recorded them in random order and two runs of one fixture differed. The parser now walks attributes in the order they were written, which fixes it for Go users too. The `invalid` fixture has no unknown block type, because that stops the parse before any other problem is reported; it carries a computed field set in configuration, an unknown attribute and a missing required attribute instead. Problems in a record are sorted so the record is stable.
+
+**Files changed**:
+- `xcl: bindings/libxcl/testdata/plugins/slow/main.go`
+- `xcl: bindings/libxcl/testdata/plugins/slow/main_test.go`
+- `xcl: bindings/libxcl/testdata/plugins/recording/main.go`
+- `xcl: bindings/libxcl/testdata/plugins/recording/main_test.go`
+- `xcl: bindings/libxcl/testdata/parity/README.md`
+- `xcl: bindings/libxcl/testdata/parity/basic_types/types.json`
+- `xcl: bindings/libxcl/testdata/parity/basic_types/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/basic_types/changed/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/annotations/types.json`
+- `xcl: bindings/libxcl/testdata/parity/annotations/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/annotations/changed/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/functions/types.json`
+- `xcl: bindings/libxcl/testdata/parity/functions/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/variables/types.json`
+- `xcl: bindings/libxcl/testdata/parity/variables/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/variables/variables.json`
+- `xcl: bindings/libxcl/testdata/parity/outputs/types.json`
+- `xcl: bindings/libxcl/testdata/parity/outputs/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/plugin_entities/types.json`
+- `xcl: bindings/libxcl/testdata/parity/plugin_entities/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/plugin_entities/changed/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/plugin_entities/variables.json`
+- `xcl: bindings/libxcl/testdata/parity/invalid/types.json`
+- `xcl: bindings/libxcl/testdata/parity/invalid/main.xcl`
+- `xcl: bindings/libxcl/cmd/parity/main.go`
+- `xcl: bindings/libxcl/cmd/parity/main_test.go`
+- `xcl: internal/parser/parser.go`
+
+**Discoveries**: The builtin for a collection's length is `len`. A `variable` block must carry a `default`, so a fixture that takes its value from the caller still declares one. An output entity's JSON carries an empty `"CtyValue": {}` key from an exported field, which a host's hydration has to tolerate. `json.MarshalIndent` HTML-escapes `<` and `>`, so the `<tmp>` and `<fixture>` placeholders appear escaped in the written file and compare correctly once decoded. go-plugin prints "[ERR] plugin: plugin acceptAndServe error: broker closed" on stderr when an external plugin is stopped; it is harmless.
+### 2026-10-11 — Task: Create the GitHub repository jumppad-labs/xcl-python and connect the registered local directory to it
+
+**What was done**: A person created `github.com/jumppad-labs/xcl-python` and connected the registered main checkout `/home/nicj/code/github.com/jumppad-labs/xcl-python` to it as `origin`, with `main` (the "Add spektacular setup" commit) pushed and tracking `origin/main`. On the code side, the spec branch adds the Apache-2.0 `LICENSE`, a copy of xcl's, and a `.gitignore` for virtual environments, build output and the locally built engine.
+
+**Deviations**: The licence was committed on the spec branch in the worktree rather than pushed to `main` by the person, so it reaches `main` when the orchestrator merges the branch.
+
+**Files changed**:
+- `xcl-python: LICENSE`
+- `xcl-python: .gitignore`
+
+**Discoveries**: None.
+### 2026-10-11 — Task: The Python package loads the engine safely
+
+**What was done**: Set up the `xcl` package in xcl-python: `pyproject.toml` (hatchling, CPython 3.10+, `protobuf` and `cffi` with the reason for each, version from `xcl/_version.py`, README as the description, the engine in `xcl/_lib` packaged as an artifact) with `hatch_build.py` tagging wheels `py3-none-<platform>` from `XCL_WHEEL_PLATFORM`; a `Makefile` with `protos` (protoc from the xcl checkout's `proto/` into `xcl/_core`), `libxcl` (the engine built into `xcl/_lib`, stamped with the package version), `plugins` and `test`. The bottom two layers of the SDK: `xcl/_transport` (the `Transport` protocol and `InProcessTransport`, which loads the library lazily with cffi in ABI mode or ctypes as the fallback, copies and frees every response, checks the ABI version on load, and refuses use in a child forked after the engine was loaded through `ForkGuard`, a fork hook plus a pid check, with `ForkedProcessError` naming `spawn` and creating the configuration after the fork), `xcl/_client.py` (the descriptor-built `Client`, mapping status 1 to the exception for the code and negative statuses to `InternalBindingError`, and checking the engine version against the package's on first use), `xcl/_errors.py` (`Error` with one subclass per code, `from_proto`, `ConfigError.problems`, `ForkedProcessError`, `EngineVersionError`, `InternalBindingError`), a minimal `Config` that creates and releases a configuration, and `xcl.engine_version()`.
+
+**Deviations**: Messages are generated with `protoc` rather than buf's remote Python plugin, so development needs no network; protoc lays the file out under `xcl/core/v1`, which would shadow the package, so `make protos` moves it to `xcl/_core/core_pb2.py`. The generated messages are committed, as xcl commits its own. A minimal `Config` (create, `close`, context manager) is included so `xcl.Config().close()` runs against the built engine; its operations and lookups come with the synchronous API task. The fork guard is a class with an injectable instance, so it is tested with a real `os.fork` and no engine.
+
+**Files changed**:
+- `xcl-python: pyproject.toml`
+- `xcl-python: hatch_build.py`
+- `xcl-python: Makefile`
+- `xcl-python: README.md`
+- `xcl-python: xcl-ref.txt`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: xcl/_version.py`
+- `xcl-python: xcl/_errors.py`
+- `xcl-python: xcl/_client.py`
+- `xcl-python: xcl/config.py`
+- `xcl-python: xcl/_transport/__init__.py`
+- `xcl-python: xcl/_transport/inprocess.py`
+- `xcl-python: xcl/_core/__init__.py`
+- `xcl-python: xcl/_core/core_pb2.py`
+- `xcl-python: xcl/_core/core_pb2.pyi`
+- `xcl-python: tests/conftest.py`
+- `xcl-python: tests/fakes.py`
+- `xcl-python: tests/unit/test_import.py`
+- `xcl-python: tests/unit/test_client.py`
+- `xcl-python: tests/unit/test_transport.py`
+- `xcl-python: tests/unit/test_fork.py`
+- `xcl-python: tests/unit/test_errors.py`
+- `xcl-python: tests/unit/test_config.py`
+- `xcl-python: tests/integration/test_load.py`
+
+**Discoveries**: Python 3.12+ warns on `fork()` in a multi-threaded process, which the Go runtime makes every process that has loaded the engine; the fork tests filter the warning since the child only checks the guard and exits. `hatchling` needs `artifacts` for files git ignores, which the built engine is. The development engine is stamped `v<package version>` so the strict version check passes locally; a release stamps the tag.
+### 2026-10-11 — Task: Python classes describe entity types
+
+**What was done**: Added `xcl/_types.py` (`Sensitive[T]` with a masked `repr` and `reveal()`, `Computed[T]` as an annotated optional, `field(name=, block=, label=, default=, default_factory=)` and `UNKNOWN`), `xcl/_entity.py` (`Meta`, the `Resource` base, the `@entity(type, subtype)` decorator that validates the class, derives and stores its schema and registers it, `Entity` for entities of unregistered types, and the lookup helpers) and `xcl/_schema.py` (`schema_for`, which derives the schema v1 document from dataclass annotations including the named-block map and label extension; `signature_for`, which derives a `FunctionSignature` from a function's annotations; `hydrate`, which turns entity JSON into the registered class, nested blocks included, with the sensitive marker and masked envelopes as redacted `Sensitive` values, or into `Entity`). The names are exported from `xcl`.
+
+**Deviations**: A class registered with `@entity` must itself be decorated with `@dataclass`: a `Resource` subclass that is not passes `dataclasses.is_dataclass` through inheritance and would describe a type with none of its attributes, so it is refused with an error saying so. A label field is marked `xcl.field(label=True)` on the element class, rather than named on the parent field, so one element class serves lists and maps alike; `computed` fields carry no `optional` key, as computed implies optional.
+
+**Files changed**:
+- `xcl-python: xcl/_types.py`
+- `xcl-python: xcl/_schema.py`
+- `xcl-python: xcl/_entity.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: tests/unit/test_schema.py`
+- `xcl-python: tests/unit/test_signature.py`
+- `xcl-python: tests/unit/test_hydrate.py`
+- `xcl-python: tests/unit/test_types.py`
+- `xcl-python: tests/unit/test_entity.py`
+
+**Discoveries**: The dataclass for the `annotations` parity fixture derives exactly its `types.json`, which the test pins, so the two sides declare the same type. The element dataclass of a block must list its required fields before the label field, which has a default, as a plain dataclass orders them.
+### 2026-10-11 — Task: The synchronous API runs every operation and lookup
+
+**What was done**: Completed `xcl.Config` with every option (registries, state path or custom store, state mask, variables, event handler, event data level, buffer and mask) and every operation and lookup: `validate`, `apply`, `diff`, `destroy`, `load`, `entities`, `entity_count`, `find`, `find_by_type`, `find_one`, `all`, `outputs`, `encode_saved_entity`. Added `xcl/registry.py` (`LocalRegistry` with `register_type`, `register_function`, `register_external_plugin`, `register_plugin_directory`; `GitHubRegistry` with every option) as message builders, `xcl/mask.py` (`aes256gcm`, `hmac_sha256`, `redact`, `omit`), `xcl/events.py` (`Event` with `entity()`), `xcl/diff.py` (`Diff`, `ResourceDiff`, `Change`, `Summary`), `xcl/_functions.py` (calling a registered function for a task) and `xcl/_poll.py`: the one poll engine, `Operation` (`step`, `complete`, `cancel`, `finish`), the task answerers and the synchronous `drive`, which runs tasks serially on the calling thread with the GIL released while the engine is polled, and on `KeyboardInterrupt` cancels, drains to the finished task and re-raises.
+
+**Deviations**: `find`, `find_by_type` and `find_one` take the class first, as the design writes them; with `None` they return the registered class or `xcl.Entity`, and a class that does not match the entity's type raises `TypeMismatchError`. `validate` does not report a missing required attribute (pre-existing engine behaviour); `apply` reports it positioned at the block, which the test pins. Cancelling through `KeyboardInterrupt` waits for the provider call in flight, as a cancelled Go apply does. `_functions.py` is included here because the poll engine dispatches function tasks; the functions task adds its tests.
+
+**Files changed**:
+- `xcl-python: xcl/config.py`
+- `xcl-python: xcl/registry.py`
+- `xcl-python: xcl/mask.py`
+- `xcl-python: xcl/events.py`
+- `xcl-python: xcl/diff.py`
+- `xcl-python: xcl/_poll.py`
+- `xcl-python: xcl/_functions.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: tests/integration/conftest.py`
+- `xcl-python: tests/integration/sync_entities.py`
+- `xcl-python: tests/integration/test_sync.py`
+
+**Discoveries**: `Event.resource_type` is the entity's "<type>.<name>", the same as `resource_id`, as `events.Event` documents. The engine aligns `=` in encoded configuration text. A `variable` record is not encodable as configuration. The fixture plugins are built by `make plugins` from the xcl checkout; the integration conftest builds them once per session and skips without Go.
+### 2026-10-11 — Task: Python functions are callable from configuration
+
+**What was done**: `LocalRegistry.register_function(fn, name=None)` derives the function's signature from its annotations and declares it when the configuration is created; the poll engine answers each function task by calling the registered function with the decoded JSON arguments (whole numbers as `int`) and returning the result as JSON, or the exception's message as the call's error. Added `tests/integration/test_functions.py`, one test per criterion: the result filled in, arguments seen, a raising function failing the apply at the call's position, a clash with a builtin and between two registries raising `FunctionNameClashError` at configuration creation, an unsupported annotation refused at registration, a variadic function refused by the engine, a sensitive argument arriving plain with the result held sensitive, list, map, number and bool arguments, and registering under another name.
+
+**Deviations**: The code (`register_function`, `_functions.py` and the poll engine's dispatch) landed with the synchronous API task, because the poll engine dispatches function tasks; this task adds its tests. An unsupported parameter annotation is refused in Python at registration, before the engine sees it, while a variadic signature is sent and refused by the engine with `invalid_function`, as planned.
+
+**Files changed**:
+- `xcl-python: tests/integration/test_functions.py`
+
+**Discoveries**: None beyond those recorded for the core service: a function is evaluated on every decode pass, so a host sees several tasks per call site.
+### 2026-10-11 — Task: Go plugins are usable from Python
+
+**What was done**: Added the Docker example plugin tests: `tests/plugins.toml` pins the release (`jumppad-labs/xcl-plugin-docker` v0.2.0), `tests/keys/jumppad-labs.asc` is the jumppad-labs release key published at xcl.dev, and `tests/integration/configs/docker/main.xcl` declares a network and an nginx container. `test_docker_plugin.py` applies that configuration with the plugin loaded from the GitHub registry (installed once per session with the trusted key), from the installed binary's path and from its directory, and reads the plugin's entities generically as `xcl.Entity`, destroying in every case. `test_github_tamper.py` serves the real release assets from a local fake GitHub API and shows a checksums file with one digit changed, and a release signed by a key that is not trusted, are refused with `xcl.PluginVerificationError`, with a positive control through the same fake. The tests skip with a clear reason when no Docker daemon is reachable.
+
+**Deviations**: The published Docker plugin release is v0.2.0, dated before xcl v0.3.0; the plugin protocol is additive, so it loads and runs unchanged, and the pin names it. The session install runs `validate`, which installs and starts the plugin without touching Docker. Docker availability is checked by pinging `DOCKER_HOST` (podman's `docker` shim ignores it, the Go plugin honours it) before `docker info`. A release served with no `.sig` installs when no trusted keys are given, the engine's documented behaviour, which a test pins.
+
+**Files changed**:
+- `xcl-python: tests/plugins.toml`
+- `xcl-python: tests/keys/jumppad-labs.asc`
+- `xcl-python: tests/integration/configs/docker/main.xcl`
+- `xcl-python: tests/integration/docker_helpers.py`
+- `xcl-python: tests/integration/test_docker_plugin.py`
+- `xcl-python: tests/integration/test_github_tamper.py`
+
+**Discoveries**: The GitHub registry keeps the archive beside the binary, checksums and signature in the cache entry `<cache>/github.com/<owner>/<repo>/<tag>/<os>_<arch>/`. Plugin-directory discovery requires the executable bit, so the sidecar files in a cache entry are skipped and the entry directory can be registered directly. A tampered checksums file fails at the signature step with a trusted key and at the checksum step without one.
+### 2026-10-11 — Task: Python gives the same results as Go on the parity fixtures
+
+**What was done**: Added `tests/parity`: `types.py` holds one dataclass per fixture type and `register(fixture)` registers them right before a run; `test_types.py` checks, per fixture, that the derived schema documents equal the fixture's `types.json`, so the two sides declare the same types; `run_python.py` is the Python counterpart of xcl's `cmd/parity`, stage for stage (validate, diff, apply, entities, outputs, state, the changed diff, load in a new process, destroy) with the same normalisation (paths to `<tmp>` and `<fixture>`, problems sorted with Go's map-print key, entities and state by id); `test_parity.py` runs both programs per fixture and compares the decoded records, failing with the fixture name and the first differing JSON path. All seven fixtures give identical records.
+
+**Deviations**: The `outputs` fixture's number list omitted `format`, which Go defaults to `int` but the Python deriver always writes; the fixture now spells `int` out like every other, so the strict document equality holds. `run_python.py` reads the raw entity JSON through the client rather than hydrated objects, since the record is the engine's JSON. `tests/parity/types.py` shadows the standard library's `types` module when the runner is executed as a script, so the runner fixes `sys.path` before importing anything else.
+
+**Files changed**:
+- `xcl-python: tests/parity/__init__.py`
+- `xcl-python: tests/parity/conftest.py`
+- `xcl-python: tests/parity/types.py`
+- `xcl-python: tests/parity/run_python.py`
+- `xcl-python: tests/parity/test_parity.py`
+- `xcl-python: tests/parity/test_types.py`
+- `xcl: bindings/libxcl/testdata/parity/outputs/types.json`
+
+**Discoveries**: `HOME` set in `os.environ` before the engine loads is seen by the Go runtime inside the library, so a Python program can isolate the plugin cache the same way a Go test does. Go's `errors.As` on a `ConfigError` reaches the first positioned cause, which the Python side reproduces by walking `causes` depth first.
+### 2026-10-11 — Task: The asyncio API never blocks and can be cancelled
+
+**What was done**: Added `xcl/aio.py` with `xcl.aio.Config`: the same constructor as `xcl.Config` and every operation and lookup as an awaitable. The engine is polled from a one-thread executor through the shared poll engine's `step`, and each task it posts is dispatched as an asyncio task: an `async def` function, event handler or state-store method is awaited on the loop and a plain one runs in the default executor. Cancelling the awaiting task cancels outstanding dispatches, sends `Cancel`, drains to the finished task under a shield so the engine saves its progress, then re-raises `asyncio.CancelledError`. `tests/integration/test_aio.py` covers an async and a sync function, an async event handler, async and sync state stores, other coroutines and an asyncio HTTP server progressing during a slow apply, prompt cancellation, no provider call starting after a cancel (from the recording plugin's log), every lookup awaited, diff and destroy, the async context manager, and the sync and async surfaces being equal with every async method a coroutine function.
+
+**Deviations**: A lifecycle call already running when an operation is cancelled finishes first, because the engine gives a provider a context that is never cancelled; "ends promptly" therefore means within one provider call, which the test bounds at a few seconds, while function and state tasks waiting on the host are released at once. The asyncio configuration is created on `open()`, `async with` or the first operation rather than in `__init__`, since creating it loads the engine and must not block the loop. `xcl.aio.Config` has `open()` beside the sync surface.
+
+**Files changed**:
+- `xcl-python: xcl/aio.py`
+- `xcl-python: tests/integration/test_aio.py`
+
+**Discoveries**: A cancelled apply leaves the already parsed entities in the configuration, so `entities()` after a cancel is not empty. `asyncio.wait_for` on a task cancelled from outside raises `CancelledError` in the awaiter, which a test must catch rather than expect `TimeoutError`.
+### 2026-10-11 — Task: Tagging xcl publishes signed engine builds for eight platforms
+
+**What was done**: Added `.github/workflows/libxcl-release.yml`, xcl's first release workflow. On a `v*` tag push, or by hand for a tag with `publish` off, it builds libxcl for Linux x86-64 and arm64 (glibc 2.28 and musl, cross-compiled with `zig cc` on one Linux runner), Windows x86-64 (zig) and arm64 (llvm-mingw), and macOS x86-64 and arm64 (GitHub's runners, deployment target 11.0), each stamped with the tag through `make libxcl`; checks the glibc builds need no symbol newer than 2.28; packages each as `libxcl_<version>_<os>_<arch>[_musl].tar.gz` (`.zip` on Windows) with the header, writes `libxcl_<version>_checksums.txt`, signs it with the jumppad-labs release key from the repository secrets and verifies the signature; keeps the assets as a workflow artifact; and, when publishing, creates the release if needed, attaches the assets and dispatches `xcl-release` to `jumppad-labs/xcl-python` with the tag.
+
+**Deviations**: The four acceptance criteria are left unchecked: they describe what a run of the workflow on GitHub produces, which the next task's manual dry run (with the signing key in place) and the first real release verify. Locally the workflow parses, `make libxcl` takes `CC`, `GOOS` and `GOARCH` as the matrix passes them, and the package job's shell was run over eight stand-in builds: eight archives with the asset names the registry verifies, an eight-line checksums file and a detached signature that verifies. The asset version drops the leading `v`, as the registry's contract does. The musl suffix is on the arch, an extension of the contract the plan records.
+
+**Files changed**:
+- `xcl: .github/workflows/libxcl-release.yml`
+
+**Discoveries**: A libxcl built with the local gcc 16 needs glibc 2.34 symbols, which is why the release builds target `gnu.2.28` through zig; the workflow's symbol check fails a build that regresses. `zip` is not installed on this machine, while ubuntu runners have it.
+### 2026-10-11 — Task: xcl-python is tested on every platform and released from the xcl tag
+
+**What was done**: Added `.github/workflows/ci.yml`: a matrix of `ubuntu-latest`, `ubuntu-24.04-arm`, `macos-13`, `macos-latest`, `windows-latest` and `windows-11-arm` against CPython 3.10, 3.11, 3.12, 3.13 and the latest `3.x`, plus Alpine containers on both Linux runners for musl, each checking out xcl at the ref in `xcl-ref.txt`, generating the messages, building the engine and the fixture plugins with Go and a C compiler, and running the suite; and a package check (`build --sdist`, `twine check`). Added `.github/workflows/release.yml`, run by the `xcl-release` dispatch from xcl's release or by hand for a tag: per platform it downloads the engine archive, checksums and signature from the xcl release, verifies the signature against `tests/keys/jumppad-labs.asc` and the archive against the checksums, places the engine in the package, sets the version from the tag, regenerates the messages from xcl at the tag, checks the engine reports the tag, builds a wheel tagged `py3-none-<platform>`, installs that wheel and runs the parity suite and the load test against it; builds an sdist; publishes everything from the `pypi` environment with Trusted Publishing; and installs `xcl==<version>` from PyPI on every platform with every Go and C compiler hidden from the path, running the smoke import and the engine version check. `pyproject.toml` lists what the sdist holds and excludes the built engine.
+
+**Deviations**: The four acceptance criteria are left unchecked: they describe runs on GitHub, verified by the first release. Locally both workflows parse, the sdist builds and passes `twine check` without the engine or stray files, a wheel built with `XCL_WHEEL_PLATFORM=manylinux_2_28_x86_64` carries the tag and the engine, and the suite passes. Messages are generated with `protoc` (`arduino/setup-protoc`) rather than buf's remote plugin. The release's wheel test runs the parity suite and the load test rather than the whole suite, since the Docker tests need a daemon the runners lack.
+
+**Files changed**:
+- `xcl-python: .github/workflows/ci.yml`
+- `xcl-python: .github/workflows/release.yml`
+- `xcl-python: pyproject.toml`
+
+**Discoveries**: hatchling's sdist needs `only-include` to keep a repository's other directories (such as `.spektacular`) out; `include` alone does not. Python 3.12+ warns about forking a multi-threaded process, which every process that has loaded the engine is.
+### 2026-10-11 — Task: The Python package is documented
+
+**What was done**: Wrote the package `README.md`: install (`pip install xcl-lang`, the eight platforms and CPython 3.10+), a synchronous getting started that defines an entity class, registers the Docker example plugin through `GitHubRegistry` with the trusted release key, applies, finds and destroys, then entity types, functions, variables, state and events, the asyncio section, errors, fork safety with its two ways out, development and the licence. Wrote `PARITY.md`, mapping every Go operation, lookup, option and registry call to its `xcl.Config` and `xcl.aio.Config` equivalent, with the "not applicable" rows (`Decode`, `As`, `EncodeEntity`, the deprecated `GetResources`/`ResourceCount`). Gave every public module, class, function, method and property a docstring, and added `tests/unit/test_docstrings.py`, which imports the package and walks `xcl.__all__`, `xcl.aio` and `xcl.mask` with `inspect`. `pyproject.toml` uses the README as the description; `twine check` passes on the built wheel and sdist.
+
+**Deviations**: The getting-started example registers a config-only class beside the Docker plugin rather than only plugin types, to show both in one program.
+
+**Amendments**: The spec's Requirements ("Install with pip, no toolchain"), Acceptance Criteria ("Clean install on every platform") and Success Metrics were amended by the orchestrator during the PyPI task: the name `xcl` on PyPI belongs to another project, so the distribution is published as `xcl-lang` and imported as `xcl`. The rename was applied to `pyproject.toml`, the README, the release workflow's uninstall and install-from-PyPI steps, the transport and client messages, the package docstring, and xcl's CHANGELOG entry and README note; the suite, a tagged wheel (`xcl_lang-<version>-py3-none-<platform>.whl`), the sdist and `twine check` were rerun green. The already ticked CI/release task's criteria name `pip install xcl==<version>` in the plan text; the workflow now installs `xcl-lang==<version>`, and those criteria remain to be verified by the first release.
+
+**Files changed**:
+- `xcl-python: README.md`
+- `xcl-python: PARITY.md`
+- `xcl-python: tests/unit/test_docstrings.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: xcl/_client.py`
+- `xcl-python: xcl/_errors.py`
+- `xcl-python: xcl/_transport/inprocess.py`
+- `xcl-python: xcl/_entity.py`
+- `xcl-python: xcl/_poll.py`
+- `xcl-python: xcl/registry.py`
+- `xcl-python: pyproject.toml`
+- `xcl-python: .github/workflows/release.yml`
+
+**Discoveries**: The docstring walk has to unwrap `property`, `classmethod` and `staticmethod` objects to reach the function whose `__doc__` is checked.
+### 2026-10-11 — Task: Record the Python support in the xcl changelog
+
+**What was done**: Inserted the `## 20261011130709-aa3eb933-python-support` entry at the top of `CHANGELOG.md`, above language-surface's, in prose: the Python package (`xcl-lang` on PyPI, imported as `xcl`) and what a Python program can do; the context-taking operations and the cancellation they carry; the untyped lookups; links recorded in written order and the atomic address parser; schema v1 and `registry.TypeFromSchema`; the `coreservice` package and its protocol; the `bindings/libxcl` module, its four C functions, `make libxcl` and the release assets; and the fixture plugins and parity program; then **Breaking:** None. Added the "Other languages" section to `README.md`, saying the engine is available to Python as `xcl-lang` from jumppad-labs/xcl-python and that Go users are unaffected.
+
+**Deviations**: None. The entry also records the three root-module fixes made during the work (cancellation always reported, links in written order, the address parser published atomically), since Go users see them.
+
+**Files changed**:
+- `xcl: CHANGELOG.md`
+- `xcl: README.md`
+
+**Discoveries**: None.
+### 2026-10-11 — Task: Add the release signing key and dispatch token to xcl
+
+**What was done**: The person added the secrets `XCL_RELEASE_GPG_KEY`, `XCL_RELEASE_GPG_PASSPHRASE` and `XCL_PYTHON_DISPATCH_TOKEN` to `jumppad-labs/xcl` (2026-10-11, about 20:26-20:32Z), the names the release workflow reads.
+
+**Deviations**: The manual dry run of the release workflow was skipped by the user's decision; the real release (workflow run 38172909823 for `v0.4.0`) verifies the workflow and the signature, so the dry-run criterion stays unchecked and is confirmed by that run.
+
+**Files changed**:
+- none (repository settings)
+
+**Discoveries**: None.
+
+### 2026-10-11 — Task: Set up the PyPI project and trusted publishing
+
+**What was done**: The person added a PyPI pending publisher for the project `xcl-lang` (owner `jumppad-labs`, repository `xcl-python`, workflow `release.yml`, environment `pypi`) and created the `pypi` environment on `jumppad-labs/xcl-python`, which the release workflow's `publish` job runs in with `id-token: write`.
+
+**Deviations**: The project is `xcl-lang`, not `xcl`: the name on PyPI belongs to another owner, so the spec was amended and the distribution renamed, with the import name kept as `xcl`. A pending publisher is used, since the project has no release yet; PyPI turns it into the project's publisher on the first upload.
+
+**Files changed**:
+- none (PyPI and repository settings)
+
+**Discoveries**: None.
+
+### 2026-10-11 — Task: Cut the first xcl release with Python support
+
+**What was done**: Both spec branches were merged, xcl at `93e1904` on `f-libxcl` and xcl-python at `81673e5` on `main`, and the orchestrator tagged xcl `v0.4.0` on `93e1904` (annotated tag `a9eaf06`) and pushed it. The libxcl release workflow run 38172909823 was queued by the push; it builds and signs the eight archives, attaches them to the release and dispatches the xcl-python release, which publishes `xcl-lang==0.4.0`.
+
+**Deviations**: The tag was cut by the orchestrator rather than by the person, by the user's decision. The task's two acceptance criteria, the eight signed archives on the release and the same version on PyPI with its install checks passed, are confirmed by run 38172909823 and the xcl-python release run it dispatches; they stay unchecked until then, as do the CI-only criteria of the release-workflow and CI/release tasks.
+
+**Files changed**:
+- none (a tag on xcl)
+
+**Discoveries**: None.

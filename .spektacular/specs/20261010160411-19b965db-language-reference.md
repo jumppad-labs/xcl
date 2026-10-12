@@ -31,33 +31,33 @@ xcl.dev explains individual features but has no page that describes the XCL lang
 -->
 ## Requirements
 
-- [ ] **Reference is reachable from the site**
+- [x] **Reference is reachable from the site**
   Readers can find the language reference from the site's main navigation and from the home page, and the xcl README points to it.
-- [ ] **Files and blocks**
+- [x] **Files and blocks**
   The reference explains which files XCL reads, how a block's labels give an entity's type, optional subtype and name, and the address each block gets, using `database "postgres" "main"` and `app "web"` as the examples.
-- [ ] **Config to type mapping**
+- [x] **Config to type mapping**
   For each shape of configuration, the reference shows the XCL next to the Go and Python types it fills in, covering required and optional attributes, nested blocks, lists of blocks, named blocks collected by name, map attributes (supported, but not the encouraged style), and fields the application computes rather than the author writes.
-- [ ] **Meta**
+- [x] **Meta**
   The reference explains the built-in fields every entity has, such as its name and address, and how configuration refers to them.
-- [ ] **References and order**
+- [x] **References and order**
   The reference explains how one entity refers to another's values, and how those references decide the order entities are processed in.
-- [ ] **Variables and outputs**
+- [x] **Variables and outputs**
   The reference explains how to declare variables, give them defaults, build a variable's default from other values, override them from the application or with `XCL_VAR_<name>` environment variables, and how outputs work.
-- [ ] **Modules**
+- [x] **Modules**
   The reference explains how to use a module, pass it values and read its outputs; that configuration reaches a module only through its outputs, while application code can reach any entity inside it by its full address; and which module sources work today.
-- [ ] **Functions**
+- [x] **Functions**
   The reference lists every built-in function with an example, explains how an application registers its own functions and how plugins provide them, that function calls are evaluated while configuration is read, and how name clashes are reported.
-- [ ] **Expressions**
+- [x] **Expressions**
   The reference explains the expressions configuration can use: references in strings, lists, maps, conditionals, `for` expressions and splat. It states that string template directives are not part of XCL and that templating is done with functions.
-- [ ] **Current behaviour only**
+- [x] **Current behaviour only**
   Every behaviour the reference describes matches the latest tagged xcl release when the pages are published; anything planned but not built is marked as not yet supported rather than described as working.
-- [ ] **Language tabs**
+- [x] **Language tabs**
   Every code example on xcl.dev that shows application code offers it in Go and Python, chosen by tab. Picking a language switches every example on the page and is remembered across pages.
-- [ ] **Python wherever there is Go**
+- [x] **Python wherever there is Go**
   Every existing page that shows Go application code also shows the Python equivalent, except the plugin authoring pages.
-- [ ] **Plugin authoring is Go**
+- [x] **Plugin authoring is Go**
   The plugin template and plugin example pages state that plugins are written in Go for now, and that they can be used from both Go and Python applications.
-- [ ] **Positioning and terminology**
+- [x] **Positioning and terminology**
   The reference describes XCL as its own language, calls blocks entities and not resources (except inside Go identifiers), and avoids describing it as a superset of HCL, using the word "interpolation", or comparing it to Terraform.
 
 <!--
@@ -88,33 +88,33 @@ xcl.dev explains individual features but has no page that describes the XCL lang
 -->
 ## Acceptance Criteria
 
-- [ ] **Reachable**
+- [x] **Reachable**
   On the built site, the language reference appears in the main navigation and is linked from the home page, and the xcl README contains a link to it; every one of those links opens the reference.
-- [ ] **Files and blocks covered**
+- [x] **Files and blocks covered**
   The reference states the file extension XCL reads, shows `database "postgres" "main"` and `app "web"`, says which label is the type, the subtype and the name in each, states that the subtype is optional, and gives the address of each (`database.postgres.main`, `app.web`).
-- [ ] **Type mapping covered**
+- [x] **Type mapping covered**
   For each of: a required attribute, an optional attribute, a nested block, a list of nested blocks, named blocks collected into a map, a map attribute, and a computed field, the reference shows an XCL snippet next to the type that receives it, tabbed in Go (with its struct tags) and Python.
-- [ ] **Meta covered**
+- [x] **Meta covered**
   The reference lists each built-in field of an entity and shows a configuration snippet that refers to one of them on another entity.
-- [ ] **References covered**
+- [x] **References covered**
   The reference shows one entity using a value from another and states that the referenced entity is processed first.
-- [ ] **Variables and outputs covered**
+- [x] **Variables and outputs covered**
   The reference shows a variable with a default, a variable whose default is built from another value, each way to override it (from the application, and with an `XCL_VAR_<name>` environment variable), and an output being declared and used. It does not describe locals.
-- [ ] **Modules covered**
+- [x] **Modules covered**
   The reference shows a module being used with an input and an output read from it in configuration, and application code finding an entity inside the module by its full address. It states that configuration can reach a module only through its outputs, and names the module sources that work today and those that do not.
-- [ ] **Functions covered**
+- [x] **Functions covered**
   Every built-in function in the current release appears in the reference with an example. The reference shows an application registering a function in Go and in Python, and a plugin-provided function being called.
-- [ ] **Expressions covered**
+- [x] **Expressions covered**
   For each of a string with an embedded reference, a list, a map, a conditional, a `for` expression and a splat, the reference has an example. It states that `%{ }` template directives are not supported and points to functions for templating.
-- [ ] **Matches the current release**
+- [x] **Matches the current release**
   Each XCL and Go example in the reference, when tried by hand against the latest tagged xcl release at the time the pages are published, behaves as the reference says; each feature it marks as not yet supported is indeed unsupported in that release.
-- [ ] **Tabs work and are remembered**
+- [x] **Tabs work and are remembered**
   On the built site, picking Python in one code box switches every code box on the page to Python, and on going to another page its code boxes open on Python too.
-- [ ] **No Go-only examples**
+- [x] **No Go-only examples**
   No page on xcl.dev outside the plugin authoring pages has a Go code box without a Python tab.
-- [ ] **Plugin pages state Go only**
+- [x] **Plugin pages state Go only**
   The plugin template and plugin example pages state that plugins are written in Go for now and can be used from Go and Python applications.
-- [ ] **Terminology**
+- [x] **Terminology**
   The reference does not contain the words "superset", "interpolation" or "Terraform", and does not use "resource" for a block, except inside Go identifiers.
 
 <!--

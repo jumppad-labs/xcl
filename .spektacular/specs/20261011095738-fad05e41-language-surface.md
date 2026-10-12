@@ -16,43 +16,43 @@ XCL currently exposes everything its HCL-derived parser happens to support, and 
 
 ## Requirements
 
-- [ ] **Environment overrides use the XCL prefix**
+- [x] **Environment overrides use the XCL prefix**
   Users can override a variable's value by setting an environment variable named with the `XCL_VAR_` prefix followed by the variable's name.
-- [ ] **No accidental environment overrides**
+- [x] **No accidental environment overrides**
   Environment variables that don't carry the `XCL_VAR_` prefix never become variables or override one.
-- [ ] **Applications can register their own functions**
+- [x] **Applications can register their own functions**
   Developers embedding XCL can make a function of their own callable from configuration, the same way they make an entity type available, without writing a plugin.
-- [ ] **Plugins can offer functions**
+- [x] **Plugins can offer functions**
   Plugin authors can offer functions from a plugin, and configuration can call them.
-- [ ] **Functions are evaluated while configuration is read**
+- [x] **Functions are evaluated while configuration is read**
   Every function call in configuration, whether built-in, application-registered or plugin-hosted, is evaluated while the configuration is read. Its result is filled into the entity before the entity reaches any plugin lifecycle, so a plugin only ever sees the resulting value.
-- [ ] **Function name clashes are reported**
+- [x] **Function name clashes are reported**
   The system reports an error, naming both sources, when two functions would share a name: two plugins, a plugin and an application function, or either of them and a built-in.
-- [ ] **Named child blocks collect into a map**
+- [x] **Named child blocks collect into a map**
   When the Go field is a map, named child blocks of the same type are collected into it, keyed by each block's name.
-- [ ] **Unnamed blocks can't go into a map**
+- [x] **Unnamed blocks can't go into a map**
   A child block without a name, written where a map is expected, is reported as a configuration error that points at the block.
-- [ ] **Duplicate block names are reported**
+- [x] **Duplicate block names are reported**
   Two child blocks of the same type with the same name inside one entity are reported as a configuration error.
-- [ ] **Lists accept named and unnamed blocks**
+- [x] **Lists accept named and unnamed blocks**
   When the Go field is a list, child blocks are collected whether or not they have a name, and a block's name is kept when the Go type has a field for the name.
-- [ ] **Unsupported field types are errors, not crashes**
+- [x] **Unsupported field types are errors, not crashes**
   A Go field that can't hold child blocks is reported as an error, never as a crash of the embedding application.
-- [ ] **Named blocks can be referenced by name**
+- [x] **Named blocks can be referenced by name**
   Configuration can refer to a value inside a named child block by the block's name, where that block is collected into a map.
-- [ ] **Optional fields are honoured inside map and object values**
+- [x] **Optional fields are honoured inside map and object values**
   Fields a Go type marks optional can be left out of map and object values written as attributes, just as they can in blocks.
-- [ ] **References inside `for` expressions resolve**
+- [x] **References inside `for` expressions resolve**
   An entity referenced inside a `for` expression is recognised as a dependency and its values are filled in before the expression is evaluated.
-- [ ] **Template directives are rejected**
+- [x] **Template directives are rejected**
   Configuration that uses string template directives (`%{ … }`) is rejected with an error explaining that templating isn't part of XCL and pointing to functions instead. References in strings (`${ … }`) keep working.
-- [ ] **Variables can be built from other values**
+- [x] **Variables can be built from other values**
   A variable's default can refer to other values in the configuration and is resolved in dependency order, so no separate `local` block is needed.
-- [ ] **Editor highlighting matches the language**
+- [x] **Editor highlighting matches the language**
   The XCL editor extension no longer highlights template directives as valid syntax.
-- [ ] **The site matches the language**
+- [x] **The site matches the language**
   Pages and feature cards on xcl.dev, and the xcl README, that describe these behaviours (the environment prefix, the function count, functions, templating) state what the library now does.
-- [ ] **The plugin template supports functions**
+- [x] **The plugin template supports functions**
   The plugin template shows how a plugin offers a function, and the example Docker plugin builds against the changed plugin interface.
 
 ## Constraints
@@ -82,43 +82,43 @@ app "web" {
 }
 ```
 
-- [ ] **Prefixed override applies**
+- [x] **Prefixed override applies**
   With `variable "region" { default = "eu" }` and `XCL_VAR_region=us` set, the applied entity that uses the variable shows `us`.
-- [ ] **Unprefixed and old-prefix variables are ignored**
+- [x] **Unprefixed and old-prefix variables are ignored**
   With the same config and `region=us` or `HCL_VAR_region=us` set (but no `XCL_VAR_region`), the entity shows `eu`. Referring to `variable.PATH` in config is reported as an unknown variable.
-- [ ] **Application function callable**
+- [x] **Application function callable**
   An application registers a function named `slugify` without any plugin. Config `name = slugify("My App")` applies, and the entity holds the function's result.
-- [ ] **Plugin function callable**
+- [x] **Plugin function callable**
   A plugin built from the plugin template offers a function. Config that loads the plugin and calls the function applies, and the entity holds the function's result.
-- [ ] **Plugin receives the result, not the call**
+- [x] **Plugin receives the result, not the call**
   When an entity handled by a plugin has an attribute set by a function call, the value the plugin receives in its create step is the function's result.
-- [ ] **Function clash reported**
+- [x] **Function clash reported**
   Registering an application function named `upper` (a built-in), registering an application function with the same name as a function a loaded plugin offers, or loading two plugins that offer the same function name, makes creating the config fail with an error naming the function and both sources.
-- [ ] **Named blocks fill a map**
+- [x] **Named blocks fill a map**
   `listener "http" { port = 80 }` and `listener "https" { port = 443 }`, read into a map field, give a map with keys `http` and `https` holding ports 80 and 443.
-- [ ] **Unnamed block into a map fails**
+- [x] **Unnamed block into a map fails**
   `listener { port = 80 }` read into a map field fails validation with an error at that block's line saying a name is required.
-- [ ] **Duplicate name fails**
+- [x] **Duplicate name fails**
   Two `listener "http"` blocks in one entity fail validation with an error naming `http` and pointing at the second block.
-- [ ] **List takes both kinds**
+- [x] **List takes both kinds**
   `listener "http" { port = 80 }` and `listener { port = 8080 }`, read into a list field whose type keeps the name, give two items: one named `http` and one with an empty name.
-- [ ] **No crash on a bad field type**
+- [x] **No crash on a bad field type**
   Registering a type whose child-block field is a type that can't hold blocks (for example a string) returns an error from creating or validating the config. The application doesn't panic.
-- [ ] **Reference by name works**
+- [x] **Reference by name works**
   With listeners collected into a map, another entity's `port = app.web.listener.https.port` applies and holds 443.
-- [ ] **Optional field omitted in a map value**
+- [x] **Optional field omitted in a map value**
   `listeners = { http = { port = 80 } }`, where the Go type marks `tls` optional, applies with `tls` left at its zero value.
-- [ ] **for over an entity resolves**
+- [x] **for over an entity resolves**
   With listeners collected into a map, `ports = { for name, l in app.web.listener : name => l.port }` applies and holds `{ http = 80, https = 443 }`.
-- [ ] **Template directive rejected**
+- [x] **Template directive rejected**
   A string containing `%{ if … }` or `%{ for … }` fails validation with an error at its position that mentions functions. A string containing `${app.web.image}` still applies with the value filled in.
-- [ ] **Variable default refers to an entity**
+- [x] **Variable default refers to an entity**
   `variable "url" { default = "http://${app.web.host}" }`, used by another entity, applies with the URL built from the applied `app.web.host`.
-- [ ] **Highlighter drops directives**
+- [x] **Highlighter drops directives**
   In the XCL editor extension, `%{ … }` inside a string is no longer coloured as template syntax. `${ … }` still is.
-- [ ] **Site claims are correct**
+- [x] **Site claims are correct**
   On xcl.dev and in the xcl README, nothing mentions `HCL_VAR_` or "around sixty" functions. The environment prefix shown is `XCL_VAR_`, and any function count matches the number of built-ins.
-- [ ] **Template and example plugin build**
+- [x] **Template and example plugin build**
   The plugin template builds with a working example function, and the example Docker plugin builds and passes its tests against the changed plugin interface.
 
 ## Technical Approach

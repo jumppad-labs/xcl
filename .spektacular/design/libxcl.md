@@ -3,13 +3,14 @@ created_date: "2026-10-11"
 document_status: draft
 specs:
     - 20261011130709-aa3eb933-python-support
+    - 20261011211634-a8895873-python-out-of-process-engine
 ---
 
-# libxcl: xcl for other languages
+# xcl for other languages: the core service and its transports
 
-xcl is a Go library. An application imports `github.com/jumppad-labs/xcl`, registers its Go types and plugins, and calls `Apply`, `Validate`, `Diff`, `Destroy` and `Load` on a `Config`. libxcl makes the same engine available to Python and Node without reimplementing any of it: the Go core is compiled once as a C shared library, every operation is one protobuf message passed through one C function, and providers written in the host language are driven by the core through a task queue the host polls.
+xcl is a Go library. An application imports `github.com/jumppad-labs/xcl`, registers its Go types and plugins, and calls `Apply`, `Validate`, `Diff`, `Destroy` and `Load` on a `Config`. This design makes the same engine available to Python, Node and any other language without reimplementing any of it: the Go core is wrapped once as a **core service** whose every operation is one protobuf message, a small static `xcl-core` program carries those messages over its standard input and output to the host process, and providers written in the host language are driven by the core through a task queue the host polls. The same messages can also cross a four-function C ABI from a shared library loaded in process (`libxcl`); that transport is kept buildable but is not what the SDKs ship.
 
-The protobuf is not an RPC interface. Nothing listens on a socket and no second process runs: a binding loads `libxcl` into its own process through FFI and calls a C function. Protobuf defines what travels through that function, the method names and the request and response layouts, so the C ABI stays four functions while the API grows in the `.proto` files. Because the API is messages rather than C functions, the same messages could later be carried over stdio by a separate `xcl-core` process; that transport is deferred, see [Deferred: the out-of-process transport](#deferred-the-out-of-process-transport).
+The protobuf is not an RPC interface in the gRPC sense: nothing listens on a socket. A binding starts the bundled `xcl-core` with two pipes and exchanges length-prefixed frames with it; protobuf defines the method names and the request and response layouts, so the transport stays a handful of lines while the API grows in the `.proto` files. Because the API is messages rather than functions, the transport is interchangeable: the shared library carries the same messages through one C function, and a static archive or a Wasm build could carry them too. Which transport an SDK ships is a packaging decision, revisited in [Subprocess as the default transport](#subprocess-as-the-default-transport-and-the-way-back-in-process); the API, the client and everything above them do not change with it.
 
 ## Goals and non-goals
 
@@ -19,6 +20,8 @@ Goals:
 - The parser, dependency graph, lifecycle, change detection, sensitive handling, state and events stay in Go and run unchanged. No language reimplements any of them.
 - One API definition. The `CoreService` protobuf is the only description of what the core does for a host; the C ABI carries it, and every language generates its message types from it.
 - Pure Go users are unaffected. Importing the root module pulls in no cgo, no subprocess and no shared library.
+- Every supported platform gets the same package, musl included. Alpine is a common base image for Python, Java and .NET services, and a binding must work there exactly as on glibc.
+- No C toolchain in the release path. The engine the SDKs ship is cross-compiled for every target from one runner with cgo disabled.
 - Plugins written in one language work with applications written in another.
 
 Non-goals:
@@ -26,7 +29,8 @@ Non-goals:
 - A browser or Wasm build. A validate-only Wasm build is a later option, not part of this design.
 - A C API for C programs. The C ABI exists to be called by a language binding, not written against by hand.
 - Supporting two Go runtimes in one process. See the hazards section.
-- An out-of-process transport in the first release. The design keeps it possible; see [Deferred: the out-of-process transport](#deferred-the-out-of-process-transport).
+- Shipping the in-process shared library in any SDK package. `bindings/libxcl` stays buildable and tested for the day it is wanted again; see [the way back in process](#subprocess-as-the-default-transport-and-the-way-back-in-process).
+- Platforms that forbid starting a process (iOS and store-sandboxed apps, browsers, edge isolates). They also forbid loading a Go shared library; they need a static archive or a Wasm build, which the message API allows as further transports when asked for.
 
 ## The guarantee for Go users
 
@@ -40,9 +44,9 @@ The root module `github.com/jumppad-labs/xcl` is unchanged by this work. Nothing
 |---|---|---|---|
 | Library | `github.com/jumppad-labs/xcl` (root module) | no | Unchanged. Go users import it directly. |
 | Core service | `coreservice/` (package in the root module) | no | Implements `CoreService` on the public xcl API: handles, the message dispatcher, the foreign provider, state store and event adapters, the task queue, error mapping. Tested with plain `go test`. |
-| Shared library | `bindings/libxcl/` (its own `go.mod`) | yes | `package main`, `//export xcl_call` and three more exports. A few hundred lines that move bytes between C and `coreservice`. |
-| Language SDKs | `xcl-python`, `xcl-node` (own repositories) | no | Load libxcl, speak `CoreService`, present a native API, derive schemas from native types, run the poll loop. |
-| Subprocess (deferred) | `cmd/xcl-core/` (in the root module) | no | Not built in the first release. Would serve the same `coreservice` over stdio. |
+| Engine program | `cmd/xcl-core/` (in the root module) | no | A static binary serving `coreservice` over stdio. The transport every SDK ships. Built by the `CGO_ENABLED=0` job for every target from one runner. |
+| Shared library | `bindings/libxcl/` (its own `go.mod`) | yes | `package main`, `//export xcl_call` and three more exports: the same `coreservice` behind a four-function C ABI, for a host that links or loads it in process. Kept buildable and smoke-tested; not shipped in SDK packages. |
+| Language SDKs | `xcl-python`, `xcl-node` (own repositories) | no | Start `xcl-core`, speak `CoreService`, present a native API, derive schemas from native types, run the poll loop. |
 
 Dependencies point one way: SDK → transport → `coreservice` → `xcl`. The root module never imports `coreservice`, and `coreservice` imports only the public packages of the root module (`xcl`, `registry`, `plugins`, `state`, `events`, `diff`, `mask`, `types`, `entity`, `errors`, `logger`). Where `coreservice` needs something internal, that something is made public in the root module first.
 
@@ -50,7 +54,7 @@ Dependencies point one way: SDK → transport → `coreservice` → `xcl`. The r
 
 A Go package that imports `"C"` has no buildable files when `CGO_ENABLED=0`. If `bindings/libxcl` sat inside the root module, `go build ./...` and `go vet ./...` on a machine without a C compiler, or in the `CGO_ENABLED=0` CI job, would fail for everyone, including users who only want the library. Giving `bindings/libxcl` its own `go.mod` keeps it out of the root module's `./...`. During development its `go.mod` carries `replace github.com/jumppad-labs/xcl => ../..`; both modules are tagged together on release, with the nested module requiring the root at the same tag. The examples under `example/` already follow this pattern, each with its own `go.mod`, listed in the `Makefile` and built as separate CI jobs.
 
-If `cmd/xcl-core` is built later it needs no cgo, so it would sit in the root module and be built by the `CGO_ENABLED=0` job like everything else.
+`cmd/xcl-core` needs no cgo, so it sits in the root module and is built by the `CGO_ENABLED=0` job like everything else; it cross-compiles for every target from one runner with no C toolchain, which is why it is the transport the SDKs ship.
 
 ### What `coreservice` is
 
@@ -74,11 +78,11 @@ func (s *Service) Call(handle uint64, method string, request []byte) (response [
 func (s *Service) Release(handle uint64) Status
 ```
 
-The shared library is thin: it turns C bytes into `Call` and back. Every test of behaviour is a Go test against `Service.Call`, which needs neither a C compiler nor Python. `coreservice` must stay free of any transport: that is what keeps a later out-of-process transport a thin wrapper rather than a second implementation.
+The shared library is thin: it turns C bytes into `Call` and back. Every test of behaviour is a Go test against `Service.Call`, which needs neither a C compiler nor Python. `coreservice` must stay free of any transport: that is what keeps both transports thin wrappers rather than second implementations.
 
 ## The C ABI
 
-Four exported functions. Nothing else is exported.
+The in-process transport. Four exported functions, nothing else; the same messages the engine program carries over stdio cross here through one call. It is the natural shape for a host that links the engine statically (a static archive is the same code with a different `-buildmode`) and for a host where starting a process is impossible, and it is what the SDKs would load if the in-process route is ever made the default again. The SDKs do not ship it today; the reasons are in [Go c-shared hazards](#go-c-shared-hazards-and-why-the-sdks-do-not-ship-it) and the decision section.
 
 ```c
 #include <stddef.h>
@@ -337,7 +341,7 @@ message CancelResponse {}
 
 An operation runs on a goroutine inside the core. It finishes with an `OperationFinished` task carrying the error, if any, and for a diff the result. The host learns nothing about the operation except through `Poll`, so the same code path serves an operation with no host providers and no events (one `Poll` returns `OperationFinished`) and one with both.
 
-Why every operation is started rather than called synchronously: a synchronous `Apply` that drives host-language providers would need the host to be in two places at once, blocked in `xcl_call` and running its provider. Starting the operation and polling removes that, and would make a later out-of-process transport identical.
+Why every operation is started rather than called synchronously: a synchronous `Apply` that drives host-language providers would need the host to be in two places at once, blocked in `xcl_call` and running its provider. Starting the operation and polling removes that, and makes the two transports identical above the byte layer.
 
 ### Polling
 
@@ -542,17 +546,19 @@ The request type of each method comes from the descriptor too (`methods.Get(i).I
 
 ### SDKs: a typed client, a byte transport, and a hand-written API
 
-Each SDK has three layers, of which only the bottom one touches the C library:
+Each SDK has three layers, of which only the bottom one knows how the engine is reached:
 
 ```
 xcl.Config.apply()          public API: dataclasses, poll loop, exceptions (hand-written)
         │
 _Client.call(h, "StartApply", StartApplyRequest)
         │                   typed: encode request, decode response, map Error to exception
-_InProcessTransport.call(h, "StartApply", b"...")
-        │                   bytes only: the FFI calls
-libxcl  xcl_call / xcl_free
+_SubprocessTransport.call(h, "StartApply", b"...")
+        │                   bytes only: one frame out, one frame back
+xcl-core  stdin / stdout
 ```
+
+A second transport class, `_InProcessTransport`, speaks the C ABI through cffi instead; it has the same `call` signature and is used only from a source checkout that built the shared library.
 
 The typed client is built from the generated descriptor at run time, so nothing beyond the `_pb2` modules is generated:
 
@@ -605,7 +611,7 @@ class _InProcessTransport:
         return status, body
 ```
 
-The split keeps memory ownership, the GIL and fork detection in one place; lets SDK tests run against a fake transport with no libxcl; and keeps the deferred out-of-process transport a second class with the same `call` signature. Node has the same three layers, with koffi in place of cffi. The public API stays hand-written because it is where the idiomatic language lives; generated code stops at the message layer.
+The split keeps process management, the GIL and fork detection in one place; lets SDK tests run against a fake transport with no engine at all; and keeps the in-process transport a second class with the same `call` signature. Node has the same three layers, with `child_process` in place of `subprocess`. The public API stays hand-written because it is where the idiomatic language lives; generated code stops at the message layer.
 
 ### Keeping the contract stable
 
@@ -867,7 +873,8 @@ xcl/
                      Provider, Plugin, Sensitive, Computed, UNKNOWN, errors, mask
   _transport/
     __init__.py      Transport protocol: call(handle, method, bytes) -> (status, bytes)
-    inprocess.py     loads libxcl through cffi ABI mode (ctypes fallback), lazy, fork-aware
+    subprocess.py    starts the bundled xcl-core, frames CoreService calls over its stdio
+    inprocess.py     loads libxcl through cffi ABI mode (ctypes fallback); source builds only
   _client.py         typed client built from the CoreService descriptor
   _core/
     core_pb2.py      generated from coreservice.proto and the shared types proto
@@ -877,21 +884,23 @@ xcl/
   plugin/            out-of-process plugin server: grpcio, PluginService, handshake
   aio.py             asyncio API
   generate.py        python -m xcl generate
-  _lib/              libxcl.so / .dylib / .dll for this wheel's platform
+  _bin/              xcl-core for this wheel's platform
+  _lib/              libxcl.so / .dylib / .dll, present only in a source build that asked for it
 ```
 
-### Loading the library
+### Starting the engine
 
-cffi in ABI mode (`ffi.dlopen`) with the four-function `cdef` above, so the wheel contains no compiled extension and one wheel per platform serves every CPython and PyPy version (`py3-none-manylinux_2_28_x86_64`, `py3-none-macosx_11_0_arm64`, `py3-none-win_amd64`, ...). ctypes is the fallback when cffi is not installed; both release the GIL for the duration of a foreign call, which is what lets `Poll` block without stalling other Python threads.
+The engine is started on first use, not at `import xcl`: `xcl-core --serve` from the package's own directory, with a pipe pair for its standard input and output and its standard error inherited, so Go runtime diagnostics and `GOTRACEBACK` output reach the user. The first exchange is `GetVersion`; the package refuses an engine whose version differs from its own, naming both. One engine serves every configuration in the host process; it is ended when the last configuration is closed or at interpreter exit, with `SIGTERM` (`TerminateProcess` on Windows) and a bounded wait. All of this lives in the transport class; nothing above it knows there is a process.
 
-The library is loaded on first use, not at `import xcl`. Loading a Go c-shared library starts the Go runtime and its threads, and a process that imports `xcl` then forks (gunicorn, celery prefork, `multiprocessing` with the fork start method) would fork a live Go runtime, which Go does not support (golang/go#31860). Lazy loading means a parent that imports `xcl` but never uses it before forking is safe. For a parent that did use it:
+The wheel contains no compiled extension, so one wheel per platform serves every CPython and PyPy version (`py3-none-manylinux_2_28_x86_64`, `py3-none-musllinux_1_2_aarch64`, `py3-none-macosx_11_0_arm64`, `py3-none-win_amd64`, ...). The transport's calls release the GIL while they wait on the pipe, which is what lets `Poll` block without stalling other Python threads.
 
-- `os.register_at_fork(after_in_child=...)` marks the child, and the transport also compares `os.getpid()` with the pid it loaded under.
-- Any call in a marked child raises `xcl.ForkedProcessError` with the two ways out: use the `spawn` start method, or create the configuration after the fork (gunicorn's `post_fork` hook, celery's `worker_process_init` signal) so each child loads its own runtime.
+Fork is unremarkable on this route. A child forked after the parent used xcl inherits the parent's pipes but must not use them: the transport records the pid it started under, and a call from a different pid on a configuration created before the fork raises `xcl.ForkedProcessError`, naming the way out, which is to create the configuration after the fork. A new configuration in the child simply starts the child's own engine. There is no Go runtime in the host process, so gunicorn's `preload_app`, celery's prefork pool and `multiprocessing` with the fork start method all work with that one rule.
 
-Temporal's Python SDK documents the same limit for its Rust core ("Clients do not work across forks"); this design refuses rather than failing somewhere inside the runtime.
+### Choosing the transport
 
-On load the binding calls `xcl_abi_version()` and refuses to continue when it differs from the version the binding was generated against, then `GetVersion` and checks the core version equals the package version.
+The wheel decides, and every wheel carries `xcl/_bin/xcl-core`. A source build can additionally produce `xcl/_lib/libxcl.*` (`make libxcl`), and then `XCL_TRANSPORT=inprocess` selects the shared library; without the variable the engine program is used even when the library is present. When neither is present the first use raises `xcl.EngineNotFoundError` naming both paths. There is no probing of the machine at runtime and no silent fallback: which engine runs is a property of the installed package and the one variable, so it is the same on every machine the package is installed on, and the parity suite runs against each wheel exactly as a user would.
+
+The in-process route exists so the suite can run both transports from one checkout, so the C ABI stays exercised, and so the SDK can switch its default back without an API change if the in-process route becomes viable again; see the decision section.
 
 ### API
 
@@ -986,12 +995,14 @@ if __name__ == "__main__":
 
 ## Node and TypeScript
 
-Repository `xcl-node`, package `@xcl/core`. It follows the same ABI and protocol with the same shapes, so only the bindings differ:
+Repository `xcl-node`, package `@xcl/core`. It follows the same protocol with the same shapes, so only the bindings differ:
 
-- Loading: koffi in ABI mode (no compile step, `koffi.load` of the bundled library and `koffi.func` for the four exports, with `.async` for `Poll` so the event loop is never blocked), or a prebuilt Node-API addon if koffi proves unsuitable. The library ships in `@xcl/core-linux-x64-gnu`, `@xcl/core-linux-arm64-musl`, `@xcl/core-darwin-arm64`, `@xcl/core-win32-x64` and so on as `optionalDependencies` with `os`, `cpu` and `libc` fields, the esbuild and SWC pattern; `@xcl/core` picks the one that installed.
+- Engine: `child_process.spawn` of the bundled `xcl-core` with piped stdio, frames read on the event loop, so nothing blocks it and `Poll` needs no special casing. The binary ships in `@xcl/core-linux-x64-gnu`, `@xcl/core-linux-arm64-musl`, `@xcl/core-darwin-arm64`, `@xcl/core-win32-x64` and so on as `optionalDependencies` with `os`, `cpu` and `libc` fields, the esbuild pattern (esbuild ships an executable this way); `@xcl/core` picks the one that installed. No FFI library and no native addon.
 - Schemas from Zod schemas (`z.object({...})` with `xcl.sensitive()`, `xcl.computed()`, `xcl.block()` refinements) or from decorators on classes; property names are camelCase in TypeScript and converted to snake_case in schema v1 and entity JSON by one rule (`connectionString` ↔ `connection_string`), applied on both directions.
 - API is Promise-based only: `await cfg.apply(paths)`; provider methods return Promises; tasks run concurrently on the event loop. No sync variant.
-- Fork: Node's `cluster` and `child_process.fork` spawn, they do not `fork(2)`, so the hazard does not arise.
+- Fork: Node's `cluster` and `child_process.fork` spawn, they do not `fork(2)`, so each worker starts its own engine.
+
+Any further language, Java, .NET, Ruby, PHP, Rust, is the same recipe: a process launcher, a frame reader, the generated messages and a hand-written API. JARs and NuGet packages carry per-platform native files already (`runtimes/<rid>/native/` in NuGet; resources extracted at run time in a JAR), and an executable travels the same way as a library would; a JAR-based binding needs a configurable extraction directory for hosts whose temporary directory is mounted `noexec`, the same accommodation Netty and Testcontainers make.
 
 ## Out-of-process plugins in other languages and protocol v2
 
@@ -1008,34 +1019,55 @@ Protocol v2 removes it:
 
 Cross-language mixing follows: a Python application drives the Go Docker plugin through `external_plugins` or the GitHub registry; a Go application drives a Python plugin through `RegisterExternalPlugin` on a script or launcher that has a Python interpreter. libxcl depends on protocol v2 only for the Python SDK's `plugin.serve()`; the in-process path does not use it.
 
-## Go c-shared hazards and mitigations
+## Go c-shared hazards, and why the SDKs do not ship it
 
-| Hazard | Source | Mitigation |
-|---|---|---|
-| Two Go runtimes in one process are unsupported: "We do not support multiple Go runtimes in a single process… no plans to ever make it work" | golang/go#18976 | One Go library per process: libxcl is bundled only by the `xcl` package, never by a plugin package, so two xcl-using packages share one copy. A process that loads another Go-built extension beside libxcl is documented as unsupported. |
-| No safe `fork()` after the runtime starts | golang/go#31860 | Lazy load, so a parent that never used xcl forks safely; fork detection with `os.register_at_fork` and a pid check; `ForkedProcessError` naming `spawn` and creating the configuration after the fork. |
-| Signal handlers: c-shared installs handlers for synchronous signals and `SIGPIPE`, chaining to existing ones | os/signal package docs | The core never calls `signal.Notify`, so `SIGINT` stays with the host; Python's `KeyboardInterrupt` arrives between `Poll` calls and the SDK sends `Cancel`. A test presses Ctrl-C during an apply and checks state was saved. |
-| Go pointers passed to C must stay valid and unmoved | cgo pointer rules | No Go pointer crosses: response buffers are `C.malloc`ed, requests are copied, objects are reached through `cgo.Handle` integers. |
-| A crash in the core takes the host process down | nature of in-process code | Same as any native extension; `GOTRACEBACK` is honoured for diagnosis. The deferred out-of-process transport would isolate it. |
-| A C toolchain is needed to build the library | `-buildmode=c-shared` | Only `bindings/libxcl` needs it, and only in the release matrix; nothing in the root module does. |
-| glibc symbol versions from the build machine leak into the binary | measured: a build on Arch needs `GLIBC_2.34` | Release builds target `manylinux_2_28` with `zig cc -target x86_64-linux-gnu.2.28` or in a manylinux container. |
+These are the reasons the in-process transport is built but not shipped. Each is real today; several would go away with upstream Go changes, which is what the way back in process waits on.
 
-## Deferred: the out-of-process transport
+| Hazard | Source | Consequence in process | On the subprocess route |
+|---|---|---|---|
+| musl's loader refuses to `dlopen` a Go c-shared library (`initial-exec TLS resolves to dynamic definition`) | golang/go#54805, open; measured on Alpine with Go 1.25 and 1.27, `zig cc` and native builds | No Python, Java or .NET on Alpine, where all three commonly run. A library linked at build time loads, because static TLS is allocated for libraries present at startup; only loading after start is refused, which is what every binding does | Does not arise |
+| Two Go runtimes in one process are unsupported: "We do not support multiple Go runtimes in a single process… no plans to ever make it work" | golang/go#18976 | A process that loads another Go-built extension beside libxcl is unsupported | Does not arise |
+| No safe `fork()` after the runtime starts | golang/go#31860 | Lazy loading plus fork detection and `ForkedProcessError` naming `spawn` and post-fork hooks; a parent that used xcl cannot fork safely | A forked child starts its own engine |
+| Signal handlers: c-shared installs handlers for synchronous signals and `SIGPIPE`, chaining to existing ones | os/signal package docs | Usually fine; the JVM and .NET use `SIGSEGV` for null checks and safepoints and .NET uses `SIGRTMIN` for GC suspension, and a handler fight ends in a crash with a Go frame in the middle | The engine owns its signals; `SIGINT` is ignored in the engine and the host cancels |
+| Go pointers passed to C must stay valid and unmoved | cgo pointer rules | No Go pointer crosses: response buffers are `C.malloc`ed, requests are copied, objects are reached through handle integers | Does not arise |
+| A crash in the core takes the host process down | nature of in-process code | As any native extension | The host gets `EngineExitedError` and survives |
+| A C toolchain per target is needed to build the library | `-buildmode=c-shared` | `zig cc` for Linux and Windows x86-64, llvm-mingw for Windows arm64, Apple's runners for macOS, glibc symbol-version pinning (`manylinux_2_28`); the first Windows x86-64 build crashed on load, a toolchain interaction still to be understood | One `CGO_ENABLED=0` job cross-compiles every target |
 
-The first release ships the in-process transport only. A static `xcl-core` binary serving `coreservice` over stdio (length-prefixed `Frame{id, handle, method, request}` and `Frame{id, status, response}`, answered out of order so a long `Poll` does not block a `Log`) is designed for but not built.
+## The transport: `xcl-core` over stdio
 
-What it would cover, and how much that matters:
+`cmd/xcl-core` is a static binary in the root module that serves `coreservice` over its standard input and output. It runs the same `coreservice.Service` as `libxcl`, so the API, the handles, the task queue, the error codes and every test of behaviour are shared; the binary is a main package of about the size of the cgo export file.
 
-| Case | How common | Without the transport |
-|---|---|---|
-| A process that loads xcl, then forks (gunicorn `preload_app`, celery prefork, `multiprocessing` fork) | The only common case | Lazy loading covers a parent that never used xcl. A parent that did gets `ForkedProcessError` naming `spawn` and the post-fork hooks. |
-| Another Go-built extension in the same process | Rare; few Python packages are built from Go | Documented as unsupported. |
-| Platforms outside the eight targets, or hosts that forbid native libraries | Rare | Unsupported until asked for. |
-| Isolating a crash in the core | Wanted occasionally | As any native extension. |
+### Framing
 
-What it would cost: a second transport in every SDK (framing, multiplexing, child-process management, and tests for both paths), roughly doubling each wheel by shipping `xcl-core` beside `libxcl` (about 6.5 MB more compressed per platform), and a further binary to build, sign and release. Temporal, the closest precedent for an in-process core driven by polling, ships no out-of-process fallback and documents its fork limit instead.
+Each direction carries length-prefixed frames, a 4-byte big-endian length followed by a protobuf message:
 
-What keeps it cheap to add later: `coreservice` holds no transport code, the whole API is protobuf messages, and the SDKs already put every FFI call behind a `call(handle, method, bytes)` transport. Adding it is `cmd/xcl-core` in the root module and one transport class per SDK; the API, the client and everything above them are unchanged. It is built when a reported case needs it.
+```protobuf
+message Request  { uint64 id = 1; uint64 handle = 2; string method = 3; bytes payload = 4; }
+message Response { uint64 id = 1; uint32 status = 2; bytes payload = 3; }
+```
+
+`id` is chosen by the host and echoed back. `handle`, `method`, `status` and `payload` mean exactly what the four C functions' arguments mean, so `Response.status` carries the same status codes and `payload` the same `CoreService` response or `Error` message. Responses may arrive out of order: the core runs each request on its own goroutine, so a `Poll` that blocks for seconds does not hold up a `Log` or a `Cancel` sent while it waits. The host's transport has one reader that matches responses to waiting callers by `id` (a thread in Python, the event loop in Node).
+
+The frame messages live in `proto/xcl/core/v1/transport.proto` beside `core.proto`, generated like the rest; they are the only thing the transport adds to the protocol.
+
+### Process lifecycle
+
+- One `xcl-core` per host process, started on first use with `xcl-core --serve` and no other arguments, a pipe pair for stdin and stdout, and stderr inherited. `xcl-core --version` prints the version for diagnosis.
+- The first exchange is `GetVersion`; the host refuses a core whose version differs from the package version, as the in-process transport does.
+- The engine's standard output belongs to the protocol. The core never writes to it except through frames; logging goes to stderr; external plugins are the core's own subprocesses and their output is already captured by go-plugin.
+- The engine exits when its standard input reaches end of file, so a host that dies without cleaning up (`SIGKILL`, a crash) takes the engine with it; this is go-plugin's rule for the same situation. On Windows the host also puts the engine in a job object with kill-on-close.
+- `Config.close()` sends `Release` for its handle; the process is ended when the last handle is released or at interpreter exit, with `SIGTERM` (`TerminateProcess` on Windows) and a bounded wait.
+- If the core exits or its pipe closes while calls are outstanding, every waiting caller gets `EngineExitedError` carrying the exit status; the next use starts a fresh core, and configurations created before the exit are gone, as they would be after an in-process crash, except that the host survives.
+- Interrupts: a terminal's Ctrl-C reaches both processes in the group. The engine ignores `SIGINT` (and `CTRL_C_EVENT` on Windows) and leaves the decision to the host, whose `KeyboardInterrupt` arrives between `Poll` calls and sends `Cancel`, exactly as designed for the in-process route; state saved before the cancel is kept.
+- Cancellation, timeouts, logging and state access are unchanged: they are `CoreService` messages and tasks, and the poll loop does not know which transport carries them.
+
+### What it costs
+
+A pipe round trip is about 20 to 50 µs against about 5 µs for a call into the library, and starting the engine takes 10 to 50 ms once per host process. For a tool that parses configuration and drives plugins that are themselves subprocesses this is noise: a configuration with a thousand function calls evaluated over three decode passes is a few thousand round trips, well under a second even at the slow end. Each platform package carries a 17 MB (6.5 MB compressed) static binary in place of a 19 MB library. The transport class is a few hundred lines per SDK, with the lifecycle rules above and their tests.
+
+### Where it cannot run
+
+iOS and store-sandboxed desktop apps, browsers, and edge isolates (Cloudflare Workers, Vercel Edge, Deno Deploy) forbid starting a process. They forbid loading a Go shared library too. iOS can link a static archive (`-buildmode=c-archive`, which Go supports there) carrying the same messages through the C ABI; browsers need the Wasm build. Both are further transports of the same protocol, built when a binding for such a platform is wanted. Serverless platforms that run a normal process (AWS Lambda, Azure Functions, Cloud Run) are fine.
 
 ## Shipping and packaging
 
@@ -1043,46 +1075,47 @@ What keeps it cheap to add later: `coreservice` holds no transport code, the who
 
 | Artifact | Targets | Size (measured, Go 1.27.1, linux/amd64) |
 |---|---|---|
-| `libxcl` c-shared | linux x86-64 and arm64, glibc (`manylinux_2_28`) and musl; macOS x86-64 and arm64; Windows x86-64 and arm64: 8 | 26.5 MB; 19.0 MB stripped (`-trimpath -ldflags="-s -w"`); 6.9 MB gzip -9 |
-
-For comparison, a static `xcl-core` (deferred) measured 17.1 MB stripped and 6.5 MB gzip.
+| `xcl-core` static binary | linux x86-64 and arm64, glibc and musl (one static binary serves both, released under both names so each wheel takes its own); macOS x86-64 and arm64; Windows x86-64 and arm64: 8, built with `CGO_ENABLED=0` from one runner | 17.1 MB stripped; 6.5 MB gzip -9 |
+| `libxcl` c-shared | not released. Built and smoke-tested on Linux x86-64 in CI so the C ABI keeps working; a release of it is added when a consumer needs one | 26.5 MB; 19.0 MB stripped (`-trimpath -ldflags="-s -w"`); 6.9 MB gzip -9 |
 
 go-getter and the AWS and GCS SDKs appear in `go.mod` as indirect dependencies but are not linked into these binaries.
 
-Build tooling: `zig cc` cross-compiles the Linux and Windows x86-64 c-shared targets from one Linux runner (`-target x86_64-linux-gnu.2.28`, `x86_64-linux-musl`, `x86_64-windows-gnu`); Windows arm64 uses llvm-mingw; macOS builds run on GitHub's macOS runners with `MACOSX_DEPLOYMENT_TARGET=11.0` (proposal).
+Build tooling: `go build` with `CGO_ENABLED=0`, `GOOS` and `GOARCH` for all eight targets in one job on one Linux runner. No C compiler, no cross toolchain and no macOS runner are in the release path. (The shared library, when it is built, needs `zig cc` for Linux and Windows x86-64, llvm-mingw for Windows arm64 and Apple's runners for macOS; that matrix is kept in a manually triggered workflow, not in the release.)
 
 ### Distribution
 
 Default route: the library travels inside each ecosystem's platform package.
 
-- PyPI: one wheel per platform, tagged `py3-none-<platform>`, containing the matching `libxcl`. Eight wheels at about 7 MB compressed is about 56 MB per release; against PyPI's default 10 GB project limit that is about 180 releases before asking for more, and the 100 MB per-file limit is not approached. Per user it is 19 MB in a virtualenv.
+- PyPI: one wheel per platform, tagged `py3-none-<platform>`, containing the matching `xcl-core`. Eight wheels at about 7 MB compressed is about 56 MB per release; against PyPI's default 10 GB project limit that is about 180 releases before asking for more, and the 100 MB per-file limit is not approached. Per user it is 19 MB in a virtualenv.
 - npm: `@xcl/core` plus one `@xcl/core-<os>-<arch>[-<libc>]` package per target as `optionalDependencies`, about 19 MB in `node_modules`.
-- GitHub release of `jumppad-labs/xcl`: the raw libraries as `libxcl_<version>_<os>_<arch>.tar.gz` (`.zip` on Windows) with `libxcl_<version>_checksums.txt` and `libxcl_<version>_checksums.txt.sig`, the same asset contract the GitHub registry already verifies for plugins (`registry/github_assets.go`, `registry/github_verify.go`), signed with the same key.
+- GitHub release of `jumppad-labs/xcl`: the binaries as `xcl-core_<version>_<os>_<arch>[_musl].tar.gz` (`.zip` on Windows), listed in `xcl-core_<version>_checksums.txt` with `xcl-core_<version>_checksums.txt.sig`, the same asset contract the GitHub registry already verifies for plugins (`registry/github_assets.go`, `registry/github_verify.go`), signed with the same key.
 
-Fallbacks, in order: download the matching archive from the release into `~/.xcl/core/<version>/`, verifying it with the registry's download, checksum and signature code; build from the sdist, which needs Go 1.25 or later and a C compiler.
+Fallbacks, in order: download the matching archive from the release into `~/.xcl/core/<version>/`, verifying it with the registry's download, checksum and signature code; build from the sdist, which needs Go 1.25 or later and nothing else.
 
 ### Versioning and provenance
 
-- The language package version equals the xcl tag it bundles. `xcl-python 1.4.0` carries `libxcl` built from `xcl v1.4.0`, and `GetVersion` is checked on load.
-- `xcl_abi_version()` returns the C ABI version, starting at 1. It changes only when a function signature or status code changes; adding a `CoreService` method or message field does not change it, since those are protobuf-compatible. Whether it stays independent of the core version is open; the design assumes it does.
-- PyPI Trusted Publishing from the release workflow; npm provenance; the GitHub release assets signed with the registry key.
+- The language package version equals the xcl tag it bundles. `xcl-lang 1.4.0` carries `xcl-core` built from `xcl v1.4.0`, and `GetVersion` is checked on start.
+- The transport frames and status codes are versioned with the C ABI version (`xcl_abi_version()`, starting at 1): it changes only when a frame field, a function signature or a status code changes; adding a `CoreService` method or message field does not change it, since those are protobuf-compatible.
+- PyPI Trusted Publishing from the release workflow; npm provenance; the GitHub release assets signed with the registry key; `xcl-core` for Windows is Authenticode-signed when a certificate is available, because a freshly started unknown executable is what antivirus heuristics flag.
 
 ## Design decisions
 
-### libxcl over Wasm, subprocess-only or reimplementation
+### A message API with a subprocess transport, over a shared library, Wasm or reimplementation
 
-Decision: compile the Go core as a C shared library and bind it; design for, but defer, an out-of-process transport.
+Decision: wrap the Go core once as a transport-free core service whose API is protobuf messages; ship it to every language as a static `xcl-core` program spoken to over stdio; keep the C shared library as a second, unshipped transport of the same messages.
+
+This decision was first taken the other way round: the shared library as the shipped transport, the subprocess deferred. The first release attempt reversed it. The musl wheels could not load the library at all (golang/go#54805), the Windows x86-64 library crashed on load, and the C toolchain matrix was the long pole of the release; meanwhile the subprocess costs that had justified deferring it, a pipe round trip per call and process management in the SDK, measured as noise and as a few hundred lines. The reasons are set out in [Go c-shared hazards](#go-c-shared-hazards-and-why-the-sdks-do-not-ship-it) and [What it costs](#what-it-costs).
 
 Alternatives:
 
 - A WebAssembly core (`GOOS=wasip1`, or TinyGo, run under wasmtime-py or Node's WebAssembly). One artifact for every platform, sandboxed, usable in a browser. Rejected as the primary route: WASI preview 1 cannot spawn processes or open sockets, so external plugins and the GitHub registry stop working; Go's Wasm target is single-threaded, so the parallel graph walk is lost; TinyGo lacks the reflection the schema reader depends on (`reflect.StructOf`); esbuild reports its Wasm build "10x slower"; OPA's Wasm route left each SDK reimplementing builtins. Kept as a later validate-only build for a browser playground or VS Code web.
-- Subprocess only (an `xcl-core` process, no library). No cgo, crash isolation, no C toolchain, six targets. Rejected as the only route because every provider call, state call and event becomes an IPC round trip, process management is the SDK's problem, and spawning is forbidden in some environments. Pkl went subprocess-first, made users install the CLI themselves and is now adding libpkl with the same message protocol; jsii and CDKTF required Node on every machine and CDKTF was archived on 10 December 2025. Kept possible as a later second transport of the same messages; see [Defer the out-of-process transport](#defer-the-out-of-process-transport).
+- The shared library as the shipped transport (the original decision). In process at function-call latency, with no process to manage. Rejected as the default for the hazards above, the first two of which have no fix on our side. Kept buildable and tested as the way back in process; see [Subprocess as the default transport](#subprocess-as-the-default-transport-and-the-way-back-in-process).
 - Reimplementing xcl per language. Rejected: python-hcl2 reimplemented the syntax only and fragmented into forks, and HashiCorp compiled Go HCL to Wasm for `@cdktf/hcl2json` rather than port it. xcl is far more than syntax: graph, lifecycle, change detection, sensitive handling and state would each need a second implementation to keep in step.
 - purego or dlopen for Go consumers, as KCL's Go SDK does. Unnecessary: Go users import the module.
 
-Why libxcl: the engine runs in process at Go speed, with its parallelism, plugins and registry intact; one artifact per platform rather than one per language and platform; and the measured artifact (19 MB stripped, 7 MB compressed) fits every package registry's limits. KCL and Temporal ship the same way. CUE's libcue (Go c-shared) and go-jsonnet's C bindings show the Go side works, with go-jsonnet's "not battle-tested" note and missing Windows wheels marking exactly the shipping work this design budgets for.
+Precedents for the subprocess route: Playwright, whose bindings for every language start one bundled driver and talk to it over pipes; Pkl's Go and Swift bindings, which run `pkl server` over stdio (their complaint was making users install the CLI, which bundling avoids); and go-plugin, which is how xcl's own plugins already run. Temporal ships in process because its core is Rust, which has none of the Go hazards. CUE's libcue and go-jsonnet's C bindings show the Go side of a shared library works, with go-jsonnet's "not battle-tested" note and missing Windows wheels marking the shipping work this design no longer has to do.
 
-Sources: https://github.com/golang/go/issues/18976, https://github.com/golang/go/issues/31860, https://esbuild.github.io/plugins/, https://pkl-lang.org/main/current/bindings-specification/index.html, https://github.com/cue-lang/libcue, https://github.com/google/go-jsonnet.
+Sources: https://github.com/golang/go/issues/54805, https://github.com/golang/go/issues/18976, https://github.com/golang/go/issues/31860, https://esbuild.github.io/plugins/, https://pkl-lang.org/main/current/bindings-specification/index.html, https://playwright.dev/docs/languages, https://github.com/cue-lang/libcue, https://github.com/google/go-jsonnet.
 
 ### One message entry point over per-function or per-language bindings
 
@@ -1125,21 +1158,23 @@ Source: https://raw.githubusercontent.com/temporalio/sdk-core/master/ARCHITECTUR
 
 Decision: `coreservice` is a plain package in the root module; `bindings/libxcl` is a separate module that imports it.
 
-Alternative: put the export file in the root module behind a build tag. Rejected: a package importing `"C"` has no buildable files under `CGO_ENABLED=0`, so `go build ./...` and `go vet ./...` in the root would fail without a C toolchain, and a build tag that users must know about is a trap. Alternative: put all binding logic in the cgo module. Rejected: it could only be tested with a C compiler and a foreign caller, and a later out-of-process transport would have to duplicate it. With the split, every behaviour is tested by `go test` against `Service.Call`, the cgo file is small enough to read in one sitting, and the root module's CI guard holds.
+Alternative: put the export file in the root module behind a build tag. Rejected: a package importing `"C"` has no buildable files under `CGO_ENABLED=0`, so `go build ./...` and `go vet ./...` in the root would fail without a C toolchain, and a build tag that users must know about is a trap. Alternative: put all binding logic in the cgo module. Rejected: it could only be tested with a C compiler and a foreign caller, and the engine program would have to duplicate it. With the split, every behaviour is tested by `go test` against `Service.Call`, both transports are thin, and the root module's CI guard holds.
 
 ### Bundled platform packages over download or system install
 
-Decision: each wheel and npm platform package carries its library; download from the signed release and build from source are fallbacks.
+Decision: each wheel and npm platform package carries its engine program; download from the signed release and build from source are fallbacks.
 
 Alternatives: download on first use (small packages, but installs break offline and behind proxies, and a download at import time is a supply-chain surface); a system package the user installs (Pkl's early route, which pushed installation onto users). Bundling costs about 7 MB compressed per platform package and 19 MB on disk, within PyPI's 100 MB per file and workable against the 10 GB project limit (about 180 releases before a limit increase), and matches how esbuild (26 platform packages), SWC and Temporal (7 abi3 wheels of 14 to 15 MB) ship.
 
 Source: https://docs.pypi.org/project-management/storage-limits/.
 
-### Defer the out-of-process transport
+### Subprocess as the default transport, and the way back in process
 
-Decision: ship the in-process transport only; build `xcl-core` when a reported case needs it.
+Decision: every SDK ships `xcl-core` and uses it on every platform. The shared library is built and smoke-tested in CI, selectable from a source build with `XCL_TRANSPORT=inprocess`, and not released.
 
-Alternative: ship `xcl-core` as a fallback from the first release. Rejected for now: the only common case it covers, a process that uses xcl and then forks, is already handled by lazy loading and a clear `ForkedProcessError`; the other cases are rare; and it would double the wheel size and add a second transport to build and test in every SDK. Temporal ships an in-process core with polling and no fallback. Nothing in the design closes the door: the API is messages, `coreservice` is transport-free and every SDK already isolates FFI behind a transport class. See [Deferred: the out-of-process transport](#deferred-the-out-of-process-transport).
+Alternatives considered on the way here: subprocess for musl only, in process elsewhere (two shipped transports to test in every SDK, and the Windows x86-64 and toolchain problems stay); drop musl (rejected by the project: Alpine is where Python services run); `LD_PRELOAD` the library (an environment variable outside the package, nothing for a wheel to do); both engines in every wheel with runtime probing (doubles every wheel, and the engine that runs would depend on the machine rather than on the package).
+
+The way back. The in-process route becomes attractive again when the Go toolchain removes the hazards that are not ours to fix: a dynamic TLS model in the linker so `dlopen` works on musl (golang/go#54805; the arm64 change landed in 2025, x86-64 is pending), and a cross-compiled Windows x86-64 library that loads. When both hold, the switch is a packaging change: the wheel carries the library, `_InProcessTransport` becomes the default, and the API, the client, the protocol and the tests above the transport are untouched, because the message API was kept transport-free for exactly this. Until then the SDKs stay on the subprocess, and the C ABI is kept honest by CI rather than by users.
 
 ### Schema v1 over the Go-string schema
 
@@ -1160,9 +1195,10 @@ Source: https://www.kcl-lang.io/docs/reference/xlang-api/overview.
 1. Schema v1. The reader in `internal/schema` accepting both formats; `GenerateSchemaFromInstance` emitting v1; the catalog using it. In-process only; the wire format of protocol 1 unchanged. No binding yet.
 2. Plugin protocol v2. `VersionedPlugins`, the host callback listener and `XCL_HOST_ADDRESS`, schema v1 in `GetTypes` under 2, protocol 1 kept.
 3. Python plugin SDK, out of process. `xcl.Plugin.serve()` over grpcio against protocol v2. This proves schema derivation and hydration with no shared library.
-4. `CoreService` and the `buf` setup, `coreservice`, `bindings/libxcl`, the Python binding and the wheels. The context-taking operation methods in the root module. The eight-target matrix with Trusted Publishing is set up first, since shipping is the long pole.
+4. `CoreService` and the `buf` setup, `coreservice`, `bindings/libxcl`, the Python binding and the wheels. The context-taking operation methods in the root module. (Done, with the library as the shipped transport; the first release attempt failed on musl and Windows x86-64.)
+4b. `cmd/xcl-core`, the transport frames, the subprocess transport as the Python package's default, every wheel carrying the program, the release matrix reduced to the cgo-disabled job, the library kept as a CI-tested source-build option, and the parity suite run over both transports.
 5. Node and TypeScript binding and SDK.
-6. Later, when needed: the `xcl-core` out-of-process transport; a validate-only Wasm build.
+6. Later, when needed: a validate-only Wasm build.
 
 ## Open questions
 
@@ -1172,4 +1208,6 @@ Source: https://www.kcl-lang.io/docs/reference/xlang-api/overview.
 - Whether the C ABI version is independent of the core version. The design assumes an ABI version that changes only with the four functions and the status codes, and a core version that changes every release.
 - The `format` hint on `number` is a proposal, so generated code can say `int`.
 - Schema v1 does not model the `key` tag option (which pairs elements of a list of blocks for change detection) or the `body` kind that `internal/xcl/tags` parses. Whether `key` needs a schema property is undecided.
-- `MACOSX_DEPLOYMENT_TARGET` and the exact musl and Windows toolchain versions are proposals for the release matrix.
+- `MACOSX_DEPLOYMENT_TARGET` and the exact toolchain versions for the shared library's manual workflow are proposals.
+- When to move back in process: once golang/go#54805 is fixed for x86-64 and the Windows x86-64 library loads, whether the gain (function-call latency, no process) is worth re-entering the C toolchain matrix. Decided then, with the measurements of the day.
+- Whether `libxcl` should be released at all before a consumer asks for it.

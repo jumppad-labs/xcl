@@ -289,7 +289,7 @@ A Python panel for a Go-only capability holds a short prose note instead of a co
 
 **Validation point**: The site's type check and production build pass. On the built site, every page outside the four plugin authoring pages and the two per-language guides (`/using-xcl-with-go/`, `/using-xcl-with-python/`) shows a Python tab on each Go box. Picking Python switches the page and carries to the next page.
 
-#### - [ ] Task: Tabbed Go and Python code boxes
+#### - [x] Task: Tabbed Go and Python code boxes
 **Id:** 0d3d8554-a31b-4984-9ddb-d0f0b9b09b8a
 **Repo:** xcl-website
 **Depends on:** none
@@ -300,14 +300,14 @@ This adds the one reusable code box with Go and Python tabs that every page will
 *Technical detail:* [context.md#task-tabbed-go-and-python-code-boxes](./context.md#task-tabbed-go-and-python-code-boxes)
 
 **Acceptance criteria**:
-- [ ] A page can show one example as a Go tab and a Python tab, each with its usual highlighting and file title.
-- [ ] Choosing Python in one box shows Python in every box on the page.
-- [ ] After choosing Python, another page opens with its boxes on Python, with no visible flash of Go.
-- [ ] With no stored choice, or with storage blocked, boxes show Go and switching still works on the page.
-- [ ] The tabs can be reached and switched with the keyboard, and screen readers announce them as tabs.
-- [ ] Untabbed code boxes look and behave as before.
+- [x] A page can show one example as a Go tab and a Python tab, each with its usual highlighting and file title.
+- [x] Choosing Python in one box shows Python in every box on the page.
+- [x] After choosing Python, another page opens with its boxes on Python, with no visible flash of Go.
+- [x] With no stored choice, or with storage blocked, boxes show Go and switching still works on the page.
+- [x] The tabs can be reached and switched with the keyboard, and screen readers announce them as tabs.
+- [x] Untabbed code boxes look and behave as before.
 
-#### - [ ] Task: Python tabs on the registry, GitHub registry and events pages
+#### - [x] Task: Python tabs on the registry, GitHub registry and events pages
 **Id:** 39c9a656-fece-4c02-9178-8f34281d1e06
 **Repo:** xcl-website
 **Depends on:**
@@ -319,12 +319,12 @@ These three pages show how an application declares types, loads plugins, install
 *Technical detail:* [context.md#task-python-tabs-on-the-registry-github-registry-and-events-pages](./context.md#task-python-tabs-on-the-registry-github-registry-and-events-pages)
 
 **Acceptance criteria**:
-- [ ] Every Go box on the registries, GitHub registry and events pages has a Python tab.
-- [ ] Each Python tab does what its Go tab does, using the same names and values.
-- [ ] Capabilities Python lacks, such as a custom registry, have a Python tab that says so and points to what Python offers.
-- [ ] The pages' prose changes only where the Python version needs it.
+- [x] Every Go box on the registries, GitHub registry and events pages has a Python tab.
+- [x] Each Python tab does what its Go tab does, using the same names and values.
+- [x] Capabilities Python lacks, such as a custom registry, have a Python tab that says so and points to what Python offers.
+- [x] The pages' prose changes only where the Python version needs it.
 
-#### - [ ] Task: Python tabs on the sensitive values, state masking, configuration text and diff pages
+#### - [x] Task: Python tabs on the sensitive values, state masking, configuration text and diff pages
 **Id:** 9d760ac9-8252-4b65-9857-8fa070b1389f
 **Repo:** xcl-website
 **Depends on:**
@@ -339,11 +339,11 @@ These pages show sensitive fields, state encryption, turning saved data back int
 *Technical detail:* [context.md#task-python-tabs-on-the-sensitive-values-state-masking-configuration-text-and-diff-pages](./context.md#task-python-tabs-on-the-sensitive-values-state-masking-configuration-text-and-diff-pages)
 
 **Acceptance criteria**:
-- [ ] Every Go box on the sensitive values, state masking, configuration text and diff pages has a Python tab.
-- [ ] Python tabs show `Sensitive[...]` with `reveal()`, state encryption with a mask, saved-entity text and diff reading as the Python package does them.
-- [ ] Each Go-only capability's Python tab says it is not yet available from Python and names what Python offers.
+- [x] Every Go box on the sensitive values, state masking, configuration text and diff pages has a Python tab.
+- [x] Python tabs show `Sensitive[...]` with `reveal()`, state encryption with a mask, saved-entity text and diff reading as the Python package does them.
+- [x] Each Go-only capability's Python tab says it is not yet available from Python and names what Python offers.
 
-#### - [ ] Task: Python tabs on the home page and the configuration-only example
+#### - [x] Task: Python tabs on the home page and the configuration-only example
 **Id:** 8dfc7c3e-5f65-44e8-8120-77fdcea3a716
 **Repo:** xcl-website
 **Depends on:**
@@ -355,11 +355,11 @@ The home page introduces XCL with a Go type and a Go program. The configuration-
 *Technical detail:* [context.md#task-python-tabs-on-the-home-page-and-the-configuration-only-example](./context.md#task-python-tabs-on-the-home-page-and-the-configuration-only-example)
 
 **Acceptance criteria**:
-- [ ] Both Go boxes on the home page have Python tabs showing the same entity type and program.
-- [ ] Every Go box on the configuration-only example page has a Python tab, including the tests, shown as pytest functions.
-- [ ] The Python dataclasses use the same block types, field names, optional fields, sensitive and computed fields as their Go structs.
+- [x] Both Go boxes on the home page have Python tabs showing the same entity type and program.
+- [x] Every Go box on the configuration-only example page has a Python tab, including the tests, shown as pytest functions.
+- [x] The Python dataclasses use the same block types, field names, optional fields, sensitive and computed fields as their Go structs.
 
-#### - [ ] Task: Plugin authoring pages say plugins are Go and tab the application code
+#### - [x] Task: Plugin authoring pages say plugins are Go and tab the application code
 **Id:** d60e0167-82d9-4e00-81a8-158e5bc54469
 **Repo:** xcl-website
 **Depends on:**
@@ -371,10 +371,10 @@ The plugin template, plugin example, replacement and plugin logging pages are ab
 *Technical detail:* [context.md#task-plugin-authoring-pages-say-plugins-are-go-and-tab-the-application-code](./context.md#task-plugin-authoring-pages-say-plugins-are-go-and-tab-the-application-code)
 
 **Acceptance criteria**:
-- [ ] The plugin template, plugin example, replacement and plugin logging pages each state that plugins are written in Go for now and can be used from Go and Python applications.
-- [ ] Plugin code on these pages is unchanged and has no Python tab.
-- [ ] Boxes that show an application loading a plugin, from a path, a directory or GitHub, have a Python tab.
-- [ ] An application box whose Go form has no Python equivalent, such as registering a plugin in process, has a Python tab that says so.
+- [x] The plugin template, plugin example, replacement and plugin logging pages each state that plugins are written in Go for now and can be used from Go and Python applications.
+- [x] Plugin code on these pages is unchanged and has no Python tab.
+- [x] Boxes that show an application loading a plugin, from a path, a directory or GitHub, have a Python tab.
+- [x] An application box whose Go form has no Python equivalent, such as registering a plugin in process, has a Python tab that says so.
 
 ### Milestone 2: XCL has a language reference
 
@@ -391,7 +391,7 @@ The plugin template, plugin example, replacement and plugin logging pages are ab
 
 **Validation point**: The site's type check and production build pass. Each of the eight `/language/` pages renders, and each spec acceptance area has its own heading on one of them. The pages contain no "superset", "interpolation" or "Terraform".
 
-#### - [ ] Task: Reference overview, entities, and attributes and blocks pages
+#### - [x] Task: Reference overview, entities, and attributes and blocks pages
 **Id:** 315c65be-3c7d-4010-8fc0-f08fd81bab16
 **Repo:** xcl-website
 **Depends on:**
@@ -413,13 +413,13 @@ This starts the reference with three pages.
 *Technical detail:* [context.md#task-reference-overview-entities-and-attributes-and-blocks-pages](./context.md#task-reference-overview-entities-and-attributes-and-blocks-pages)
 
 **Acceptance criteria**:
-- [ ] The overview states that XCL reads `.xcl` files (and `.vars` files for variable values) and lists the reference pages.
-- [ ] The entities page shows `database "postgres" "main"` and `app "web"`, names the type, subtype and name labels in each, says the subtype is optional, and gives the addresses `database.postgres.main` and `app.web`.
-- [ ] The entities page lists each built-in field of an entity and shows configuration referring to one on another entity.
-- [ ] For each of the seven shapes, the attributes and blocks page shows an XCL snippet beside a tabbed Go type (with struct tags) and Python type. The map attribute is described as supported but not the encouraged style.
-- [ ] The pages call blocks entities, use "resource" only inside Go identifiers, and never say "superset", "interpolation" or "Terraform".
+- [x] The overview states that XCL reads `.xcl` files (and `.vars` files for variable values) and lists the reference pages.
+- [x] The entities page shows `database "postgres" "main"` and `app "web"`, names the type, subtype and name labels in each, says the subtype is optional, and gives the addresses `database.postgres.main` and `app.web`.
+- [x] The entities page lists each built-in field of an entity and shows configuration referring to one on another entity.
+- [x] For each of the seven shapes, the attributes and blocks page shows an XCL snippet beside a tabbed Go type (with struct tags) and Python type. The map attribute is described as supported but not the encouraged style.
+- [x] The pages call blocks entities, use "resource" only inside Go identifiers, and never say "superset", "interpolation" or "Terraform".
 
-#### - [ ] Task: References and expressions pages
+#### - [x] Task: References and expressions pages
 **Id:** ef9c18fa-f532-4b8e-8114-9d89a07ff6b8
 **Repo:** xcl-website
 **Depends on:**
@@ -438,13 +438,13 @@ It states that `%{ }` template directives are not part of XCL, and that templati
 *Technical detail:* [context.md#task-references-and-expressions-pages](./context.md#task-references-and-expressions-pages)
 
 **Acceptance criteria**:
-- [ ] The references page shows one entity using a value from another, and states that the referenced entity is processed first.
-- [ ] The references page explains `depends_on` and that a cycle is reported as an error.
-- [ ] The expressions page has an example for each of: a string with an embedded reference, a list, a map, a conditional, a `for` expression and a splat.
-- [ ] The expressions page states that `%{ }` directives are not supported and points to the functions page for templating.
-- [ ] Neither page says "interpolation".
+- [x] The references page shows one entity using a value from another, and states that the referenced entity is processed first.
+- [x] The references page explains `depends_on` and that a cycle is reported as an error.
+- [x] The expressions page has an example for each of: a string with an embedded reference, a list, a map, a conditional, a `for` expression and a splat.
+- [x] The expressions page states that `%{ }` directives are not supported and points to the functions page for templating.
+- [x] Neither page says "interpolation".
 
-#### - [ ] Task: Variables and outputs, and modules pages
+#### - [x] Task: Variables and outputs, and modules pages
 **Id:** 62c9bfc3-e7d0-461f-b1f6-3d4315b0f899
 **Repo:** xcl-website
 **Depends on:**
@@ -465,14 +465,14 @@ The modules page covers:
 *Technical detail:* [context.md#task-variables-and-outputs-and-modules-pages](./context.md#task-variables-and-outputs-and-modules-pages)
 
 **Acceptance criteria**:
-- [ ] The variables page shows a variable with a default, and a variable whose default is built from another value.
-- [ ] It shows each way to override a variable: from the application in Go and Python, and with an `XCL_VAR_<name>` environment variable.
-- [ ] It shows an output being declared and used, and does not describe locals.
-- [ ] The modules page shows a module used with an input and an output read from it in configuration.
-- [ ] It shows application code finding an entity inside the module by its full address, in Go and Python.
-- [ ] It states that configuration reaches a module only through its outputs, and names the module sources that work today and those that do not.
+- [x] The variables page shows a variable with a default, and a variable whose default is built from another value.
+- [x] It shows each way to override a variable: from the application in Go and Python, and with an `XCL_VAR_<name>` environment variable.
+- [x] It shows an output being declared and used, and does not describe locals.
+- [x] The modules page shows a module used with an input and an output read from it in configuration.
+- [x] It shows application code finding an entity inside the module by its full address, in Go and Python.
+- [x] It states that configuration reaches a module only through its outputs, and names the module sources that work today and those that do not.
 
-#### - [ ] Task: Functions page
+#### - [x] Task: Functions page
 **Id:** 48e85d3d-4c21-45fe-8828-d7ac70a51265
 **Repo:** xcl-website
 **Depends on:**
@@ -488,11 +488,11 @@ The functions page lists every built-in function, grouped by kind, each with a o
 *Technical detail:* [context.md#task-functions-page](./context.md#task-functions-page)
 
 **Acceptance criteria**:
-- [ ] Every built-in function in the release appears with an example.
-- [ ] The page shows an application registering a function in Go and in Python, and configuration calling it.
-- [ ] The page shows a plugin-provided function being called from configuration, and links to the plugin template for writing one.
-- [ ] The page states that function calls are evaluated while configuration is read.
-- [ ] It explains how name clashes are reported: when the config is created for application functions, and when plugins load for plugin functions.
+- [x] Every built-in function in the release appears with an example.
+- [x] The page shows an application registering a function in Go and in Python, and configuration calling it.
+- [x] The page shows a plugin-provided function being called from configuration, and links to the plugin template for writing one.
+- [x] The page states that function calls are evaluated while configuration is read.
+- [x] It explains how name clashes are reported: when the config is created for application functions, and when plugins load for plugin functions.
 
 ### Milestone 3: The reference is reachable and matches the release
 
@@ -503,7 +503,7 @@ The functions page lists every built-in function, grouped by kind, each with a o
 
 **Validation point**: The nav, home page and README links open the reference. The verification record lists every example as tried, with each difference resolved in the page or reported as a gap. The site's production build passes. The manual checks in the Testing Approach are carried into the implementation test plan.
 
-#### - [ ] Task: Link the reference from the navigation and the home page
+#### - [x] Task: Link the reference from the navigation and the home page
 **Id:** 852e2985-5a4e-4448-8315-58f2c7a261be
 **Repo:** xcl-website
 **Depends on:**
@@ -522,13 +522,13 @@ The home page's feature cards for variables, modules and functions link to their
 *Technical detail:* [context.md#task-link-the-reference-from-the-navigation-and-the-home-page](./context.md#task-link-the-reference-from-the-navigation-and-the-home-page)
 
 **Acceptance criteria**:
-- [ ] The main navigation has a "Language" menu listing all eight reference pages, and each item opens its page.
-- [ ] The home page links to the reference from its introduction and from a "Documentation" section.
-- [ ] The variables, modules and functions feature cards link to their reference pages.
-- [ ] The home page hero's version badge shows the release the reference is verified against (expected v0.4.0), and its tagline says XCL is available for Go and Python.
-- [ ] No existing page is moved or renamed.
+- [x] The main navigation has a "Language" menu listing all eight reference pages, and each item opens its page.
+- [x] The home page links to the reference from its introduction and from a "Documentation" section.
+- [x] The variables, modules and functions feature cards link to their reference pages.
+- [x] The home page hero's version badge shows the release the reference is verified against (expected v0.4.0), and its tagline says XCL is available for Go and Python.
+- [x] No existing page is moved or renamed.
 
-#### - [ ] Task: Point the xcl README and changelog at the reference
+#### - [x] Task: Point the xcl README and changelog at the reference
 **Id:** a3314b5e-b571-417c-9b31-1317a4a710b1
 **Repo:** xcl
 **Depends on:**
@@ -540,10 +540,10 @@ The xcl README stays an overview and sends readers to xcl.dev for documentation.
 *Technical detail:* [context.md#task-point-the-xcl-readme-and-changelog-at-the-reference](./context.md#task-point-the-xcl-readme-and-changelog-at-the-reference)
 
 **Acceptance criteria**:
-- [ ] The README's Documentation list starts with a link to the language reference on xcl.dev.
-- [ ] The changelog has a `## 20261010160411-19b965db-language-reference` entry in prose, followed by **Breaking:** None.
+- [x] The README's Documentation list starts with a link to the language reference on xcl.dev.
+- [x] The changelog has a `## 20261010160411-19b965db-language-reference` entry in prose, followed by **Breaking:** None.
 
-#### - [ ] Task: Try every example against the release and correct the pages
+#### - [x] Task: Try every example against the release and correct the pages
 **Id:** 0b1d93be-ee1f-4e83-b454-056decf10f38
 **Repo:** xcl-website
 **Depends on:**
@@ -561,11 +561,11 @@ The pages were written from the plans for the language and Python work. This tas
 *Technical detail:* [context.md#task-try-every-example-against-the-release-and-correct-the-pages](./context.md#task-try-every-example-against-the-release-and-correct-the-pages)
 
 **Acceptance criteria**:
-- [ ] Every XCL, Go and Python example in the reference, and every new Python tab on the site, behaves as its page says in the release that contains the language and Python work.
-- [ ] Each feature the pages mark as not yet supported, or not yet available from Python, is indeed unavailable in that release.
-- [ ] The module sources named as working have each been tried and work, and those named as not working fail.
-- [ ] The built-in function list matches the release exactly.
-- [ ] Any gap or bug found is listed in the task's record for reporting, and is not fixed in the library.
+- [x] Every XCL, Go and Python example in the reference, and every new Python tab on the site, behaves as its page says in the release that contains the language and Python work.
+- [x] Each feature the pages mark as not yet supported, or not yet available from Python, is indeed unavailable in that release.
+- [x] The module sources named as working have each been tried and work, and those named as not working fail.
+- [x] The built-in function list matches the release exactly.
+- [x] Any gap or bug found is listed in the task's record for reporting, and is not fixed in the library.
 
 ## Open Questions
 
@@ -588,3 +588,167 @@ No other questions remain open. Placement, slugs, page split and the plugin-auth
 - No search, sidebar or site restructure (Starlight or similar). No page is moved or renamed, because the site has no redirects.
 - No API renames: Go examples keep `types.ResourceBase` and other current names (spec constraint).
 - No description of locals. The reference covers building a variable's default from other values instead.
+
+## Changelog
+
+### 2026-10-11 — Task: Tabbed Go and Python code boxes
+
+**What was done**: Added `CodeTabs.astro`, a tabbed code box with `go` and `python` named slots that keeps each fenced block rendering through Expressive Code with its title. A pre-paint inline script in `Head.astro` reads the `xcl-lang` localStorage key and sets `data-lang` on `<html>`, the component's CSS shows the panel matching that attribute in every box, and a handler in `Shell.astro` switches the attribute, stores the choice, syncs `aria-selected`/`tabindex`, handles ArrowLeft/ArrowRight/Home/End, and keeps the clicked box in place on screen.
+
+**Deviations**: None in behaviour. Astro requires `<slot name>` to be a static string, so the two panels are written out rather than mapped. No test files were written: the plan routes tab behaviour to manual checks, and xcl-website has no test tooling. The browser criteria were nonetheless exercised with a throwaway headless-Chrome self-test page (deleted) covering click switching, second-visit persistence, CSP-sandboxed storage and keyboard navigation.
+
+**Files changed**:
+- `xcl-website: src/components/CodeTabs.astro`
+- `xcl-website: src/components/Head.astro`
+- `xcl-website: src/layouts/Shell.astro`
+
+**Discoveries**: Fenced code blocks inside `<div slot="go">` do render through Expressive Code (the plan's open question), provided MDX gets a blank line after the opening `<div>` and before `</div>`. Inline `<script>` bodies with braces cannot live in an `.mdx` page because MDX parses `{}` as expressions; put page scripts in components or external files. Selected-tab styling is driven by `html[data-lang]` so the right tab is lit before any handler runs.
+
+### 2026-10-11 — Task: Python tabs on the registry, GitHub registry and events pages
+
+**What was done**: Every Go application-code box on the registries (9), GitHub registry (6) and events (6) pages is now a `CodeTabs` box with a Python panel written against the released `xcl-lang` package: `xcl.LocalRegistry` / `xcl.GitHubRegistry`, `@xcl.entity` dataclasses, `xcl.Config(registries=…, on_event=…, event_data=…, event_mask=…, event_buffer_size=…)`, the matching `xcl.*Error` exceptions, and a `logging`-based event handler plus a standard-library `prettylog.py`. The two "Writing your own registry" boxes carry a "not yet available from Python" note linking the parity list. `site.ts` gained `pythonRepoURL`, `pythonParityURL` and `pypiURL`.
+
+**Deviations**: Go fences are unchanged; prose changed only by one sentence per box naming the Python form. The GitHub-registry "pinning a version" Python panel does not state what Python sees for an invalid version: Go's `RegisterPlugin` panics and the core service has no `recover`, so the verification task must establish it. No sentence was added about a raising Python event handler because the package source shows the exception propagating out of the operation rather than being reported as its error.
+
+**Files changed**:
+- `xcl-website: src/pages/registries.mdx`
+- `xcl-website: src/pages/github-registry.mdx`
+- `xcl-website: src/pages/events.mdx`
+- `xcl-website: src/config/site.ts`
+
+**Discoveries**: In MDX a Markdown link cannot take a JSX expression (`[x]({url})` renders a literal `%7Burl%7D`); use `<a href={url}>`. Plugin install failures reach Python as `xcl.PluginNotFoundError` / `xcl.PluginVerificationError` with `details` `repository`, `version` and `platform` (`coreservice/errors.go` maps `PluginInstallError` before `PluginLoadError`).
+
+### 2026-10-11 — Task: Python tabs on the sensitive values, state masking, configuration text and diff pages
+
+**What was done**: Every Go application-code box on the sensitive values (3), state masking (2), configuration text (9) and diff (4) pages is now a `CodeTabs` box with a Python panel: `xcl.Sensitive[T]` dataclass fields, `xcl.ConfigError.problems`, `state_mask=xcl.mask.aes256gcm(key)`, `cfg.encode_saved_entity(event.data, highlight=…)`, `event.entity()`, and `cfg.diff(…, reveal_sensitive=…)` with `Diff.summary`, `resources`, `changes` and `after_value`. Seven Go-only capabilities (a custom masker, `EncodeEntity`, `IncludeComputed`, `ShowReferences`, editor themes, a custom renderer, diff rendering/colour) carry a "not yet available from Python" note naming what Python offers and linking the parity list.
+
+**Deviations**: None in scope. The sensitive-values page's Python panel states truthfully that a `Sensitive` read back through a lookup prints `(sensitive)` and `reveal()` returns `None` in Python, because real values never leave the engine through a lookup; it does not mirror Go's `Reveal()` returning the value.
+
+**Files changed**:
+- `xcl-website: src/pages/sensitive-values.mdx`
+- `xcl-website: src/pages/state-masking.mdx`
+- `xcl-website: src/pages/configuration-text.mdx`
+- `xcl-website: src/pages/diff.mdx`
+
+**Discoveries**: Python has no text rendering of a diff and no live-entity encoding; `Diff.raw` holds the JSON document. A looked-up `xcl.Sensitive` is always redacted (`is_redacted` is `True`), which the reference's sensitive-fields section must also say.
+
+### 2026-10-11 — Task: Python tabs on the home page and the configuration-only example
+
+**What was done**: The home page's two Go boxes (the `PostgreSQL` type and the program that applies and finds it) and the configuration-only example's seven Go boxes (the types, `main.go`, `routes.go` and the two tests) are now `CodeTabs` boxes with Python panels: `@xcl.entity` dataclasses with the same block types, optional, sensitive and computed fields; a `main.py` that fills an `AppConfig` with one `cfg.all(...)` per type; `routes.py` in plain Python over `meta.id`; and `test_routes.py` as pytest functions. The home page's Python program loads the plugin as an external binary with a comment saying Python loads Go plugins as separate programs. One sentence on the example page says the Python tabs are shown for comparison and are not in the repository.
+
+**Deviations**: None in scope. Go's single `Decode` call has no Python form, so the Python `main.py` says so in one sentence and uses `all` per type. The hero badge and tagline were left as they are for the later home-page task, as planned.
+
+**Files changed**:
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: src/pages/examples/configuration-only.mdx`
+
+**Discoveries**: A Python dataclass that names a later class in an annotation needs `from __future__ import annotations`; the package resolves the hints with `typing.get_type_hints` (`xcl/_schema.py`), so forward references in the Go field order work.
+
+### 2026-10-11 — Task: Plugin authoring pages say plugins are Go and tab the application code
+
+**What was done**: The plugin template, plugin example, replacement and plugin logging pages each open with a statement that plugins are written in Go for now and work from both Go and Python applications. Plugin, provider and test code stays Go-only with no tabs. The application boxes gained Python panels: loading a plugin from a path, a directory or GitHub on the template and logging pages (3 and 2 boxes), and the twelve `xcl-docker` program boxes on the plugin example (`main.py`, `plan.py`, `status.py`, `inspect.py`) using `register_external_plugin`, `xcl.Config(state_path=…, on_event=…, event_data="processed")`, `apply`, `diff`, `load`, `find_by_type(None, …)`, `find(None, …)`, `destroy` and `xcl.PluginLoadError`. In-process registration, rendered diff text and live-entity encoding carry "not yet available from Python" notes with the parity link.
+
+**Deviations**: None. The replacement page gets the statement only, as all nine of its boxes are provider code.
+
+**Files changed**:
+- `xcl-website: src/pages/plugin-template.mdx`
+- `xcl-website: src/pages/plugin-logging.mdx`
+- `xcl-website: src/pages/replacement.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+
+**Discoveries**: Entities of a plugin's types come back to Python as `xcl.Entity` (a read-only mapping with `.meta` and `.address`) when `None` is passed as the class, which is how the status and inspect commands read Docker entities.
+
+### 2026-10-11 — Task: Reference overview, entities, and attributes and blocks pages
+
+**What was done**: Started the language reference under `/language/` with three pages. The overview says what XCL is, which files it reads (`.xcl` files per directory, `.vars` files beside them, modules for other directories) and lists the seven topic pages. The entities page covers blocks and labels with `database "postgres" "main"` and `app "web"`, addresses, the built-in fields (`depends_on`, `disabled`, `meta.*`) with configuration reading `meta.id` and `meta.name` on other entities, and the built-in entity types, with CodeTabs boxes for type registration and the entity base. The attributes and blocks page walks one `app "web"` example through required and optional attributes, nested blocks, lists of blocks, named blocks collected by name (with the two error texts), map attributes (supported, named blocks encouraged), object values, computed fields, sensitive fields and the entity base, each as XCL beside a tabbed Go struct with tags and a Python dataclass.
+
+**Deviations**: `xcl.Find[*App]` in the entities page was corrected to `xcl.Find[App]` (`Find[T]` takes the struct type). The Python shared-fields example declares the subclass `kw_only=True`, which is needed by dataclasses when a required field follows a defaulted one; that the package accepts it is left to the verification task.
+
+**Files changed**:
+- `xcl-website: src/pages/language/index.mdx`
+- `xcl-website: src/pages/language/entities.mdx`
+- `xcl-website: src/pages/language/attributes-and-blocks.mdx`
+
+**Discoveries**: `Find[T any](c, address) (*T, error)` returns a pointer, so the type parameter is the struct type; an existing Go fence on `configuration-text.mdx` uses `xcl.Find[*Postgres]` and is reported as a gap, not changed.
+
+### 2026-10-11 — Task: References and expressions pages
+
+**What was done**: The references page shows one entity using another's attribute, a whole entity and a list of entities as values (with a tabbed Go struct and Python dataclass receiving them), a named block referenced by name, processing order (the referenced entity is always processed first, independent entities run concurrently, destroy runs in reverse, a cycle is an error), `depends_on`, and the module boundary in one paragraph. The expressions page gives an example for a string with an embedded `${ }` reference, lists, maps, conditionals, both `for` forms, splat, indexing and attribute access, operators, and templating: `%{ }` directives are rejected with the library's message, and the same results are shown with a conditional inside `${ }`, `format` and `join`, pointing to `template_file` on the functions page.
+
+**Deviations**: None. The writer ran every XCL example on both pages through the Python package against a locally built engine, and the Go receiving types through a scratch Go module; nothing was committed. One fact was established by that probe and stated on the page: in Python a registered entity class cannot be the type of a field that receives a whole entity, so a plain dataclass with `xcl.field(block=False)` is used.
+
+**Files changed**:
+- `xcl-website: src/pages/language/references.mdx`
+- `xcl-website: src/pages/language/expressions.mdx`
+
+**Discoveries**: Registering a Python class that uses an `xcl.Resource` subclass as a `block=False` field fails with "no cty.Type for interface {}" (from `Meta.extra`); a plain dataclass works. The exact wording of the cycle error is not asserted by any test, so the page does not quote one.
+
+### 2026-10-11 — Task: Variables and outputs, and modules pages
+
+**What was done**: The variables and outputs page covers declaring variables, a default built from another value (`variable "url" { default = "http://${app.web.host}" }`, the home of derived values, without naming locals), setting variables from the application (tabbed `xcl.WithVariables` / `variables=`), `.vars` files, `XCL_VAR_<name>` environment variables, their precedence, outputs with string, list and map values, and reading outputs from the application (tabbed `c.Outputs()` and `xcl.Find[types.Output]` / `cfg.outputs()`). The modules page covers using a module with `source` and `variables`, reading `module.db.output.port`, the module boundary with the library's error text verbatim and the re-export pattern, finding an entity inside a module by its full address (tabbed `xcl.Find[PostgreSQL]` / `cfg.find(PostgreSQL, …)`), and module sources: a local directory only, with git, GitHub and HTTP sources stated as not yet supported and `version` as accepted but unused.
+
+**Deviations**: None. The Go `Find` examples use the struct type (`xcl.Find[PostgreSQL]`), as `Find[T]` returns `*T`.
+
+**Files changed**:
+- `xcl-website: src/pages/language/variables-and-outputs.mdx`
+- `xcl-website: src/pages/language/modules.mdx`
+
+**Discoveries**: There is no Go option to name a `.vars` file; only discovery beside each root path. The derived-default example and the hypothetical `app` / `database "postgres"` types the pages use must be declared by the verification task when it tries them.
+
+### 2026-10-11 — Task: Functions page
+
+**What was done**: The functions page explains that calls are evaluated while configuration is read, lists all 57 built-ins grouped as strings, numbers, collections, encoding, dates, and files and environment, each with a one-line description and an example in a runnable `output` block with its result as a comment, shows an application registering `slugify` in tabbed Go (`local.RegisterFunction`) and Python (`local.register_function`) with the supported signatures, shows a plugin-provided function called from configuration with a link to the plugin template, and explains name clashes: application clashes reported when the configuration is created, plugin clashes when plugins load on the first operation, with a tabbed `errors.As` / `except xcl.FunctionNameClashError` box.
+
+**Deviations**: None. The built-in list was diffed against the map in `internal/functions/functions.go` and matches exactly (57).
+
+**Files changed**:
+- `xcl-website: src/pages/language/functions.mdx`
+
+**Discoveries**: xcl vendors go-cty under `internal/cty`, and three built-ins differ from cty's stdlib: `trim(str)` takes one argument and trims whitespace, `element` also accepts a map key, and `len` works on strings as well as collections. Results shown as comments for set functions, `csvdecode` and `regex` groups follow the source and are for the verification task to confirm.
+
+### 2026-10-11 — Task: Link the reference from the navigation and the home page
+
+**What was done**: The site navigation gained a "Language" dropdown between "Features" and "Examples" listing the eight reference pages, overview first. The home page's "What is XCL?" section ends with a sentence linking the reference and a "Learn the language →" button; a new "Documentation" section after "Two examples" lists the language reference first, leaving room for the two guides; the "Variables and outputs", "Modules" and "Functions" feature cards link to their reference pages; the hero badge now reads "v0.4.0 · Go and Python" and the tagline ends "Available for Go and Python."
+
+**Deviations**: None. No page was moved or renamed.
+
+**Files changed**:
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: src/pages/index.mdx`
+
+**Discoveries**: None.
+
+### 2026-10-11 — Task: Point the xcl README and changelog at the reference
+
+**What was done**: The xcl README's Documentation list now starts with "Language reference" linking https://xcl.dev/language/ and naming what it covers, with Go and Python types. The CHANGELOG gained a `## 20261010160411-19b965db-language-reference` entry above the python-support entry, in prose: the eight-page reference, the Go and Python tabs across the site with the choice remembered across pages, the "not yet available from Python" notes, and the plugin-authoring statement, followed by **Breaking:** None.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl: README.md`
+- `xcl: CHANGELOG.md`
+
+**Discoveries**: None.
+
+### 2026-10-11 — Task: Try every example against the release and correct the pages
+
+**What was done**: Every XCL and Go example on the eight reference pages was tried with throwaway Go programs against `github.com/jumppad-labs/xcl v0.4.0` from the Go module proxy (no `replace`), one scratch module per page group, running `Validate`, `Apply` and the lookups each page shows. Every Python panel on the site (the reference pages and the twelve topic and example pages) was tried against the same release's engine built locally from the tagged commit (`libxcl` from the xcl worktree at 93e1904, loaded through `XCL_LIBRARY_PATH`) with the xcl-python checkout, because `xcl-lang` 0.4.0 is not on PyPI yet. The Docker example plugin v0.2.0 release served the plugin-dependent snippets. Nothing was committed from the scratch directories.
+
+Go and XCL results: every example behaves as its page says, with these corrections made to the pages: the overview now says a path with another extension is read as empty rather than rejected; the duplicate-name error on the attributes page is quoted with its real separator and range (`Duplicate listener name: A listener named "http" was already defined at <file>:4,3-18`); the references page says a reference cycle is not caught by `Validate` and fails at `Apply` with a dependency graph error; the functions page sorts the three set functions' results into lists and says a set published as it is through an `output` is not yet supported; the variables page no longer claims a root output can be read as `output.<name>` from another block, pointing to a derived variable default instead. The built-in list matches the release exactly (57). Module sources: a local relative directory works; `github.com/...` and `git::` sources fail; `version` is accepted and unused, as the page says. The module boundary message matches verbatim.
+
+Python results: every Python panel on the reference pages, the registries, GitHub registry and events pages, and the sensitive values, state masking, configuration text and diff pages behaves as its page says, and every "not yet available from Python" note names something the package really lacks. One correction: the GitHub registry page's "pinning a version" Python panel now says that a bad repository or version aborts the process when `xcl.Config` is created, because the engine's panic is not recovered, rather than raising a Python exception. The home page, configuration-only example, plugin example, plugin template and plugin logging pages were tried last: the home program, the configuration-only program and its two pytest tests, and the `xcl-docker` program's apply, plan, status, inspect and destroy commands all ran, the Docker-backed ones against a real Docker engine, and the plugin registries loaded the Docker plugin from a path, a directory and the GitHub registry with the site's release key. One correction: the plugin example's `inspect.py` is now `inspect_entity.py`, with a sentence saying why, because a module named `inspect` beside `main.py` shadows the standard library's `inspect`, which `dataclasses` imports, so `import xcl` fails with a circular import.
+
+**Deviations**: Python examples were checked against the tagged source rather than the PyPI wheel, by decision of the orchestrator, because the xcl-python release run failed; the pages keep `pip install xcl-lang`. The session running the last Python pass (home page, examples, plugin pages) was cut off before it reported, so a later session re-ran that pass from its scratch programs against the current page text. Docker was available, so the Docker-backed examples ran for real rather than stopping at `validate`.
+
+**Files changed**:
+- `xcl-website: src/pages/language/index.mdx`
+- `xcl-website: src/pages/language/attributes-and-blocks.mdx`
+- `xcl-website: src/pages/language/references.mdx`
+- `xcl-website: src/pages/language/functions.mdx`
+- `xcl-website: src/pages/language/variables-and-outputs.mdx`
+- `xcl-website: src/pages/github-registry.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+- `xcl-website: src/pages/examples/configuration-only.mdx` (touched by the pass that was cut off; its panels were re-verified as they stand)
+
+**Discoveries**: Library gaps found and not fixed here, for upstream: (1) `Validate` accepts a reference cycle; only `Apply` fails, with the raw error `unable to validate dependency graph: multiple roots: []dag.Vertex{...}` that names no entity. (2) A set-typed value published through an `output` reads back as its cty `GoString` (`internal/parser/util.go convertCtyToGo` has no set case); typed `[]string` fields decode sets correctly. (3) A root-level `output.<name>` reference from another block passes `Validate` but fails at `Apply` with `There is no variable named "output"`; only `module.<name>.output.<name>` works from the parent. (4) An entity type whose struct has no fields of its own (only `types.ResourceBase`) is never added to the evaluation context, so references to its `meta` fail at `Apply`. (5) `EncodeEntity` prints an unnamed list-block element as `volume "" { … }`. (6) `xcl-lang` 0.4.0 is not published: the xcl-python release run failed, and PyPI publication waits on an out-of-process engine for musl wheels. (7) The pre-existing Go fence on `configuration-text.mdx` uses `xcl.Find[*Postgres]`, but `Find[T]` takes the struct type.
+Python package gaps for upstream: (8) a bad GitHub plugin repository or version aborts the Python process (SIGABRT) when `xcl.Config` is created, since `coreservice.buildGitHubRegistry` calls the panicking `RegisterPlugin` with no `recover`; (9) environment variables set from Python at runtime are invisible to the in-process engine, which sees the environment the process started with; (10) an omitted object attribute declared `default=None` hydrates as the zero object, and an omitted `xcl.Sensitive[str] | None` field as a redacted `Sensitive`, not `None`; (11) a registered entity class used as a field type is rejected only when the `Config` is created (`InvalidTypeError`), and a non-dataclass base between `xcl.Resource` and the registered class silently drops its fields; (12) `TypeNameClashError.details` names the synthesised Go struct rather than the Python class, and `PluginNotFoundError` / `PluginVerificationError` are not subclasses of `PluginLoadError` in Python. (13) A program module named `inspect.py` beside one that imports `xcl` breaks the import by shadowing the standard library; this is a Python fact rather than a package gap, and the page names the file differently. The Python panels were verified against the engine built from tag v0.4.0 (commit 93e1904) and the xcl-python checkout at 81673e5, not a PyPI wheel.
