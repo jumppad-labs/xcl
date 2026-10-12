@@ -14,6 +14,7 @@ specs:
     - name: 20261011232013-da18c586-python-release-hardening
       depends_on:
         - 20261011130709-aa3eb933-python-support
+        - 20261011211634-a8895873-python-out-of-process-engine
     - name: 20261010160411-19b965db-language-reference
       depends_on:
         - 20261011095738-fad05e41-language-surface

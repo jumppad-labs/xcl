@@ -12,9 +12,13 @@ created_date: "2026-10-11"
 - **Tabs check exemption** — language-reference, using-xcl-with-go. The per-language guides are exempt from the "no Go box without a Python tab" check, alongside the plugin authoring pages.
 - **Release versions** — language-surface, python-support, language-reference, using-xcl-with-go. The latest tag is v0.2.1: language-surface ships as v0.3.0 and python-support as v0.4.0; the docs are verified against v0.4.0.
 - **Home page hero** — language-reference. The hero badge shows the verified release (expected v0.4.0) and the tagline says XCL is available for Go and Python.
+- **CHANGELOG entry for small xcl changes** — python-out-of-process-engine, python-release-hardening. Every spec that changes xcl adds one `## <spec name>` entry with a `**Breaking:**` list; release hardening adds one for the untrusted-key message (Breaking: None).
+- **Strict mode and engine routes** — python-out-of-process-engine, python-release-hardening. `XCL_TEST_STRICT=1` fails a skip only for something the job is meant to provide: sources, fixture plugins and the plugin release everywhere; engines only as listed in `XCL_TEST_ENGINES` (`subprocess` everywhere, `inprocess` on the Linux libxcl job). Engine skips go through `tests/engines.py::skip_missing_engine`; route-marker skips stay skips.
+- **Windows interrupt testing** — python-out-of-process-engine, python-release-hardening. Both use `CREATE_NEW_PROCESS_GROUP` plus `CTRL_BREAK_EVENT`; `xcl-core` discards Ctrl-C and Ctrl-Break and shares the host's process group, so the Python host drives cancellation.
 
 ## Order added for shared files
 - Added: `20261011084948-c995ed25-using-xcl-with-go` now depends on `20261010160411-19b965db-language-reference`. Both change `xcl-website:src/config/site.ts`, `xcl-website:src/pages/state-masking.mdx`, `xcl-website:src/pages/index.mdx`, `xcl-website:main.go`, `xcl-website:main.py`, `xcl-website:database.postgres.main`, `xcl-website:app.web`, `xcl-website:src/components/Nav.astro`, `xcl:README.md`, `xcl:CHANGELOG.md`.
+- Added: `20261011232013-da18c586-python-release-hardening` now depends on `20261011211634-a8895873-python-out-of-process-engine`. Both change `xcl:internal/testutil`, `xcl-python:.exe`, `xcl-python:sys.path`, `xcl-python:pyproject.toml`, `xcl-python:tests/conftest.py`, `xcl-python:tests/integration/conftest.py`, `xcl-python:tests/parity/conftest.py`, `xcl-python:tests/integration/test_load.py`, `xcl-python:tests/integration/test_sync.py`, `xcl-python:test_sync.py`, `xcl-python:.github/workflows/ci.yml`, `xcl-python:ci.yml`, `xcl-python:.github/scripts/musl-wheel.sh`, `xcl-python:README.md`, `xcl:CHANGELOG.md`.
 
 ## 20261011095738-fad05e41-language-surface
 ### Approach
@@ -117,6 +121,122 @@ In-process Python providers (proto numbers reserved), out-of-process Python plug
 - Review the CHANGELOG entry: additions described, Breaking None.
 - Review the PyPI project page: install, sync getting started, then the asyncio section.
 - Watch the first tagged release end to end: 8 signed archives, 8 wheels plus an sdist, install checks green on every platform.
+
+## 20261011211634-a8895873-python-out-of-process-engine
+### Approach
+
+The engine runs as its own program everywhere, per the revised `libxcl.md` design. `cmd/xcl-core` is a cgo-free program in the xcl root module that serves the unchanged `coreservice.Service` over stdin/stdout using length-prefixed `Request`/`Response` frames defined in `proto/xcl/core/v1/transport.proto`; `Release` is a reserved frame method, so no CoreService method or C ABI change is needed. The serve loop lives in the program (coreservice stays transport-free), runs each request on its own goroutine, discards Ctrl-C and Ctrl-Break, and on stdin EOF or SIGTERM releases every configuration through a new additive `Service.Close`. Because go-plugin hands `os.Stdin` to every plugin it starts, the program keeps the real stdio for frames and points `os.Stdin` at the null device and `os.Stdout` at stderr. Python gains a `SubprocessTransport` with the same interface as the in-process one: lazy start with a version/ABI handshake, one reader thread matching responses by id, waits in short slices (GIL released, Ctrl-C delivered on Windows), live-handle tracking, stop on last release or `atexit`, a Windows job object, `EngineExitedError` then a fresh engine, and fork detection. Selection looks only at the package contents and `XCL_TRANSPORT` (`inprocess` picks the shared library); no probing, no fallback. One release job builds all eight targets with `CGO_ENABLED=0` and no reachable C compiler; the libxcl toolchain matrix moves to a manual workflow.
+
+### Milestones and tasks
+
+- M1, the xcl engine runs as a standalone program (xcl): the frame messages join the protocol; the engine program serves the core service over stdin/stdout.
+- M2, Python runs the engine as a bundled subprocess on every platform (xcl-python): the subprocess transport; the package runs the bundled program by default and the shared library on request (selection, packaging, `cffi` as an extra, version 0.5.0.dev0, route markers, lifecycle tests); CI tests the program everywhere and the shared library on Linux.
+- M3, every release publishes the program and eight wheels with no C toolchain: tagging xcl releases the program for eight platforms (xcl); the Python release builds eight wheels around it and checks them on every platform (xcl-python); the xcl-python README; an install section on xcl.dev (xcl-website); xcl CHANGELOG and README; cut v0.5.0 (human).
+
+### Tasks a person must do
+
+- Cut the v0.5.0 release (push the tag that publishes the engine archives and the PyPI wheels).
+
+### Out of scope
+
+Releasing libxcl or shipping it in a wheel; the Node binding; the release-hardening work (tomllib on 3.10, `XCL_SRC`, the test plugin, the recorded xcl ref); moving back in process; platforms that forbid starting a process; Authenticode signing; the design's download-into-`~/.xcl/core` and build-from-sdist fallbacks (the design says no silent fallback); Python providers, protocol v2, Python plugins, code generation; any Python API, CoreService or C ABI change beyond two new exception classes; changing v0.4.0; new xcl.dev pages or navigation.
+
+### Drafting assumptions
+
+- The serve loop is in the `cmd/xcl-core` main package; Python uses one reader thread with per-call waiters and decodes `CreateConfig` responses to track handles.
+- `Release` travels as a reserved frame method name, documented in `transport.proto`.
+- Negative statuses cross the design's `uint32 status` field as two's complement and Python reads them as signed (the design could say `int32` instead; raise with the design's owner).
+- `cffi` becomes the optional `inprocess` extra; ctypes stays the fallback.
+- "No C compiler" in the release job is shown with failing compiler shims on PATH plus an assertion that `cc` fails.
+- No `XCL_CORE_PATH` override; `XCL_TRANSPORT` is the only selection override and `XCL_LIBRARY_PATH` stays for the in-process route.
+- xcl.dev had no Python install section, so the home page gains one with Go and Python tabs, and the badge moves to v0.5.0.
+- `libxcl-release.yml` is replaced by `release.yml` plus a manual `libxcl-build.yml`.
+- The one-second first `Config()` metric is an integration test on every CI platform; the README getting-started example stays a manual check (it needs Docker).
+- Lifecycle tests go in a new `test_engine_process.py`; the version-mismatch test builds a second program stamped `v9.9.9`.
+- `xcl-core` discards interrupts with `signal.Notify`, not `signal.Ignore` (believed, not yet verified, that an ignored console event on Windows kills the process; the Windows smoke test confirms).
+
+### Project-wide rules
+
+- CHANGELOG: one `## <spec name>` prose entry at the top of xcl's CHANGELOG.md, ending with `**Breaking:**` and `None.`
+- Tests never read workflows, READMEs, the changelog or site pages; Go tests use testify `require`, no tables, positive and negative cases apart; pytest has no `parametrize` tables.
+- Release assets are `xcl-core_<version>_<os>_<arch>[_musl].tar.gz` (`.zip` on Windows) with `xcl-core_<version>_checksums.txt(.sig)`, signed with the jumppad-labs key; `<version>` has no leading `v`.
+- xcl's release workflow is `release.yml`; `libxcl-release.yml` is removed; `libxcl-build.yml` is manual only; secret names are unchanged.
+- Transport selection is decided only by the installed package plus `XCL_TRANSPORT` (`inprocess`).
+- The frame protocol reserves the method name `Release`, is covered by `buf lint` and `buf breaking`, and by ABI version 1.
+- The wheel carries `xcl/_bin/xcl-core[.exe]`; `cffi` is an extra; the package version moves to the 0.5.0 line.
+- Strict mode: every CI and release test step sets `XCL_TEST_STRICT=1`; a skip fails only for something the job is meant to provide.
+- `XCL_TEST_ENGINES` lists the engines a job provides: `subprocess` on every job, plus `inprocess` only on the Linux glibc x86-64 job that builds libxcl.
+- Every missing-engine skip goes through `tests/engines.py::skip_missing_engine(route, reason)`; route-marker skips (`subprocess_only` / `inprocess_only`) are never strict failures.
+- Windows interrupts are tested with `CREATE_NEW_PROCESS_GROUP` and `CTRL_BREAK_EVENT`, the child mapping SIGBREAK to KeyboardInterrupt.
+- `xcl-core` discards Ctrl-C and Ctrl-Break with `signal.Notify` and runs in the host's process group.
+- The xcl work must be on the ref `xcl-ref.txt` names (today `f-libxcl`) before xcl-python's CI can go green.
+- Cutting a release tag is a human task.
+
+### Manual checks
+
+- Run the README's getting-started example (Docker plugin) against `xcl-lang 0.5.0`.
+- Compare the v0.5.0 release workflow's wall time with the v0.4.0 run (38172909823).
+- After release, review the issue tracker for reports of orphaned engine processes.
+- Review the xcl CHANGELOG entry for this spec.
+- Review the xcl-python README as shown on PyPI: bundled subprocess, same API everywhere, Alpine listed.
+- Review the xcl.dev home page install section: Python tab text, Alpine listed, badge at v0.5.0.
+- Watch the v0.5.0 release end to end: eight `xcl-core` archives and a signed checksums file, no libxcl archive, no C compiler in the build log, eight wheels and an sdist on PyPI, every install check green.
+- Run the manual libxcl build workflow once and confirm it still builds all eight libraries.
+
+## 20261011232013-da18c586-python-release-hardening
+### Approach
+
+A new repository, jumppad-labs/xcl-plugin-test (registered with Spektacular at `/home/nicj/code/github.com/jumppad-labs/xcl-plugin-test`), is generated from xcl-plugin-template and published as a signed release, v0.1.0. It must be its own repository because the GitHub registry names every asset and the binary after the repository; extra assets on the xcl release or reusing the template's sample plugin were rejected. Its single block type, `test "item"`, is modelled on xcl's recording fixture (`log`, `value`, `input`, a sensitive `secret`, a computed `output`) and appends each operation to a JSON-lines log, so tests can read back a destroy. xcl-python's test harness stops being Docker-specific: Python 3.10 reads TOML through `tomli` (installed only below 3.11); one locator, `tests/xcl_source.py`, finds the xcl sources (`XCL_SRC`, else the sibling checkout); CI strict mode turns harness skips into failures, routing engine skips through the out-of-process plan's `skip_missing_engine`; CI passes `GITHUB_TOKEN`. Extra CI failures are fixed here: the `.exe` suffix for Windows fixtures, Windows interrupts by Ctrl-Break to a new process group, and a macOS stall test calibrated against an idle baseline. xcl's untrusted-key refusal also names the signing key's ID, keeping its existing wording.
+
+### Milestones and tasks
+
+- M1, the suite runs on every supported Python, platform and checkout layout (xcl-python): read the plugin pin on every supported Python; find the xcl sources through one locator; build and find fixture programs with the Windows executable suffix; make the interrupt and stall tests hold on every platform; run CI in strict mode with a GitHub token.
+- M2, a signed test plugin is published: create the xcl-plugin-test repository from the template (human); build the test item plugin (xcl-plugin-test); publish the first signed release, tag v0.1.0 (human).
+- M3, end-to-end and registry tests run without Docker: pin the test plugin release in plugin-agnostic release helpers; replace the Docker plugin tests; retarget the tamper tests (xcl-python); name the untrusted signing key in the registry refusal, with its CHANGELOG entry (xcl); assert the refusal names the key; describe the test setup in the README (xcl-python).
+
+### Tasks a person must do
+
+- Create jumppad-labs/xcl-plugin-test from the template, add the release-key secrets (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`), turn the registered local directory into the checkout and commit its footprint.
+- Tag xcl-plugin-test v0.1.0 to publish the first signed release.
+
+### Out of scope
+
+The engine program, subprocess transport, musl wheels and the Windows x86-64 wheel (including the Windows parity access violation and the Alpine TLS load error), which belong to the out-of-process engine spec; Python plugins or a Python plugin SDK; reworking release workflows beyond the test plugin's own; any change to xcl-plugin-docker, which stays the documented example; switching `xcl-ref.txt` to `main` (a one-line follow-up once f-libxcl merges); moving xcl's own tests that mention xcl-plugin-docker.
+
+### Drafting assumptions
+
+- The tamper tests keep their gpg-generated untrusted key; if a runner lacks gpg, stop and ask (fallback: a committed public key, needs the user's agreement).
+- The untrusted-key refusal gains the signer's key ID with a new Go test and a new Python test; existing tamper tests are not edited.
+- Block type `test "item"` with `log`, `value`, `input`, `secret`, `output`; each log record is `{"operation","address"}`.
+- `GITHUB_TOKEN` is passed to the CI test step because about 30 matrix jobs download the release.
+- Milestone order is harness first, then the plugin release, then the Docker swap; the ref switch is a follow-up, not a task.
+- Strict mode only affects harness-level skips; `skipif` platform markers and route markers are untouched.
+- The stall test passes when ticks during the apply reach at least 50% of the idle baseline.
+- The test plugin requires the latest xcl tag at implementation time (v0.4.0 today); the plugin protocol is unchanged since v0.3.0.
+- If the out-of-process engine plan has already reshaped the interrupt, stall or fixture-lookup tests or the CI step, this plan's intent is applied to the new shape; if it no longer applies, stop and ask.
+
+### Project-wide rules
+
+- CHANGELOG: one `## 20261011232013-da18c586-python-release-hardening` prose entry at the top of xcl's CHANGELOG.md, ending with `**Breaking:**` and `None.`, checked by review, never by a test.
+- Strict mode: with `XCL_TEST_STRICT=1`, missing xcl sources, fixture plugins or the plugin release fail every job; a missing engine fails only for engines the job provides.
+- `XCL_TEST_ENGINES` and `tests/engines.py::skip_missing_engine` come from the out-of-process engine plan: `subprocess` everywhere, plus `inprocess` only on the Linux glibc x86-64 libxcl job; `strict_skip(reason, *, route=None)` hands engine skips to it; route-marker skips are never strict failures.
+- Windows interrupts are tested with `CTRL_BREAK_EVENT` and `CREATE_NEW_PROCESS_GROUP`, the child mapping SIGBREAK to KeyboardInterrupt; `xcl-core` discards Ctrl-C/Ctrl-Break and runs in the host's process group, so the host drives cancellation.
+- `XCL_SRC` is the only way tests locate the xcl sources, through `tests/xcl_source.py`.
+- xcl-python CI builds the engine and fixtures from the single ref in `xcl-ref.txt`.
+- `tests/plugins.toml` pins `jumppad-labs/xcl-plugin-test` v0.1.0 under a `[test]` table.
+- Fixture binaries carry the platform's executable suffix, in the Makefile and in fixture lookups.
+- xcl's untrusted-key refusal keeps "does not verify against any trusted key" and adds "signed by key <ID>, which is not trusted".
+- Test plugins live in their own repos, generated from xcl-plugin-template and signed with the jumppad-labs release key.
+
+### Manual checks
+
+- The xcl-python CI matrix is fully green on the first run after both this plan and the out-of-process engine plan land.
+- One run per platform shows zero Docker-gated skips in its skip summary.
+- xcl-plugin-test v0.1.0 has six platform archives, a checksums file and a `.sig` that verifies against the jumppad-labs key.
+- With xcl checked out away from xcl-python and `XCL_SRC` set, the suite passes; with it unset and no sibling checkout, tests skip with the `XCL_SRC` message.
+- On a branch, changing only `xcl-ref.txt` switches every CI job's build source.
+- Review the README Development section; Getting started still shows the Docker plugin.
+- Review the xcl CHANGELOG entry for this spec.
 
 ## 20261010160411-19b965db-language-reference
 ### Approach

@@ -51,3 +51,5 @@ repos:
       location: ../../xcl-plugin-docker/.spektacular
     - name: xcl-python
       location: /home/nicj/code/github.com/jumppad-labs/xcl-python/.spektacular
+    - name: xcl-plugin-test
+      location: /home/nicj/code/github.com/jumppad-labs/xcl-plugin-test/.spektacular
