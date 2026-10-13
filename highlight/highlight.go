@@ -137,8 +137,8 @@ func Text(text []byte, renderer Renderer) []byte {
 	var out strings.Builder
 	out.Grow(len(text))
 
-	for _, p := range tokenize(text) {
-		out.WriteString(renderer.Render(p.scope, p.text))
+	for _, p := range Pieces(text) {
+		out.WriteString(renderer.Render(p.Scope, p.Text))
 	}
 
 	return []byte(out.String())

@@ -57,6 +57,77 @@ func TestTextWithMarkerRendererChangesOutput(t *testing.T) {
 	require.Equal(t, `[storage.type.xcl]variable[/storage.type.xcl] [entity.name.tag.xcl]"cpu"[/entity.name.tag.xcl] {}`, string(output))
 }
 
+// joined is the text of pieces, in order
+func joined(pieces []highlight.Piece) string {
+	text := ""
+	for _, p := range pieces {
+		text += p.Text
+	}
+
+	return text
+}
+
+// requireWellFormed fails unless no piece is empty and no two neighbours
+// share a scope
+func requireWellFormed(t *testing.T, pieces []highlight.Piece) {
+	t.Helper()
+
+	for i, p := range pieces {
+		require.NotEmpty(t, p.Text, "piece %d is empty", i)
+
+		if i > 0 {
+			require.NotEqual(t, pieces[i-1].Scope, p.Scope, "pieces %d and %d share scope %q", i-1, i, p.Scope)
+		}
+	}
+}
+
+func TestPiecesJoinToTheSampleInput(t *testing.T) {
+	input, err := os.ReadFile("testdata/sample.xcl")
+	require.NoError(t, err)
+
+	require.Equal(t, string(input), joined(highlight.Pieces(input)))
+}
+
+func TestPiecesJoinToTheReferencesInput(t *testing.T) {
+	input, err := os.ReadFile("testdata/references.xcl")
+	require.NoError(t, err)
+
+	require.Equal(t, string(input), joined(highlight.Pieces(input)))
+}
+
+func TestPiecesJoinToMalformedInput(t *testing.T) {
+	input := []byte("resource \"a\" {\n  x = \"abc\n  y = ${\n  z = <<EOF\nnever closed\n")
+
+	require.Equal(t, string(input), joined(highlight.Pieces(input)))
+}
+
+func TestPiecesOfEmptyInputAreNone(t *testing.T) {
+	require.Empty(t, highlight.Pieces(nil))
+}
+
+func TestPiecesOfTheSampleAreWellFormed(t *testing.T) {
+	input, err := os.ReadFile("testdata/sample.xcl")
+	require.NoError(t, err)
+
+	requireWellFormed(t, highlight.Pieces(input))
+}
+
+func FuzzPiecesKeepText(f *testing.F) {
+	f.Add([]byte(`variable "cpu" { default = 2 }`))
+	f.Add([]byte(`x = "a ${var.b} c"`))
+	f.Add([]byte("x = <<EOF\nno end\n"))
+	f.Add([]byte("\xff\xfe"))
+	f.Add([]byte("/* never closed"))
+	f.Add([]byte(""))
+
+	f.Fuzz(func(t *testing.T, input []byte) {
+		pieces := highlight.Pieces(input)
+
+		require.Equal(t, string(input), joined(pieces))
+		requireWellFormed(t, pieces)
+	})
+}
+
 func FuzzTextKeepsText(f *testing.F) {
 	sample, err := os.ReadFile("testdata/sample.xcl")
 	require.NoError(f, err)
