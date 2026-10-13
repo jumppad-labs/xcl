@@ -11,19 +11,13 @@ import (
 
 // markers wraps every labelled piece as [scope]text[/scope] and passes
 // unlabelled text through unchanged
-var markers = highlight.RendererFunc(func(scope, text string) string {
-	if scope == "" {
-		return text
+var markers = highlight.PieceFunc(func(p highlight.Piece) string {
+	if p.Scope == "" {
+		return p.Text
 	}
 
-	return "[" + scope + "]" + text + "[/" + scope + "]"
+	return "[" + p.Scope + "]" + p.Text + "[/" + p.Scope + "]"
 })
-
-// piece is one call a recording renderer received
-type piece struct {
-	scope string
-	text  string
-}
 
 func markedFile(t *testing.T, path string) string {
 	t.Helper()
@@ -31,27 +25,13 @@ func markedFile(t *testing.T, path string) string {
 	input, err := os.ReadFile(path)
 	require.NoError(t, err)
 
-	return string(highlight.Text(input, markers))
+	return renderText(markers, input)
 }
 
 func markedSample(t *testing.T) string {
 	t.Helper()
 
 	return markedFile(t, "testdata/sample.xcl")
-}
-
-func recordedPieces(t *testing.T, input string) []piece {
-	t.Helper()
-
-	var pieces []piece
-	recorder := highlight.RendererFunc(func(scope, text string) string {
-		pieces = append(pieces, piece{scope: scope, text: text})
-		return text
-	})
-
-	highlight.Text([]byte(input), recorder)
-
-	return pieces
 }
 
 func TestTextLabelsBlockTypeAsStorageType(t *testing.T) {
@@ -379,32 +359,32 @@ func TestTextLabelsReferenceRootInsideInterpolationInShownReferences(t *testing.
 	require.Contains(t, output, `${[/punctuation.section.interpolation.begin.xcl][support.class.reference.xcl]variable[/support.class.reference.xcl][punctuation.accessor.xcl].`)
 }
 
-func TestTextMergesLabelQuotesIntoOnePiece(t *testing.T) {
-	pieces := recordedPieces(t, `variable "cpu" {}`)
+func TestPiecesMergesLabelQuotesIntoOnePiece(t *testing.T) {
+	pieces := highlight.Pieces([]byte(`variable "cpu" {}`))
 
-	require.Contains(t, pieces, piece{scope: "entity.name.tag.xcl", text: `"cpu"`})
+	require.Contains(t, pieces, highlight.Piece{Scope: "entity.name.tag.xcl", Text: `"cpu"`})
 }
 
-func TestTextPassesBracesAndNewlinesWithEmptyScope(t *testing.T) {
-	pieces := recordedPieces(t, "variable \"cpu\" {\n}\n")
+func TestPiecesLeavesBracesAndNewlinesWithEmptyScope(t *testing.T) {
+	pieces := highlight.Pieces([]byte("variable \"cpu\" {\n}\n"))
 
-	require.Equal(t, piece{scope: "", text: " {\n}\n"}, pieces[len(pieces)-1])
+	require.Equal(t, highlight.Piece{Scope: "", Text: " {\n}\n"}, pieces[len(pieces)-1])
 }
 
-func TestTextPassesWhitespaceWithEmptyScope(t *testing.T) {
-	pieces := recordedPieces(t, "variable \"cpu\" {\n}\n")
+func TestPiecesLeavesWhitespaceWithEmptyScope(t *testing.T) {
+	pieces := highlight.Pieces([]byte("variable \"cpu\" {\n}\n"))
 
-	require.Equal(t, piece{scope: "", text: " "}, pieces[1])
+	require.Equal(t, highlight.Piece{Scope: "", Text: " "}, pieces[1])
 }
 
-func TestTextPassesUnlabelledTextWithEmptyScope(t *testing.T) {
-	pieces := recordedPieces(t, "variable \"cpu\" {\n}\n")
+func TestPiecesLeavesUnlabelledTextWithEmptyScope(t *testing.T) {
+	pieces := highlight.Pieces([]byte("variable \"cpu\" {\n}\n"))
 
-	expected := []piece{
-		{scope: "storage.type.xcl", text: "variable"},
-		{scope: "", text: " "},
-		{scope: "entity.name.tag.xcl", text: `"cpu"`},
-		{scope: "", text: " {\n}\n"},
+	expected := []highlight.Piece{
+		{Scope: "storage.type.xcl", Text: "variable"},
+		{Scope: "", Text: " "},
+		{Scope: "entity.name.tag.xcl", Text: `"cpu"`},
+		{Scope: "", Text: " {\n}\n"},
 	}
 	require.Equal(t, expected, pieces)
 }

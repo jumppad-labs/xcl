@@ -19,8 +19,8 @@ import (
 // time with each newline left outside the codes, so a caller can indent or
 // prefix lines without colour leaking.
 //
-// Create one with NewANSIRenderer and pass it to xcl.Highlight or Text. It is
-// safe for concurrent use.
+// Use ANSI for the default theme, or NewANSI for one of your own. It is safe
+// for concurrent use.
 type ANSIRenderer struct {
 	theme *theme
 }
@@ -32,7 +32,7 @@ type ansiOptions struct {
 	path   string
 }
 
-// ANSIOption configures NewANSIRenderer. Construct one with WithTheme or
+// ANSIOption configures NewANSI. Construct one with WithTheme or
 // WithThemeFile.
 type ANSIOption func(*ansiOptions)
 
@@ -57,15 +57,19 @@ func WithThemeFile(path string) ANSIOption {
 	}
 }
 
-// NewANSIRenderer returns a terminal renderer. With no option it uses the
-// default theme, which uses only the terminal's 16 standard colours so the
-// result follows the user's own palette. Given a theme, it colours text the
-// way the editor colours it with that theme.
+// ANSI renders pieces for a terminal with the default theme, which uses only
+// the terminal's 16 standard colours, so the result follows the user's own
+// palette. Use NewANSI for a theme of your own.
+var ANSI = &ANSIRenderer{theme: defaultTheme()}
+
+// NewANSI returns a terminal renderer. Given a theme, it colours text the way
+// the editor colours it with that theme; with no option it is the same as
+// ANSI.
 //
 // A theme that cannot be read or is invalid returns an error matching
 // xcl.ErrInvalidTheme, with an InvalidThemeError detail saying what was
 // wrong. A bad theme is never replaced with the default colours.
-func NewANSIRenderer(options ...ANSIOption) (*ANSIRenderer, error) {
+func NewANSI(options ...ANSIOption) (*ANSIRenderer, error) {
 	var opts ansiOptions
 	for _, option := range options {
 		option(&opts)
@@ -97,9 +101,20 @@ func NewANSIRenderer(options ...ANSIOption) (*ANSIRenderer, error) {
 	return &ANSIRenderer{theme: defaultTheme()}, nil
 }
 
-// Render returns text wrapped in the SGR codes of the style scope gets, or
+// Render returns the pieces' text, each wrapped in the SGR codes of the style
+// its scope gets, one line at a time
+func (r *ANSIRenderer) Render(pieces []Piece) []byte {
+	var out strings.Builder
+	for _, p := range pieces {
+		out.WriteString(r.piece(p.Scope, p.Text))
+	}
+
+	return []byte(out.String())
+}
+
+// piece returns text wrapped in the SGR codes of the style scope gets, or
 // text unchanged when scope is empty or the theme gives it no style
-func (r *ANSIRenderer) Render(scope, text string) string {
+func (r *ANSIRenderer) piece(scope, text string) string {
 	if scope == "" {
 		return text
 	}

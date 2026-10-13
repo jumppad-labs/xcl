@@ -17,12 +17,12 @@ var encodeHighlightMarkers = regexp.MustCompile(`\[/?[a-z.\-]+\]`)
 // passes unlabelled text through unchanged, so a test can read which scope
 // each piece was given
 func encodeMarkerRenderer() highlight.Renderer {
-	return highlight.RendererFunc(func(scope, text string) string {
-		if scope == "" {
-			return text
+	return highlight.PieceFunc(func(p highlight.Piece) string {
+		if p.Scope == "" {
+			return p.Text
 		}
 
-		return "[" + scope + "]" + text + "[/" + scope + "]"
+		return "[" + p.Scope + "]" + p.Text + "[/" + p.Scope + "]"
 	})
 }
 
@@ -30,6 +30,15 @@ func encodeMarkerRenderer() highlight.Renderer {
 // encodeMarkerRenderer wrote removed
 func stripEncodeHighlightMarkers(text string) string {
 	return encodeHighlightMarkers.ReplaceAllString(text, "")
+}
+
+// rendered returns encoded configuration text rendered through renderer
+func rendered(t *testing.T, text []byte, err error, renderer highlight.Renderer) string {
+	t.Helper()
+
+	require.NoError(t, err)
+
+	return string(renderer.Render(highlight.Pieces(text)))
 }
 
 func TestEncodeEntityWithoutHighlightHasNoColourCodes(t *testing.T) {
@@ -55,15 +64,13 @@ func TestEncodeEntityWithoutHighlightHasNoColourCodes(t *testing.T) {
 	require.NotContains(t, string(out), "\x1b")
 }
 
-func TestEncodeEntityWithHighlightPassesEveryTokenToRenderer(t *testing.T) {
+func TestEncodedEntityPiecesLabelEveryToken(t *testing.T) {
 	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
-	out, err := EncodeEntity(database, Highlight(encodeMarkerRenderer()))
-	require.NoError(t, err)
-
-	text := string(out)
+	out, err := EncodeEntity(database)
+	text := rendered(t, out, err, encodeMarkerRenderer())
 
 	require.Contains(t, text, `[storage.type.xcl]resource[/storage.type.xcl]`)
 	require.Contains(t, text, `[entity.name.type.xcl]"database"[/entity.name.type.xcl]`)
@@ -74,77 +81,75 @@ func TestEncodeEntityWithHighlightPassesEveryTokenToRenderer(t *testing.T) {
 	require.Contains(t, text, `[entity.name.function.block.xcl]timeouts[/entity.name.function.block.xcl]`)
 }
 
-func TestEncodeEntityWithHighlightStripsToPlainText(t *testing.T) {
+func TestEncodedEntityPiecesStripToPlainText(t *testing.T) {
 	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
 	plain, err := EncodeEntity(container)
-	require.NoError(t, err)
+	highlighted := rendered(t, plain, err, encodeMarkerRenderer())
 
-	highlighted, err := EncodeEntity(container, Highlight(encodeMarkerRenderer()))
-	require.NoError(t, err)
-
-	require.NotEqual(t, string(plain), string(highlighted))
-	require.Equal(t, string(plain), stripEncodeHighlightMarkers(string(highlighted)))
+	require.NotEqual(t, string(plain), highlighted)
+	require.Equal(t, string(plain), stripEncodeHighlightMarkers(highlighted))
 }
 
-func TestEncodeSavedEntityWithHighlightStripsToPlainText(t *testing.T) {
+func TestEncodedSavedEntityPiecesStripToPlainText(t *testing.T) {
 	c, statePath := applyEncodeFixture(t)
 
 	record := encodeSavedRecordByID(t, statePath, encodeContainerID)
 
 	plain, err := c.EncodeSavedEntity(record)
-	require.NoError(t, err)
+	highlighted := rendered(t, plain, err, encodeMarkerRenderer())
 
-	highlighted, err := c.EncodeSavedEntity(record, Highlight(encodeMarkerRenderer()))
-	require.NoError(t, err)
-
-	require.NotEqual(t, string(plain), string(highlighted))
-	require.Equal(t, string(plain), stripEncodeHighlightMarkers(string(highlighted)))
+	require.NotEqual(t, string(plain), highlighted)
+	require.Equal(t, string(plain), stripEncodeHighlightMarkers(highlighted))
 }
 
-func TestEncodeEntityWithANSIHighlightStripsToPlainText(t *testing.T) {
+func TestEncodedEntityRenderedAsANSIStripsToPlainText(t *testing.T) {
 	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
-	renderer, err := highlight.NewANSIRenderer()
-	require.NoError(t, err)
-
 	plain, err := EncodeEntity(container)
-	require.NoError(t, err)
+	highlighted := rendered(t, plain, err, highlight.ANSI)
 
-	highlighted, err := EncodeEntity(container, Highlight(renderer))
-	require.NoError(t, err)
-
-	require.Contains(t, string(highlighted), "\x1b[")
-	require.Equal(t, string(plain), testutil.StripANSI(string(highlighted)))
+	require.Contains(t, highlighted, "\x1b[")
+	require.Equal(t, string(plain), testutil.StripANSI(highlighted))
 }
 
-func TestEncodeEntityWithHighlightAndShowReferencesLabelsReferenceRoots(t *testing.T) {
+func TestEncodedEntityRenderedAsTextIsThePlainText(t *testing.T) {
+	c, _ := applyEncodeFixture(t)
+
+	container := encodeEntityByID(t, c, encodeContainerID)
+
+	plain, err := EncodeEntity(container)
+
+	require.Equal(t, string(plain), rendered(t, plain, err, highlight.Text))
+}
+
+func TestEncodedEntityWithShowReferencesLabelsReferenceRoots(t *testing.T) {
 	c, _ := applyEncodeFixture(t)
 
 	database := encodeEntityByID(t, c, encodeDatabaseID)
 
-	out, err := EncodeEntity(database, ShowReferences(), Highlight(encodeMarkerRenderer()))
-	require.NoError(t, err)
+	out, err := EncodeEntity(database, ShowReferences())
+	text := rendered(t, out, err, encodeMarkerRenderer())
 
 	// location = variable.region, as the fixture wrote it
 	expected := `[support.class.reference.xcl]variable[/support.class.reference.xcl]` +
 		`[punctuation.accessor.xcl].[/punctuation.accessor.xcl]` +
 		`[variable.other.member.xcl]region[/variable.other.member.xcl]`
 
-	require.Contains(t, string(out), expected)
+	require.Contains(t, text, expected)
 }
 
-func TestEncodeEntityWithHighlightAndShowReferencesLabelsNestedReferenceRoots(t *testing.T) {
+func TestEncodedEntityWithShowReferencesLabelsNestedReferenceRoots(t *testing.T) {
 	c, _ := applyEncodeFixture(t)
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
-	out, err := EncodeEntity(container, ShowReferences(), Highlight(encodeMarkerRenderer()))
-	require.NoError(t, err)
+	out, err := EncodeEntity(container, ShowReferences())
+	text := rendered(t, out, err, encodeMarkerRenderer())
 
 	// name = resource.network.main.meta.name, as the fixture wrote it in each
 	// network block
@@ -152,33 +157,5 @@ func TestEncodeEntityWithHighlightAndShowReferencesLabelsNestedReferenceRoots(t 
 		`[punctuation.accessor.xcl].[/punctuation.accessor.xcl]` +
 		`[variable.other.member.xcl]network[/variable.other.member.xcl]`
 
-	require.Contains(t, string(out), expected)
-}
-
-func TestEncodeEntityWithNilRendererMatchesPlainText(t *testing.T) {
-	c, _ := applyEncodeFixture(t)
-
-	container := encodeEntityByID(t, c, encodeContainerID)
-
-	plain, err := EncodeEntity(container)
-	require.NoError(t, err)
-
-	withNil, err := EncodeEntity(container, Highlight(nil))
-	require.NoError(t, err)
-
-	require.Equal(t, string(plain), string(withNil))
-}
-
-func TestEncodeSavedEntityWithNilRendererMatchesPlainText(t *testing.T) {
-	c, statePath := applyEncodeFixture(t)
-
-	record := encodeSavedRecordByID(t, statePath, encodeContainerID)
-
-	plain, err := c.EncodeSavedEntity(record)
-	require.NoError(t, err)
-
-	withNil, err := c.EncodeSavedEntity(record, Highlight(nil))
-	require.NoError(t, err)
-
-	require.Equal(t, string(plain), string(withNil))
+	require.Contains(t, text, expected)
 }

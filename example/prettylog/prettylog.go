@@ -42,8 +42,8 @@ const LevelEnv = "XCL_LOG_LEVEL"
 // When an entity is created it also writes that entity's configuration
 // beneath the success line, so a reader sees what was actually made,
 // including the values the provider filled in. When w shows colour, the
-// configuration is coloured by xcl itself, through xcl.Highlight and the
-// highlight package's terminal renderer, the way the xcl-vscode extension
+// configuration is coloured by xcl itself, rendering its highlight.Pieces
+// with the terminal renderer highlight.ANSI, the way the xcl-vscode extension
 // colours it in the editor. The example has no highlighting code of its own:
 //
 //	10:04AM INFO create success source=core operation=create resource=template.welcome
@@ -77,25 +77,17 @@ func Handler(w io.Writer, level slog.Level) xcl.EventHandler {
 		return delegate
 	}
 
-	// the example output is for a person to read, so it shows the values the
-	// provider filled in as well as the ones that were configured
-	options := []xcl.EncodeOption{xcl.IncludeComputed()}
-
 	// colour is decided for w itself, as the logger does, so output to a
 	// file or a buffer is plain text. xcl never checks for a terminal, asking
 	// it for colour is the application's decision.
+	var renderer highlight.Renderer = highlight.Text
 	if lipgloss.NewRenderer(w).ColorProfile() != termenv.Ascii {
-		// the default theme is built in, so creating the renderer cannot
-		// fail. Were it ever to, the configuration is simply written plain.
-		renderer, err := highlight.NewANSIRenderer()
-		if err == nil {
-			options = append(options, xcl.Highlight(renderer))
-		}
+		renderer = highlight.ANSI
 	}
 
 	return func(e xcl.Event) {
 		delegate(e)
-		writeConfiguration(w, logger, options, e)
+		writeConfiguration(w, logger, renderer, e)
 	}
 }
 
@@ -103,7 +95,7 @@ func Handler(w io.Writer, level slog.Level) xcl.EventHandler {
 // created, beneath the line reporting it. An event carries the entity only
 // when the application asked for xcl.EventDataProcessed, so this does nothing
 // by default.
-func writeConfiguration(w io.Writer, logger *charmlog.Logger, options []xcl.EncodeOption, e xcl.Event) {
+func writeConfiguration(w io.Writer, logger *charmlog.Logger, renderer highlight.Renderer, e xcl.Event) {
 	if e.Operation != events.OperationCreate || e.Phase != events.PhaseSuccess {
 		return
 	}
@@ -119,7 +111,9 @@ func writeConfiguration(w io.Writer, logger *charmlog.Logger, options []xcl.Enco
 		return
 	}
 
-	text, err := xcl.EncodeEntity(entity, options...)
+	// the example output is for a person to read, so it shows the values the
+	// provider filled in as well as the ones that were configured
+	text, err := xcl.EncodeEntity(entity, xcl.IncludeComputed())
 	if err != nil {
 		// a variable, output or module is never written as configuration, so
 		// there is simply nothing to show and nothing to report
@@ -136,7 +130,7 @@ func writeConfiguration(w io.Writer, logger *charmlog.Logger, options []xcl.Enco
 
 	// indenting after highlighting is safe, the renderer leaves every newline
 	// outside its colour codes
-	fmt.Fprintf(w, "%s\n", indent(string(text)))
+	fmt.Fprintf(w, "%s\n", indent(string(renderer.Render(highlight.Pieces(text)))))
 }
 
 // indent shifts every non-empty line of text right, so the configuration sits

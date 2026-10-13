@@ -25,26 +25,20 @@ func inspect(out io.Writer, c *xcl.Config, address string) error {
 		return err
 	}
 
-	options := []xcl.EncodeOption{xcl.IncludeComputed(), xcl.ShowReferences()}
-
-	// xcl never checks for a terminal, asking it for colour is the program's
-	// decision. It is decided for out itself, so output to a file or a pipe
-	// is plain text.
-	if lipgloss.NewRenderer(out).ColorProfile() != termenv.Ascii {
-		renderer, err := highlight.NewANSIRenderer()
-		if err != nil {
-			return err
-		}
-
-		options = append(options, xcl.Highlight(renderer))
-	}
-
-	text, err := xcl.EncodeEntity(entity, options...)
+	text, err := xcl.EncodeEntity(entity, xcl.IncludeComputed(), xcl.ShowReferences())
 	if err != nil {
 		return err
 	}
 
-	_, err = out.Write(text)
+	// xcl never checks for a terminal, asking it for colour is the program's
+	// decision. It is decided for out itself, so output to a file or a pipe
+	// is plain text.
+	var renderer highlight.Renderer = highlight.Text
+	if lipgloss.NewRenderer(out).ColorProfile() != termenv.Ascii {
+		renderer = highlight.ANSI
+	}
+
+	_, err = out.Write(renderer.Render(highlight.Pieces(text)))
 
 	return err
 }

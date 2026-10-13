@@ -11,6 +11,7 @@ import (
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 )
 
@@ -372,7 +373,7 @@ func TestDiffRendersReplacedDependencyAsReason(t *testing.T) {
 
 	result := h.runDiff(t, twoDependenciesConfig)
 
-	output := string(diff.Render(result))
+	output := string(highlight.Text.Render(result.Pieces()))
 	require.Contains(t, output, "  # "+twoDependenciesUserID+" will be replaced because "+twoDependenciesReplacedID+" is replaced\n-/+ resource \"container\" \"user\" {")
 }
 

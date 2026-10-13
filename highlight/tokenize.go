@@ -5,11 +5,12 @@ import (
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 )
 
-// piece is one labelled run of the input. scope is "" for text the grammar
-// leaves unlabelled.
-type piece struct {
-	scope string
-	text  string
+// Piece is one labelled run of text. Scope is the TextMate scope the text is
+// labelled with, one of the Scope constants, or "" for text left unlabelled,
+// such as whitespace, braces and commas.
+type Piece struct {
+	Scope string
+	Text  string
 }
 
 // builtinFunctions are the functions the xcl-vscode grammar labels
@@ -93,14 +94,21 @@ type span struct {
 type tokenizer struct {
 	src    []byte
 	tokens hclsyntax.Tokens
-	pieces []piece
+	pieces []Piece
 	cursor int
 	stack  []frame
 	spans  []span
 }
 
-// tokenize splits src into labelled pieces that, joined, give back src
-func tokenize(src []byte) []piece {
+// Pieces splits src, xcl configuration text, into pieces labelled with the
+// scopes the xcl-vscode grammar gives the same text. Joined in order, their
+// text gives back src exactly: every byte is in exactly one piece, so
+// rendering can add to the text but never change it. Neighbouring pieces have
+// different scopes, and none is empty.
+//
+// Pieces accepts any input, including text that is not valid configuration:
+// what cannot be labelled is left with the empty scope.
+func Pieces(src []byte) []Piece {
 	// the diagnostics are ignored, an invalid token is simply left unlabelled
 	tokens, _ := hclsyntax.LexConfig(src, "", hcl.InitialPos)
 
@@ -164,12 +172,12 @@ func (t *tokenizer) emit(scope, text string) {
 		return
 	}
 
-	if n := len(t.pieces); n > 0 && t.pieces[n-1].scope == scope {
-		t.pieces[n-1].text += text
+	if n := len(t.pieces); n > 0 && t.pieces[n-1].Scope == scope {
+		t.pieces[n-1].Text += text
 		return
 	}
 
-	t.pieces = append(t.pieces, piece{scope: scope, text: text})
+	t.pieces = append(t.pieces, Piece{Scope: scope, Text: text})
 }
 
 // spanAt returns the scope of the span covering offset, dropping the spans
