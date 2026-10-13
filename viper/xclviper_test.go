@@ -5,6 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jumppad-labs/xcl"
+	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
@@ -130,13 +133,26 @@ func TestNamesTheFileItReadInAnError(t *testing.T) {
 	_, err := read(t, "broken.xcl")
 
 	require.ErrorContains(t, err, "broken.xcl:2")
-	require.ErrorContains(t, err, `An argument named "modls"`)
+	require.ErrorContains(t, err, `An argument named "modls" is not expected here`)
 }
 
-func TestShowsTheSourceInAnError(t *testing.T) {
+func TestKeepsTheSourceOfTheFileItReadInAnError(t *testing.T) {
 	_, err := read(t, "broken.xcl")
 
-	require.ErrorContains(t, err, `modls = ["opus"]`)
+	var d *xclerrors.Diagnostic
+	require.ErrorAs(t, err, &d)
+	require.NotNil(t, d.Source)
+	require.Contains(t, d.Source.Lines, `  modls = ["opus"]`)
+}
+
+func TestShowsTheSourceInTheReportOfAnError(t *testing.T) {
+	_, err := read(t, "broken.xcl")
+
+	var d *xclerrors.Diagnostic
+	require.ErrorAs(t, err, &d)
+
+	report := string(highlight.Text.Render(xcl.DiagnosticPieces(xclerrors.Diagnostics{d}, 0)))
+	require.Contains(t, report, `modls = ["opus"]`)
 }
 
 func TestReadsConfigurationGivenAsBytes(t *testing.T) {
