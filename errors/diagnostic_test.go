@@ -182,6 +182,21 @@ func TestADiagnosticInAConfigErrorIsFoundWithAs(t *testing.T) {
 	require.Equal(t, "Unsupported argument", found.Summary)
 }
 
+func TestADiagnosticMatchesItsCause(t *testing.T) {
+	cause := errors.New("connection refused")
+	d := NewDiagnostic(unsupported(), nil)
+	d.Cause = cause
+
+	ce := NewConfigError()
+	ce.AppendError(d)
+
+	require.ErrorIs(t, ce, cause)
+}
+
+func TestADiagnosticWithoutACauseUnwrapsToNil(t *testing.T) {
+	require.Nil(t, NewDiagnostic(unsupported(), nil).Unwrap())
+}
+
 func TestConfigErrorDiagnosticsLeavesOutOtherErrors(t *testing.T) {
 	diagnostic := NewDiagnostic(unsupported(), nil)
 
