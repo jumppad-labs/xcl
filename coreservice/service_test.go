@@ -447,3 +447,57 @@ func TestCallIsSafeForConcurrentUse(t *testing.T) {
 		require.Equal(t, StatusOK, status)
 	}
 }
+
+func TestCloseReleasesEveryConfiguration(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	first := c.createConfig(appRequest(t))
+	second := c.createConfig(appRequest(t))
+
+	c.s.Close()
+
+	_, status := c.call(first, "Entities", &corepb.EntitiesRequest{})
+	require.Equal(t, StatusUnknownHandle, status)
+
+	_, status = c.call(second, "Entities", &corepb.EntitiesRequest{})
+	require.Equal(t, StatusUnknownHandle, status)
+}
+
+func TestCloseSavesStateOfRunningApply(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	f := newPluginConfig(t, c)
+
+	started, release := holdCreate(f.plugin, "resource.network.first")
+
+	c.start(f.handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, chainConfig)}})
+	waitStarted(t, started, release)
+
+	conf := c.s.lookup(f.handle)
+	require.NotNil(t, conf)
+
+	op := conf.current()
+	require.NotNil(t, op)
+
+	// the held create returns once Close has cancelled the operation, as a
+	// provider call already running finishes on its own
+	go func() {
+		<-op.ctx.Done()
+		close(release)
+	}()
+
+	c.s.Close()
+
+	// Close returned only once the operation had ended
+	select {
+	case <-op.done:
+	default:
+		t.Fatal("Close returned while the operation was still running")
+	}
+
+	// the create that was running when Close was called completed and the
+	// apply saved it, and container.second, which depends on it, never began
+	require.Equal(t, []string{"resource.network.first"}, savedIDs(t, f.stateDir))
+}

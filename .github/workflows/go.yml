@@ -123,3 +123,26 @@ jobs:
 
     - name: Smoke-test through the C ABI
       run: make test-libxcl LIBXCL_VERSION=v0.0.0-ci
+
+  # xcl-core, the engine program in cmd/xcl-core, must survive the console
+  # control events a terminal sends its process group on Windows, which only
+  # a Windows runner can show: its smoke tests start the program in a new
+  # process group and send it Ctrl-Break, and drive it over pipes. The
+  # Linux job above runs every test of the program, with POSIX signals and an
+  # external plugin; the fixture plugin helpers build no .exe, so the plugin
+  # test is not run here.
+  xcl-core-windows:
+    name: Test xcl-core on Windows
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.27.0'
+
+    - name: Test
+      env:
+        CGO_ENABLED: '0'
+      run: go test -count=1 -v -run 'TestVersionFlag|TestNoArguments|TestServe|TestClosingStdin|TestCtrlBreak' ./cmd/xcl-core/

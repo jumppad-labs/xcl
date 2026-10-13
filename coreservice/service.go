@@ -1,8 +1,9 @@
 // Package coreservice implements CoreService, the message API through which a
 // host written in another language drives the xcl engine. It is the whole of
 // the binding logic, written once and free of any transport: the shared
-// library in bindings/libxcl moves bytes between C and Service.Call, and a
-// later out-of-process transport would do the same over a pipe.
+// library in bindings/libxcl moves bytes between C and Service.Call, and the
+// engine program in cmd/xcl-core does the same over its standard input and
+// output.
 //
 // Every method of CoreService, defined in proto/xcl/core/v1/core.proto, is
 // dispatched by name through Service.Call with the method's serialised request
@@ -121,6 +122,25 @@ func (s *Service) Release(handle uint64) Status {
 	conf.release()
 
 	return StatusOK
+}
+
+// Close releases every configuration the Service holds, as Release does for
+// each: it cancels each operation in progress and waits for it to stop so its
+// state is saved. A transport calls it when its host goes away, for example
+// when the engine program's input ends. Handles stay never reused, so every
+// handle used after Close returns StatusUnknownHandle.
+func (s *Service) Close() {
+	s.mu.Lock()
+	configs := s.configs
+	s.configs = map[uint64]*configuration{}
+	s.mu.Unlock()
+
+	var released sync.WaitGroup
+	for _, conf := range configs {
+		released.Go(conf.release)
+	}
+
+	released.Wait()
 }
 
 // add stores conf under a new handle and returns it. Handles are never

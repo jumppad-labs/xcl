@@ -1,5 +1,17 @@
 # Changelog
 
+## 20261011211634-a8895873-python-out-of-process-engine
+
+The engine runs as a program any language can start and talk to. `xcl-core`, in `cmd/xcl-core`, is a static program built with cgo disabled that serves the core service over its standard input and output: `xcl-core --serve` reads `Request` frames, each a 4-byte big-endian length followed by the message, and answers each with a `Response` frame carrying the same id, the same status and the same payload the C ABI would give. Each request runs on its own goroutine, so a `Poll` that waits never holds up a `Cancel` or another call, and the method name `Release` frees a handle as `xcl_release` does. The two frame messages are defined in `proto/xcl/core/v1/transport.proto` beside `core.proto` and generated into `coreservice/proto`; the core service messages and the C ABI are unchanged, and the ABI version covers the frames. The program keeps its standard output for frames alone, so an external plugin it starts can neither read nor write the protocol, discards Ctrl-C and, on Windows, Ctrl-Break so the host decides what to cancel, and on end of input or `SIGTERM` releases every configuration, saving the state of any operation in progress, and exits 0. `xcl-core --version` prints the version it was stamped with, and `make xcl-core` builds it for any `GOOS` and `GOARCH`. `coreservice.Service` gains the additive `Close`, which releases every configuration it holds and waits for each to save its state.
+
+Tagging a release now builds `xcl-core` for Linux x86-64 and arm64, macOS x86-64 and arm64 and Windows x86-64 and arm64 in one job with cgo disabled and no C compiler reachable, and attaches eight `xcl-core_<version>_<os>_<arch>` archives, the static Linux program also under the two `_musl` names, with a checksums file signed by the jumppad-labs release key, before dispatching the xcl-python release. The release workflow is `release.yml`, replacing `libxcl-release.yml`. The shared library is no longer attached to releases: `bindings/libxcl` stays in the tree, CI still builds it and smoke-tests it through the C ABI on every change, and the manually run `libxcl-build.yml` builds it for all eight platforms as workflow artifacts.
+
+From v0.5.0 the Python package bundles `xcl-core` and runs it as a subprocess on every platform, Alpine included, with the same API and results everywhere; the shared library remains a source-build option there.
+
+**Breaking:**
+
+None.
+
 ## 20261010160411-19b965db-language-reference
 
 xcl.dev has a language reference. Eight pages under [xcl.dev/language](https://xcl.dev/language/) describe XCL itself as released in v0.3.0 and v0.4.0: the files it reads, entities and their labels, addresses and built-in fields, each shape of attribute and block beside the Go struct and the Python dataclass that receive it, references and processing order, expressions, variables and outputs, modules, and every built-in function with an example, plus application and plugin functions and how name clashes are reported. The reference is in the site's navigation, linked from the home page, and is the first item of this README's Documentation list.

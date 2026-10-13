@@ -194,9 +194,10 @@ Each example under [`example`](./example) is a Go module of its own, and runs wi
 
 The engine is available to Python as the `xcl-lang` package, `pip install xcl-lang`, imported as `xcl`,
 from [jumppad-labs/xcl-python](https://github.com/jumppad-labs/xcl-python):
-the same engine, built as a shared library and bundled in the wheel, with a
-synchronous and an asyncio API. Go users are unaffected: the Go library
-needs no cgo, and nothing in it changes for the binding.
+the same engine, bundled in the wheel as the `xcl-core` program and run as a
+subprocess on every platform, Alpine included, with no shared library to
+load, and a synchronous and an asyncio API. Go users are unaffected: the Go
+library needs no cgo, and nothing in it changes for the binding.
 
 ## Contributing
 

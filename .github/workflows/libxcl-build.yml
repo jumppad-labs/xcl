@@ -1,0 +1,162 @@
+# Builds the engine as a C shared library, libxcl, for the eight platforms the
+# C ABI supports, on demand. Run by hand only: the release does not use it
+# (release.yml ships the engine program, xcl-core, built without a C
+# toolchain), and nothing it builds is attached to a release. It is kept so
+# the C ABI can still be built for every platform when a consumer needs it,
+# and each library is kept as a workflow artifact, libxcl-<target>. go.yml
+# builds and smoke-tests the library on Linux x86-64 on every change.
+#
+# The toolchains are those the library needs: zig cc for Linux (glibc 2.28
+# and musl) and Windows x86-64, llvm-mingw for Windows arm64, and Apple's
+# runner for macOS.
+
+name: libxcl build
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The branch, tag or commit to build; the triggering ref when empty
+        required: false
+        type: string
+        default: ''
+      version:
+        description: The version stamped into each library, e.g. v0.5.0; dev when empty
+        required: false
+        type: string
+        default: ''
+
+env:
+  GO_VERSION: '1.27.0'
+  ZIG_VERSION: '0.13.0'
+  # llvm-mingw provides the Windows arm64 toolchain, which zig does not
+  LLVM_MINGW_VERSION: '20240619'
+
+jobs:
+  # Linux (glibc 2.28 and musl, x86-64 and arm64) and Windows x86-64 are
+  # cross-compiled from one Linux runner with zig cc
+  build-linux-windows:
+    name: Build ${{ matrix.target.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: linux_amd64,      goos: linux,   goarch: amd64, cc: 'zig cc -target x86_64-linux-gnu.2.28',  glibc: '2.28' }
+          - { name: linux_arm64,      goos: linux,   goarch: arm64, cc: 'zig cc -target aarch64-linux-gnu.2.28', glibc: '2.28' }
+          - { name: linux_amd64_musl, goos: linux,   goarch: amd64, cc: 'zig cc -target x86_64-linux-musl' }
+          - { name: linux_arm64_musl, goos: linux,   goarch: arm64, cc: 'zig cc -target aarch64-linux-musl' }
+          - { name: windows_amd64,    goos: windows, goarch: amd64, cc: 'zig cc -target x86_64-windows-gnu' }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+
+      - name: Build
+        run: |
+          make libxcl \
+            LIBXCL_VERSION='${{ inputs.version || 'dev' }}' \
+            LIBXCL_OUT="$PWD/dist/${{ matrix.target.name }}/libxcl.$([ '${{ matrix.target.goos }}' = windows ] && echo dll || echo so)" \
+            CC='${{ matrix.target.cc }}' \
+            GOOS='${{ matrix.target.goos }}' \
+            GOARCH='${{ matrix.target.goarch }}'
+          cp bindings/libxcl/xcl.h "dist/${{ matrix.target.name }}/xcl.h"
+          ls -la "dist/${{ matrix.target.name }}"
+
+      # a glibc build must not need a newer glibc than the one it targets,
+      # or the manylinux wheel built from it would fail on older systems
+      - name: Check the glibc symbol versions
+        if: matrix.target.glibc != ''
+        run: |
+          max=$(objdump -T "dist/${{ matrix.target.name }}/libxcl.so" | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -V | tail -1)
+          echo "newest glibc symbol version: ${max:-none}"
+          if [ -n "$max" ] && [ "$(printf '%s\n%s\n' "$max" '${{ matrix.target.glibc }}' | sort -V | tail -1)" != '${{ matrix.target.glibc }}' ]; then
+            echo "the library needs glibc $max, newer than ${{ matrix.target.glibc }}"; exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libxcl-${{ matrix.target.name }}
+          path: dist/${{ matrix.target.name }}
+          if-no-files-found: error
+
+  build-windows-arm64:
+    name: Build windows_arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install llvm-mingw
+        run: |
+          curl -fsSL -o llvm-mingw.tar.xz \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/${LLVM_MINGW_VERSION}/llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-ubuntu-20.04-x86_64.tar.xz"
+          mkdir -p "$HOME/llvm-mingw"
+          tar -xJf llvm-mingw.tar.xz -C "$HOME/llvm-mingw" --strip-components=1
+          echo "$HOME/llvm-mingw/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          make libxcl \
+            LIBXCL_VERSION='${{ inputs.version || 'dev' }}' \
+            LIBXCL_OUT="$PWD/dist/windows_arm64/libxcl.dll" \
+            CC=aarch64-w64-mingw32-clang \
+            GOOS=windows \
+            GOARCH=arm64
+          cp bindings/libxcl/xcl.h dist/windows_arm64/xcl.h
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libxcl-windows_arm64
+          path: dist/windows_arm64
+          if-no-files-found: error
+
+  # macOS is built on GitHub's arm64 runner with the Xcode toolchain; the
+  # x86-64 dylib is cross-compiled there, as the Intel runners are retired
+  build-macos:
+    name: Build ${{ matrix.target.name }}
+    runs-on: ${{ matrix.target.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: darwin_amd64, runner: macos-latest, goarch: amd64 }
+          - { name: darwin_arm64, runner: macos-latest, goarch: arm64 }
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build
+        run: |
+          make libxcl \
+            LIBXCL_VERSION='${{ inputs.version || 'dev' }}' \
+            LIBXCL_OUT="$PWD/dist/${{ matrix.target.name }}/libxcl.dylib" \
+            GOOS=darwin \
+            GOARCH='${{ matrix.target.goarch }}'
+          cp bindings/libxcl/xcl.h "dist/${{ matrix.target.name }}/xcl.h"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libxcl-${{ matrix.target.name }}
+          path: dist/${{ matrix.target.name }}
+          if-no-files-found: error
