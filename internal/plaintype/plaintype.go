@@ -204,8 +204,25 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 
 	b.Engine = reflect.StructOf(fields)
 	built.Store(b.Engine, b)
+	plains.Store(plain, true)
 
 	return b, nil
+}
+
+// plains holds every plain type Build has built, so a value of one can be
+// recognised for what it is where the engine type is not to hand.
+var plains sync.Map
+
+// IsBuilt reports whether plain, or the type a pointer to it points at, has
+// been built as a plain block type: a value of it is a copy of an entity,
+// not the entity.
+func IsBuilt(plain reflect.Type) bool {
+	for plain.Kind() == reflect.Pointer {
+		plain = plain.Elem()
+	}
+
+	_, ok := plains.Load(plain)
+	return ok
 }
 
 // built holds every Built by its engine type, so an entity can be turned back

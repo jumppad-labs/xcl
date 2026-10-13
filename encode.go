@@ -3,6 +3,7 @@ package xcl
 import (
 	"fmt"
 	"maps"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/cty"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
@@ -195,6 +197,15 @@ func (c *Config) EncodeSavedEntity(data []byte, options ...EncodeOption) ([]byte
 // an entity and its saved data give identical text
 func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 	meta, err := types.GetMeta(entity)
+	if err != nil && entity != nil && plaintype.IsBuilt(reflect.TypeOf(entity)) {
+		// a plain type's value is a copy the application was handed, and
+		// carries neither the block type it was declared as nor its labels
+		return nil, &xclerrors.NotEncodableError{
+			What:   fmt.Sprintf("a value of the plain type %T", entity),
+			Reason: "it is a copy of an entity and does not say what it was declared as, encode the entity itself, as Entities or FindEntitiesByType return it",
+		}
+	}
+
 	if err != nil {
 		return nil, &xclerrors.NotEncodableError{
 			What:   fmt.Sprintf("a value of type %T", entity),

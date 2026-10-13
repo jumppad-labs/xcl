@@ -262,6 +262,20 @@ func TestLookupIsFalseForATypeItDidNotBuild(t *testing.T) {
 	require.False(t, ok)
 }
 
+func TestIsBuiltForABuiltPlainType(t *testing.T) {
+	build(t, agent{}, 1)
+
+	require.True(t, IsBuilt(reflect.TypeOf(&agent{})))
+}
+
+func TestIsBuiltIsFalseForATypeNeverBuilt(t *testing.T) {
+	type neverBuilt struct {
+		Value string `xcl:"value,optional"`
+	}
+
+	require.False(t, IsBuilt(reflect.TypeOf(neverBuilt{})))
+}
+
 func TestToPlainCopiesTheFields(t *testing.T) {
 	built := build(t, agent{}, 1)
 	stored := entity(t, built, "", "claude")
