@@ -42,9 +42,17 @@ jobs:
     - name: Lint the protos
       run: buf lint
 
+    # A pull request that introduces proto/ has nothing on main to break, and
+    # buf refuses to compare against a module with no .proto files.
     - name: Check the protos for breaking changes
       if: github.event_name == 'pull_request'
-      run: buf breaking --against 'https://github.com/${{ github.repository }}.git#branch=main,subdir=proto'
+      run: |
+        git fetch --depth=1 origin main
+        if [ -z "$(git ls-tree -r --name-only FETCH_HEAD -- proto | grep '\.proto$')" ]; then
+          echo "main has no protos in proto/ yet; nothing to check for breaking changes"
+          exit 0
+        fi
+        buf breaking --against 'https://github.com/${{ github.repository }}.git#branch=main,subdir=proto'
 
   # The minimum supported version is what the portable form of the lookup
   # surface exists for, and nothing else proves it: the newest toolchain
