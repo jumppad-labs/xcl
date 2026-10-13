@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
-	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
@@ -31,12 +30,11 @@ type encodeOptions struct {
 	includeEmpty    bool
 	revealSensitive bool
 	showReferences  bool
-	renderer        highlight.Renderer
 }
 
 // EncodeOption configures how an entity is written as configuration text.
-// Construct one with IncludeComputed, IncludeEmpty, RevealSensitive,
-// ShowReferences or Highlight.
+// Construct one with IncludeComputed, IncludeEmpty, RevealSensitive or
+// ShowReferences.
 type EncodeOption func(*encodeOptions)
 
 // IncludeComputed also writes the fields a provider fills in, such as an
@@ -102,22 +100,6 @@ func ShowReferences() EncodeOption {
 	}
 }
 
-// Highlight passes the finished text through renderer, labelling each token
-// with the TextMate scope the xcl-vscode grammar gives it, such as
-// storage.type.xcl for a block type. The text is unchanged apart from what the
-// renderer adds, and highlighting combines with every other option, including
-// ShowReferences, whose expressions are highlighted like any other text.
-//
-// Use highlight.ANSI to colour text for a terminal, or write a
-// highlight.Renderer for any other format. xcl never checks whether output is
-// a terminal, so whether to ask for colour is the caller's decision. A nil
-// renderer means no highlighting.
-func Highlight(renderer highlight.Renderer) EncodeOption {
-	return func(o *encodeOptions) {
-		o.renderer = renderer
-	}
-}
-
 // EncodeEntity returns entity as configuration text in xcl's own syntax,
 // formatted and ready to print or write to a .xcl file.
 //
@@ -133,7 +115,8 @@ func Highlight(renderer highlight.Renderer) EncodeOption {
 // IncludeEmpty is given. Values are written as the
 // literals they resolved to, not as the expressions the original configuration
 // used, unless ShowReferences is given. The text is plain, with no colour or
-// markup, unless Highlight is given.
+// markup; to colour it, render its pieces, such as
+// highlight.ANSI.Render(highlight.Pieces(text)).
 //
 // It fails with ErrNotEncodable when entity is not an entity, when it is a
 // builtin such as a variable, output or module, or when it holds a value that
@@ -245,12 +228,6 @@ func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 
 	// Bytes runs the formatter, so the text is ready to write as it is
 	text := file.Bytes()
-
-	// highlighting runs last, on the final text, so it sees exactly what is
-	// returned and interacts with no other option
-	if opts.renderer != nil {
-		text = opts.renderer.Render(highlight.Pieces(text))
-	}
 
 	return text, nil
 }

@@ -3,7 +3,6 @@ package coreservice
 import (
 	"encoding/json"
 
-	"github.com/jumppad-labs/xcl"
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
 	"github.com/jumppad-labs/xcl/highlight"
 )
@@ -129,19 +128,13 @@ func (s *Service) encodeSavedEntity(conf *configuration, req *corepb.EncodeSaved
 		return nil, invalidArgument("an entity is required", "argument", "entity")
 	}
 
-	options := []xcl.EncodeOption{}
-	if req.GetHighlight() {
-		renderer, err := highlight.NewANSI()
-		if err != nil {
-			return nil, err
-		}
-
-		options = append(options, xcl.Highlight(renderer))
-	}
-
-	text, err := conf.cfg.EncodeSavedEntity(req.GetEntity(), options...)
+	text, err := conf.cfg.EncodeSavedEntity(req.GetEntity())
 	if err != nil {
 		return nil, err
+	}
+
+	if req.GetHighlight() {
+		text = highlight.ANSI.Render(highlight.Pieces(text))
 	}
 
 	return &corepb.EncodeSavedEntityResponse{Text: text}, nil
