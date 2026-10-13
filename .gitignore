@@ -25,3 +25,5 @@ example/prettylog/prettylog
 .spektacular/tmp/
 # libxcl built for the local platform by make libxcl
 bindings/libxcl/build/
+# the engine program built for the local platform by make xcl-core
+/build/

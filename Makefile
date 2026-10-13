@@ -59,6 +59,24 @@ test-libxcl:
 	cd bindings/libxcl && CGO_ENABLED=1 go test -count=1 -ldflags="-X github.com/jumppad-labs/xcl/coreservice.Version=$(LIBXCL_VERSION)" ./...
 
 .PHONY: libxcl test-libxcl
+
+# xcl-core is the engine as a program a binding starts and talks to over its
+# standard input and output, from cmd/xcl-core. It is built with cgo disabled,
+# so any GOOS and GOARCH build from one machine with no C compiler.
+# XCL_CORE_VERSION is stamped into the program exactly as LIBXCL_VERSION is
+# into the library; a release sets it to the tag. XCL_CORE_OUT is the
+# program's path, with .exe when GOOS is windows, e.g.
+# make xcl-core GOOS=windows GOARCH=arm64 XCL_CORE_VERSION=v1.0.0
+XCL_CORE_VERSION ?= dev
+XCL_CORE_GOOS ?= $(if $(GOOS),$(GOOS),$(shell go env GOOS))
+XCL_CORE_GOARCH ?= $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
+XCL_CORE_EXT := $(if $(filter windows,$(XCL_CORE_GOOS)),.exe,)
+XCL_CORE_OUT ?= $(CURDIR)/build/xcl-core$(XCL_CORE_EXT)
+
+xcl-core:
+	CGO_ENABLED=0 GOOS=$(XCL_CORE_GOOS) GOARCH=$(XCL_CORE_GOARCH) go build -trimpath -ldflags="-s -w -X github.com/jumppad-labs/xcl/coreservice.Version=$(XCL_CORE_VERSION)" -o "$(XCL_CORE_OUT)" ./cmd/xcl-core
+
+.PHONY: xcl-core
 # Install and start a real plugin release from github.com. Set
 # XCL_GITHUB_LIVE_PLUGIN=owner/repo@vX.Y.Z, optionally XCL_GITHUB_LIVE_KEY to
 # the path of an armoured public key to trust, and GITHUB_TOKEN or GH_TOKEN
