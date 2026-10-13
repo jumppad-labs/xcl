@@ -16,23 +16,23 @@ The first attempt to publish XCL for Python failed on two of the eight platforms
 
 ## Requirements
 
-- [ ] **One way to run the engine, everywhere**
+- [x] **One way to run the engine, everywhere**
   Every Python package carries the engine as a separate program that the package starts and talks to, serving the same operations the shared library served, so no behaviour is reimplemented and no platform is special.
 - [ ] **Works on every supported platform, Alpine included**
   Users can install XCL for Python from PyPI on all eight supported platforms without Go or a C compiler, and use it with the same API and the same results for the same configuration, plugins and state.
-- [ ] **The shared library remains a source-build option**
+- [x] **The shared library remains a source-build option**
   A developer building from source can still build the shared library and select it with a user-settable override, so the in-process route stays tested and can be made the default again later without changing the API.
-- [ ] **Clear error when the engine is missing**
+- [x] **Clear error when the engine is missing**
   If the installed package holds neither engine form, the first use fails with an error naming what was looked for and where.
-- [ ] **Engine lifecycle is invisible in normal use**
+- [x] **Engine lifecycle is invisible in normal use**
   The engine program starts on first use, is shared by every configuration in the process, is stopped when the last configuration is closed or the interpreter exits, and never outlives a host that died without cleaning up.
-- [ ] **Engine failures are reported, not hidden**
+- [x] **Engine failures are reported, not hidden**
   If the engine program exits unexpectedly, every call waiting on it fails with an error carrying the exit status; the next use starts a fresh engine and the host process survives. The engine's own diagnostics reach the user's standard error.
 - [ ] **Interrupts behave as before**
   Pressing Ctrl-C during an operation cancels it through the package, with state saved so far kept, rather than killing the engine out from under it.
-- [ ] **Fork works**
+- [x] **Fork works**
   A child process forked after the parent used XCL can use XCL by creating its own configuration; using a configuration created before the fork raises a clear error naming that way out.
-- [ ] **Same guarantees as the shared library gave**
+- [x] **Same guarantees as the shared library gave**
   Version mismatch refusal, cancellation, concurrent calls, events, custom state stores and Python functions behave exactly as the python-support spec defines them.
 - [ ] **Released without a C toolchain**
   Every XCL release builds the engine program for all eight supported platforms in one job that needs no C compiler, and attaches the archives to the GitHub release under a signed checksums file. The shared library is no longer part of the release, though it stays buildable and is exercised in CI.
@@ -40,7 +40,7 @@ The first attempt to publish XCL for Python failed on two of the eight platforms
   The Python release publishes eight wheels, each carrying its platform's engine program, and installs cleanly from PyPI on every platform, including a plain Alpine image with no compiler.
 - [ ] **Package version matches the tag**
   Tagging an XCL release publishes the Python package at the same version, and the engine reports that version.
-- [ ] **Documented**
+- [x] **Documented**
   The package README and the Python install documentation on xcl.dev say that the engine runs as a bundled subprocess with the same API everywhere, and that Alpine is supported.
 
 ## Constraints
@@ -61,23 +61,23 @@ The first attempt to publish XCL for Python failed on two of the eight platforms
   In a fresh `python:3-alpine` image on x86-64 and on arm64, with no Go or C compiler, `pip install xcl-lang==0.5.0` succeeds and a program registers a class, applies a configuration, reads the entity back and closes; the engine version it reports is `v0.5.0`.
 - [ ] **Parity on every wheel**
   The Go–Python parity fixtures produce results identical to Go on each of the eight wheels.
-- [ ] **Parity on the source-built library**
+- [x] **Parity on the source-built library**
   From a source checkout with both engine forms built, with the override enabled the full test suite passes on the in-process route on Linux glibc, and with it disabled the same suite passes on the engine program.
-- [ ] **Missing engine named**
+- [x] **Missing engine named**
   With the engine program removed from an installed package, the first use raises an error naming the program's and the library's expected locations.
-- [ ] **One engine per process, cleaned up**
+- [x] **One engine per process, cleaned up**
   Creating three configurations in one process starts one engine process; closing the last one, or exiting the interpreter, leaves no engine process running; killing the host process with no chance to clean up leaves no engine process running within a few seconds.
-- [ ] **Engine death is surfaced**
+- [x] **Engine death is surfaced**
   Killing the engine process while an apply is in progress makes the apply raise the engine-exited error carrying the signal or exit status; the host process continues, and a new configuration created afterwards works.
-- [ ] **Ctrl-C cancels**
+- [x] **Ctrl-C cancels**
   Sending an interrupt to a program mid-apply ends the apply with the cancellation error, the entities completed before it are in state, and no engine process is left running.
-- [ ] **Fork**
+- [x] **Fork**
   A child forked after the parent used XCL applies a configuration it created itself; using the parent's configuration raises the fork error naming that alternative.
-- [ ] **Same guarantees**
+- [x] **Same guarantees**
   An engine of a different version is refused naming both versions; cancelling an asyncio apply stops it with no provider call recorded after the cancellation; a slow plugin operation does not stall other Python threads or other coroutines; events, a custom state store and a Python function all round-trip.
 - [ ] **Release attaches the engine program**
   Tagging xcl v0.5.0 attaches eight engine-program archives listed in one checksums file whose signature verifies with the jumppad-labs key, from a job with no C compiler installed; no shared-library archive is attached.
-- [ ] **Shared library still builds**
+- [x] **Shared library still builds**
   CI builds the shared library on Linux x86-64 and runs its smoke test through the C ABI on every change.
 - [ ] **Eight wheels published**
   The xcl-python release for v0.5.0 publishes eight wheels and the sdist to PyPI as xcl-lang 0.5.0, and the install check passes on all eight platforms, the two musl ones in a plain Alpine image.

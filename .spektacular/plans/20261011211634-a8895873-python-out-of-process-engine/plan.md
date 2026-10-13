@@ -417,7 +417,7 @@ The sibling release-hardening plan's `strict_skip` helper, implemented after thi
 - `buf lint` passes with the frame messages.
 - The libxcl CI job still builds and smoke-tests the library.
 
-#### - [ ] Task: The frame messages are part of the protocol
+#### - [x] Task: The frame messages are part of the protocol
 **Id:** 1c4a2ab7-d1eb-4fff-a934-58d965d8ead7
 **Repo:** xcl
 **Depends on:** none
@@ -428,11 +428,11 @@ This adds the two messages that carry every call between a host and the engine p
 *Technical detail:* [context.md#task-the-frame-messages-are-part-of-the-protocol](./context.md#task-the-frame-messages-are-part-of-the-protocol)
 
 **Acceptance criteria**:
-- [ ] The request and response messages exist exactly as the design writes them, and Go code for them is generated beside the CoreService messages.
-- [ ] The protocol's lint check passes, and the CoreService messages and methods are unchanged.
-- [ ] The messages' documentation says how `Release` and negative statuses are carried.
+- [x] The request and response messages exist exactly as the design writes them, and Go code for them is generated beside the CoreService messages.
+- [x] The protocol's lint check passes, and the CoreService messages and methods are unchanged.
+- [x] The messages' documentation says how `Release` and negative statuses are carried.
 
-#### - [ ] Task: The engine program serves the core service over standard input and output
+#### - [x] Task: The engine program serves the core service over standard input and output
 **Id:** 46cf5eda-9cd3-450a-87e6-267679e0146f
 **Repo:** xcl
 **Depends on:**
@@ -449,13 +449,13 @@ The core service gains one additive method that releases everything it holds, an
 *Technical detail:* [context.md#task-the-engine-program-serves-the-core-service-over-standard-input-and-output](./context.md#task-the-engine-program-serves-the-core-service-over-standard-input-and-output)
 
 **Acceptance criteria**:
-- [ ] A host that writes framed requests gets each answered with the same id. A `Log` or `Cancel` sent while a `Poll` waits is answered before the `Poll` returns.
-- [ ] `Release` frees a configuration. A later call on that handle gets the unknown-handle status, and every negative status decodes back to its value.
-- [ ] Closing the program's standard input makes it release every configuration, with an apply's state saved, and exit with status 0.
+- [x] A host that writes framed requests gets each answered with the same id. A `Log` or `Cancel` sent while a `Poll` waits is answered before the `Poll` returns.
+- [x] `Release` frees a configuration. A later call on that handle gets the unknown-handle status, and every negative status decodes back to its value.
+- [x] Closing the program's standard input makes it release every configuration, with an apply's state saved, and exit with status 0.
 - [ ] An interrupt does not stop the program: `SIGINT` on Linux and macOS, and Ctrl-Break sent to its process group on Windows. A terminate signal stops it cleanly.
-- [ ] A configuration that starts an external plugin keeps getting answers. Nothing but frames ever appears on standard output.
-- [ ] `xcl-core --version` prints the version it was built with, and a build with cgo disabled succeeds for every one of the eight targets.
-- [ ] Importing the root module still starts no process and needs no C compiler.
+- [x] A configuration that starts an external plugin keeps getting answers. Nothing but frames ever appears on standard output.
+- [x] `xcl-core --version` prints the version it was built with, and a build with cgo disabled succeeds for every one of the eight targets.
+- [x] Importing the root module still starts no process and needs no C compiler.
 
 ### Milestone 2: Python runs the engine as a bundled subprocess, the same way on every platform
 
@@ -472,7 +472,7 @@ The core service gains one additive method that releases everything it holds, an
 - On Linux glibc x86-64 the same suite passes again with `XCL_TRANSPORT=inprocess`.
 - The parity fixtures show no differences on either route.
 
-#### - [ ] Task: Python talks to the engine program through a subprocess transport
+#### - [x] Task: Python talks to the engine program through a subprocess transport
 **Id:** bb7eb51b-a035-41dc-a3f6-3b8108daef3e
 **Repo:** xcl-python
 **Depends on:**
@@ -492,14 +492,14 @@ The package gains the two errors the design names, and its development build gai
 *Technical detail:* [context.md#task-python-talks-to-the-engine-program-through-a-subprocess-transport](./context.md#task-python-talks-to-the-engine-program-through-a-subprocess-transport)
 
 **Acceptance criteria**:
-- [ ] Calls made from several threads at once each get their own response, even when the engine answers out of order.
-- [ ] The engine starts on the first call, not at import. Several configurations share one engine, which stops once the last configuration is released or the transport is closed.
-- [ ] When the engine exits or is killed, every waiting call raises `xcl.EngineExitedError` carrying the exit status or signal. The next call starts a new engine, and a configuration from the dead engine raises `EngineExitedError`, not an internal error.
-- [ ] An engine reporting a different ABI version is refused, naming both versions.
-- [ ] In a forked child, a configuration created before the fork raises `xcl.ForkedProcessError` naming the way out, while a new configuration starts the child's own engine.
-- [ ] The engine's standard error reaches the host's standard error.
+- [x] Calls made from several threads at once each get their own response, even when the engine answers out of order.
+- [x] The engine starts on the first call, not at import. Several configurations share one engine, which stops once the last configuration is released or the transport is closed.
+- [x] When the engine exits or is killed, every waiting call raises `xcl.EngineExitedError` carrying the exit status or signal. The next call starts a new engine, and a configuration from the dead engine raises `EngineExitedError`, not an internal error.
+- [x] An engine reporting a different ABI version is refused, naming both versions.
+- [x] In a forked child, a configuration created before the fork raises `xcl.ForkedProcessError` naming the way out, while a new configuration starts the child's own engine.
+- [x] The engine's standard error reaches the host's standard error.
 
-#### - [ ] Task: The package runs the bundled engine program by default and the shared library on request
+#### - [x] Task: The package runs the bundled engine program by default and the shared library on request
 **Id:** a08d3d86-6310-4e19-beeb-2992a7b0c11c
 **Repo:** xcl-python
 **Depends on:**
@@ -516,18 +516,18 @@ Each wheel carries the program, `cffi` becomes an optional extra for the in-proc
 *Technical detail:* [context.md#task-the-package-runs-the-bundled-engine-program-by-default-and-the-shared-library-on-request](./context.md#task-the-package-runs-the-bundled-engine-program-by-default-and-the-shared-library-on-request)
 
 **Acceptance criteria**:
-- [ ] Without `XCL_TRANSPORT` the package runs the engine program even when the shared library is also present. With `XCL_TRANSPORT=inprocess` it loads the library.
-- [ ] With the engine program removed from an installed package, the first use raises `xcl.EngineNotFoundError` naming the program's and the library's expected locations.
-- [ ] Creating three configurations starts one engine process. Closing the last one, or the interpreter exiting, leaves none running. Killing the host with no chance to clean up leaves none running within a few seconds.
-- [ ] Killing the engine during an apply raises `EngineExitedError` with the signal or status. The host carries on, and a new configuration created afterwards applies.
-- [ ] An interrupt sent to the program's process group mid-apply ends the apply with the cancellation error. The entities completed before it are in state, and no engine is left running.
-- [ ] A child forked after the parent used XCL applies a configuration it created itself. Using the parent's configuration in the child raises the fork error naming that alternative.
-- [ ] An engine of a different version is refused naming both versions, and a first `Config()` in a fresh interpreter completes within one second.
-- [ ] The full existing suite (asyncio cancellation, threads not stalled, events, custom state stores, Python functions, parity) passes on the engine program. With both engines built and `XCL_TRANSPORT=inprocess`, it passes on the shared library.
-- [ ] A wheel built from the checkout carries the engine program for its platform, executable, and installing it needs neither Go nor a C compiler.
-- [ ] A missing engine skips its tests, unless `XCL_TEST_STRICT=1` is set and the engine's route is listed in `XCL_TEST_ENGINES`, in which case the run fails. A test that belongs to the other route always skips.
+- [x] Without `XCL_TRANSPORT` the package runs the engine program even when the shared library is also present. With `XCL_TRANSPORT=inprocess` it loads the library.
+- [x] With the engine program removed from an installed package, the first use raises `xcl.EngineNotFoundError` naming the program's and the library's expected locations.
+- [x] Creating three configurations starts one engine process. Closing the last one, or the interpreter exiting, leaves none running. Killing the host with no chance to clean up leaves none running within a few seconds.
+- [x] Killing the engine during an apply raises `EngineExitedError` with the signal or status. The host carries on, and a new configuration created afterwards applies.
+- [x] An interrupt sent to the program's process group mid-apply ends the apply with the cancellation error. The entities completed before it are in state, and no engine is left running.
+- [x] A child forked after the parent used XCL applies a configuration it created itself. Using the parent's configuration in the child raises the fork error naming that alternative.
+- [x] An engine of a different version is refused naming both versions, and a first `Config()` in a fresh interpreter completes within one second.
+- [x] The full existing suite (asyncio cancellation, threads not stalled, events, custom state stores, Python functions, parity) passes on the engine program. With both engines built and `XCL_TRANSPORT=inprocess`, it passes on the shared library.
+- [x] A wheel built from the checkout carries the engine program for its platform, executable, and installing it needs neither Go nor a C compiler.
+- [x] A missing engine skips its tests, unless `XCL_TEST_STRICT=1` is set and the engine's route is listed in `XCL_TEST_ENGINES`, in which case the run fails. A test that belongs to the other route always skips.
 
-#### - [ ] Task: CI tests the package on the engine program everywhere and on the shared library on Linux
+#### - [x] Task: CI tests the package on the engine program everywhere and on the shared library on Linux
 **Id:** a7327c0c-1ee8-4248-bf1d-e8427d4b6862
 **Repo:** xcl-python
 **Depends on:**
@@ -539,10 +539,10 @@ The CI workflow builds the engine program from the recorded xcl checkout on ever
 *Technical detail:* [context.md#task-ci-tests-the-package-on-the-engine-program-everywhere-and-on-the-shared-library-on-linux](./context.md#task-ci-tests-the-package-on-the-engine-program-everywhere-and-on-the-shared-library-on-linux)
 
 **Acceptance criteria**:
-- [ ] Every runner and Python version in the matrix, and both Alpine jobs, run the suite on the engine program.
-- [ ] The Linux glibc x86-64 job runs the suite a second time on the shared library with `XCL_TRANSPORT=inprocess`.
-- [ ] Neither Alpine job installs a C compiler to build the engine.
-- [ ] Every test run sets `XCL_TEST_STRICT=1`, with `XCL_TEST_ENGINES` naming `subprocess` on every job and also `inprocess` on the Linux job's in-process run. An engine the job should have built can never be silently skipped.
+- [x] Every runner and Python version in the matrix, and both Alpine jobs, run the suite on the engine program.
+- [x] The Linux glibc x86-64 job runs the suite a second time on the shared library with `XCL_TRANSPORT=inprocess`.
+- [x] Neither Alpine job installs a C compiler to build the engine.
+- [x] Every test run sets `XCL_TEST_STRICT=1`, with `XCL_TEST_ENGINES` naming `subprocess` on every job and also `inprocess` on the Linux job's in-process run. An engine the job should have built can never be silently skipped.
 
 ### Milestone 3: Every XCL release publishes the engine program and eight Python wheels without a C toolchain
 
@@ -558,7 +558,7 @@ The CI workflow builds the engine program from the recorded xcl checkout on ever
 - `xcl-lang 0.5.0` is on PyPI with eight wheels and an sdist.
 - Every install check passes, and the engine reports `v0.5.0`.
 
-#### - [ ] Task: Tagging xcl releases the engine program for eight platforms with no C toolchain
+#### - [x] Task: Tagging xcl releases the engine program for eight platforms with no C toolchain
 **Id:** 9d2e550d-a82e-408e-8cc7-5d338ff3420d
 **Repo:** xcl
 **Depends on:**
@@ -570,13 +570,13 @@ The release workflow is replaced by one that builds the engine program for all e
 *Technical detail:* [context.md#task-tagging-xcl-releases-the-engine-program-for-eight-platforms-with-no-c-toolchain](./context.md#task-tagging-xcl-releases-the-engine-program-for-eight-platforms-with-no-c-toolchain)
 
 **Acceptance criteria**:
-- [ ] A tag push builds eight `xcl-core` archives, Linux x86-64 and arm64 on glibc and musl, macOS x86-64 and arm64, and Windows x86-64 and arm64, in one job that fails if a C compiler is reachable.
+- [x] A tag push builds eight `xcl-core` archives, Linux x86-64 and arm64 on glibc and musl, macOS x86-64 and arm64, and Windows x86-64 and arm64, in one job that fails if a C compiler is reachable.
 - [ ] The archives are listed in one checksums file with a detached signature that verifies with the jumppad-labs key, and all are attached to the release. No libxcl archive is attached.
-- [ ] Each archived program reports the tag as its version.
+- [x] Each archived program reports the tag as its version.
 - [ ] The xcl-python release is dispatched with the tag once the assets are attached. Run by hand with publishing off, the workflow only keeps the assets as an artifact.
 - [ ] The shared library's eight-platform build can still be run by hand and produces the eight libraries as workflow artifacts.
 
-#### - [ ] Task: The Python release builds eight wheels around the engine program and checks them on every platform
+#### - [x] Task: The Python release builds eight wheels around the engine program and checks them on every platform
 **Id:** 92f42c4a-de67-409c-8e67-42694af0d8ba
 **Repo:** xcl-python
 **Depends on:**
@@ -590,11 +590,11 @@ For each of the eight platforms, the release downloads the engine-program archiv
 
 **Acceptance criteria**:
 - [ ] Each of the eight wheels carries its platform's engine program, verified against the signed checksums from the xcl release.
-- [ ] The parity suite runs against every installed wheel before anything is published, and any difference stops the release.
+- [x] The parity suite runs against every installed wheel before anything is published, and any difference stops the release.
 - [ ] Eight wheels and an sdist are published to PyPI at the tag's version.
 - [ ] On all eight platforms, with no Go or C compiler, the published package installs, applies and reads back an entity, and reports the tag as the engine version. The two musl platforms run in a plain `python:3-alpine` image.
 
-#### - [ ] Task: The Python package README describes the bundled engine
+#### - [x] Task: The Python package README describes the bundled engine
 **Id:** fe764af7-e6d7-4153-895a-6dce2e665eba
 **Repo:** xcl-python
 **Depends on:**
@@ -611,12 +611,12 @@ The development section explains building the program, and optionally the shared
 *Technical detail:* [context.md#task-the-python-package-readme-describes-the-bundled-engine](./context.md#task-the-python-package-readme-describes-the-bundled-engine)
 
 **Acceptance criteria**:
-- [ ] The README states that the engine runs as a bundled subprocess on every platform with the same API, and lists Alpine (musl) among the supported platforms.
-- [ ] The forking section gives the subprocess route's rule, and the errors section names `EngineNotFoundError` and `EngineExitedError`.
-- [ ] The development section explains `XCL_TRANSPORT=inprocess` and how to build each engine form.
-- [ ] Nothing in the README or the package description still says the engine is loaded as a shared library by default.
+- [x] The README states that the engine runs as a bundled subprocess on every platform with the same API, and lists Alpine (musl) among the supported platforms.
+- [x] The forking section gives the subprocess route's rule, and the errors section names `EngineNotFoundError` and `EngineExitedError`.
+- [x] The development section explains `XCL_TRANSPORT=inprocess` and how to build each engine form.
+- [x] Nothing in the README or the package description still says the engine is loaded as a shared library by default.
 
-#### - [ ] Task: xcl.dev shows how to install XCL for Python
+#### - [x] Task: xcl.dev shows how to install XCL for Python
 **Id:** a91c5228-6bb5-4ccf-8dbc-87070f3da914
 **Repo:** xcl-website
 **Depends on:**
@@ -628,12 +628,12 @@ The home page gains an install section with Go and Python tabs. The Python tab g
 *Technical detail:* [context.md#task-xcldev-shows-how-to-install-xcl-for-python](./context.md#task-xcldev-shows-how-to-install-xcl-for-python)
 
 **Acceptance criteria**:
-- [ ] The home page has an install section whose Python tab shows `pip install xcl-lang` and says the engine runs as a bundled subprocess on every platform with the same API.
-- [ ] The Python tab lists Alpine among the supported platforms and links the PyPI project.
-- [ ] The hero badge reads v0.5.0, and the page description no longer says only Go is available.
-- [ ] The site builds.
+- [x] The home page has an install section whose Python tab shows `pip install xcl-lang` and says the engine runs as a bundled subprocess on every platform with the same API.
+- [x] The Python tab lists Alpine among the supported platforms and links the PyPI project.
+- [x] The hero badge reads v0.5.0, and the page description no longer says only Go is available.
+- [x] The site builds.
 
-#### - [ ] Task: The xcl changelog and README record the engine program
+#### - [x] Task: The xcl changelog and README record the engine program
 **Id:** 3abbaf58-6386-42c8-ba52-6fc30c6d83f7
 **Repo:** xcl
 **Depends on:**
@@ -653,8 +653,8 @@ The README's note on other languages says the same in a sentence.
 *Technical detail:* [context.md#task-the-xcl-changelog-and-readme-record-the-engine-program](./context.md#task-the-xcl-changelog-and-readme-record-the-engine-program)
 
 **Acceptance criteria**:
-- [ ] The changelog has a `## 20261011211634-a8895873-python-out-of-process-engine` entry at the top, in prose, ending with **Breaking:** and `None.`
-- [ ] The README says Python runs the engine as a bundled program on every platform, with no shared library to load.
+- [x] The changelog has a `## 20261011211634-a8895873-python-out-of-process-engine` entry at the top, in prose, ending with **Breaking:** and `None.`
+- [x] The README says Python runs the engine as a bundled program on every platform, with no shared library to load.
 
 #### - [ ] Task: Cut the v0.5.0 release
 **Id:** 7ac16d04-6d56-48fd-b4b6-94e79445158c
@@ -700,3 +700,236 @@ No other questions remain open. Every design choice is settled in the architectu
 - **Changes to the Python API, the CoreService messages or the C ABI**, beyond the two new exception classes the design names (spec constraint).
 - **Republishing or altering v0.4.0.** The tag and its GitHub release are left as they are (spec constraint).
 - **New xcl.dev pages or navigation for Python.** The docs specs in this epic write the getting-started guides; this plan adds only the home page install section.
+
+## Changelog
+
+### 2026-10-13 — Task: The frame messages are part of the protocol
+
+**What was done**: Added `proto/xcl/core/v1/transport.proto` with the design's `Request{id, handle, method, payload}` and `Response{id, status, payload}` frame messages, documenting the 4-byte big-endian length prefix, host-chosen ids echoed back, out-of-order responses, the reserved `Release` method name and the two's-complement carriage of negative statuses. Generated `coreservice/proto/transport.pb.go` with `buf generate`.
+
+**Deviations**: The `go_package` option carries the `;corepb` package name suffix that `core.proto` already uses, so the generated code shares the `corepb` package. No dedicated test was written for this task, as the plan's testing strategy says; the serve-loop tests of the next task exercise the messages.
+
+**Files changed**:
+- `xcl: proto/xcl/core/v1/transport.proto`
+- `xcl: coreservice/proto/transport.pb.go`
+
+**Discoveries**: `buf breaking --against '.git#branch=main'` (the Makefile's `buf-breaking` target) fails locally on a pre-existing issue ("plugins/plugin.proto was deleted") unrelated to this work; CI uses `subdir=proto`, and the check against `HEAD` passes.
+
+### 2026-10-13 — Task: The engine program serves the core service over standard input and output
+
+**What was done**: Added `cmd/xcl-core`, a cgo-free program in the root module. `--version` prints the stamped version; `--serve` keeps the original stdin/stdout for frames, points `os.Stdin` at the null device and `os.Stdout` at stderr, discards interrupts (and SIGPIPE) through `signal.Notify`, and serves until end of input or SIGTERM. The serve loop decodes length-prefixed `Request` frames, answers each on its own goroutine through `coreservice.Service` (method `Release` goes to `Service.Release`), writes `Response` frames under a mutex with negative statuses as two's-complement `uint32`, and on end of input, SIGTERM or a failed write releases every configuration and drains in-flight requests. `coreservice.Service` gained the additive `Close`, and the Makefile gained the `xcl-core` target. Serve-loop, smoke and `Close` tests were written beside the code, and a Windows job in `go.yml` runs the program's pipe and Ctrl-Break smoke tests.
+
+**Deviations**:
+- `serve` takes a `context.Context` first (`serve(ctx, in, out, service)`), as the plan's context.md describes, rather than the three-argument form in the plan's interface sketch; SIGTERM cancels the context.
+- The program also discards SIGPIPE, so a host that has gone away turns the next write into an error rather than killing the program before configurations are released.
+- The loop calls `Service.Close` a second time after draining in-flight requests, so a configuration created by a request still in flight during the first release is released too; new requests arriving once shutdown has begun are dropped.
+- The Makefile target honours `GOOS`/`GOARCH` passed as make variables (deriving `.exe` from them) as well as `XCL_CORE_GOOS`/`XCL_CORE_GOARCH`.
+- The external-plugin smoke test uses the root module's `internal/testutil.BuildFixturePlugin` (the widget plugin) rather than the nested libxcl fixture plugins.
+- `.github/workflows/go.yml` gained an `xcl-core-windows` job (the plan expected no go.yml change): Go CI only tested on Linux, so without it the Ctrl-Break smoke test would never run. It runs the pipe and Ctrl-Break tests on `windows-latest`; the external plugin test is left to Linux because the fixture plugin helper builds no `.exe`.
+- The acceptance criterion on interrupts is left unchecked: SIGINT and SIGTERM pass on Linux, but the Windows Ctrl-Break test was only compile-checked here (`GOOS=windows go vet`); it runs in the new Windows CI job, which needs a push to execute.
+- Doc comments in `coreservice/service.go` and `coreservice/version.go` now name xcl-core beside libxcl.
+
+**Files changed**:
+- `xcl: cmd/xcl-core/main.go`
+- `xcl: cmd/xcl-core/serve.go`
+- `xcl: cmd/xcl-core/serve_test.go`
+- `xcl: cmd/xcl-core/smoke_test.go`
+- `xcl: cmd/xcl-core/signals_windows_test.go`
+- `xcl: cmd/xcl-core/signals_other_test.go`
+- `xcl: coreservice/service.go`
+- `xcl: coreservice/service_test.go`
+- `xcl: coreservice/version.go`
+- `xcl: Makefile`
+- `xcl: .gitignore`
+- `xcl: .github/workflows/go.yml`
+
+**Discoveries**: CoreService has no `Log` method, so the out-of-order test sends a `Cancel` while a `Poll` waits; cancelling a finished operation keeps the ordering deterministic. go-plugin v1.6.3 hands `os.Stdin` (the variable) to every plugin it starts, so reassigning the variable before serving is enough to keep plugins off the frame pipe. Go writes to a broken fd 1 raise SIGPIPE and kill the process unless SIGPIPE is notified. `go test ./... -race` on the root module passes; `make test-libxcl` still passes.
+
+### 2026-10-13 — Task: Python talks to the engine program through a subprocess transport
+
+**What was done**: Added `xcl/_transport/subprocess.py` with `SubprocessTransport`: it starts `xcl/_bin/xcl-core --serve` on the first call with a pipe pair and inherited stderr, checks the ABI through `GetVersion`, matches responses to waiting calls by id on one daemon reader thread, waits in 0.1 s slices, tracks configurations from `CreateConfig` responses, stops the engine (close stdin, bounded wait, terminate, kill) when the last configuration is released, on `close()` and at exit, fails every waiter with `EngineExitedError` when the engine's output ends and starts a fresh engine on the next call, refuses pre-fork configurations in a forked child with `ForkedProcessError`, and on Windows puts the engine in a kill-on-close job object through ctypes. Added `EngineNotFoundError` and `EngineExitedError` to `xcl/_errors.py` and the package exports, the `transport.proto` messages to `make protos` (generated `transport_pb2`), and a `make engine` target. Unit tests drive the transport against `tests/fake_engine.py`.
+
+**Deviations**:
+- The transport gives out its own configuration handles and maps each to the engine that issued it and that engine's handle, rewriting the `CreateConfig` response. A new engine numbers its handles from 1 again, so with engine-issued handles a configuration of a dead engine (or of the parent of a fork) would silently reach whichever configuration the new engine numbered the same; the plan's `_dead_handles`/`_forked_handles` sets could not tell them apart. Unknown transport handles return the unknown-handle status (-3) without contacting the engine.
+- A forked child closes its copies of the parent engine's pipes, so a child that outlives its parent cannot keep the parent's engine alive.
+- Failure to create or assign the Windows job object is a `RuntimeWarning`, not an error: the engine still ends with its input.
+- Waiters are failed before the transport lock is taken, and a failed start does not join the reader, so an engine that dies during its handshake cannot deadlock the start.
+- `ForkedProcessError`'s docstring now describes both routes; its default (in-process) message is unchanged.
+- `select.py`, the `default_client()` change, packaging, version and test-fixture changes landed in the worktree at the same time but belong to the next task and are recorded there.
+
+**Files changed**:
+- `xcl-python: xcl/_transport/subprocess.py`
+- `xcl-python: xcl/_transport/__init__.py`
+- `xcl-python: xcl/_errors.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: xcl/_core/transport_pb2.py`
+- `xcl-python: xcl/_core/transport_pb2.pyi`
+- `xcl-python: Makefile`
+- `xcl-python: .gitignore`
+- `xcl-python: tests/fake_engine.py`
+- `xcl-python: tests/unit/test_subprocess_transport.py`
+- `xcl-python: tests/unit/test_engine_errors.py`
+
+**Discoveries**: The committed `core_pb2.py` is protobuf 7.36.1 gencode, so `transport_pb2.py` was generated with the same local protoc (libprotoc 36.1) to match; CI regenerates both with protoc 28.x. Handles are only unique within one engine process, so any host that restarts the engine must not hand engine handles straight to its callers.
+
+### 2026-10-13 — Task: The package runs the bundled engine program by default and the shared library on request
+
+**What was done**: Added `xcl/_transport/select.py` (`TRANSPORT_ENV`, `selected_route()`, `select_transport()`): unset, empty or `subprocess` selects `xcl/_bin/xcl-core`, `inprocess` selects the shared library, any other value raises `ValueError`, and a missing selected engine raises `EngineNotFoundError` naming both paths, with no fallback. `default_client()` builds its client over `select_transport()`, still lazily. Packaging: version `0.5.0.dev0`, `cffi` moved to an `inprocess` extra, `xcl/_bin/*` added to the wheel artifacts and excluded from the sdist, and the package, `hatch_build.py` and in-process module docstrings describe the bundled program. The test tree gained `tests/engines.py` (`expected_routes`, `skip_missing_engine`, `selected_engine`), the `subprocess_only`/`inprocess_only` markers with a collection hook, engine fixtures that follow the selected route, unit tests for selection and the strict-skip helper, and `tests/integration/test_engine_process.py` covering one engine per process, stop on close/exit/host kill, engine death, process-group interrupt, fork, version mismatch, first-`Config()` timing and the missing program.
+
+**Deviations**:
+- The engine fixtures call `tests/engines.py::selected_engine()`, which checks the selected engine's file and raises the same `EngineNotFoundError` message through `skip_missing_engine`, rather than constructing a transport with `select_transport()`; the effect is the same and no transport is built at fixture time.
+- `test_load.py`'s `needs_engine` became `pytest.mark.usefixtures("engine")`, so strict mode applies to it.
+- The interrupt integration test signals the process group while a short create is in flight and asserts the next resource never starts, because a provider call already running is not interrupted by cancellation on either route (see Discoveries).
+- The engine-kill tests list the engine's plugin children before the kill and end them afterwards (see Discoveries).
+- Locally verified: the full suite passes on the engine program (243 passed, 1 in-process-only skip, also under `XCL_TEST_STRICT=1 XCL_TEST_ENGINES=subprocess`) and on the shared library with `XCL_TRANSPORT=inprocess` (232 passed, 12 subprocess-only skips); with the program removed, strict mode errors and non-strict mode skips; a wheel built with `XCL_WHEEL_PLATFORM=manylinux_2_28_x86_64` carries `xcl/_bin/xcl-core` with mode 0755 and installs into a fresh venv without cffi, Go or a C compiler.
+
+**Files changed**:
+- `xcl-python: xcl/_transport/select.py`
+- `xcl-python: xcl/_client.py`
+- `xcl-python: xcl/_transport/inprocess.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: xcl/_version.py`
+- `xcl-python: pyproject.toml`
+- `xcl-python: hatch_build.py`
+- `xcl-python: tests/conftest.py`
+- `xcl-python: tests/engines.py`
+- `xcl-python: tests/integration/conftest.py`
+- `xcl-python: tests/parity/conftest.py`
+- `xcl-python: tests/integration/test_load.py`
+- `xcl-python: tests/integration/test_engine_process.py`
+- `xcl-python: tests/unit/test_transport_selection.py`
+- `xcl-python: tests/unit/test_engines_helper.py`
+
+**Discoveries**:
+- Cancelling an apply does not interrupt a provider call already running, on either route: the slow fixture plugin's wait never sees its context cancelled, so a SIGINT during a 30 s create waits out the 30 s. The existing `test_keyboard_interrupt_cancels_apply` passes only because its 3 s delay ends inside its bound. This is engine/plugin behaviour, outside this spec.
+- An engine ended by SIGKILL leaves its go-plugin plugin processes running as orphans (go-plugin plugins do not watch for their host dying). Ending the host instead lets the engine release its configurations and its plugins on end of input, so the spec's host-kill guarantee holds; only a directly killed engine leaks plugins.
+
+### 2026-10-13 — Task: CI tests the package on the engine program everywhere and on the shared library on Linux
+
+**What was done**: `.github/workflows/ci.yml` builds the engine program (`make protos engine plugins`) on every runner and Python version and runs the suite with `XCL_TEST_STRICT=1` and `XCL_TEST_ENGINES=subprocess`. On `ubuntu-latest` it then builds the shared library, installs `.[test,inprocess]`, and runs the suite again with `XCL_TRANSPORT=inprocess` and `XCL_TEST_ENGINES=subprocess,inprocess`. The Alpine jobs keep the hand-started `python:3-alpine` container, build the engine program, pass the strict-mode variables, and install no C compiler. The header comment describes the routes and strict mode.
+
+**Deviations**:
+- The Alpine jobs install Go from the official go.dev archive (`GO_VERSION` passed into the container) instead of `apk add go`, and check that neither `cc` nor `gcc` is on the path: Alpine's `go` package pulls in `gcc` and `musl-dev`, so dropping `build-base` alone would still install a C compiler. Only `libgcc`, a runtime library, remains.
+- Verified locally by running the Alpine job's script in docker on x86-64 against the worktrees. The engine program builds with no C compiler, and every engine test passes in strict mode: 234 passed, with skips only for Docker-daemon tests, the in-process-only test and the version test that needs Go on the path. One test failed: `tests/unit/test_schema.py::test_annotations_dataclass_matches_parity_fixture`. It reads the parity fixtures from `ROOT.parent / "xcl"` rather than `XCL_SRC`, which is the fixture-path fix owned by the sibling spec `20261011232013-da18c586-python-release-hardening`. It fails the same way before this change.
+- GitHub-hosted runs of the workflow are outstanding: nothing is pushed.
+
+**Files changed**:
+- `xcl-python: .github/workflows/ci.yml`
+
+**Discoveries**: On Alpine, `apk add go` installs gcc and musl-dev as dependencies. A job that must prove "no C compiler" has to take Go from the official archive, whose toolchain runs on musl.
+
+### 2026-10-13 — Task: Tagging xcl releases the engine program for eight platforms with no C toolchain
+
+**What was done**: Added `.github/workflows/release.yml`, which replaces `libxcl-release.yml` (deleted). It keeps the `settings` and `dispatch` jobs. A single `build` job on `ubuntu-latest` runs with `CGO_ENABLED=0` and puts failing shims in front of `cc`, `gcc`, `clang`, `zig`, `c++`, `g++`, `clang++` and the cross gcc names, then checks that none answers. It then:
+- builds `xcl-core` for linux, darwin and windows on amd64 and arm64 with `make xcl-core`, and copies the two Linux builds to the `_musl` names;
+- checks that the linux_amd64 program reports the tag, and that every binary's recorded build settings show `CGO_ENABLED=0`;
+- archives the eight builds as `xcl-core_<version>_<target>.tar.gz` or `.zip` and asserts there are eight;
+- writes, signs and verifies the checksums, uploads the `release-assets` artifact, and attaches the assets when publishing.
+
+The libxcl toolchain matrix (`build-linux-windows`, `build-windows-arm64`, `build-macos`) moved verbatim into the new `workflow_dispatch`-only `.github/workflows/libxcl-build.yml`. It takes optional `ref` and `version` inputs, uploads the `libxcl-<target>` artifacts, and does no packaging, signing, attaching or dispatch. `go.yml`'s `libxcl` job is unchanged.
+
+**Deviations**:
+- The plan expected only a linux_amd64 version check. The workflow also reads each binary's build settings with `go version -m` to prove cgo was off for all eight, because the darwin, windows and arm64 programs cannot be run on the release runner.
+- `libxcl-build.yml` gained a `version` input that stamps the libraries, defaulting to `dev`. The plan described stamping with the ref.
+- Verified locally:
+  - The build-and-package shell ran with the compiler shims in front of `PATH` and `CGO_ENABLED=0`: eight archives, `--version` equal to the tag, `CGO_ENABLED=0` recorded in every binary, and a checksums file whose entries verify.
+  - The sign-and-verify commands ran with a throwaway GPG key.
+  - `zip` is not installed locally, so the two `.zip` archives were made with Python's zipfile for the dry run. The ubuntu runner has `zip`, which the old workflow already used.
+- Three acceptance criteria are left unchecked until a real tag run or manual workflow run:
+  - the signature verifying with the jumppad-labs key, and the assets attached;
+  - the dispatch to xcl-python, and a manual run keeping only the artifact;
+  - the manual `libxcl-build.yml` run producing the eight libraries.
+
+  Nothing is pushed or tagged. The v0.5.0 tag is cut by the user in the final task.
+
+**Files changed**:
+- `xcl: .github/workflows/release.yml`
+- `xcl: .github/workflows/libxcl-build.yml`
+- `xcl: .github/workflows/libxcl-release.yml` (deleted)
+
+**Discoveries**: `go version -m` on a binary built with `-trimpath` does not record `-ldflags`, so the stamped version of a cross-built program cannot be read without running it. `CGO_ENABLED`, `GOOS` and `GOARCH` are recorded.
+
+### 2026-10-13 — Task: The Python release builds eight wheels around the engine program and checks them on every platform
+
+**What was done**: `.github/workflows/release.yml` (xcl-python) now builds each wheel around the engine program:
+- Each wheel job downloads `xcl-core_<version>_<asset>` and the signed `xcl-core_<version>_checksums.txt(.sig)` from the xcl release, verifies the signature and the archive, and places `xcl-core[.exe]` in `xcl/_bin`, executable. The matrix's `lib` column became `exe`.
+- The wheel test runs parity and `test_load.py` in strict mode (`XCL_TEST_STRICT=1`, `XCL_TEST_ENGINES=subprocess`).
+- A new step asserts the installed program is executable, importing from outside the checkout.
+- `.github/scripts/musl-wheel.sh` does the same for the musl archive, drops `build-base`, and exports the strict variables.
+- New `.github/scripts/install_check.py` registers the README's `settings` class, applies a configuration, reads the entity back, closes, and asserts `xcl.engine_version()` equals `TAG`. The install-check jobs sparse-check out `.github/scripts` and run it, the musl ones inside plain `python:3-alpine` with the checkout mounted.
+
+**Deviations**:
+- `musl-wheel.sh` never installed Go, although `make plugins` needs it. It now installs Go from the official go.dev archive (`GO_VERSION` passed into the container), because Alpine's `go` package pulls in gcc.
+- The executable-bit check runs from `$RUNNER_TEMP` (from `/tmp` in Alpine), so it inspects the wheel installed in site-packages. Without that, it would read the checkout's `xcl/_bin`.
+- Verified locally:
+  - A wheel built with `XCL_WHEEL_PLATFORM=manylinux_2_28_x86_64` carries `xcl/_bin/xcl-core` at mode 0755. It installs into a fresh venv with only protobuf, and `install_check.py` passes.
+  - A `musllinux_1_2_x86_64` wheel installed into a plain `python:3-alpine` container with no C compiler. protobuf came from a musllinux wheel, and `install_check.py` passed. This answers the plan's open question for x86-64; arm64 is outstanding.
+  - The parity suite passes on the engine program.
+- Criterion ticked: parity on every installed wheel before publishing. The `publish` job needs the wheel jobs, which run parity strictly.
+- Left unchecked until the v0.5.0 run: verified archives in all eight wheels, eight wheels and an sdist on PyPI, and the eight install checks from PyPI.
+
+**Files changed**:
+- `xcl-python: .github/workflows/release.yml`
+- `xcl-python: .github/scripts/musl-wheel.sh`
+- `xcl-python: .github/scripts/install_check.py`
+
+**Discoveries**: hatchling keeps the 0755 mode of `xcl/_bin/xcl-core` in the wheel, and pip and uv apply it on install. The plan's open question about the executable bit holds on Linux.
+
+### 2026-10-13 — Task: The Python package README describes the bundled engine
+
+**What was done**: The xcl-python README, which is also the PyPI page, now says the engine is bundled as a small program run as a subprocess the same way on every platform, Alpine included, with the same API and results. The Install section lists glibc and musl (Alpine) Linux, macOS and Windows on x86-64 and arm64, says one wheel per platform serves every CPython 3.10+, and describes the engine starting on first use, being shared, stopping on its own and never outliving its host. The Errors section names `EngineNotFoundError` and `EngineExitedError`. Forking is rewritten for the subprocess route, where a child creates its own configuration and gunicorn `preload_app`, celery prefork and `multiprocessing` fork work. The Development section covers `make protos engine plugins`, and `make libxcl` with `pip install -e '.[test,inprocess]'` and `XCL_TRANSPORT=inprocess`, plus the stricter fork rule on that route. The `pyproject.toml` description, changed in the selection task, reads consistently.
+
+**Deviations**: None. `twine check` on an sdist built from the worktree passes.
+
+**Files changed**:
+- `xcl-python: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: xcl.dev shows how to install XCL for Python
+
+**What was done**: The home page (`src/pages/index.mdx`) gained an `Install` section between the hero and "What is XCL?", with `CodeTabs`. The Go tab gives `go get github.com/jumppad-labs/xcl` and notes that no cgo is needed. The Python tab gives `pip install xcl-lang` and says the package is imported as `xcl`, bundles the engine as a small program run as a subprocess on every platform with the same API and results and no Go or C compiler, and lists wheels for Linux on glibc and on musl (Alpine), macOS and Windows on x86-64 and arm64, linking `pypiURL`. The hero badge reads `v0.5.0 · Go and Python`, and the page description ends "Available for Go and Python." The hero's `InstallBlock` stays Go-only.
+
+**Deviations**: The Go tab has a one-line note under the command, so the two tabs read alike. `npm ci && npm run build` in the worktree builds all 21 pages, and the built `index.html` renders both fences as code blocks with the PyPI link.
+
+**Files changed**:
+- `xcl-website: src/pages/index.mdx`
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: The xcl changelog and README record the engine program
+
+**What was done**: `CHANGELOG.md` has a `## 20261011211634-a8895873-python-out-of-process-engine` entry at the top, in prose. It covers:
+- the `xcl-core` program and its frame messages, `Release`, the stdio, signal and shutdown rules, `--version` and `make xcl-core`;
+- `Service.Close`;
+- the release building eight `xcl-core` archives in one cgo-free job with no C compiler, signed as before, from `release.yml`;
+- libxcl kept, CI-tested and built by the manual `libxcl-build.yml` but no longer released;
+- Python running the engine as a bundled subprocess everywhere, Alpine included, from v0.5.0.
+
+The entry ends with `**Breaking:**` and `None.` The README's "Other languages" note says the wheel bundles the `xcl-core` program, run as a subprocess on every platform, Alpine included, with no shared library to load.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl: CHANGELOG.md`
+- `xcl: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: Cut the v0.5.0 release
+
+**What was done**: Nothing. This is a human task: publishing the `v0.5.0` tag triggers PyPI publishing under the project's credentials, and pushes are on hold. It stays unchecked, for the person who merges this spec's branches and pushes the tag. Every agent task it depends on is implemented and verified locally.
+
+**Deviations**: These release-dependent checks are outstanding until that run, and are carried into the test plan:
+- the jumppad-labs signature on the `xcl-core` checksums, and the assets attached with no libxcl archive;
+- the dispatch to xcl-python;
+- eight wheels and an sdist on PyPI;
+- the eight install checks from PyPI;
+- arm64 Alpine;
+- the Windows Ctrl-Break smoke test in the new `xcl-core-windows` Go CI job;
+- one manual `libxcl-build.yml` run.
+
+**Files changed**:
+- None.
+
+**Discoveries**: Before CI can go green, the person must push this spec's xcl changes to the ref in xcl-python's `xcl-ref.txt` (`f-libxcl`). xcl-python's CI and wheel builds compile `cmd/xcl-core` and generate `transport.proto` from that ref.
