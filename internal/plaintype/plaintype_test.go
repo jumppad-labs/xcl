@@ -249,6 +249,19 @@ func TestPlainOfIsFalseForATypeItDidNotBuild(t *testing.T) {
 	require.False(t, ok)
 }
 
+func TestLookupFindsTheBuiltTypeOfAnEntity(t *testing.T) {
+	built := build(t, agent{}, 1)
+
+	found, ok := Lookup(reflect.TypeOf(built.New()))
+	require.True(t, ok)
+	require.Equal(t, reflect.TypeOf(agent{}), found.Plain)
+}
+
+func TestLookupIsFalseForATypeItDidNotBuild(t *testing.T) {
+	_, ok := Lookup(reflect.TypeOf(&types.Output{}))
+	require.False(t, ok)
+}
+
 func TestToPlainCopiesTheFields(t *testing.T) {
 	built := build(t, agent{}, 1)
 	stored := entity(t, built, "", "claude")

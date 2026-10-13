@@ -22,6 +22,7 @@ package plaintype
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/jumppad-labs/xcl/internal/xcl/tags"
 	"github.com/jumppad-labs/xcl/types"
@@ -202,8 +203,31 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 	})
 
 	b.Engine = reflect.StructOf(fields)
+	built.Store(b.Engine, b)
 
 	return b, nil
+}
+
+// built holds every Built by its engine type, so an entity can be turned back
+// into its plain type where nothing else knows how it was built, such as a
+// query given an entity and a Go type and no configuration. Building is
+// deterministic, so the same plain type always yields an equivalent Built and
+// storing it again is harmless.
+var built sync.Map
+
+// Lookup returns how engine, or the type a pointer to it points at, was
+// built, and false for a type Build did not make.
+func Lookup(engine reflect.Type) (*Built, bool) {
+	for engine.Kind() == reflect.Pointer {
+		engine = engine.Elem()
+	}
+
+	b, ok := built.Load(engine)
+	if !ok {
+		return nil, false
+	}
+
+	return b.(*Built), true
 }
 
 // New returns a pointer to a new zero value of the engine type.

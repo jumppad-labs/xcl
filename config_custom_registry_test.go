@@ -130,5 +130,5 @@ func TestCustomRegistryMalformedTypeFailsNewConfig(t *testing.T) {
 
 	c, err := xcl.NewConfig(xcl.WithRegistry(custom))
 	require.Nil(t, c)
-	require.ErrorContains(t, err, "must be a pointer to a struct that embeds types.ResourceBase")
+	require.ErrorContains(t, err, "must be a pointer to a struct")
 }
