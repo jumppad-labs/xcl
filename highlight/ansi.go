@@ -97,9 +97,20 @@ func NewANSIRenderer(options ...ANSIOption) (*ANSIRenderer, error) {
 	return &ANSIRenderer{theme: defaultTheme()}, nil
 }
 
-// Render returns text wrapped in the SGR codes of the style scope gets, or
+// Render returns the pieces' text, each wrapped in the SGR codes of the style
+// its scope gets, one line at a time
+func (r *ANSIRenderer) Render(pieces []Piece) []byte {
+	var out strings.Builder
+	for _, p := range pieces {
+		out.WriteString(r.piece(p.Scope, p.Text))
+	}
+
+	return []byte(out.String())
+}
+
+// piece returns text wrapped in the SGR codes of the style scope gets, or
 // text unchanged when scope is empty or the theme gives it no style
-func (r *ANSIRenderer) Render(scope, text string) string {
+func (r *ANSIRenderer) piece(scope, text string) string {
 	if scope == "" {
 		return text
 	}

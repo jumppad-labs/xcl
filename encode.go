@@ -249,7 +249,7 @@ func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 	// highlighting runs last, on the final text, so it sees exactly what is
 	// returned and interacts with no other option
 	if opts.renderer != nil {
-		text = highlight.Text(text, opts.renderer)
+		text = opts.renderer.Render(highlight.Pieces(text))
 	}
 
 	return text, nil

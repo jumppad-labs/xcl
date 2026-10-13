@@ -404,12 +404,12 @@ var sgrCodes = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 // passes unlabelled text through unchanged, so a test can read which scope
 // each piece was given
 func renderMarkerRenderer() highlight.Renderer {
-	return highlight.RendererFunc(func(scope, text string) string {
-		if scope == "" {
-			return text
+	return highlight.PieceFunc(func(p highlight.Piece) string {
+		if p.Scope == "" {
+			return p.Text
 		}
 
-		return "[" + scope + "]" + text + "[/" + scope + "]"
+		return "[" + p.Scope + "]" + p.Text + "[/" + p.Scope + "]"
 	})
 }
 

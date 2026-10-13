@@ -11,12 +11,12 @@ import (
 
 // markers wraps every labelled piece as [scope]text[/scope] and passes
 // unlabelled text through unchanged
-var markers = highlight.RendererFunc(func(scope, text string) string {
-	if scope == "" {
-		return text
+var markers = highlight.PieceFunc(func(p highlight.Piece) string {
+	if p.Scope == "" {
+		return p.Text
 	}
 
-	return "[" + scope + "]" + text + "[/" + scope + "]"
+	return "[" + p.Scope + "]" + p.Text + "[/" + p.Scope + "]"
 })
 
 func markedFile(t *testing.T, path string) string {
@@ -25,7 +25,7 @@ func markedFile(t *testing.T, path string) string {
 	input, err := os.ReadFile(path)
 	require.NoError(t, err)
 
-	return string(highlight.Text(input, markers))
+	return renderText(markers, input)
 }
 
 func markedSample(t *testing.T) string {

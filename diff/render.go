@@ -115,17 +115,12 @@ func Render(d *Diff, options ...RenderOption) []byte {
 		}
 	}
 
-	var out strings.Builder
-	for _, p := range d.Pieces() {
-		if resolved.renderer == nil {
-			out.WriteString(p.Text)
-			continue
-		}
-
-		out.WriteString(resolved.renderer.Render(p.Scope, p.Text))
+	renderer := resolved.renderer
+	if renderer == nil {
+		renderer = highlight.Text
 	}
 
-	return []byte(out.String())
+	return renderer.Render(d.Pieces())
 }
 
 // Pieces lays d out as text in the style of a git diff, as labelled pieces

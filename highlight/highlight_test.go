@@ -2,6 +2,7 @@ package highlight_test
 
 import (
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,52 +10,37 @@ import (
 	"github.com/jumppad-labs/xcl/highlight"
 )
 
-// identity returns every piece unchanged
-var identity = highlight.RendererFunc(func(scope, text string) string {
-	return text
-})
-
-func TestTextWithIdentityRendererReturnsSampleInput(t *testing.T) {
+func TestTextRendersTheSampleInputUnchanged(t *testing.T) {
 	input, err := os.ReadFile("testdata/sample.xcl")
 	require.NoError(t, err)
 
-	output := highlight.Text(input, identity)
-
-	require.Equal(t, string(input), string(output))
+	require.Equal(t, string(input), renderText(highlight.Text, input))
 }
 
-func TestTextWithIdentityRendererReturnsReferencesInput(t *testing.T) {
-	input, err := os.ReadFile("testdata/references.xcl")
-	require.NoError(t, err)
-
-	output := highlight.Text(input, identity)
-
-	require.Equal(t, string(input), string(output))
-}
-
-func TestTextWithIdentityRendererReturnsMalformedInput(t *testing.T) {
+func TestTextRendersMalformedInputUnchanged(t *testing.T) {
 	input := []byte("resource \"a\" {\n  x = \"abc\n  y = ${\n  z = <<EOF\nnever closed\n")
 
-	output := highlight.Text(input, identity)
-
-	require.Equal(t, string(input), string(output))
+	require.Equal(t, string(input), renderText(highlight.Text, input))
 }
 
-func TestTextWithNilRendererReturnsInput(t *testing.T) {
-	input, err := os.ReadFile("testdata/sample.xcl")
-	require.NoError(t, err)
-
-	output := highlight.Text(input, nil)
-
-	require.Equal(t, string(input), string(output))
+func TestTextRendersNoPiecesAsNothing(t *testing.T) {
+	require.Empty(t, highlight.Text.Render(nil))
 }
 
-func TestTextWithMarkerRendererChangesOutput(t *testing.T) {
-	input := []byte(`variable "cpu" {}`)
+func TestPieceFuncRendersEachPieceInOrder(t *testing.T) {
+	output := renderText(markers, []byte(`variable "cpu" {}`))
 
-	output := highlight.Text(input, markers)
+	require.Equal(t, `[storage.type.xcl]variable[/storage.type.xcl] [entity.name.tag.xcl]"cpu"[/entity.name.tag.xcl] {}`, output)
+}
 
-	require.Equal(t, `[storage.type.xcl]variable[/storage.type.xcl] [entity.name.tag.xcl]"cpu"[/entity.name.tag.xcl] {}`, string(output))
+func TestRendererFuncSeesEveryPieceAtOnce(t *testing.T) {
+	counted := highlight.RendererFunc(func(pieces []highlight.Piece) []byte {
+		return []byte(strconv.Itoa(len(pieces)))
+	})
+
+	output := renderText(counted, []byte(`variable "cpu" {}`))
+
+	require.Equal(t, "4", output)
 }
 
 // joined is the text of pieces, in order
@@ -149,8 +135,6 @@ func FuzzTextKeepsText(f *testing.F) {
 	f.Add([]byte(""))
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-		output := highlight.Text(input, identity)
-
-		require.Equal(t, string(input), string(output))
+		require.Equal(t, string(input), renderText(highlight.Text, input))
 	})
 }
