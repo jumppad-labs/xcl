@@ -359,5 +359,6 @@ func TestConfigErrorListsCausesWithFileAndLine(t *testing.T) {
 	require.Equal(t, file, cause.GetDetails()["file"])
 	require.Equal(t, "1", cause.GetDetails()["line"])
 	require.NotEmpty(t, cause.GetDetails()["column"])
-	require.Contains(t, cause.GetDetails()["summary"], "image")
+	require.Equal(t, "Missing required argument", cause.GetDetails()["summary"])
+	require.Contains(t, cause.GetDetails()["detail"], "image")
 }

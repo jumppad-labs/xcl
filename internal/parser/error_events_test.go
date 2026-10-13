@@ -126,7 +126,13 @@ func TestApplyDecodeFailureEmitsApplyErrorEventNamingTheResource(t *testing.T) {
 	p := h.newParser(t, collector.collect)
 
 	_, err = p.Apply(context.Background(), file)
-	require.ErrorContains(t, err, "unable to decode body")
+	require.ErrorContains(t, err, "Unsuitable value type")
+
+	// the problem is at the attribute, not the block
+	var d *errors.Diagnostic
+	require.ErrorAs(t, err, &d)
+	require.Equal(t, 2, d.Subject.Start.Line)
+	require.Equal(t, "subnet", d.Field)
 
 	failed := eventsWith(collector.all(), events.OperationApply, events.PhaseError)
 	require.Len(t, failed, 1)
@@ -136,7 +142,7 @@ func TestApplyDecodeFailureEmitsApplyErrorEventNamingTheResource(t *testing.T) {
 	require.Equal(t, lifecycleNetworkID, event.ResourceID)
 	require.Equal(t, "network.one", event.ResourceType)
 	require.Equal(t, file, event.File)
-	require.ErrorContains(t, event.Error, "unable to decode body")
+	require.ErrorContains(t, event.Error, "Unsuitable value type")
 
 	// the body never decoded, so no provider was called
 	require.Empty(t, h.plugin.GetCalls())

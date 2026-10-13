@@ -69,6 +69,53 @@ type parsed struct {
 	headers map[string]hcl.Range
 }
 
+// diagnosticsFor turns the errors HCL reported for the resource id, whose
+// body is body, into diagnostics: one for each, at the field it is about,
+// with the source around it. A problem HCL gave no position is placed at the
+// resource's header, so none is reported nowhere.
+//
+// Only the first problem at any one range is kept. HCL follows a failure
+// with what it causes at the same place — a function call that fails leaves
+// its value unknown, which is then reported as unsuitable — and the second
+// says nothing the first did not.
+func (p *parsed) diagnosticsFor(id string, body *hclsyntax.Body, diags hcl.Diagnostics) errors.Diagnostics {
+	header, hasHeader := p.headers[id]
+
+	problems := errors.Diagnostics{}
+	reported := map[hcl.Range]bool{}
+	for _, d := range diags {
+		if d.Severity != hcl.DiagError {
+			continue
+		}
+
+		if d.Subject != nil {
+			if reported[*d.Subject] {
+				continue
+			}
+			reported[*d.Subject] = true
+		}
+
+		if d.Subject == nil && hasHeader {
+			placed := *d
+			placed.Subject = &header
+			d = &placed
+		}
+
+		problem := errors.NewDiagnostic(d, p.sources)
+		problem.Entity = id
+		if hasHeader {
+			problem.EntityPos = &header
+		}
+		if d.Subject != nil && body != nil {
+			problem.Field = fieldAt(body, d.Subject.Start, "")
+		}
+
+		problems = append(problems, problem)
+	}
+
+	return problems
+}
+
 // store records a parsed resource, its body and where its block starts,
 // keeping the order in which resources were first declared.
 func (p *parsed) store(id string, block *hclsyntax.Block, resource any) {
@@ -1535,7 +1582,7 @@ func nestedBlockElement(fieldType reflect.Type) reflect.Type {
 
 // processDisabled processes any expression for the disabled attribute
 // and sets the disabled state on the resource
-func processDisabled(bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (bool, error) {
+func processDisabled(parsedData *parsed, id string, bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (bool, []error) {
 	var isDisabled bool
 
 	// This expression could be a reference to another resource or it could be a
@@ -1545,19 +1592,20 @@ func processDisabled(bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (b
 		// now we need to evaluate the expression
 		expdiags := gohcl.DecodeExpression(attr.Expr, ctx, &isDisabled)
 		if expdiags.HasErrors() {
-			return isDisabled,
-				errors.NewParserErrorFromResource(
-					r,
-					fmt.Sprintf("unable to decode disabled expression: %s", expdiags.Error()),
-				)
+			problems := []error{}
+			for _, problem := range parsedData.diagnosticsFor(id, bdy, expdiags) {
+				problems = append(problems, problem)
+			}
+
+			return isDisabled, problems
 		}
 
 		err := types.SetDisabled(r, isDisabled)
 		if err != nil {
-			return isDisabled, errors.NewParserErrorFromResource(
+			return isDisabled, []error{errors.NewParserErrorFromResource(
 				r,
 				fmt.Sprintf("failed to set disabled state: %s", err),
-			)
+			)}
 		}
 	}
 

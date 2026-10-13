@@ -1000,8 +1000,16 @@ func TestParseFileReturnsConfigErrorWhenFunctionError(t *testing.T) {
 	require.IsType(t, &errors.ConfigError{}, err)
 
 	ce := err.(*errors.ConfigError)
+
+	// the failed call leaves its value unknown, which HCL reports again at the
+	// same place; only the call itself is reported
 	require.Len(t, ce.Errors, 1)
-	require.IsType(t, &errors.ParserError{}, ce.Errors[0])
+
+	d, ok := ce.Errors[0].(*errors.Diagnostic)
+	require.True(t, ok, "the problem is a %T", ce.Errors[0])
+	require.Equal(t, "Error in function call", d.Summary)
+	require.Equal(t, "resource.container.consul", d.Entity)
+	require.Equal(t, "network[0].name", d.Field)
 }
 
 func TestParseFileReturnsConfigErrorWhenResourceInterpolationError(t *testing.T) {
