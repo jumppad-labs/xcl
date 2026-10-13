@@ -89,6 +89,27 @@ func TestValidateReferenceProblemEmitsValidateErrorEventNamingTheResource(t *tes
 	require.Equal(t, "resource 'resource.container.consul' refers to 'resource.network.nosuch.meta.name', which is not defined anywhere in the configuration", pe.Message)
 }
 
+func TestValidateSchemaProblemEmitsValidateErrorEventNamingTheResource(t *testing.T) {
+	f, err := filepath.Abs("../test_fixtures/config/registered/invalid_attribute/main.xcl")
+	require.NoError(t, err)
+
+	collector := &eventCollector{}
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, collector.collect)
+
+	err = p.Validate(context.Background(), f)
+	require.Error(t, err)
+
+	failed := eventsWith(collector.all(), events.OperationValidate, events.PhaseError)
+	require.Len(t, failed, 1)
+
+	// the problem is at an attribute inside the block, not at its header,
+	// and the event still names the resource it is in
+	event := failed[0]
+	require.Equal(t, f, event.File)
+	require.Equal(t, "resource.database.main", event.ResourceID)
+}
+
 func TestApplyDecodeFailureEmitsApplyErrorEventNamingTheResource(t *testing.T) {
 	h := setupLifecycle(t)
 

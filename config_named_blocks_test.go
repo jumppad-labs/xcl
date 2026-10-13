@@ -204,17 +204,17 @@ func (f *namedBlocksFixture) applyConfig(t *testing.T, contents string) *Config 
 }
 
 // requireParserError returns the one ParserError a failed operation reports
-func requireParserError(t *testing.T, err error) *errors.ParserError {
+func requireDiagnostic(t *testing.T, err error) *errors.Diagnostic {
 	t.Helper()
 
 	configError, ok := err.(*errors.ConfigError)
 	require.True(t, ok, "expected a *errors.ConfigError, got %T: %v", err, err)
 	require.Len(t, configError.Errors, 1)
 
-	parserError, ok := configError.Errors[0].(*errors.ParserError)
-	require.True(t, ok, "expected a *errors.ParserError, got %T: %v", configError.Errors[0], configError.Errors[0])
+	diagnostic, ok := configError.Errors[0].(*errors.Diagnostic)
+	require.True(t, ok, "expected a *errors.Diagnostic, got %T: %v", configError.Errors[0], configError.Errors[0])
 
-	return parserError
+	return diagnostic
 }
 
 func TestApplyCollectsNamedBlocksIntoMap(t *testing.T) {
@@ -242,14 +242,14 @@ func TestValidateRejectsUnnamedBlockIntoMapAtTheBlock(t *testing.T) {
 	err := c.Validate(f.configFile)
 	require.Error(t, err)
 
-	parserError := requireParserError(t, err)
-	require.Contains(t, parserError.Message, "A name is required")
-	require.Contains(t, parserError.Message, "listener blocks are collected by name")
+	d := requireDiagnostic(t, err)
+	require.Contains(t, d.Error(), "A name is required")
+	require.Contains(t, d.Error(), "listener blocks are collected by name")
 
 	// the error is placed at the unnamed listener block, line 6 column 3
-	require.Equal(t, f.configFile, parserError.Filename)
-	require.Equal(t, 6, parserError.Line)
-	require.Equal(t, 3, parserError.Column)
+	require.Equal(t, f.configFile, d.Subject.Filename)
+	require.Equal(t, 6, d.Subject.Start.Line)
+	require.Equal(t, 3, d.Subject.Start.Column)
 }
 
 func TestApplyRejectsUnnamedBlockIntoMap(t *testing.T) {
@@ -261,9 +261,9 @@ func TestApplyRejectsUnnamedBlockIntoMap(t *testing.T) {
 	err := c.Apply(f.configFile)
 	require.Error(t, err)
 
-	parserError := requireParserError(t, err)
-	require.Contains(t, parserError.Message, "A name is required")
-	require.Equal(t, 6, parserError.Line)
+	d := requireDiagnostic(t, err)
+	require.Contains(t, d.Error(), "A name is required")
+	require.Equal(t, 6, d.Subject.Start.Line)
 }
 
 func TestValidateRejectsDuplicateBlockNameAtTheSecondBlock(t *testing.T) {
@@ -275,13 +275,13 @@ func TestValidateRejectsDuplicateBlockNameAtTheSecondBlock(t *testing.T) {
 	err := c.Validate(f.configFile)
 	require.Error(t, err)
 
-	parserError := requireParserError(t, err)
-	require.Contains(t, parserError.Message, "Duplicate listener name")
-	require.Contains(t, parserError.Message, `A listener named "http" was already defined at `+f.configFile+":6,3")
+	d := requireDiagnostic(t, err)
+	require.Contains(t, d.Error(), "Duplicate listener name")
+	require.Contains(t, d.Error(), `A listener named "http" was already defined at `+f.configFile+":6,3")
 
 	// the error is placed at the second block's name, line 10 column 12
-	require.Equal(t, 10, parserError.Line)
-	require.Equal(t, 12, parserError.Column)
+	require.Equal(t, 10, d.Subject.Start.Line)
+	require.Equal(t, 12, d.Subject.Start.Column)
 }
 
 func TestApplyRejectsDuplicateBlockName(t *testing.T) {
@@ -293,9 +293,9 @@ func TestApplyRejectsDuplicateBlockName(t *testing.T) {
 	err := c.Apply(f.configFile)
 	require.Error(t, err)
 
-	parserError := requireParserError(t, err)
-	require.Contains(t, parserError.Message, "Duplicate listener name")
-	require.Equal(t, 10, parserError.Line)
+	d := requireDiagnostic(t, err)
+	require.Contains(t, d.Error(), "Duplicate listener name")
+	require.Equal(t, 10, d.Subject.Start.Line)
 }
 
 func TestApplyCollectsNamedAndUnnamedBlocksIntoList(t *testing.T) {
