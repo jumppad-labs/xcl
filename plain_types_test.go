@@ -18,6 +18,7 @@ func plainRegistry() *registry.Local {
 	local.RegisterType(&plain.Organization{}, "organization")
 	local.RegisterType(&plain.Job{}, "job")
 	local.RegisterType(&plain.Unlabelled{}, "unlabelled")
+	local.RegisterType(&plain.Service{}, "service")
 
 	return local
 }

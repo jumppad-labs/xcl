@@ -128,6 +128,27 @@ func impliedStructType(rt reflect.Type, path cty.Path, constraint bool) (cty.Typ
 				optional = append(optional, k)
 			}
 		}
+
+		// an untagged field registered to receive an attribute is a target
+		// of conversion only, so it is part of a constraint, optionally, and
+		// never of the type of a value
+		if constraint {
+			for k, fi := range untaggedFieldsOf(rt) {
+				if _, tagged := atys[k]; tagged {
+					continue
+				}
+
+				path[len(path)-1] = cty.GetAttrStep{Name: k}
+
+				aty, err := impliedType(rt.Field(fi).Type, path, constraint)
+				if err != nil {
+					return cty.NilType, err
+				}
+
+				atys[k] = aty
+				optional = append(optional, k)
+			}
+		}
 	}
 
 	// now check any anonymous fields

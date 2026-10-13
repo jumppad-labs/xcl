@@ -16,6 +16,7 @@ type Database struct {
 	Engine string `xcl:"engine,label"`
 	Name   string `xcl:"name,label"`
 	Port   int    `xcl:"port,optional"`
+	Meta   types.Meta
 }
 
 // Override is a nested block of Organization, never registered itself.
@@ -38,6 +39,13 @@ type Job struct {
 	DependsOn []string `xcl:"depends_on,optional"`
 	Command   string   `xcl:"command,optional"`
 	Meta      types.Meta
+}
+
+// Service reads databases by reference, as plain values of their type.
+type Service struct {
+	Name      string     `xcl:"name,label"`
+	Database  Database   `xcl:"database"`
+	Databases []Database `xcl:"databases,optional"`
 }
 
 // Unlabelled has no label field: its name is not wanted.

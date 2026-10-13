@@ -76,3 +76,11 @@ to `github.com/jumppad-labs/xcl/internal/cty/...`.
   value when the attribute's value is null, instead of failing because a
   non-pointer field cannot hold null. The recursion into embedded structs now
   returns its error instead of discarding it.
+- `gocty/untagged.go` (new), `gocty/out.go`, `gocty/type_implied.go`: a
+  generic hook, `RegisterUntaggedField(attribute, field, type)`, for an object
+  attribute decoded into a struct field with no tag. `FromCtyValue` decodes
+  the attribute into an untagged field of that name and type when no tagged
+  field takes it, and `ImpliedConstraintType` lists it as an optional
+  attribute so conversion keeps it; `ImpliedType` and `ToCtyValue` are
+  unchanged. The hook knows nothing about XCL; `types` registers the `meta`
+  attribute for a `Meta types.Meta` field.
