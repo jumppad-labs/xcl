@@ -17,6 +17,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
@@ -202,6 +203,18 @@ func (f *FakeGitHubRelease) PublicKey() string {
 // the release, unless the release was built with SignedByOtherKey
 func (f *FakeGitHubRelease) OtherPublicKey() string {
 	return armoredPublicKey(f.otherKey)
+}
+
+// OtherKeyID is the long key ID, 16 upper-case hex digits, of the key
+// OtherPublicKey returns, as it signs: its signing subkey when it has one,
+// else its primary key
+func (f *FakeGitHubRelease) OtherKeyID() string {
+	key, ok := f.otherKey.SigningKey(time.Now())
+	if !ok {
+		return fmt.Sprintf("%016X", f.otherKey.PrimaryKey.KeyId)
+	}
+
+	return fmt.Sprintf("%016X", key.PublicKey.KeyId)
 }
 
 // Archive is the build for os/arch as it is served, nil when the release has

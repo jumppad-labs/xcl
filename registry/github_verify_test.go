@@ -8,8 +8,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/stretchr/testify/require"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
@@ -135,4 +137,25 @@ func TestExtractBinaryFailsWhenZipHasNoBinaryAtItsRoot(t *testing.T) {
 
 	require.True(t, errors.Is(err, xclerrors.ErrPluginVerification))
 	require.NoFileExists(t, dest)
+}
+
+func TestSignatureIssuerReadsTheSigningKeyID(t *testing.T) {
+	key, err := openpgp.NewEntity("issuer test", "", "", nil)
+	require.NoError(t, err)
+
+	var signature bytes.Buffer
+	err = openpgp.ArmoredDetachSign(&signature, key, strings.NewReader("checksums"), nil)
+	require.NoError(t, err)
+
+	keyID, ok := signatureIssuer(signature.Bytes())
+
+	require.True(t, ok)
+	require.Equal(t, key.PrimaryKey.KeyId, keyID)
+}
+
+func TestSignatureIssuerOfSomethingThatIsNotASignatureReportsFalse(t *testing.T) {
+	keyID, ok := signatureIssuer([]byte("not an armoured signature"))
+
+	require.False(t, ok)
+	require.Zero(t, keyID)
 }

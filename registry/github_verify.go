@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -16,6 +17,9 @@ import (
 	"path/filepath"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 )
@@ -85,7 +89,7 @@ func verifySignature(dir string, names assetNames, checksums []byte, keys openpg
 		return nil
 	}
 
-	signature, err := os.Open(filepath.Join(dir, names.signature))
+	signature, err := os.ReadFile(filepath.Join(dir, names.signature))
 	if errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%w: release is not signed, and trusted keys were supplied", xclerrors.ErrPluginVerification)
 	}
@@ -93,16 +97,59 @@ func verifySignature(dir string, names assetNames, checksums []byte, keys openpg
 	if err != nil {
 		return err
 	}
-	defer signature.Close()
 
-	if _, err := openpgp.CheckArmoredDetachedSignature(keys, bytes.NewReader(checksums), signature, nil); err != nil {
-		return fmt.Errorf(
-			"%w: signature %s does not verify against any trusted key: %s",
-			xclerrors.ErrPluginVerification, names.signature, err,
-		)
+	_, err = openpgp.CheckArmoredDetachedSignature(keys, bytes.NewReader(checksums), bytes.NewReader(signature), nil)
+	if err == nil {
+		return nil
 	}
 
-	return nil
+	// a signature made by a key that is not trusted names the key, so the
+	// caller can see which key they would need to trust
+	if errors.Is(err, pgperrors.ErrUnknownIssuer) {
+		if keyID, ok := signatureIssuer(signature); ok {
+			return fmt.Errorf(
+				"%w: signature %s does not verify against any trusted key: signed by key %016X, which is not trusted",
+				xclerrors.ErrPluginVerification, names.signature, keyID,
+			)
+		}
+	}
+
+	return fmt.Errorf(
+		"%w: signature %s does not verify against any trusted key: %s",
+		xclerrors.ErrPluginVerification, names.signature, err,
+	)
+}
+
+// signatureIssuer returns the long key ID of the key that made the armoured
+// detached signature, from its issuer key ID, or from the low 64 bits of its
+// issuer fingerprint when it carries only that. It reports false when the
+// signature cannot be read or names no issuer.
+func signatureIssuer(signature []byte) (uint64, bool) {
+	block, err := armor.Decode(bytes.NewReader(signature))
+	if err != nil {
+		return 0, false
+	}
+
+	read, err := packet.Read(block.Body)
+	if err != nil {
+		return 0, false
+	}
+
+	sig, ok := read.(*packet.Signature)
+	if !ok {
+		return 0, false
+	}
+
+	if sig.IssuerKeyId != nil {
+		return *sig.IssuerKeyId, true
+	}
+
+	if len(sig.IssuerFingerprint) >= 8 {
+		fingerprint := sig.IssuerFingerprint
+		return binary.BigEndian.Uint64(fingerprint[len(fingerprint)-8:]), true
+	}
+
+	return 0, false
 }
 
 // verifyBinary checks the extracted binary in dir is the archive's copy
