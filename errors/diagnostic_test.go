@@ -90,6 +90,19 @@ func TestNewDiagnosticTakesTheLinesOfItsContextToo(t *testing.T) {
 	require.Len(t, d.Source.Lines, 3)
 }
 
+func TestNewDiagnosticEndingAtTheStartOfALineLeavesThatLineOut(t *testing.T) {
+	diagnostic := unsupported()
+	diagnostic.Subject = &hcl.Range{
+		Filename: "main.xcl",
+		Start:    hcl.Pos{Line: 2, Column: 3},
+		End:      hcl.Pos{Line: 3, Column: 1},
+	}
+
+	d := NewDiagnostic(diagnostic, sources())
+
+	require.Equal(t, []string{`  modls = ["opus"]`}, d.Source.Lines)
+}
+
 func TestNewDiagnosticTakesLinesWithoutTheirCarriageReturns(t *testing.T) {
 	d := NewDiagnostic(unsupported(), map[string][]byte{"main.xcl": []byte("agent \"claude\" {\r\n  modls = [\"opus\"]\r\n}\r\n")})
 

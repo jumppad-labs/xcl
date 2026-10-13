@@ -756,10 +756,15 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 func (p *Parser) parseFile(file string) (*hcl.File, hcl.Diagnostics) {
 	src, err := os.ReadFile(file)
 	if err != nil {
+		// placed at the start of the file, so the problem still says which
+		// file it is about
+		start := hcl.Range{Filename: file, Start: hcl.InitialPos, End: hcl.InitialPos}
+
 		return nil, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  "Failed to read file",
-			Detail:   fmt.Sprintf("The configuration file %q could not be read.", file),
+			Detail:   fmt.Sprintf("The configuration file %q could not be read: %s.", file, err),
+			Subject:  &start,
 		}}
 	}
 
@@ -772,14 +777,14 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 	f, diag := p.parseFile(file)
 	if diag.HasErrors() {
 		// a single malformed input can produce several diagnostics, report every
-		// one of them rather than only the first
+		// one of them rather than only the first, each as HCL described it
 		errs := []error{}
 		for _, d := range diag {
-			pe := errors.NewParserErrorFromHCLDiag(d, file)
-			errs = append(errs, pe)
+			problem := errors.NewDiagnostic(d, p.parsedResources.sources)
+			errs = append(errs, problem)
 
 			// the file is not valid syntax, so no problem is in a resource
-			emitParse(&p.options, "", "", file, pe)
+			emitParse(&p.options, "", "", file, problem)
 		}
 
 		return errs

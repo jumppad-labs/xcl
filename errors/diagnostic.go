@@ -90,6 +90,12 @@ func linesOf(src []byte, r hcl.Range) *SourceLines {
 		return nil
 	}
 
+	// a range ending at the start of a later line ends with the line break
+	// before it, and covers nothing of that line
+	if r.End.Line > r.Start.Line && r.End.Column <= 1 {
+		last = r.End.Line - 1
+	}
+
 	lines := strings.Split(string(src), "\n")
 	if first > len(lines) {
 		return nil

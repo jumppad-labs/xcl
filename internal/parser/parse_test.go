@@ -915,11 +915,42 @@ func TestParseDirectoryReturnsConfigErrorWhenResourceProcessError(t *testing.T) 
 	// reported as a failure, located in that file
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(f, "bad_format.xcl"), pe.Filename)
-	require.Equal(t, 7, pe.Line)
-	require.Equal(t, 30, pe.Column)
-	require.Contains(t, pe.Message, "unable to parse file")
+	d, ok := ce.Errors[0].(*errors.Diagnostic)
+	require.True(t, ok, "the problem is a %T", ce.Errors[0])
+	require.True(t, d.IsError())
+	require.Equal(t, filepath.Join(f, "bad_format.xcl"), d.Subject.Filename)
+	require.Equal(t, 7, d.Subject.Start.Line)
+	require.Equal(t, 30, d.Subject.Start.Column)
+	require.NotEmpty(t, d.Summary)
+}
+
+func TestParseDirectoryKeepsTheSourceOfAMalformedFile(t *testing.T) {
+	f, pathErr := filepath.Abs("../test_fixtures/config/process_error")
+	require.NoError(t, pathErr)
+
+	p, _ := setupParser(t)
+
+	_, err := p.Apply(context.Background(), f)
+	ce := err.(*errors.ConfigError)
+
+	d := ce.Errors[0].(*errors.Diagnostic)
+	require.NotNil(t, d.Source)
+	require.Equal(t, 7, d.Source.Start)
+	require.NotEmpty(t, d.Source.Lines)
+}
+
+func TestParseReportsAFileThatCannotBeReadAtThatFile(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "gone.xcl")
+
+	p, _ := setupParser(t)
+	p.parsedResources = &parsed{sources: map[string][]byte{}}
+
+	errs := p.parseResourcesInFile(missing, "")
+	require.Len(t, errs, 1)
+
+	d := errs[0].(*errors.Diagnostic)
+	require.Equal(t, "Failed to read file", d.Summary)
+	require.Equal(t, missing, d.Subject.Filename)
 }
 
 func TestParseFileReturnsConfigErrorWhenParseDirectoryFails(t *testing.T) {
@@ -951,10 +982,10 @@ func TestParseFileReturnsConfigErrorWhenResourceBadlyFormed(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, f, pe.Filename)
-	require.Equal(t, 7, pe.Line)
-	require.Equal(t, 30, pe.Column)
+	d := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, f, d.Subject.Filename)
+	require.Equal(t, 7, d.Subject.Start.Line)
+	require.Equal(t, 30, d.Subject.Start.Column)
 }
 
 func TestParseFileReturnsConfigErrorWhenFunctionError(t *testing.T) {
@@ -1338,14 +1369,14 @@ func TestParseFileReportsEveryDiagnosticForSingleMalformation(t *testing.T) {
 	require.Len(t, ce.Errors, 3)
 
 	for _, e := range ce.Errors {
-		pe := e.(*errors.ParserError)
-		require.Equal(t, f, pe.Filename)
-		require.Greater(t, pe.Line, 0)
-		require.Greater(t, pe.Column, 0)
+		d := e.(*errors.Diagnostic)
+		require.Equal(t, f, d.Subject.Filename)
+		require.Greater(t, d.Subject.Start.Line, 0)
+		require.Greater(t, d.Subject.Start.Column, 0)
 	}
 
 	// the unterminated string itself starts on line 4 of the fixture
-	require.Equal(t, 4, ce.Errors[0].(*errors.ParserError).Line)
+	require.Equal(t, 4, ce.Errors[0].(*errors.Diagnostic).Subject.Start.Line)
 }
 
 func TestParseFileReportsMalformedBlockAsErrorNotWarning(t *testing.T) {
@@ -1362,11 +1393,13 @@ func TestParseFileReportsMalformedBlockAsErrorNotWarning(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 
 	// a file that is not well formed is a failure, and every problem in it is
-	// reported as a parser error
+	// reported as an error
 	require.NotEmpty(t, ce.Errors)
 
 	for _, e := range ce.Errors {
-		require.IsType(t, &errors.ParserError{}, e)
+		d, ok := e.(*errors.Diagnostic)
+		require.True(t, ok, "the problem is a %T", e)
+		require.True(t, d.IsError())
 	}
 }
 
@@ -1384,13 +1417,13 @@ func TestParseFileReportsFileAndPositionForMalformedBlock(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
+	d := ce.Errors[0].(*errors.Diagnostic)
 
 	// the missing opening brace is on line 7 of the fixture, the parser reports
 	// it at the point the block body should have started
-	require.Equal(t, f, pe.Filename)
-	require.Equal(t, 7, pe.Line)
-	require.Equal(t, 30, pe.Column)
+	require.Equal(t, f, d.Subject.Filename)
+	require.Equal(t, 7, d.Subject.Start.Line)
+	require.Equal(t, 30, d.Subject.Start.Column)
 }
 
 func TestParseFileToleratesUninterpolatableValue(t *testing.T) {
@@ -1408,10 +1441,10 @@ func TestParseFileToleratesUninterpolatableValue(t *testing.T) {
 
 	// this file is well formed, its only fault is a value that cannot yet be
 	// interpolated. The parse stage must not report it as a malformed file, so
-	// none of the reported problems may be a parse diagnostic.
+	// none of the reported problems may be a syntax diagnostic.
 	for _, e := range ce.Errors {
-		pe := e.(*errors.ParserError)
-		require.NotContains(t, pe.Message, "unable to parse file")
+		_, isSyntax := e.(*errors.Diagnostic)
+		require.False(t, isSyntax, "a well formed file was reported as malformed: %v", e)
 	}
 }
 
