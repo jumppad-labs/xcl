@@ -1,5 +1,13 @@
 # Changelog
 
+## 20261011232013-da18c586-python-release-hardening
+
+A plugin release signed by a key that is not trusted now says which key signed it. The GitHub registry still refuses it with `ErrPluginVerification` and the same "signature `<name>_<version>_checksums.txt.sig` does not verify against any trusted key" wording, and now ends the message with "signed by key `<long key ID>`, which is not trusted", the 16-hex-digit ID read from the signature's issuer, so whoever installs the plugin can see which key they would need to trust. Every binding reports the engine's message as it is, so Python's `PluginVerificationError` carries it too. A tampered, unsigned or correctly signed release is handled exactly as before, and a signature that cannot be read for its issuer keeps the previous message. The shared test helper `internal/testutil.FakeGitHubRelease` gains `OtherKeyID`, the long ID of the key `SignedByOtherKey` signs with.
+
+**Breaking:**
+
+None.
+
 ## 20261011211634-a8895873-python-out-of-process-engine
 
 The engine runs as a program any language can start and talk to. `xcl-core`, in `cmd/xcl-core`, is a static program built with cgo disabled that serves the core service over its standard input and output: `xcl-core --serve` reads `Request` frames, each a 4-byte big-endian length followed by the message, and answers each with a `Response` frame carrying the same id, the same status and the same payload the C ABI would give. Each request runs on its own goroutine, so a `Poll` that waits never holds up a `Cancel` or another call, and the method name `Release` frees a handle as `xcl_release` does. The two frame messages are defined in `proto/xcl/core/v1/transport.proto` beside `core.proto` and generated into `coreservice/proto`; the core service messages and the C ABI are unchanged, and the ABI version covers the frames. The program keeps its standard output for frames alone, so an external plugin it starts can neither read nor write the protocol, discards Ctrl-C and, on Windows, Ctrl-Break so the host decides what to cancel, and on end of input or `SIGTERM` releases every configuration, saving the state of any operation in progress, and exits 0. `xcl-core --version` prints the version it was stamped with, and `make xcl-core` builds it for any `GOOS` and `GOARCH`. `coreservice.Service` gains the additive `Close`, which releases every configuration it holds and waits for each to save its state.
