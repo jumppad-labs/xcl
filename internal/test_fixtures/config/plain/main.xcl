@@ -35,3 +35,8 @@ job "off" {
 unlabelled "only" {
   value = "kept ${agent.claude.name} ${database.postgres.main.engine}"
 }
+
+service "api" {
+  database  = database.postgres.main
+  databases = [database.postgres.main]
+}

@@ -487,6 +487,21 @@ func fromCtyObject(val cty.Value, target reflect.Value, path cty.Path) error {
 
 			fieldIdx, exists := targetFields[k]
 			if !exists {
+				// an untagged field registered to receive the attribute takes
+				// it, see RegisterUntaggedField
+				if untaggedIdx, ok := untaggedFieldFor(target.Type(), k); ok {
+					ev := val.GetAttr(k)
+					if ev.IsNull() {
+						continue
+					}
+
+					if err := fromCtyValue(ev, target.Field(untaggedIdx), path); err != nil {
+						return err
+					}
+
+					continue
+				}
+
 				// if the target does not exist, this could be due to the field
 				// being on an embedded or anonymous field
 

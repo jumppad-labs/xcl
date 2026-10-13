@@ -30,6 +30,7 @@ func setupPlainConfig(t *testing.T) *Config {
 	local.RegisterType(&plain.Organization{}, "organization")
 	local.RegisterType(&plain.Job{}, "job")
 	local.RegisterType(&plain.Unlabelled{}, "unlabelled")
+	local.RegisterType(&plain.Service{}, "service")
 
 	c, err := NewConfig(WithRegistry(local), WithStateStore(ss))
 	require.NoError(t, err)
@@ -129,6 +130,34 @@ func TestFindFillsAPlainTypesMetaField(t *testing.T) {
 	require.Equal(t, "deploy", job.Meta.Name)
 	require.Equal(t, "main.xcl", filepath.Base(job.Meta.File))
 	require.Equal(t, 25, job.Meta.Line)
+}
+
+func TestAReferenceToAPlainTypeFillsItsMeta(t *testing.T) {
+	c := setupPlainConfig(t)
+
+	service, err := Find[plain.Service](c, "service.api")
+	require.NoError(t, err)
+	require.Equal(t, "database.postgres.main", service.Database.Meta.ID)
+	require.Equal(t, "main.xcl", filepath.Base(service.Database.Meta.File))
+}
+
+func TestAReferenceToAPlainTypeFillsItsLabelsAndAttributes(t *testing.T) {
+	c := setupPlainConfig(t)
+
+	service, err := Find[plain.Service](c, "service.api")
+	require.NoError(t, err)
+	require.Equal(t, "postgres", service.Database.Engine)
+	require.Equal(t, "main", service.Database.Name)
+	require.Equal(t, 5432, service.Database.Port)
+}
+
+func TestAListOfReferencesToAPlainTypeFillsEachMeta(t *testing.T) {
+	c := setupPlainConfig(t)
+
+	service, err := Find[plain.Service](c, "service.api")
+	require.NoError(t, err)
+	require.Len(t, service.Databases, 1)
+	require.Equal(t, "database.postgres.main", service.Databases[0].Meta.ID)
 }
 
 func TestFindReturnsAPlainTypeWithoutLabelFields(t *testing.T) {

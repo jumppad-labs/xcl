@@ -187,6 +187,11 @@ var (
 // field converts as its inner type carrying SensitiveMark, and a cty value
 // decoded into a sensitive field is unmarked and wrapped.
 func init() {
+	// a block read through a reference carries its metadata as the meta
+	// attribute, and a plain struct holds it in an untagged Meta field, as a
+	// registered plain type does
+	gocty.RegisterUntaggedField("meta", "Meta", reflect.TypeFor[Meta]())
+
 	gocty.RegisterWrapper(gocty.Wrapper{
 		Inner: func(t reflect.Type) (reflect.Type, bool) {
 			if t.Kind() != reflect.Struct || !t.Implements(sensitiveValueType) || !reflect.PointerTo(t).Implements(sensitiveSetterType) {
