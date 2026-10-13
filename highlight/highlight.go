@@ -2,7 +2,7 @@ package highlight
 
 import "strings"
 
-// The scopes Text labels pieces with. They are the names the xcl-vscode
+// The scopes Pieces labels configuration with. They are the names the xcl-vscode
 // grammar (syntaxes/xcl.tmLanguage.json) gives the same text, .xcl suffix
 // included, so they are exactly the names the editor shows and a VS Code
 // colour theme matches against.

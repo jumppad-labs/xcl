@@ -42,8 +42,8 @@ const LevelEnv = "XCL_LOG_LEVEL"
 // When an entity is created it also writes that entity's configuration
 // beneath the success line, so a reader sees what was actually made,
 // including the values the provider filled in. When w shows colour, the
-// configuration is coloured by xcl itself, through xcl.Highlight and the
-// highlight package's terminal renderer, the way the xcl-vscode extension
+// configuration is coloured by xcl itself, rendering its highlight.Pieces
+// with the terminal renderer highlight.ANSI, the way the xcl-vscode extension
 // colours it in the editor. The example has no highlighting code of its own:
 //
 //	10:04AM INFO create success source=core operation=create resource=template.welcome
