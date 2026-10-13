@@ -1633,6 +1633,29 @@ func (p *Parser) emitValidateError(problem error) {
 		Error:     problem,
 	}
 
+	// a diagnostic names its block, so the resource is found by its id
+	// rather than by where the problem is, which can be anywhere inside it
+	var d *errors.Diagnostic
+	if stderrors.As(problem, &d) {
+		if d.Subject != nil {
+			e.File = d.Subject.Filename
+		}
+
+		for _, r := range p.parsedResources.resources {
+			meta, err := types.GetMeta(r)
+			if err != nil || d.Entity == "" || meta.ID != d.Entity {
+				continue
+			}
+
+			e.ResourceID = meta.ID
+			e.ResourceType = resourceType(meta)
+			break
+		}
+
+		emit(&p.options, e)
+		return
+	}
+
 	var pe *errors.ParserError
 	if stderrors.As(problem, &pe) {
 		e.File = pe.Filename
