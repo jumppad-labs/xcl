@@ -395,6 +395,45 @@ func TestOperationIDsIncrease(t *testing.T) {
 	require.Equal(t, uint64(1), c.start(other, "StartValidate", &corepb.StartValidateRequest{Paths: []string{file}}))
 }
 
+func TestFinishedTaskQueuedAfterOperationEnds(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	f := newPluginConfig(t, c)
+	conf := c.s.lookup(f.handle)
+
+	started, release := holdCreate(f.plugin, "resource.network.first")
+
+	opID := c.start(f.handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, chainConfig)}})
+	waitStarted(t, started, release)
+
+	// the operation cannot end while the configuration's lock is held, so a
+	// host that polls its finished task meanwhile would find it still in
+	// progress and have its next call refused
+	conf.mu.Lock()
+	close(release)
+
+	finishedEarly := false
+	for {
+		resp := &corepb.PollResponse{}
+		c.ok(f.handle, "Poll", &corepb.PollRequest{WaitMs: 500}, resp)
+
+		if resp.GetTask() == nil {
+			break
+		}
+
+		if resp.GetFinished() != nil {
+			finishedEarly = true
+			break
+		}
+	}
+
+	conf.mu.Unlock()
+
+	require.False(t, finishedEarly, "the finished task arrived while the operation was in progress")
+	require.Nil(t, c.drive(f.handle, opID, nil, nil).GetError())
+}
+
 func TestEventsArriveBeforeFinishedInOrder(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 

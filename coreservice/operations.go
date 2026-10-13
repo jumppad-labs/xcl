@@ -48,17 +48,19 @@ func (c *configuration) start(work func(ctx context.Context) (diffJSON []byte, e
 		diffJSON, err := work(op.ctx)
 		op.cancel()
 
-		c.queue.post(&corepb.PollResponse{Task: &corepb.PollResponse_Finished{Finished: &corepb.OperationFinished{
-			OperationId: op.id,
-			Error:       toProto(err),
-			DiffJson:    diffJSON,
-		}}})
-
+		// the operation is over before the host can see it finish, so a call
+		// the host makes as soon as it polls the finished task is not refused
 		c.mu.Lock()
 		if c.inProgress == op {
 			c.inProgress = nil
 		}
 		c.mu.Unlock()
+
+		c.queue.post(&corepb.PollResponse{Task: &corepb.PollResponse_Finished{Finished: &corepb.OperationFinished{
+			OperationId: op.id,
+			Error:       toProto(err),
+			DiffJson:    diffJSON,
+		}}})
 	}()
 
 	return op.id, nil
