@@ -6,7 +6,7 @@ The engine runs as a program any language can start and talk to. `xcl-core`, in 
 
 Tagging a release now builds `xcl-core` for Linux x86-64 and arm64, macOS x86-64 and arm64 and Windows x86-64 and arm64 in one job with cgo disabled and no C compiler reachable, and attaches eight `xcl-core_<version>_<os>_<arch>` archives, the static Linux program also under the two `_musl` names, with a checksums file signed by the jumppad-labs release key, before dispatching the xcl-python release. The release workflow is `release.yml`, replacing `libxcl-release.yml`. The shared library is no longer attached to releases: `bindings/libxcl` stays in the tree, CI still builds it and smoke-tests it through the C ABI on every change, and the manually run `libxcl-build.yml` builds it for all eight platforms as workflow artifacts.
 
-From v0.5.0 the Python package bundles `xcl-core` and runs it as a subprocess on every platform, Alpine included, with the same API and results everywhere; the shared library remains a source-build option there.
+From v0.5.3 the Python package bundles `xcl-core` and runs it as a subprocess on every platform, Alpine included, with the same API and results everywhere; the shared library remains a source-build option there.
 
 **Breaking:**
 

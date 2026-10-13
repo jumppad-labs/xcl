@@ -656,7 +656,7 @@ The README's note on other languages says the same in a sentence.
 - [x] The changelog has a `## 20261011211634-a8895873-python-out-of-process-engine` entry at the top, in prose, ending with **Breaking:** and `None.`
 - [x] The README says Python runs the engine as a bundled program on every platform, with no shared library to load.
 
-#### - [ ] Task: Cut the v0.5.0 release
+#### - [x] Task: Cut the v0.5.0 release
 **Id:** 7ac16d04-6d56-48fd-b4b6-94e79445158c
 **Repo:** xcl
 **Depends on:**
@@ -672,8 +672,8 @@ A person merges the xcl, xcl-python and xcl-website work and pushes the xcl tag 
 *Technical detail:* [context.md#task-cut-the-v050-release](./context.md#task-cut-the-v050-release)
 
 **Acceptance criteria**:
-- [ ] The xcl v0.5.0 release carries eight `xcl-core` archives and a signed checksums file, and no libxcl archive.
-- [ ] `xcl-lang 0.5.0` is on PyPI with eight wheels and an sdist, and its install checks passed on all eight platforms.
+- [x] The xcl v0.5.0 release carries eight `xcl-core` archives and a signed checksums file, and no libxcl archive. (Released as v0.5.3; see the changelog.)
+- [x] `xcl-lang 0.5.0` is on PyPI with eight wheels and an sdist, and its install checks passed on all eight platforms. (Released as `xcl-lang 0.5.3`; see the changelog.)
 
 ## Open Questions
 
@@ -933,3 +933,24 @@ The entry ends with `**Breaking:**` and `None.` The README's "Other languages" n
 - None.
 
 **Discoveries**: Before CI can go green, the person must push this spec's xcl changes to the ref in xcl-python's `xcl-ref.txt` (`f-libxcl`). xcl-python's CI and wheel builds compile `cmd/xcl-core` and generate `transport.proto` from that ref.
+
+### 2026-10-13 — Task: Cut the v0.5.0 release (done, as v0.5.3)
+
+**What was done**: The user merged this spec's branches, pushed xcl `f-libxcl` and xcl-python `main`, and published the release as **v0.5.3**. xcl Release run 38376117991 attached eight `xcl-core_0.5.3_*` archives, `xcl-core_0.5.3_checksums.txt` and its signature, and no libxcl archive. xcl-python Release run 38377379298 published `xcl-lang 0.5.3` to PyPI (eight wheels and an sdist), and all eight install checks passed, Alpine x86-64 and arm64 included. Go CI run 38377258845 passed, including the Windows Ctrl-Break test in `xcl-core-windows`.
+
+**Deviations**:
+- The version is v0.5.3, not v0.5.0. `v0.5.0` had already been tagged on 9927404, before this spec's code, and its release carries libxcl archives only. v0.5.1 and v0.5.2 were tagged on the way, and neither reached PyPI: v0.5.1's xcl-python dispatch ran the old workflow (xcl-python `main` was not yet pushed), and v0.5.2's publish was rejected. The xcl.dev badge and the xcl CHANGELOG now say v0.5.3.
+- Fixes made to get there:
+  - `coreservice/operations.go`: the finished task was queued before the operation was cleared, so a host's next call could be refused with `operation_in_progress`. It is now cleared first; `TestFinishedTaskQueuedAfterOperationEnds` covers it.
+  - `internal/testutil/github_release.go`: the fake release archives are stored without compression. The registry tests had outlasted the 10-minute `go test` timeout under `-race`; they now take about 40 s.
+  - `.github/workflows/go.yml`: the proto breaking-change check is skipped while `main` has no `.proto` files in `proto/`.
+  - xcl-python `.github/workflows/release.yml`: `pypa/gh-action-pypi-publish` was bumped from v1.12.4 to v1.14.2, because hatchling now writes Metadata-Version 2.5, which the older twine rejects.
+- Still outstanding: one manual `libxcl-build.yml` run.
+
+**Files changed**:
+- xcl: `coreservice/operations.go`, `coreservice/operations_test.go`, `internal/testutil/github_release.go`, `.github/workflows/go.yml`, `CHANGELOG.md`
+- xcl-python: `.github/workflows/release.yml`
+- xcl-website: `src/pages/index.mdx`
+
+**Discoveries**: xcl-python's CI on the new `main` still fails on the issues python-release-hardening covers (`test_schema.py` reads `../xcl`; `tomllib` on 3.10; Windows `AF_UNIX`, `.exe` fixtures and SIGINT; the macOS stall threshold). It also fails on one new test from this spec: on macOS, `test_engine_killed_fails_waiting_call_with_signal` sees return code 137 instead of -9.
+
