@@ -421,7 +421,7 @@ The topic pages stay the single home of detail, and the guides stay short enough
 
 **Validation point**: The site builds with the new page. Following the guide by hand in an empty directory against the release tag produces a program that applies, finds, reloads and destroys exactly as the guide shows. The nav entry, the home page button and the README link each open the guide.
 
-#### - [ ] Task: Write the Using XCL with Go guide
+#### - [x] Task: Write the Using XCL with Go guide
 **Id:** f4b3152b-7ef8-4b8d-bad3-6ab83c097d74
 **Repo:** xcl-website
 **Depends on:** none
@@ -439,15 +439,15 @@ Each section adds to the same program, and the page ends with the full program a
 *Technical detail:* [context.md#task-write-the-using-xcl-with-go-guide](./context.md#task-write-the-using-xcl-with-go-guide)
 
 **Acceptance criteria**:
-- [ ] The page is served at `/using-xcl-with-go/` and the site builds.
-- [ ] Copying only the code the page shows, in order, into an empty directory gives a program that runs against the release tag and prints what the page says at each step.
-- [ ] The page covers creating a config, registering an entity type, parsing (validating) configuration, applying it, keeping state between runs, finding an entity by address and by type, reading outputs, matching not-found and not-unique errors, and destroying.
-- [ ] Every lookup uses the package-level function form, and the page says the method form needs Go 1.27.
-- [ ] The page links to the language reference, the registries, plugin, state and events pages, and the Go API reference through `goReferenceURL`.
-- [ ] The page shows only Go and XCL code, with no language tabs, and uses "entity" for every block.
-- [ ] The page never uses the words "superset", "interpolation" or "Terraform".
+- [x] The page is served at `/using-xcl-with-go/` and the site builds.
+- [x] Copying only the code the page shows, in order, into an empty directory gives a program that runs against the release tag and prints what the page says at each step.
+- [x] The page covers creating a config, registering an entity type, parsing (validating) configuration, applying it, keeping state between runs, finding an entity by address and by type, reading outputs, matching not-found and not-unique errors, and destroying.
+- [x] Every lookup uses the package-level function form, and the page says the method form needs Go 1.27.
+- [x] The page links to the language reference, the registries, plugin, state and events pages, and the Go API reference through `goReferenceURL`.
+- [x] The page shows only Go and XCL code, with no language tabs, and uses "entity" for every block.
+- [x] The page never uses the words "superset", "interpolation" or "Terraform".
 
-#### - [ ] Task: Put the Go guide in the navigation and on the home page
+#### - [x] Task: Put the Go guide in the navigation and on the home page
 **Id:** 3c3d939c-fba4-4353-848f-76e05faed545
 **Repo:** xcl-website
 **Depends on:**
@@ -459,14 +459,14 @@ Readers must be able to find the guide without knowing its address. This task ad
 *Technical detail:* [context.md#task-put-the-go-guide-in-the-navigation-and-on-the-home-page](./context.md#task-put-the-go-guide-in-the-navigation-and-on-the-home-page)
 
 **Acceptance criteria**:
-- [ ] On every page, the Guides dropdown lists "Using XCL with Go" first, and clicking the Guides label opens the Go guide.
-- [ ] The home page's closing banner has a button that opens the Go guide.
-- [ ] The home page's "Documentation" section lists "Using XCL with Go" immediately after the Language reference entry, and the item opens the Go guide.
-- [ ] The examples remain reachable from the home page.
-- [ ] No existing page is removed or renamed.
-- [ ] The website README's page table lists the Go guide.
+- [x] On every page, the Guides dropdown lists "Using XCL with Go" first, and clicking the Guides label opens the Go guide.
+- [x] The home page's closing banner has a button that opens the Go guide.
+- [x] The home page's "Documentation" section lists "Using XCL with Go" immediately after the Language reference entry, and the item opens the Go guide.
+- [x] The examples remain reachable from the home page.
+- [x] No existing page is removed or renamed.
+- [x] The website README's page table lists the Go guide.
 
-#### - [ ] Task: Link the Go guide from the xcl README
+#### - [x] Task: Link the Go guide from the xcl README
 **Id:** 0f64b79a-1c34-4d66-a66f-2af359635d8c
 **Repo:** xcl
 **Depends on:**
@@ -478,8 +478,8 @@ The README is an overview that points to xcl.dev. This task adds the Go guide to
 *Technical detail:* [context.md#task-link-the-go-guide-from-the-xcl-readme](./context.md#task-link-the-go-guide-from-the-xcl-readme)
 
 **Acceptance criteria**:
-- [ ] The README's Documentation list links `https://xcl.dev/using-xcl-with-go/` with a one-line description, immediately after the Language reference entry (or first, if that entry is not there yet).
-- [ ] The README stays an overview, with no walkthrough content added.
+- [x] The README's Documentation list links `https://xcl.dev/using-xcl-with-go/` with a one-line description, immediately after the Language reference entry (or first, if that entry is not there yet).
+- [x] The README stays an overview, with no walkthrough content added.
 
 ### Milestone 2: The Go and Python APIs are browsable on xcl.dev, generated from the advertised release
 
@@ -493,7 +493,7 @@ The README is an overview that points to xcl.dev. This task adds the Go guide to
 
 **Validation point**: `npm run api-docs && npm run build` succeeds locally and produces `/api/go/` (with a page per documented package) and `/api/python/` (with `aio/` and `mask/`). The pages list `xcl.Config`, `NewConfig`, `Find`, the registry and types packages, and `xcl.Config`, `xcl.aio.Config`, `xcl.LocalRegistry`, `xcl.GitHubRegistry` and the exceptions, with their doc comments and docstrings, inside the site layout. The "API" dropdown, the footer links and the home page entries open them. After merge, the deploy workflow publishes them.
 
-#### - [ ] Task: xcl.dev generates the Go and Python API references from the advertised release
+#### - [x] Task: xcl.dev generates the Go and Python API references from the advertised release
 **Id:** efe7da14-70e1-4741-a54b-92108b6b947d
 **Repo:** xcl-website
 **Depends on:** none
@@ -504,19 +504,19 @@ There is no generated Python API reference anywhere, and the Go one lives only o
 *Technical detail:* [context.md#task-xcldev-generates-the-go-and-python-api-references-from-the-advertised-release](./context.md#task-xcldev-generates-the-go-and-python-api-references-from-the-advertised-release)
 
 **Acceptance criteria**:
-- [ ] `src/config/release.json` is the only place the advertised xcl tag is written. The hero badge, the Go reference heading and the Python reference heading all show it, and the Python version is the tag without its `v`.
-- [ ] `npm run api-docs` generates the Go reference from the pinned xcl tag and the Python reference from `xcl-lang` at the matching version on PyPI, never from a main branch, and exits non-zero if either cannot be fetched or rendered.
-- [ ] `npm run build` after `npm run api-docs` serves `/api/go/` plus one page for each of `diff`, `entity`, `errors`, `events`, `highlight`, `logger`, `mask`, `plugins`, `registry`, `state` and `types`, and `/api/python/`, `/api/python/aio/` and `/api/python/mask/`. No `internal`, `e2e`, `mocks`, `plugins/testing`, example, protobuf or `coreservice` package is documented.
-- [ ] Every API page shows every public name with its doc comment or docstring, inside the site's header, nav, footer and palette, with highlighted code. Links between API pages stay on xcl.dev, and links to undocumented packages and the standard library go to pkg.go.dev or docs.python.org.
-- [ ] Generating the Python reference creates no config and starts no engine.
-- [ ] The Go reference heading links pkg.go.dev (`goPkgDevURL`), and the Python reference heading links PyPI.
-- [ ] Without generated fragments, `npm run build` still succeeds locally with a warning, and fails when `CI` is set.
-- [ ] `deploy.yml` sets up Go and Python, runs `npm run api-docs` before the Astro build, deploys on push to main as before, and can be run by hand (`workflow_dispatch`).
-- [ ] doc2go and pdoc (and pdoc's dependencies) are pinned to exact versions, each with a comment giving the reason. `generated/` is git-ignored, and nothing generated is committed except the two highlighter stylesheets.
-- [ ] `site.ts` exports `xclRelease`, `xclLangVersion`, `goReferenceURL = "/api/go/"`, `pythonReferenceURL = "/api/python/"` and `goPkgDevURL`, and the site's type check passes.
-- [ ] The website README explains `npm run api-docs`, its toolchain needs and how to move the references to a new release.
+- [x] `src/config/release.json` is the only place the advertised xcl tag is written. The hero badge, the Go reference heading and the Python reference heading all show it, and the Python version is the tag without its `v`.
+- [x] `npm run api-docs` generates the Go reference from the pinned xcl tag and the Python reference from `xcl-lang` at the matching version on PyPI, never from a main branch, and exits non-zero if either cannot be fetched or rendered.
+- [x] `npm run build` after `npm run api-docs` serves `/api/go/` plus one page for each of `diff`, `entity`, `errors`, `events`, `highlight`, `logger`, `mask`, `plugins`, `registry`, `state` and `types`, and `/api/python/`, `/api/python/aio/` and `/api/python/mask/`. No `internal`, `e2e`, `mocks`, `plugins/testing`, example, protobuf or `coreservice` package is documented.
+- [x] Every API page shows every public name with its doc comment or docstring, inside the site's header, nav, footer and palette, with highlighted code. Links between API pages stay on xcl.dev, and links to undocumented packages and the standard library go to pkg.go.dev or docs.python.org.
+- [x] Generating the Python reference creates no config and starts no engine.
+- [x] The Go reference heading links pkg.go.dev (`goPkgDevURL`), and the Python reference heading links PyPI.
+- [x] Without generated fragments, `npm run build` still succeeds locally with a warning, and fails when `CI` is set.
+- [x] `deploy.yml` sets up Go and Python, runs `npm run api-docs` before the Astro build, deploys on push to main as before, and can be run by hand (`workflow_dispatch`).
+- [x] doc2go and pdoc (and pdoc's dependencies) are pinned to exact versions, each with a comment giving the reason. `generated/` is git-ignored, and nothing generated is committed except the two highlighter stylesheets.
+- [x] `site.ts` exports `xclRelease`, `xclLangVersion`, `goReferenceURL = "/api/go/"`, `pythonReferenceURL = "/api/python/"` and `goPkgDevURL`, and the site's type check passes.
+- [x] The website README explains `npm run api-docs`, its toolchain needs and how to move the references to a new release.
 
-#### - [ ] Task: Put the API references in the navigation, footer and home page
+#### - [x] Task: Put the API references in the navigation, footer and home page
 **Id:** da899ef6-6fda-44e5-a1e4-0c3970f10b61
 **Repo:** xcl-website
 **Depends on:**
@@ -528,12 +528,12 @@ Readers must find the references without knowing their address. This task adds a
 *Technical detail:* [context.md#task-put-the-api-references-in-the-navigation-footer-and-home-page](./context.md#task-put-the-api-references-in-the-navigation-footer-and-home-page)
 
 **Acceptance criteria**:
-- [ ] On every page wider than the `sm` breakpoint, the nav shows "API" after "Language". Its dropdown lists "Go" then "Python", and clicking the label opens `/api/go/`.
-- [ ] At 375px wide the nav bar does not overflow, and "Features" and "API" are hidden.
-- [ ] The footer shows "Go API" (`/api/go/`) and "Python API" (`/api/python/`), opening in the same tab, and no longer links pkg.go.dev directly.
-- [ ] The home page's "Documentation" section ends with "Go API reference" and "Python API reference", each opening its page.
-- [ ] The website README's page table lists `/api/go/` and `/api/python/`.
-- [ ] No existing page is removed or renamed, and the site builds.
+- [x] On every page wider than the `sm` breakpoint, the nav shows "API" after "Language". Its dropdown lists "Go" then "Python", and clicking the label opens `/api/go/`.
+- [x] At 375px wide the nav bar does not overflow, and "Features" and "API" are hidden.
+- [x] The footer shows "Go API" (`/api/go/`) and "Python API" (`/api/python/`), opening in the same tab, and no longer links pkg.go.dev directly.
+- [x] The home page's "Documentation" section ends with "Go API reference" and "Python API reference", each opening its page.
+- [x] The website README's page table lists `/api/go/` and `/api/python/`.
+- [x] No existing page is removed or renamed, and the site builds.
 
 ### Milestone 3: Python developers can go from an empty program to a working one, synchronously or with asyncio
 
@@ -553,7 +553,7 @@ Readers must find the references without knowing their address. This task adds a
 
 **Validation point**: The site builds. Following the guide by hand in a fresh virtualenv with a Docker engine, against the released package, produces a program that applies (with the plugin), finds, reloads and destroys, and an asyncio version whose apply runs while other work continues. All links from the nav, home page, footer, the xcl and xcl-python READMEs and the guide open existing pages. The changelog entry is present.
 
-#### - [ ] Task: Write the Using XCL with Python guide
+#### - [x] Task: Write the Using XCL with Python guide
 **Id:** 561506a0-3890-4708-a844-8b3bd3d746a6
 **Repo:** xcl-website
 **Depends on:**
@@ -574,17 +574,17 @@ A second part shows the same apply with the asyncio API, explains when to choose
 *Technical detail:* [context.md#task-write-the-using-xcl-with-python-guide](./context.md#task-write-the-using-xcl-with-python-guide)
 
 **Acceptance criteria**:
-- [ ] The page is served at `/using-xcl-with-python/` and the site builds.
-- [ ] Copying only the code the page shows, in order, into a fresh virtualenv with a Docker engine gives a program that installs `xcl-lang` from PyPI and runs against the released package. It prints what the page says at each step.
-- [ ] The page covers installing, creating a config, registering an entity type and a function, using a Go plugin, applying, keeping state between runs, finding an entity by address and by type, handling errors, and destroying, in that order.
-- [ ] The synchronous API comes first. The asyncio section that follows runs the asyncio version of apply while other work keeps running, and says when to use it.
-- [ ] The page says plugins are written in Go for now and can be used from Python.
-- [ ] The page links to the language reference, the registries, plugin, state and events pages, and the Python API reference through `pythonReferenceURL`.
+- [x] The page is served at `/using-xcl-with-python/` and the site builds.
+- [x] Copying only the code the page shows, in order, into a fresh virtualenv with a Docker engine gives a program that installs `xcl-lang` from PyPI and runs against the released package. It prints what the page says at each step.
+- [x] The page covers installing, creating a config, registering an entity type and a function, using a Go plugin, applying, keeping state between runs, finding an entity by address and by type, handling errors, and destroying, in that order.
+- [x] The synchronous API comes first. The asyncio section that follows runs the asyncio version of apply while other work keeps running, and says when to use it.
+- [x] The page says plugins are written in Go for now and can be used from Python.
+- [x] The page links to the language reference, the registries, plugin, state and events pages, and the Python API reference through `pythonReferenceURL`.
 
-- [ ] The page shows only Python and XCL code (plus shell commands), with no language tabs.
-- [ ] The page uses "entity" for every block, and never uses the words "superset", "interpolation" or "Terraform".
+- [x] The page shows only Python and XCL code (plus shell commands), with no language tabs.
+- [x] The page uses "entity" for every block, and never uses the words "superset", "interpolation" or "Terraform".
 
-#### - [ ] Task: Put the Python guide in the navigation and on the home page
+#### - [x] Task: Put the Python guide in the navigation and on the home page
 **Id:** 1c7d59de-6cbf-4f72-b35b-51d54c8f4ae8
 **Repo:** xcl-website
 **Depends on:**
@@ -597,12 +597,12 @@ This adds the Python guide as the second entry of the Guides dropdown, right aft
 *Technical detail:* [context.md#task-put-the-python-guide-in-the-navigation-and-on-the-home-page](./context.md#task-put-the-python-guide-in-the-navigation-and-on-the-home-page)
 
 **Acceptance criteria**:
-- [ ] On every page, the Guides dropdown lists "Using XCL with Go" then "Using XCL with Python" before the topic pages.
-- [ ] The home page's closing banner has buttons opening the Go guide and the Python guide.
-- [ ] The home page's "Documentation" section lists the Language reference, then "Using XCL with Go", then "Using XCL with Python".
-- [ ] The website README's page table lists the Python guide.
+- [x] On every page, the Guides dropdown lists "Using XCL with Go" then "Using XCL with Python" before the topic pages.
+- [x] The home page's closing banner has buttons opening the Go guide and the Python guide.
+- [x] The home page's "Documentation" section lists the Language reference, then "Using XCL with Go", then "Using XCL with Python".
+- [x] The website README's page table lists the Python guide.
 
-#### - [ ] Task: Link the Python guide from the xcl README and record the guides in the changelog
+#### - [x] Task: Link the Python guide from the xcl README and record the guides in the changelog
 **Id:** 55f704ae-a2d1-4515-9814-592e3e52f0c6
 **Repo:** xcl
 **Depends on:**
@@ -615,10 +615,10 @@ The README's Documentation list gains the Python guide immediately after the Go 
 *Technical detail:* [context.md#task-link-the-python-guide-from-the-xcl-readme-and-record-the-guides-in-the-changelog](./context.md#task-link-the-python-guide-from-the-xcl-readme-and-record-the-guides-in-the-changelog)
 
 **Acceptance criteria**:
-- [ ] The README's Documentation list has the Language reference, then "Using XCL with Go", then "Using XCL with Python" (the two guides first, if the reference entry is not there yet).
-- [ ] The changelog has one `## 20261011084948-c995ed25-using-xcl-with-go` entry, in prose, followed by **Breaking:** and None.
+- [x] The README's Documentation list has the Language reference, then "Using XCL with Go", then "Using XCL with Python" (the two guides first, if the reference entry is not there yet).
+- [x] The changelog has one `## 20261011084948-c995ed25-using-xcl-with-go` entry, in prose, followed by **Breaking:** and None.
 
-#### - [ ] Task: Link the API reference and the Python guide from the xcl-python README
+#### - [x] Task: Link the API reference and the Python guide from the xcl-python README
 **Id:** 8386a518-8676-4f3e-ac0a-ca6c63526956
 **Repo:** xcl-python
 **Depends on:**
@@ -631,8 +631,8 @@ Readers often arrive at the package from PyPI, where the README is the page they
 *Technical detail:* [context.md#task-link-the-api-reference-and-the-python-guide-from-the-xcl-python-readme](./context.md#task-link-the-api-reference-and-the-python-guide-from-the-xcl-python-readme)
 
 **Acceptance criteria**:
-- [ ] The README links `https://xcl.dev/api/python/` (API reference) and `https://xcl.dev/using-xcl-with-python/` (guide), near its existing xcl.dev link.
-- [ ] No other file in xcl-python changes, and the package gains no dependency.
+- [x] The README links `https://xcl.dev/api/python/` (API reference) and `https://xcl.dev/using-xcl-with-python/` (guide), near its existing xcl.dev link.
+- [x] No other file in xcl-python changes, and the package gains no dependency.
 
 ## Open Questions
 
@@ -661,3 +661,130 @@ No other questions remain open. Every design choice is settled in the architectu
 - No hand-written API pages and no custom renderer of a generator's data model. The generators' HTML is embedded and styled, not rebuilt.
 - No redirects. Pages are added and none are removed or renamed. `goReferenceURL` changes from an external URL to `/api/go/`; its only user is the footer, which this plan updates.
 
+## Changelog
+
+### 2026-10-13 — Task: Write the Using XCL with Go guide
+
+**What was done**: Added `/using-xcl-with-go/`, a build-up walkthrough of one program, `deployer`, from an empty module: entity types as structs, a local registry with `RegisterType` and `RegisterFunction`, `NewConfig`, `Validate` with the `ConfigError` loop, `ApplyContext` under `signal.NotifyContext`, `Find`/`FindByType`/`FindOne`/`All` and the untyped `FindEntitiesByType`/`Entities`, outputs, `ErrNotFound` and `*NotUniqueError`, a `status` command using `Load`, and `Destroy`, ending with the full program and links out. Every snippet was assembled in page order in an empty directory against `github.com/jumppad-labs/xcl@v0.5.3` and run (`apply`, the temporary replica, `status`, `destroy`); the printed lines in the page are copied from that run.
+
+**Deviations**: The release is v0.5.3, not v0.5.0 (v0.5.0 was already taken and v0.5.1/v0.5.2 never reached PyPI; orchestrator brief), so `go get` pins `@v0.5.3`. The `go get` line is a literal for now because the release pin (`src/config/release.json`) arrives with the API reference task. The program is split into one file per concern (`types.go`, `registry.go`, `config.go`, `check.go`, `apply.go`, `find.go`, `outputs.go`, `lookups.go`, `main.go`) so each section adds a whole file with its own imports, and `run` grows by "replace the final return" edits; this keeps "copy the snippets in order" exact under Go's unused-import rule. The not-unique error is shown by adding a replica database temporarily, and removing it again shows that an entity dropped from the configuration is removed on the next apply. No tests were written (plan convention and spec non-goal), so the test step had nothing to delegate.
+
+**Files changed**:
+- `xcl-website: src/pages/using-xcl-with-go.mdx`
+
+**Discoveries**: The validation error text from the release still says "resource 'app.web' refers to ..., which is not defined", so the guide describes validation problems rather than quoting them, to keep the "entity, not resource" rule; this is a library wording gap to report, not fix here. `Outputs()` is keyed by the full address (`output.database_location`). After `Destroy`, `Load` succeeds with nothing in state, so a lookup then returns `ErrNotFound`.
+
+### 2026-10-13 — Task: Put the Go guide in the navigation and on the home page
+
+**What was done**: "Using XCL with Go" is the first child of the Guides dropdown, so the Guides label now opens the Go guide. The home page's closing banner is now "Start building with XCL" with the Go guide as its primary button and "See an example →" as the secondary, and the home page's Documentation section lists the Go guide right after the Language reference. The website README's page table lists the guide.
+
+**Deviations**: None. The Documentation section from the language-reference spec was already in place (`index.mdx` around line 346), so the entry was added after its Language reference item.
+
+**Files changed**:
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: Link the Go guide from the xcl README
+
+**What was done**: The README's Documentation list links `https://xcl.dev/using-xcl-with-go/` with a one-line description, directly after the Language reference entry. Nothing else in the README changed.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: xcl.dev generates the Go and Python API references from the advertised release
+
+**What was done**: Added the release pin `src/config/release.json` (`{ "xcl": "v0.5.3" }`), re-exported from `site.ts` as `xclRelease` and `xclLangVersion`, with `goReferenceURL = "/api/go/"`, `pythonReferenceURL = "/api/python/"` and `goPkgDevURL`. The hero badge and the Go guide's `go get` line read the pin. `npm run api-docs` (`scripts/api-docs/generate.sh`) clones xcl at the pinned tag and runs doc2go v0.12.2 in embed mode over the twelve public packages, then installs pdoc 16.0.0 (pinned with its dependencies in `requirements.txt`) and `xcl-lang==0.5.3` into a throwaway venv and runs `python.py`, which renders `xcl`, `xcl.aio` and `xcl.mask` through a content-only `frame.html.jinja2` and rewrites pdoc's file links to `/api/python/...` (an undocumented target fails the run). Two catch-all routes render the fragments inside `Shell` through `ApiReference.astro`, with a heading naming the release, a pkg.go.dev or PyPI link and a list of the reference's packages or modules; `api-reference.css` styles both generators' markup with the site tokens and carries the generated Chroma and Pygments `github-dark` classes. `deploy.yml` gains `workflow_dispatch`, Go 1.27.x, Python 3.12 and an `npm run api-docs` step before the build; `generated/` is git-ignored; `make api-docs` and a README section were added. The footer's Go link now opens in the same tab.
+
+**Deviations**: Release v0.5.3 instead of v0.5.0 (orchestrator brief: v0.5.0 was taken, v0.5.1/v0.5.2 never reached PyPI). The fragment parsing is shared in `src/lib/api-fragments.ts` rather than repeated in both routes, and `ApiReference.astro` takes the parsed page plus the list of all pages (to render a package or module list in the header, which also gives the three Python pages links to each other since pdoc's own nav is dropped) instead of separate `title`/`description`/`html` props. `process.env.CI` is read through `globalThis`, because the site has no Node type definitions and `astro check` rejected `process`. The Go guide's install block switched from a fenced block to expressive-code's `<Code>` component so the version comes from the pin.
+
+**Files changed**:
+- `xcl-website: src/config/release.json`
+- `xcl-website: src/config/site.ts`
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: src/pages/using-xcl-with-go.mdx`
+- `xcl-website: src/components/Footer.astro`
+- `xcl-website: src/components/ApiReference.astro`
+- `xcl-website: src/lib/api-fragments.ts`
+- `xcl-website: src/pages/api/go/[...path].astro`
+- `xcl-website: src/pages/api/python/[...path].astro`
+- `xcl-website: src/styles/api-reference.css`
+- `xcl-website: scripts/api-docs/generate.sh`
+- `xcl-website: scripts/api-docs/python.py`
+- `xcl-website: scripts/api-docs/go-frontmatter.tmpl`
+- `xcl-website: scripts/api-docs/requirements.txt`
+- `xcl-website: scripts/api-docs/pdoc-templates/frame.html.jinja2`
+- `xcl-website: .github/workflows/deploy.yml`
+- `xcl-website: package.json`
+- `xcl-website: Makefile`
+- `xcl-website: .gitignore`
+- `xcl-website: README.md`
+
+**Discoveries**: doc2go's front matter `.Path` is the full import path (the root is `github.com/jumppad-labs/xcl`), not a path relative to `-home`. doc2go run with Go 1.27 also documents the Go 1.27 method-form lookups (`Config.Find` and friends) beside the functions. The released `xcl-lang` 0.5.3 imports with only `protobuf` beside it, and importing `xcl`, `xcl.aio` and `xcl.mask` spawns no process (checked by spying on `subprocess.Popen`). Its docstrings are reStructuredText (double backticks), pdoc's default format. The whole generation takes about five seconds locally once the Go module cache is warm. The live deploy (push to main or a manual dispatch) has not run: it is outstanding until the user pushes.
+
+### 2026-10-13 — Task: Put the API references in the navigation, footer and home page
+
+**What was done**: The nav gains an "API" dropdown right after "Language", with Go then Python, so its label opens `/api/go/`. Nav items now carry an optional `hideOnSmall`, set on "Features" and "API", replacing the hard-coded "first item hidden on phones" check. The footer's "Go Reference" became "Go API" (`/api/go/`) and "Python API" (`/api/python/`) follows it, both in the same tab. The home page's Documentation section ends with the Go and Python API references, and the website README's page table lists both.
+
+**Deviations**: None. Checked with headless Chrome: at 375px the bar shows xcl, Language, Examples, Guides and GitHub without overflow; at desktop width "API" sits between "Language" and "Examples".
+
+**Files changed**:
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: src/components/Footer.astro`
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: Write the Using XCL with Python guide
+
+**What was done**: Added `/using-xcl-with-python/`, the same `deployer` walkthrough in Python: install `xcl-lang` (version from the release pin) in a virtualenv, `@xcl.entity` dataclasses, a `LocalRegistry` with `register_type` and `register_function(slugify)`, the Go Docker plugin through `xcl.GitHubRegistry(trusted_keys=...)` at `v0.2.0` with the key from `https://xcl.dev/keys/jumppad-labs-releases.asc`, `xcl.Config` as a context manager, `validate` with `ConfigError.problems`, `apply`, `find`/`find_by_type`/`find_one`/`all` and `find(None, ...)` for the plugin's container, outputs, `NotFoundError` and `NotUniqueError`, a `status` command with `load`, `destroy`, then `main_async.py` with `xcl.aio.Config`, an `async def` function, a ticker that keeps running during the apply and `asyncio.timeout` for cancellation, and a fork-safety section. Every snippet was assembled in page order in an empty directory with a fresh virtualenv holding `xcl-lang==0.5.3` from PyPI and a Docker-compatible engine (podman), and run: apply, the temporary replica, status, destroy and the asyncio program. The printed lines in the page are copied from those runs.
+
+**Deviations**: `xcl.ConfigError` exposes `problems` (file, line, column, message), not `causes` as the plan's context said; the guide uses `problems`. `NotUniqueError` carries the count in `details["count"]`, as a string. A plugin entity is read as `container["ip_address"]` and `container.meta`. The program is one `main.py` that grows by adding functions above `main` and replacing `main`, plus `main_async.py`, which imports the classes and the GitHub registry from `main.py` and defines its own registry for the `async def` slugify. The asyncio demo uses a ticker rather than `asyncio.start_server`. The plugin is pinned at `v0.2.0`, the latest release, which loads under v0.5.3.
+
+**Files changed**:
+- `xcl-website: src/pages/using-xcl-with-python.mdx`
+
+**Discoveries**: `jumppad-labs/xcl-plugin-docker` v0.2.0 (built 2026-10-10) loads and works under xcl v0.5.3 from Python, against podman's Docker-compatible socket. The sync API turns Ctrl-C into a cancel that drains the operation so progress is saved, then re-raises `KeyboardInterrupt`. A leftover `guide` network from an earlier run makes the next apply fail with "network already exists", so the run-through must start from a destroyed state. Engine error details reach Python as strings (`details["count"] == "2"`).
+
+### 2026-10-13 — Task: Put the Python guide in the navigation and on the home page
+
+**What was done**: "Using XCL with Python" is the second entry of the Guides dropdown, after the Go guide. The home page's closing banner offers both guides (Go primary, Python secondary), the Documentation section reads Language reference, Go guide, Python guide, then the two API references, and the website README's page table lists the Python guide.
+
+**Deviations**: None. The examples stay linked from the hero and the "Two examples" section.
+
+**Files changed**:
+- `xcl-website: src/components/Nav.astro`
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: Link the Python guide from the xcl README and record the guides in the changelog
+
+**What was done**: The README's Documentation list now reads Language reference, "Using XCL with Go", "Using XCL with Python". `CHANGELOG.md` gains this spec's single entry at the top: one prose paragraph on the two guides, what each covers, the generated API references at `/api/go/` and `/api/python/` and the README links, then **Breaking:** None.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl: README.md`
+- `xcl: CHANGELOG.md`
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: Link the API reference and the Python guide from the xcl-python README
+
+**What was done**: The xcl-python README links `https://xcl.dev/api/python/` (Python API reference) and `https://xcl.dev/using-xcl-with-python/` (getting started guide), right after its xcl.dev bullet. It is the only change in xcl-python: no docs build, workflow, Pages site or dependency. The links reach PyPI with the next `xcl-lang` release, since the README is the package's long description.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-python: README.md`
+
+**Discoveries**: None. Both URLs open only once xcl.dev has been deployed with this work; that is outstanding until the user pushes.

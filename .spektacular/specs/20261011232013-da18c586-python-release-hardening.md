@@ -13,17 +13,17 @@ The first attempt to publish XCL for Python showed two gaps that stop a release 
 
 ## Requirements
 
-- [ ] **Test suite runs on every supported Python**
+- [x] **Test suite runs on every supported Python**
   The full xcl-python test suite runs on CPython 3.10 through the latest stable release without import errors.
-- [ ] **Test suite runs from any checkout layout**
+- [x] **Test suite runs from any checkout layout**
   Every test that needs the xcl sources finds them through the location the suite is given, never by assuming where the xcl checkout sits on disk; when no location is given and none is found, those tests skip with a message naming what to set.
 - [ ] **No Docker in the test suite**
   The end-to-end and GitHub-registry tests use a purpose-built test plugin and need no Docker engine; the suite passes in full on every CI platform.
 - [ ] **Test plugin published as a signed release**
   The test plugin is published as a release with signed assets, so the tests exercise the real download, checksum and signature path, including refusal of a tampered asset and of an untrusted key.
-- [ ] **Test plugin covers the plugin behaviours the tests need**
+- [x] **Test plugin covers the plugin behaviours the tests need**
   The test plugin's provider records the operations it is asked to perform, so tests can assert what ran, and its types include sensitive and computed fields so masking and computed values are covered through an external plugin.
-- [ ] **CI builds the engine from one recorded source**
+- [x] **CI builds the engine from one recorded source**
   xcl-python's CI builds the engine from a single recorded xcl ref, so switching the source line (today the libxcl branch, xcl's main line once that work merges) is one change.
 
 ## Constraints
@@ -39,15 +39,15 @@ The first attempt to publish XCL for Python showed two gaps that stop a release 
 
 - [ ] **Green on 3.10**
   Every CPython version in the CI matrix, from 3.10 to the latest stable release, passes on Linux, macOS and Windows.
-- [ ] **Fixtures found through the given location**
+- [x] **Fixtures found through the given location**
   With the xcl sources checked out to a directory that is not next to the package checkout, and the suite told where they are, every test passes; with no location given and no sibling checkout, tests that need them skip with a message naming what to set.
 - [ ] **Suite passes without Docker**
   On a runner with no Docker engine, the full xcl-python suite passes with no skipped end-to-end or registry tests.
 - [ ] **Registry path exercised by the test plugin**
   Installing the test plugin from the GitHub registry downloads it, verifies its checksum and signature, and an apply through it succeeds; a tampered asset is refused with a signature error, and an asset signed by an untrusted key is refused naming the key.
-- [ ] **Recorded operations**
+- [x] **Recorded operations**
   After an apply and a destroy through the test plugin, the test can read back the ordered list of operations the provider performed, and a sensitive attribute of its type is masked in events and state while a computed one is filled in.
-- [ ] **CI source switch**
+- [x] **CI source switch**
   CI builds the engine from the xcl ref recorded for the package, and changing that single ref is enough to switch the build source.
 
 ## Technical Approach

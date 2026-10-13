@@ -244,7 +244,7 @@ CI keeps the sibling plan's strict mode and engine signal, and extends strict fa
 
 **Validation point**: On the full CI matrix, every test outside the Docker-plugin and tamper modules passes. The only exceptions are the failures owned by the sibling engine spec: the Windows in-process parity crash and the Alpine load error. Locally, with `XCL_SRC` unset and no sibling checkout, the source-dependent tests skip with the `XCL_SRC` message.
 
-#### - [ ] Task: Read the plugin pin on every supported Python
+#### - [x] Task: Read the plugin pin on every supported Python
 **Id:** d8fe0539-eaef-4f55-a874-3c6569b58a42
 **Repo:** xcl-python
 **Depends on:** none
@@ -255,11 +255,11 @@ The release helpers read the pinned plugin release from a TOML file with `tomlli
 *Technical detail:* [context.md#task-read-the-plugin-pin-on-every-supported-python](./context.md#task-read-the-plugin-pin-on-every-supported-python)
 
 **Acceptance criteria**:
-- [ ] On CPython 3.10 every test module imports and is collected without an import error
-- [ ] On CPython 3.11 and later no TOML package beyond the standard library is installed with the test extras
-- [ ] The pinned repository and version are read the same way on every supported Python
+- [x] On CPython 3.10 every test module imports and is collected without an import error
+- [x] On CPython 3.11 and later no TOML package beyond the standard library is installed with the test extras
+- [x] The pinned repository and version are read the same way on every supported Python
 
-#### - [ ] Task: Find the xcl sources through one locator
+#### - [x] Task: Find the xcl sources through one locator
 **Id:** 78f1a21e-e0c2-43f6-8272-a90f53c5b644
 **Repo:** xcl-python
 **Depends on:** none
@@ -275,13 +275,13 @@ This task adds one locator that every test uses: `XCL_SRC` if set, otherwise the
 *Technical detail:* [context.md#task-find-the-xcl-sources-through-one-locator](./context.md#task-find-the-xcl-sources-through-one-locator)
 
 **Acceptance criteria**:
-- [ ] With the xcl sources anywhere on disk and `XCL_SRC` pointing at them, the schema, integration and parity tests find them
-- [ ] With `XCL_SRC` unset and no sibling checkout, every test that needs the sources skips with a message telling the developer to set `XCL_SRC`
-- [ ] With strict mode on, a missing fixture plugin build or xcl source checkout fails the run instead of skipping
-- [ ] With strict mode on, a missing engine is reported through the sibling's `skip_missing_engine`, failing only for a route listed in `XCL_TEST_ENGINES`; route-marker skips (`subprocess_only` / `inprocess_only`) stay skips
-- [ ] Legitimate platform skips (such as fork on Windows) are unaffected by strict mode
+- [x] With the xcl sources anywhere on disk and `XCL_SRC` pointing at them, the schema, integration and parity tests find them
+- [x] With `XCL_SRC` unset and no sibling checkout, every test that needs the sources skips with a message telling the developer to set `XCL_SRC`
+- [x] With strict mode on, a missing fixture plugin build or xcl source checkout fails the run instead of skipping
+- [x] With strict mode on, a missing engine is reported through the sibling's `skip_missing_engine`, failing only for a route listed in `XCL_TEST_ENGINES`; route-marker skips (`subprocess_only` / `inprocess_only`) stay skips
+- [x] Legitimate platform skips (such as fork on Windows) are unaffected by strict mode
 
-#### - [ ] Task: Build and find fixture programs with the Windows executable suffix
+#### - [x] Task: Build and find fixture programs with the Windows executable suffix
 **Id:** ffaad710-b276-4087-ae44-781a45a46837
 **Repo:** xcl-python
 **Depends on:**
@@ -294,10 +294,10 @@ On Windows the fixture plugins and the Go parity program are built without `.exe
 
 **Acceptance criteria**:
 - [ ] On Windows the slow and recording fixture plugins start and the async, sync and diff tests that use them pass
-- [ ] On Linux and macOS the fixture programs keep their current names and behaviour
+- [x] On Linux and macOS the fixture programs keep their current names and behaviour
 - [ ] The Go parity program runs on Windows from the same build directory
 
-#### - [ ] Task: Make the interrupt and stall tests hold on every platform
+#### - [x] Task: Make the interrupt and stall tests hold on every platform
 **Id:** 7ea63d06-86ef-4ea5-8bbb-0c6eff176922
 **Repo:** xcl-python
 **Depends on:**
@@ -310,10 +310,10 @@ Two tests fail for reasons that have nothing to do with the package. Windows can
 
 **Acceptance criteria**:
 - [ ] On Windows, interrupting a running apply in a child process ends it promptly, reports the interruption and leaves state saved, as on Linux and macOS
-- [ ] The stall test still fails when an apply blocks other Python threads, and passes on slow runners where threads keep running
-- [ ] Neither test is skipped on any CI platform
+- [x] The stall test still fails when an apply blocks other Python threads, and passes on slow runners where threads keep running
+- [x] Neither test is skipped on any CI platform
 
-#### - [ ] Task: Run CI in strict mode with a GitHub token
+#### - [x] Task: Run CI in strict mode with a GitHub token
 **Id:** 2f402e04-31f7-44f4-9e95-885703a1095a
 **Repo:** xcl-python
 **Depends on:**
@@ -325,10 +325,10 @@ The sibling plan's CI and release steps already set `XCL_TEST_STRICT=1` and `XCL
 *Technical detail:* [context.md#task-run-ci-in-strict-mode-with-a-github-token](./context.md#task-run-ci-in-strict-mode-with-a-github-token)
 
 **Acceptance criteria**:
-- [ ] Every matrix job runs the suite in strict mode with a GitHub token available to the engine
-- [ ] Every job, Alpine included, keeps the sibling's `XCL_TEST_STRICT=1` and `XCL_TEST_ENGINES` settings unchanged and also has the GitHub token
-- [ ] The engine and fixture plugins in every job are still built from the single xcl ref recorded in the repository
-- [ ] The workflow no longer describes or relies on a Docker engine for the main test matrix
+- [x] Every matrix job runs the suite in strict mode with a GitHub token available to the engine
+- [x] Every job, Alpine included, keeps the sibling's `XCL_TEST_STRICT=1` and `XCL_TEST_ENGINES` settings unchanged and also has the GitHub token
+- [x] The engine and fixture plugins in every job are still built from the single xcl ref recorded in the repository
+- [x] The workflow no longer describes or relies on a Docker engine for the main test matrix
 
 ### Milestone 2: A signed test plugin is published for release testing
 
@@ -336,7 +336,7 @@ The sibling plan's CI and release steps already set `XCL_TEST_STRICT=1` and `XCL
 
 **Validation point**: The plugin's CI passes (build, lint, unit and end-to-end tests). The `v0.1.0` release lists six platform archives, the checksums file and a signature that verifies against the jumppad-labs release key.
 
-#### - [ ] Task: Create the xcl-plugin-test repository from the template
+#### - [x] Task: Create the xcl-plugin-test repository from the template
 **Id:** 46405e9d-c75f-4264-b0a7-3d21a4f5879c
 **Repo:** xcl-plugin-test
 **Depends on:** none
@@ -347,11 +347,11 @@ A person creates jumppad-labs/xcl-plugin-test on GitHub from the xcl-plugin-temp
 *Technical detail:* [context.md#task-create-the-xcl-plugin-test-repository-from-the-template](./context.md#task-create-the-xcl-plugin-test-repository-from-the-template)
 
 **Acceptance criteria**:
-- [ ] jumppad-labs/xcl-plugin-test exists as a public repository generated from the template
-- [ ] The repository has the release-key signing secrets the release workflow needs
-- [ ] The registered local directory is a git checkout of the new repository with its Spektacular footprint committed
+- [x] jumppad-labs/xcl-plugin-test exists as a public repository generated from the template
+- [x] The repository has the release-key signing secrets the release workflow needs
+- [x] The registered local directory is a git checkout of the new repository with its Spektacular footprint committed
 
-#### - [ ] Task: Build the test item plugin
+#### - [x] Task: Build the test item plugin
 **Id:** ff6fefc1-7ae5-4ff2-be61-db1b5d93bff5
 **Repo:** xcl-plugin-test
 **Depends on:**
@@ -363,13 +363,13 @@ This task turns the template's notes example into the test plugin: one `test "it
 *Technical detail:* [context.md#task-build-the-test-item-plugin](./context.md#task-build-the-test-item-plugin)
 
 **Acceptance criteria**:
-- [ ] Applying two linked items and destroying them leaves a log listing create, create, destroy, destroy in dependency order
-- [ ] An item's `output` is filled in after create and recomputed after an in-place update of `value`
-- [ ] An item's `secret` is treated as sensitive by xcl
+- [x] Applying two linked items and destroying them leaves a log listing create, create, destroy, destroy in dependency order
+- [x] An item's `output` is filled in after create and recomputed after an in-place update of `value`
+- [x] An item's `secret` is treated as sensitive by xcl
 - [ ] The plugin builds, lints and passes its unit and end-to-end tests in CI, both in-process and as a separate program
-- [ ] The release build produces six platform archives and a checksums file named for `xcl-plugin-test`
+- [x] The release build produces six platform archives and a checksums file named for `xcl-plugin-test`
 
-#### - [ ] Task: Publish the first signed test plugin release
+#### - [x] Task: Publish the first signed test plugin release
 **Id:** eafec176-f773-4b3d-8288-18e5391d12a5
 **Repo:** xcl-plugin-test
 **Depends on:**
@@ -381,8 +381,8 @@ A person merges the plugin to the main branch and tags `v0.1.0`, and the release
 *Technical detail:* [context.md#task-publish-the-first-signed-test-plugin-release](./context.md#task-publish-the-first-signed-test-plugin-release)
 
 **Acceptance criteria**:
-- [ ] Release `v0.1.0` of jumppad-labs/xcl-plugin-test is published, not a draft
-- [ ] It carries six platform archives, the checksums file and a detached signature over it
+- [x] Release `v0.1.0` of jumppad-labs/xcl-plugin-test is published, not a draft
+- [x] It carries six platform archives, the checksums file and a detached signature over it
 
 ### Milestone 3: xcl-python's end-to-end and registry tests run without Docker
 
@@ -390,7 +390,7 @@ A person merges the plugin to the main branch and tags `v0.1.0`, and the release
 
 **Validation point**: On a machine with no Docker engine, the full xcl-python suite passes with no skipped end-to-end or registry tests. In CI with strict mode, every matrix job's Docker-plugin and tamper tests pass, apart from failures still owned by the sibling engine spec.
 
-#### - [ ] Task: Pin the test plugin release in plugin-agnostic release helpers
+#### - [x] Task: Pin the test plugin release in plugin-agnostic release helpers
 **Id:** 4aa20a4a-b233-43df-92b0-5262a1f0f2ad
 **Repo:** xcl-python
 **Depends on:**
@@ -404,12 +404,12 @@ The suite's pinned release moves from the Docker plugin to `jumppad-labs/xcl-plu
 *Technical detail:* [context.md#task-pin-the-test-plugin-release-in-plugin-agnostic-release-helpers](./context.md#task-pin-the-test-plugin-release-in-plugin-agnostic-release-helpers)
 
 **Acceptance criteria**:
-- [ ] The suite's single plugin pin names the test plugin release
+- [x] The suite's single plugin pin names the test plugin release
 - [ ] The test plugin release is installed and verified once per test session from GitHub with the jumppad-labs key
-- [ ] Nothing in the suite probes for or needs a Docker engine
-- [ ] A failure to install the release fails the run under strict mode instead of skipping
+- [x] Nothing in the suite probes for or needs a Docker engine
+- [x] A failure to install the release fails the run under strict mode instead of skipping
 
-#### - [ ] Task: Replace the Docker plugin tests with test plugin tests
+#### - [x] Task: Replace the Docker plugin tests with test plugin tests
 **Id:** 146a5ff4-3f98-4a92-988d-8454dd07e8c0
 **Repo:** xcl-python
 **Depends on:**
@@ -421,13 +421,13 @@ The four Docker plugin tests are ported to the test plugin: start through the Gi
 *Technical detail:* [context.md#task-replace-the-docker-plugin-tests-with-test-plugin-tests](./context.md#task-replace-the-docker-plugin-tests-with-test-plugin-tests)
 
 **Acceptance criteria**:
-- [ ] The test plugin starts and applies through the GitHub registry, from its binary path and from its directory
-- [ ] Applied items read back generically with their meta, references and links
-- [ ] After an apply and a destroy the test reads back the operations in dependency order
-- [ ] The computed value is filled in, and the sensitive value is redacted in lookups and event data and not stored in plain text in masked state
-- [ ] No Docker plugin test remains in the suite
+- [x] The test plugin starts and applies through the GitHub registry, from its binary path and from its directory
+- [x] Applied items read back generically with their meta, references and links
+- [x] After an apply and a destroy the test reads back the operations in dependency order
+- [x] The computed value is filled in, and the sensitive value is redacted in lookups and event data and not stored in plain text in masked state
+- [x] No Docker plugin test remains in the suite
 
-#### - [ ] Task: Retarget the tamper tests at the test plugin
+#### - [x] Task: Retarget the tamper tests at the test plugin
 **Id:** 7f99a20f-f4df-493b-9a8e-87fdf79bb4c1
 **Repo:** xcl-python
 **Depends on:**
@@ -439,12 +439,12 @@ The fake GitHub API tests keep their four test functions and assertions as they 
 *Technical detail:* [context.md#task-retarget-the-tamper-tests-at-the-test-plugin](./context.md#task-retarget-the-tamper-tests-at-the-test-plugin)
 
 **Acceptance criteria**:
-- [ ] A tampered checksums file is refused with a signature error and nothing is cached
-- [ ] A release checked against a key that did not sign it is refused, with the message saying it does not verify against any trusted key
-- [ ] A valid release served by the fake API installs and applies, and an unsigned one installs when no keys are trusted
+- [x] A tampered checksums file is refused with a signature error and nothing is cached
+- [x] A release checked against a key that did not sign it is refused, with the message saying it does not verify against any trusted key
+- [x] A valid release served by the fake API installs and applies, and an unsigned one installs when no keys are trusted
 - [ ] The four tests run, rather than skip, on every CI platform
 
-#### - [ ] Task: Name the untrusted signing key in the registry refusal
+#### - [x] Task: Name the untrusted signing key in the registry refusal
 **Id:** 66c6aaa8-4fdf-491b-b36c-8e91ef0e4ed9
 **Repo:** xcl
 **Depends on:** none
@@ -455,12 +455,12 @@ When a plugin release is signed by a key that is not trusted, the engine refuses
 *Technical detail:* [context.md#task-name-the-untrusted-signing-key-in-the-registry-refusal](./context.md#task-name-the-untrusted-signing-key-in-the-registry-refusal)
 
 **Acceptance criteria**:
-- [ ] A release signed by an untrusted key is refused with a verification error that names the signing key's ID
-- [ ] The refusal still says the signature does not verify against any trusted key, and is still a plugin verification error
-- [ ] Tampered, unsigned and correctly signed releases behave exactly as before
-- [ ] xcl's CHANGELOG opens with an entry for this spec. It explains that the untrusted-key refusal now names the signing key's long ID while keeping the existing wording, and ends by stating there is no breaking change
+- [x] A release signed by an untrusted key is refused with a verification error that names the signing key's ID
+- [x] The refusal still says the signature does not verify against any trusted key, and is still a plugin verification error
+- [x] Tampered, unsigned and correctly signed releases behave exactly as before
+- [x] xcl's CHANGELOG opens with an entry for this spec. It explains that the untrusted-key refusal now names the signing key's long ID while keeping the existing wording, and ends by stating there is no breaking change
 
-#### - [ ] Task: Assert the untrusted-key refusal names the signing key
+#### - [x] Task: Assert the untrusted-key refusal names the signing key
 **Id:** df430a08-97ca-4594-b7c5-e817826b1a2f
 **Repo:** xcl-python
 **Depends on:**
@@ -473,10 +473,10 @@ A new registry test, added beside the unchanged tamper tests, installs the test 
 *Technical detail:* [context.md#task-assert-the-untrusted-key-refusal-names-the-signing-key](./context.md#task-assert-the-untrusted-key-refusal-names-the-signing-key)
 
 **Acceptance criteria**:
-- [ ] Trusting a key other than the release key, installing the test plugin is refused with a plugin verification error naming the release signing key's ID
-- [ ] The existing four tamper tests are unchanged apart from the plugin they install
+- [x] Trusting a key other than the release key, installing the test plugin is refused with a plugin verification error naming the release signing key's ID
+- [x] The existing four tamper tests are unchanged apart from the plugin they install
 
-#### - [ ] Task: Describe the test setup in the README
+#### - [x] Task: Describe the test setup in the README
 **Id:** ba4a50af-153d-4004-8a0e-99a592556d33
 **Repo:** xcl-python
 **Depends on:**
@@ -493,8 +493,8 @@ The Getting started example keeps the Docker plugin as the documented example.
 *Technical detail:* [context.md#task-describe-the-test-setup-in-the-readme](./context.md#task-describe-the-test-setup-in-the-readme)
 
 **Acceptance criteria**:
-- [ ] A developer can learn from the README how to run the suite against an xcl checkout anywhere on disk
-- [ ] The README says the tests use the test plugin and need no Docker, while its Getting started example still shows the Docker plugin
+- [x] A developer can learn from the README how to run the suite against an xcl checkout anywhere on disk
+- [x] The README says the tests use the test plugin and need no Docker, while its Getting started example still shows the Docker plugin
 
 ## Open Questions
 
@@ -511,3 +511,237 @@ The Getting started example keeps the Docker plugin as the documented example.
 - **Changing the Docker example plugin or its tests** (spec Constraint). jumppad-labs/xcl-plugin-docker keeps its repository, tests and place as the README's documented example.
 - **Switching `xcl-ref.txt` from `f-libxcl` to `main`.** This plan makes and checks that the switch is a single change. Making it waits for f-libxcl to merge into xcl's main line after the epic completes, and is a one-line follow-up at that point.
 - **Moving xcl's own tests that mention xcl-plugin-docker** (asset-name unit tests, the remote-plugin example) to the test plugin. The spec scopes the Docker removal to xcl-python's suite.
+
+## Changelog
+
+### 2026-10-13 — Task: Read the plugin pin on every supported Python
+
+**What was done**: The release helpers now read `tests/plugins.toml` through `tomllib` on CPython 3.11+ and through the `tomli` backport on 3.10, and the `test` extra installs `tomli` only under `python_version < '3.11'`, with a comment saying why. A test reads the pin through the helper on whichever interpreter runs it.
+
+**Deviations**: The pin-reader test lives at `tests/integration/test_plugin_pin.py` rather than `tests/unit/test_plugins_toml.py`: the helper module sits in `tests/integration/`, which pytest's prepend import mode puts on `sys.path` only for tests in that directory, so a unit test could not import it without a second import path. The test needs no engine. Test authored directly rather than through a sub-agent, given its size.
+
+**Files changed**:
+- `xcl-python: pyproject.toml`
+- `xcl-python: tests/integration/docker_helpers.py`
+- `xcl-python: tests/integration/test_plugin_pin.py`
+
+**Discoveries**: Verified locally with a uv-managed CPython 3.10.21: the full suite collected and passed (244 passed, 1 route skip); before the change collection failed with `No module named 'tomllib'`. On 3.14 `tomli` is not installed with `.[test]`.
+
+### 2026-10-13 — Task: Find the xcl sources through one locator
+
+**What was done**: Added `tests/xcl_source.py`: `path()` (`XCL_SRC`, else the sibling `../xcl`), `strict()`, `skip(reason, *, route=None)` (no route: fail under `XCL_TEST_STRICT=1`, else skip; with a route: delegates to the sibling's `engines.skip_missing_engine`) and `require(relative)`. A session fixture `xcl_src` in `tests/conftest.py` is the one way tests get the checkout. The schema unit test, the integration and parity conftests and the parity type tests now use it, and every harness skip in those conftests goes through `xcl_source.skip`.
+
+**Deviations**: The out-of-process-engine spec had added a fourth private locator, `xcl_source()` in `tests/integration/test_engine_process.py`; it was removed and `test_engine_of_other_version_refused` now takes the `xcl_src` fixture (its go-missing skip goes through `xcl_source.skip`). The parity conftest's `FIXTURES` module constant, which `tests/parity/test_types.py` imported, became a `parity_fixtures` session fixture, and the seven type tests take it. Unit tests written directly rather than through a sub-agent.
+
+**Files changed**:
+- `xcl-python: tests/xcl_source.py`
+- `xcl-python: tests/conftest.py`
+- `xcl-python: tests/unit/test_schema.py`
+- `xcl-python: tests/unit/test_xcl_source.py`
+- `xcl-python: tests/integration/conftest.py`
+- `xcl-python: tests/integration/test_engine_process.py`
+- `xcl-python: tests/parity/conftest.py`
+- `xcl-python: tests/parity/test_types.py`
+
+**Discoveries**: Checked from a copy of the package with no sibling `xcl`: with `XCL_SRC` unset, the 16 source-dependent tests skip with "the xcl sources are not at …; set XCL_SRC to the xcl checkout"; with `XCL_TEST_STRICT=1` they error instead; with `XCL_SRC` set, 254 pass. The suite passes strict on CPython 3.10 and 3.14.
+
+### 2026-10-13 — Task: Build and find fixture programs with the Windows executable suffix
+
+**What was done**: `make plugins` builds `xcl-plugin-slow`, `xcl-plugin-recording` and `parity` with `$(EXE)`, the `.exe`-on-Windows suffix the out-of-process-engine spec had already defined in the Makefile for the engine program. `xcl_source.executable(name)` gives the same name in Python, and the integration conftest (`SLOW`, `RECORDING`) and the parity conftest (`wanted`, the `parity` program path) look the binaries up through it.
+
+**Deviations**: The Makefile already had an `EXE` variable (added by the sibling for `xcl-core`), so it was reused rather than adding a second one. The two Windows acceptance criteria are left unchecked: they can only be observed on the Windows CI runners, which this run cannot push to. Locally, Linux names are unchanged (strict suite 254 passed) and `make -n plugins EXE=.exe` names all three programs with `.exe`.
+
+**Files changed**:
+- `xcl-python: Makefile`
+- `xcl-python: tests/xcl_source.py`
+- `xcl-python: tests/integration/conftest.py`
+- `xcl-python: tests/parity/conftest.py`
+
+**Discoveries**: xcl's directory discovery (`registry/discovery.go`) and plugin naming (`plugins/grpc_plugin_host.go`) already strip `.exe` on Windows, so the `.exe` fixture plugins are found by directory too. Outstanding (needs GitHub runners): the Windows jobs start the fixture plugins and the Go parity program.
+
+### 2026-10-13 — Task: Make the interrupt and stall tests hold on every platform
+
+**What was done**: The keyboard-interrupt test starts its child in a new process group on Windows and sends `CTRL_BREAK_EVENT`, and SIGINT elsewhere; the child maps `SIGBREAK` to `KeyboardInterrupt` where it exists, so the assertions are unchanged. The stall test now measures a baseline tick count for 1.5 s with nothing running, through a shared `count_ticks` helper, and requires the apply to let the thread tick at least half as often, instead of a fixed 50.
+
+**Deviations**: None. The Windows acceptance criterion is left unchecked until a Windows CI run shows the break event reaching the child (the plan's Open Question).
+
+**Files changed**:
+- `xcl-python: tests/integration/test_sync.py`
+
+**Discoveries**: Checked that the calibrated check still catches a stall: a call that holds the GIL for 3.5 s let the counter tick 0 times against a baseline of 149. Both tests pass strict locally on Linux. Outstanding (needs GitHub runners): the Windows interrupt and the macOS stall test.
+
+### 2026-10-13 — Task: Run CI in strict mode with a GitHub token
+
+**What was done**: Both Test steps of `ci.yml` and the Alpine job now pass `GITHUB_TOKEN: ${{ github.token }}` to the tests (into Alpine with `docker run -e GITHUB_TOKEN`) and run `pytest -q -rs`, so any skip is listed in the log. The sibling's `XCL_TEST_STRICT=1` and `XCL_TEST_ENGINES` settings are unchanged, and both jobs still check xcl out at `xcl-ref.txt`. The header comment drops the Docker wording and describes strict mode over sources, fixture plugins and the plugin release, and the signed test plugin release.
+
+**Deviations**:
+- Fixed CI failure (e), not in the plan: on macOS `tests/unit/test_subprocess_transport.py::test_engine_killed_fails_waiting_call_with_signal` saw `137` instead of `-SIGKILL`. The fake engine is started with `sys.executable`, and on the macOS runners (framework Python under `/Library/Frameworks`) that process is an interpreter stub that waits for the real interpreter and reports its signal as 128+n, as a shell does. Reproduced locally by running the test with a non-`exec` shell wrapper as `sys.executable` (same `137`). `FakeLauncher` now passes `FAKE_LAUNCHER_PID`, and the fake engine's `Kill` sends SIGKILL to its parent first when that parent is not the launcher, so the process the transport started ends by the signal, as the real engine does. The transport is unchanged: the real engine is a Go program with no stub.
+- The Alpine job installs `gnupg`: the tamper tests' `other_key` fixture generates its untrusted key with gpg, and `python:3-alpine` has none, so those registry tests would skip there once they no longer skip for Docker.
+- The stall test's threshold is a quarter of the idle baseline rather than the plan's half. The failing macOS runs ticked 36 and 48 times in about 1.56 s, and with an unknown baseline half was too close to call; a real stall still ticks about 0 times (measured: 0 against a baseline of 149).
+- Acceptance criterion 4 was ticked once milestone 3's agent tasks had replaced the Docker-plugin tests and deleted the Docker probe; until then the workflow ran tests that needed Docker.
+
+**Files changed**:
+- `xcl-python: .github/workflows/ci.yml`
+- `xcl-python: tests/fake_engine.py`
+- `xcl-python: tests/unit/test_subprocess_transport.py`
+- `xcl-python: tests/integration/test_sync.py`
+
+**Discoveries**: `release.yml` and `.github/scripts/musl-wheel.sh` run only `tests/parity` and `tests/integration/test_load.py`, which install no plugin release, so they need no token. Locally, strict, with a token: subprocess route 254 passed and 1 route skip; in-process route (`make libxcl`, `XCL_TEST_ENGINES=subprocess,inprocess`) 243 passed and 12 route skips. Outstanding (needs GitHub runners): the whole matrix, and in particular macOS (killed engine, stall test) and Windows.
+
+### 2026-10-13 — Task: Create the xcl-plugin-test repository from the template
+
+**What was done**: Human task, already carried out by the user before this run; verified rather than performed. `jumppad-labs/xcl-plugin-test` is a public repository generated from `jumppad-labs/xcl-plugin-template`, its Actions secrets list `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` (both set 2026-10-12), and `/home/nicj/code/github.com/jumppad-labs/xcl-plugin-test` is a checkout of it (`origin` = `git@github.com:jumppad-labs/xcl-plugin-test.git`) whose second commit, `17c96b7 Add spektacular folder`, commits the Spektacular footprint.
+
+**Deviations**: A `v0.1.0` tag and release already exist on the repository, made from the template's initial commit (`d1a3b60`): its assets are named `xcl-plugin-template_0.1.0_*`, so the GitHub registry cannot install it as `xcl-plugin-test`. It has to be deleted before the plugin's real `v0.1.0` is tagged (see the publish task).
+
+**Files changed**:
+- None (no code; the repository and its secrets are on GitHub).
+
+**Discoveries**: The template-made `v0.1.0` release proves the signing secrets work: the release workflow signed and published it.
+
+### 2026-10-13 — Task: Build the test item plugin
+
+**What was done**: Turned the template's notes example into the test plugin, module `github.com/jumppad-labs/xcl-plugin-test`, package `testplugin`. `entities.Item` is `test "item"` (`log`, `value`, `input`, sensitive `secret`, computed `output`). `client/oplog` holds `Operation`, the `OperationLog` interface and the file-backed `File` (JSON lines appended under a mutex, a missing file reads as empty), with its Mockery double regenerated by `make generate`. `providers.ItemProvider` appends each create, read, update and destroy to the item's log before acting, computes `output` as `<name>-<value>` on create and update, keeps it on read, and uses `plugins.DefaultChanged`. `cmd/xcl-plugin-test` serves the plugin; the Makefile builds `xcl-plugin-test`; `examples/basic` holds two linked items; the README says what the plugin is for and that it is not an example to copy.
+
+**Deviations**:
+- Requires xcl `v0.5.3`, the latest tag now, rather than the plan's `v0.4.0` ("latest tag at implementation time").
+- The e2e behaviours (apply/plan/destroy, create and destroy order between the linked items, computed output, in-place update recomputing output, secret masked in processed event data) live once in `e2e/behaviour_test.go` as functions taking a config constructor, called by one named test per route in `inprocess_test.go` and `external_test.go`; `changes_test.go` checks a value change plans an update. Not table-driven.
+- The weekly `current.yml` comment now speaks of the test plugin instead of the template; `ci.yml` and `release.yml` are unchanged.
+- Tests written in the main context rather than through a sub-agent.
+- Acceptance criterion 4 ("passes … in CI") is left unchecked: `make build`, `make lint` (vet, gofmt, staticcheck) and `make test` (race, unit, in-process, external and state-only e2e) pass locally, but the branch has not run on GitHub Actions, which needs a push.
+
+**Files changed**:
+- `xcl-plugin-test: go.mod`
+- `xcl-plugin-test: go.sum`
+- `xcl-plugin-test: Makefile`
+- `xcl-plugin-test: .mockery.yml`
+- `xcl-plugin-test: .github/workflows/current.yml`
+- `xcl-plugin-test: README.md`
+- `xcl-plugin-test: plugin.go`
+- `xcl-plugin-test: plugin_test.go`
+- `xcl-plugin-test: entities/item.go`
+- `xcl-plugin-test: client/oplog/oplog.go`
+- `xcl-plugin-test: client/oplog/oplog_test.go`
+- `xcl-plugin-test: client/oplog/mocks/mock_operation_log.go`
+- `xcl-plugin-test: providers/item.go`
+- `xcl-plugin-test: providers/item_test.go`
+- `xcl-plugin-test: cmd/xcl-plugin-test/main.go`
+- `xcl-plugin-test: examples/basic/main.xcl`
+- `xcl-plugin-test: e2e/main_test.go`
+- `xcl-plugin-test: e2e/behaviour_test.go`
+- `xcl-plugin-test: e2e/inprocess_test.go`
+- `xcl-plugin-test: e2e/external_test.go`
+- `xcl-plugin-test: e2e/changes_test.go`
+- `xcl-plugin-test: e2e/stateonly/stateonly_test.go`
+- Removed: `xcl-plugin-test: entities/note.go`, `providers/note.go`, `providers/note_test.go`, `client/files/` (client, test, mock), `cmd/notes/main.go`
+
+**Discoveries**: `types.Sensitive[T]` has an unexported value; build it with `types.NewSensitive(v)` and read it with `Reveal()`. `Config.ResourceCount` is deprecated in v0.5.3 (staticcheck SA1019), and `EntityCount` counts variables too, so "nothing left after destroy" is asserted with `FindByType`. `make dist VERSION=v0.0.0-snapshot` produced the six archives and `xcl-plugin-test_0.0.0-snapshot_checksums.txt` (zip was supplied locally through a `python3 -m zipfile` shim; the CI runner has zip).
+
+### 2026-10-13 — Task: Pin the test plugin release in plugin-agnostic release helpers
+
+**What was done**: `tests/plugins.toml` pins `[test]` `jumppad-labs/xcl-plugin-test` `v0.1.0`. `docker_helpers.py` became `release_helpers.py` (`git mv`): `plugin_release()` reads `["test"]`, `TEST_PLUGIN_CONFIG` points at `configs/test_plugin/main.xcl` (moved with `git mv` from `configs/docker/`), `FIRST_ADDRESS`/`SECOND_ADDRESS` replace the Docker constants, `log_variables(log)` gives the configuration its log, and the Docker probe (`DEFAULT_DOCKER_HOST`, `_UnixHTTPConnection`, `daemon_unreachable`, `docker_unavailable`, `require_docker`) is deleted. `installed_release` validates the test plugin configuration and turns an install failure into `xcl_source.skip(...)`, a failure under strict mode.
+
+**Deviations**:
+- `variable "log"` has `default = "ops.jsonl"`: xcl refuses a variable block without a default ("The argument \"default\" is required"), so the plan's `variable "log" {}` does not parse. The tests always pass `log`.
+- This task depends on the human task "Publish the first signed test plugin release", which is not done. It was implemented anyway, as the orchestrator's CI goal needs the Docker probe gone (Windows `AF_UNIX`). Acceptance criterion 2 is left unchecked until the real release exists: today `v0.1.0` of the repository is the template-made release, whose assets are named `xcl-plugin-template_*`, so the install reports "has no build for linux/amd64" and the tests skip locally (fail under strict).
+- Verified instead against a release built locally from the plugin worktree (`make dist VERSION=v0.1.0`), signed with a throwaway gpg key and served through the suite's own `FakeGitHub` by a scratch, uncommitted pytest plugin that points `xcl.GitHubRegistry`'s default API and the trusted key at it.
+
+**Files changed**:
+- `xcl-python: tests/plugins.toml`
+- `xcl-python: tests/integration/release_helpers.py` (renamed from `tests/integration/docker_helpers.py`)
+- `xcl-python: tests/integration/configs/test_plugin/main.xcl` (renamed from `tests/integration/configs/docker/main.xcl`)
+- `xcl-python: tests/integration/test_plugin_pin.py`
+
+**Discoveries**: An xcl `variable` block must have a `default`, even when every caller supplies the value.
+
+### 2026-10-13 — Task: Replace the Docker plugin tests with test plugin tests
+
+**What was done**: `test_docker_plugin.py` became `test_test_plugin.py` (`git mv`), with no Docker gate. The registry, path and directory start tests apply the two items with the log in the test's temp directory and check their values, `output`s (`first-one`, `second-two`), `second.input`, and that no item remains after destroy; the directory test keeps its sidecar-files check. The generic-read test checks meta (`type`/`subtype`, `file`, `line` 9 and 15, `status`), `second.meta.references` and links, `__getitem__`, `in` and `to_dict`, with the `AttributeError`/`KeyError` cases in their own test. New tests: `test_recorded_operations_follow_dependencies` (creates first then second, destroys second then first, read from `ops.jsonl`), `test_computed_output_filled_in`, `test_sensitive_secret_redacted_in_lookup`, `test_sensitive_secret_redacted_in_events` (`event_data="processed"`) and `test_sensitive_secret_masked_in_state` (a real apply into `MemoryStore` under `xcl.mask.aes256gcm`).
+
+**Deviations**:
+- `second.meta.references` is `{"log": "variable.log", "input": "test.item.first.output"}`: the variable reference is recorded too.
+- A generic `xcl.Entity` has no type to rebuild an `xcl.Sensitive` from, so the redacted secret reads back as the string `"(sensitive)"`; the lookup test asserts that and that `hunter2` is nowhere in `to_dict()`, rather than `is_redacted`/`reveal()` as `test_sync.py` does for a typed entity.
+- After-destroy emptiness is checked with `find_by_type(None, "test", "item") == []`, which names what must be gone, rather than `entity_count() == 0`.
+- Verified against the locally built and signed release (see the pin task); the real release is pending the human task.
+
+**Files changed**:
+- `xcl-python: tests/integration/test_test_plugin.py` (renamed from `tests/integration/test_docker_plugin.py`)
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: Retarget the tamper tests at the test plugin
+
+**What was done**: The tamper tests import from `release_helpers`, drop `require_docker` from their imports, `__all__` and `pytestmark`, validate and apply `TEST_PLUGIN_CONFIG` with a `log` variable, and the docstring names the test plugin release. In `test_fake_api_serves_valid_release_installs` the network and container checks became `first.output == "first-one"`; every request, cache and remaining-count assertion, the four test names and their refusal assertions, `FakeGitHub` and the gpg-generated `other_key` fixture are unchanged.
+
+**Deviations**: Acceptance criterion 4 ("run, rather than skip, on every CI platform") is left unchecked until CI runs with the real release. The Alpine job now installs `gnupg` (recorded under the CI task) so `other_key` does not skip there; the other runner images ship gpg. Verified locally against the locally built and signed release: all four pass, strict.
+
+**Files changed**:
+- `xcl-python: tests/integration/test_github_tamper.py`
+
+**Discoveries**: `entity_count()` after destroy is still 0 with the configuration's variable, so the remaining-count assertion was kept as it was.
+
+### 2026-10-13 — Task: Name the untrusted signing key in the registry refusal
+
+**What was done**: `verifySignature` reads the signature file once and, when `openpgp.CheckArmoredDetachedSignature` fails with `pgperrors.ErrUnknownIssuer`, returns `ErrPluginVerification` with the existing "signature <file> does not verify against any trusted key" text followed by "signed by key <%016X>, which is not trusted". The ID comes from the new `signatureIssuer(signature []byte) (uint64, bool)`, which decodes the armour, reads the signature packet and takes `IssuerKeyId`, or the low 64 bits of `IssuerFingerprint`. Every other failure, and a signature whose issuer cannot be read, keeps the previous message. `testutil.FakeGitHubRelease.OtherKeyID()` gives the ID of the key `SignedByOtherKey` signs with. xcl's CHANGELOG opens with this spec's entry, ending `**Breaking:**` / `None.`.
+
+**Deviations**: `OtherKeyID` uses the other key's signing key (`Entity.SigningKey`), falling back to the primary key, rather than `PrimaryKey.KeyId` alone, so it stays right if the fake ever signs with a subkey. No new dependency: `openpgp/armor`, `openpgp/errors` and `openpgp/packet` are from `github.com/ProtonMail/go-crypto` v1.1.6, already required.
+
+**Files changed**:
+- `xcl: registry/github_verify.go`
+- `xcl: registry/github_verify_test.go`
+- `xcl: registry/github_signature_test.go`
+- `xcl: internal/testutil/github_release.go`
+- `xcl: CHANGELOG.md`
+
+**Discoveries**: `go test ./...` and `go vet` of the touched packages pass in the xcl worktree; `TestGitHubPluginStartWithTrustedKeyRefusesReleaseSignedByOtherKey` is unchanged and still passes beside the new `…RefusalNamesTheSigningKey`. The change reaches xcl-python CI only once it is on xcl `f-libxcl`, the ref in `xcl-ref.txt`.
+
+### 2026-10-13 — Task: Assert the untrusted-key refusal names the signing key
+
+**What was done**: `release_helpers.RELEASE_SIGNING_KEY_ID = "F775DA00AFD4B502"`, with a comment on where it comes from, and a new `test_untrusted_key_refusal_names_signing_key` beside the four unchanged tamper tests: the real release files served by `fake_github`, `other_key` trusted, and the `PluginVerificationError` must contain "signed by key F775DA00AFD4B502, which is not trusted".
+
+**Deviations**: The key ID was read with `gpg --list-packets` from the `.sig` of the release already on jumppad-labs/xcl-plugin-test (the template-made `v0.1.0`, signed by the release workflow with the same secrets), since the plugin's own release is not published yet: issuer `F775DA00AFD4B502`, fingerprint `15BDA6843A1FA0EAD1AA5190F775DA00AFD4B502`, the primary key of `tests/keys/jumppad-labs.asc`, which has no signing subkey. Verified locally with the engine and the shared library rebuilt from the xcl worktree, against the locally signed release (the scratch plugin substitutes the local key's ID).
+
+**Files changed**:
+- `xcl-python: tests/integration/release_helpers.py`
+- `xcl-python: tests/integration/test_github_tamper.py`
+
+**Discoveries**: In CI this test needs an engine built from an xcl ref that includes the key-naming change; until that change is on `f-libxcl` it fails there.
+
+### 2026-10-13 — Task: Describe the test setup in the README
+
+**What was done**: The README's Development section now says the tests find the xcl sources through `XCL_SRC`, else a sibling `../xcl`, how to run against a checkout elsewhere, and that tests needing the sources skip naming `XCL_SRC`; that the end-to-end and registry tests install the signed `jumppad-labs/xcl-plugin-test` release pinned in `tests/plugins.toml` and need network but no Docker, with `GITHUB_TOKEN` for the rate limit; and what `XCL_TEST_STRICT=1` fails and what stays a skip. Getting started still shows the Docker plugin.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-python: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-13 — Task: Publish the first signed test plugin release (outstanding: human)
+
+**What was done**: Nothing; this is the user's task and stays unchecked. The agent tasks that depend on it were implemented and verified against a locally built, locally signed release. Until it is done, xcl-python's test-plugin and tamper tests cannot install the pinned release: they skip locally and fail in CI under strict mode.
+
+**Deviations**: A `v0.1.0` tag and release already exist on jumppad-labs/xcl-plugin-test, made from the template's initial commit, with assets named `xcl-plugin-template_0.1.0_*`. They must be removed before the plugin's `v0.1.0` is tagged.
+
+**Files changed**:
+- None.
+
+**Discoveries**: Steps for the user, from the xcl-plugin-test checkout once this spec's branch is merged:
+1. Push `main` and wait for the plugin's CI (build, lint, test, dist) to go green.
+2. Remove the template-made release and its tag: `gh release delete v0.1.0 -R jumppad-labs/xcl-plugin-test --cleanup-tag --yes`, then `git tag -d v0.1.0` locally.
+3. Tag and push: `make release VERSION=v0.1.0`. The release workflow tests, builds, signs with `GPG_PRIVATE_KEY`/`GPG_PASSPHRASE` and publishes.
+4. Check: `gh release view v0.1.0 -R jumppad-labs/xcl-plugin-test` lists `xcl-plugin-test_0.1.0_{linux,darwin,windows}_{amd64,arm64}` (`.zip` for Windows), `xcl-plugin-test_0.1.0_checksums.txt` and `.sig`, and `gpg --verify` of the `.sig` against xcl-python's `tests/keys/jumppad-labs.asc` succeeds (issuer `F775DA00AFD4B502`).
+If reusing `v0.1.0` is not wanted, tag `v0.1.1` instead and change `version` in xcl-python's `tests/plugins.toml`, a one-line change.
+
+### 2026-10-13 — Task: Publish the first signed test plugin release (done)
+
+**What was done**: The user pushed xcl-plugin-test `main` (its CI, run 38384180661, passed), deleted the template-made `v0.1.0` release and tag, and ran `make release VERSION=v0.1.0`. Release run 38384311373 published `v0.1.0`, which is not a draft. It carries `xcl-plugin-test_0.1.0_{darwin,linux}_{amd64,arm64}.tar.gz`, `xcl-plugin-test_0.1.0_windows_{amd64,arm64}.zip`, `xcl-plugin-test_0.1.0_checksums.txt` and its `.sig`. `gpg --verify` of the `.sig` against xcl-python's `tests/keys/jumppad-labs.asc` reports a good signature from `15BDA6843A1FA0EAD1AA5190F775DA00AFD4B502` (issuer `F775DA00AFD4B502`).
+
+**Deviations**: None. The tag is `v0.1.0`, so `tests/plugins.toml` is unchanged.
+
+**Files changed**:
+- None.
+
+**Discoveries**: xcl-python's CI tamper test for the key-naming message needs xcl's merged change on `f-libxcl`, the ref in `xcl-ref.txt`. A CI run started before that push fails that one test.
+
