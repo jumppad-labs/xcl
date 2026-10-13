@@ -1662,6 +1662,61 @@ func TestParseModuleReturnsConfigErrorWhenSourceDoesNotExist(t *testing.T) {
 	require.Contains(t, pe.Message, "unable to obtain contents for module 'gone' source")
 }
 
+// writeVariablesConfig writes a directory holding a variable, an output that
+// reads it, and the variables file vars, and returns the directory
+func writeVariablesConfig(t *testing.T, vars string) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.xcl"), []byte(`variable "region" {
+  default = "eu-west"
+}
+
+output "region" {
+  value = variable.region
+}
+`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "settings.vars"), []byte(vars), 0o600))
+
+	return dir
+}
+
+func TestParseReportsAMalformedVariablesFile(t *testing.T) {
+	dir := writeVariablesConfig(t, "region = \"us-east\nzone = 1\n")
+
+	p, _ := setupParser(t)
+
+	err := p.Validate(context.Background(), dir)
+
+	var d *errors.Diagnostic
+	require.ErrorAs(t, err, &d)
+	require.Equal(t, filepath.Join(dir, "settings.vars"), d.Subject.Filename)
+	require.NotNil(t, d.Source)
+}
+
+func TestParseReportsAVariablesFileHoldingABlock(t *testing.T) {
+	dir := writeVariablesConfig(t, "region = \"us-east\"\n\nsettings {\n  zone = 1\n}\n")
+
+	p, _ := setupParser(t)
+
+	err := p.Validate(context.Background(), dir)
+
+	var d *errors.Diagnostic
+	require.ErrorAs(t, err, &d)
+	require.Equal(t, filepath.Join(dir, "settings.vars"), d.Subject.Filename)
+	require.Equal(t, 3, d.Subject.Start.Line)
+}
+
+func TestParseReadsAWellFormedVariablesFileOnce(t *testing.T) {
+	dir := writeVariablesConfig(t, "region = \"us-east\"\n")
+
+	p, _ := setupParser(t)
+
+	require.NoError(t, p.Validate(context.Background(), dir))
+	require.Len(t, p.parsedResources.variables, 1)
+	require.Contains(t, p.parsedResources.variables[0], "region")
+}
+
 func TestParseKeepsTheSourceOfEveryFileItReads(t *testing.T) {
 	root, err := filepath.Abs("../test_fixtures/config/module_reused_twice/reuse.xcl")
 	require.NoError(t, err)

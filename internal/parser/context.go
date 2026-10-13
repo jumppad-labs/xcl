@@ -201,12 +201,13 @@ func buildContextForResource(res *parsed, r any, addresses *resources.AddressPar
 		// For root-level resources only, load variables from files and apply precedence
 		// Precedence: variable defaults < .vars files < environment variables < direct variables
 
-		// Load variables from .vars files (these override variable defaults)
-		for _, vf := range options.VariablesFiles {
-			if err := loadVariablesFromFile(ctx, vf); err != nil {
-				// Continue processing other files even if one fails
-				// This matches the behavior in parser.go
-				continue
+		// Set variables from .vars files (these override variable defaults).
+		// The files were read and checked once, when the configuration was
+		// parsed; only their values are evaluated here.
+		for _, attributes := range res.variables {
+			for name, attribute := range attributes {
+				value, _ := attribute.Expr.Value(ctx)
+				setContextVariable(ctx, name, value)
 			}
 		}
 

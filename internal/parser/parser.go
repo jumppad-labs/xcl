@@ -67,6 +67,11 @@ type parsed struct {
 	// headers holds the range of each resource's block header, by FQRN, so a
 	// diagnostic about a resource can say where its block starts
 	headers map[string]hcl.Range
+
+	// variables holds the attributes of each variables file, in the order the
+	// files take precedence, lowest first. Each is evaluated for every
+	// resource that reads variables, and parsed only once.
+	variables []hcl.Attributes
 }
 
 // diagnosticsFor turns the errors HCL reported for the resource id, whose
@@ -752,6 +757,15 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 	// Update options with merged list
 	p.options.VariablesFiles = mergedVarsFiles
 
+	// Read every variables file once, here, rather than for each resource
+	// that reads variables, and report a file that is not well formed rather
+	// than leaving its values out without a word
+	for _, file := range mergedVarsFiles {
+		for _, problem := range p.parseVariablesFile(file) {
+			ce.AppendError(problem)
+		}
+	}
+
 	// Get all the xcl files from the paths
 	files, err := findXclFiles(paths...)
 	if err != nil {
@@ -818,6 +832,30 @@ func (p *Parser) parseFile(file string) (*hcl.File, hcl.Diagnostics) {
 	p.parsedResources.sources[file] = src
 
 	return hclsyntax.ParseConfig(src, file, hcl.InitialPos)
+}
+
+// parseVariablesFile reads a variables file, keeping its attributes for
+// building each resource's context, and returns its problems: a file that is
+// not well formed, or that holds anything but attributes.
+func (p *Parser) parseVariablesFile(file string) []error {
+	f, diags := p.parseFile(file)
+	if !diags.HasErrors() {
+		var attributes hcl.Attributes
+		attributes, diags = f.Body.JustAttributes()
+		if !diags.HasErrors() {
+			p.parsedResources.variables = append(p.parsedResources.variables, attributes)
+			return nil
+		}
+	}
+
+	problems := []error{}
+	for _, d := range diags {
+		if d.Severity == hcl.DiagError {
+			problems = append(problems, errors.NewDiagnostic(d, p.parsedResources.sources))
+		}
+	}
+
+	return problems
 }
 
 func (p *Parser) parseResourcesInFile(file string, module string) []error {
