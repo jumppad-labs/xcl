@@ -45,6 +45,10 @@ not at end users writing `.xcl` config.
 | `types/` | Shared entity metadata: `types.Meta`, `types.ResourceBase`, reflection helpers |
 | `plugins/` | Provider contract (`ProviderAdapter`) and hosting (in-process / gRPC) |
 | `registry/` | Public plugin sources: the `Registry` and `Plugin` interfaces, `InProcess`/`Executable` starters, and the local registry `NewLocal` (declared Go types, application functions, in-process plugins, plugin binaries, plugin directories) |
+| `internal/plaintype/` | Builds the type a plain struct block type is stored as, embedding `types.ResourceBase`, and turns stored entities back into the plain struct |
+| `highlight/` | Output in two steps: `Pieces` labels xcl text with TextMate scopes, and a `Renderer` (`Text`, `ANSI`, `NewANSI`, or the application's own) turns labelled pieces into bytes |
+| `diff/` | The changes an apply would make (`Diff`), laid out as labelled pieces by `(*Diff).Pieces` |
+| `viper/` | A Go module of its own, `github.com/jumppad-labs/xcl/viper`: a Viper that reads `.xcl` files into the application's plain block types |
 | `internal/catalog/` | `Catalog` — the `Config`'s private set of declared types, functions and registries; loads plugins on the first operation, checks type and function name clashes, builds the callable for each plugin function, aggregates plugin hosts, resolves types to adapters |
 | `events/` | The one event shape (`events.Event`), the `Handler`/`Emit` types, the operation, phase and level constants, and `SlogHandler`, the adapter to `log/slog` |
 | `internal/eventstream/` | Delivers one operation's events: a bounded queue that emitters wait on only when it is full, drained into the application's receiver on the calling goroutine |

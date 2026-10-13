@@ -42,9 +42,9 @@ registry, `registry.NewLocal()`.
 
 ```go
 local := registry.NewLocal()
-local.RegisterType(&Server{}, "server")   // a plain Go type, no plugin
+registry.Register[Server](local, "server")  // a plain Go type, no plugin
 local.RegisterFunction("slugify", slugify) // a Go func configuration can call
-local.RegisterPlugin(&MyPlugin{})         // an in-process plugin
+local.RegisterPlugin(&MyPlugin{})          // an in-process plugin
 
 cfg, err := xcl.NewConfig(
     xcl.WithRegistry(local),              // Go types and plugins
@@ -142,9 +142,13 @@ See [Parser & Entity Lifecycle](parser-lifecycle.md#destroy) and
 
 ## Entity metadata convention
 
-Every entity type — builtin (`resources.Module`, `resources.Output`, ...)
-or plugin-defined — embeds [`types.ResourceBase`](../types/resource.go#L58),
-which in turn embeds [`types.Meta`](../types/resource.go#L5):
+Every entity the engine holds — builtin (`resources.Module`,
+`resources.Output`, ...), plugin-defined, or declared by the application —
+embeds [`types.ResourceBase`](../types/resource.go#L58), which in turn embeds
+[`types.Meta`](../types/resource.go#L5). A declared type may be a plain struct
+that embeds neither: it is stored as a type built from it that embeds
+`types.ResourceBase` (`internal/plaintype`), and turned back into the plain
+struct, its `Meta` field if it has one filled, when it is read:
 
 ```go
 type ResourceBase struct {
@@ -175,8 +179,10 @@ never saved: a destroyed entity leaves the state. See
 `types.GetMeta(resource any) (*Meta, error)` ([`types/resource_helpers.go`](../types/resource_helpers.go))
 is the canonical way engine code reads this off an arbitrary entity value —
 it walks embedded fields by reflection, so it works uniformly whether the
-entity is a compiled-in Go struct or one dynamically built by
-`schema.CreateInstanceFromSchema` (see [Plugin Architecture](plugins.md)).
+entity is a compiled-in Go struct, one dynamically built by
+`schema.CreateInstanceFromSchema` (see [Plugin Architecture](plugins.md)), or
+one built from a plain struct. It finds nothing on the plain struct itself,
+which is what an application is handed: that is the stored entity's copy.
 This is what lets `internal/parser` and `internal/catalog` operate on
 entities as `any` without knowing their concrete type.
 

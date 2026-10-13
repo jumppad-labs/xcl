@@ -77,13 +77,21 @@ time, and destroying runs in reverse order.
 
 An application that only reads its configuration declares each Go type, on a
 local registry, under the block type name it is written with, applies the
-configuration and reads it back. No plugin and no provider is needed:
+configuration and reads it back. No plugin and no provider is needed. A
+block type is a plain struct of the application's own:
 
 ```go
+type PostgreSQL struct {
+	Engine string     `xcl:"engine,label"` // the block's labels, filled by xcl:
+	Name   string     `xcl:"name,label"`   // database "postgres" "main"
+	Port   int        `xcl:"port,optional"`
+	Meta   types.Meta // the block's id, file and line, filled by xcl
+}
+
 local := registry.NewLocal()
-local.RegisterType(&resources.Deployment{}, "deployment") // deployment "api" {}
-local.RegisterType(&resources.Service{}, "service")       // service "api" {}
-local.RegisterType(&PostgreSQL{}, "database", "postgres") // database "postgres" "main" {}
+registry.Register[resources.Deployment](local, "deployment") // deployment "api" {}
+registry.Register[resources.Service](local, "service")       // service "api" {}
+registry.Register[PostgreSQL](local, "database", "postgres") // database "postgres" "main" {}
 
 c, err := xcl.NewConfig(xcl.WithRegistry(local))
 if err != nil {
@@ -96,6 +104,25 @@ if err := c.Apply("./config"); err != nil {
 
 var cfg appConfig
 err = c.Decode(&cfg)
+```
+
+A field tagged as a label is filled from the block's labels and can be read
+in expressions like an attribute (`database.postgres.main.name`); fields
+tagged `disabled` or `depends_on` receive the values every block has; and a
+field called `Meta`, a `types.Meta`, receives the block's metadata. A type may
+instead embed `types.ResourceBase`, as plugin types do. On Go 1.27 the
+declaration is also a method, `local.Register[PostgreSQL]("database", "postgres")`,
+and `RegisterType(&PostgreSQL{}, ...)` remains for a type only known at run
+time.
+
+To read configuration through [Viper](https://github.com/spf13/viper), the
+`github.com/jumppad-labs/xcl/viper` module returns a Viper that reads `.xcl`
+files into the same plain types, as keys such as `database.postgres.main.port`:
+
+```go
+v := xclviper.New(xclviper.Type[PostgreSQL]("database", "postgres"))
+v.SetConfigFile("config.xcl")
+err := v.ReadInConfig()
 ```
 
 **No state.** Without `WithStatePath` or `WithStateStore` nothing is
@@ -150,8 +177,9 @@ reported in one of three places:
 
 - A mistake in a single call, wrong on every run, panics straight away
   naming the type: an empty name, more than one subtype or an empty subtype,
-  a prototype that is not a pointer to a struct embedding
-  `types.ResourceBase`, or a nil plugin or registry.
+  a prototype that is not a pointer to a struct, a plain struct xcl cannot lay
+  out (such as one declaring an attribute called `meta`, or a `Meta` field
+  that is not a `types.Meta`), or a nil plugin or registry.
 - Declared Go types that do not fit together are an error returned by
   `NewConfig`: the same block type declared twice, in one registry or across
   two, or with a builtin name, is a `*xcl.TypeNameClashError` naming both Go

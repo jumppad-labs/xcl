@@ -320,14 +320,14 @@ logger, and registering only records:
 
 ```go
 local := registry.NewLocal()
-local.RegisterType(&resources.Deployment{}, "deployment")
+registry.Register[resources.Deployment](local, "deployment")
 local.RegisterFunction("slugify", slugify)
 local.RegisterPlugin(&template.TemplatePlugin{})
 local.RegisterExternalPlugin("./bin/xcl-plugin-docker")
 local.RegisterPluginDirectory("~/.xcl/plugins")
 ```
 
-`RegisterType` declares a plain Go type, `RegisterFunction` offers a Go func
+`registry.Register` declares a Go type, `RegisterFunction` offers a Go func
 to configuration (see [Application functions](#application-functions)),
 `RegisterPlugin` is for in-process plugins, `RegisterExternalPlugin` for a
 gRPC plugin binary, and `RegisterPluginDirectory` for a directory to search
@@ -567,23 +567,37 @@ loading is a `load` event rather than a log message.
 
 ## Configuration-only types
 
-Not every block type needs a plugin. A registry's
-`RegisterType(prototype any, name ...string)`, i.e. on `registry.NewLocal()`,
-declares a plain Go type (a pointer to a struct embedding
-`types.ResourceBase`) under a name made of a type and an optional subtype,
-with no plugin and no provider, and the registry is given to the `Config`
-with `xcl.WithRegistry`. A plugin
-registers its types the same way, through
-`PluginBase.RegisterType(entityType, subtype, ...)`:
+Not every block type needs a plugin. `registry.Register[T](r, name...)`
+declares the Go type `T` on a registry, such as `registry.NewLocal()`, under
+a name made of a type and an optional subtype, with no plugin and no
+provider, and the registry is given to the `Config` with `xcl.WithRegistry`.
+On Go 1.27 the same is a method, `local.Register[T](name...)`, and a
+registry's `RegisterType(prototype any, name ...string)` takes a pointer to a
+value instead, for a type only known at run time. A plugin registers its types
+the same way, through `PluginBase.RegisterType(entityType, subtype, ...)`:
 
 ```go
 local := registry.NewLocal()
-local.RegisterType(&PostgreSQL{}, "database", "postgres") // database "postgres" "main" {}
-local.RegisterType(&Server{}, "server", "big")            // server "big" "web" {}
-local.RegisterType(&Cache{}, "cache")                     // cache "main" {}
+registry.Register[PostgreSQL](local, "database", "postgres") // database "postgres" "main" {}
+registry.Register[Server](local, "server", "big")            // server "big" "web" {}
+registry.Register[Cache](local, "cache")                     // cache "main" {}
 
 c, err := xcl.NewConfig(xcl.WithRegistry(local))
 ```
+
+A declared type is a plain struct of the application's own, or a struct
+embedding `types.ResourceBase` as a plugin's types do. A plain struct is
+stored as a type built from it that embeds `types.ResourceBase`, so
+everything that handles entities sees an ordinary block type, and every
+query hands back the plain struct, as a copy:
+
+- a field tagged as a label, such as `xcl:"name,label"`, is filled from the
+  block's labels, the subtype and the name for a type with a subtype, and is
+  read in expressions like an attribute; configuration cannot set it;
+- a field tagged `disabled` (a `bool`) or `depends_on` (a `[]string`)
+  receives the values every block has;
+- a field called `Meta`, which must be a `types.Meta` with no tag, receives a
+  copy of the block's metadata.
 
 The type is the keyword a block leads with and the subtype its first label.
 A type keyword takes a subtype for every registration or for none, so the
@@ -597,7 +611,7 @@ a type, on its registry, with `RegisterFunction(name string, fn any)`:
 
 ```go
 local := registry.NewLocal()
-local.RegisterType(&Server{}, "server")
+registry.Register[Server](local, "server")
 local.RegisterFunction("slugify", func(title string) (string, error) {
     return strings.ToLower(strings.ReplaceAll(title, " ", "-")), nil
 })
@@ -629,14 +643,17 @@ which `*catalog.Catalog` satisfies. The lifecycle and the destroy walk treat a d
 builtin: it gets a success event and no provider is ever called for it. On
 apply its status is left unchanged; on destroy it is removed from the state.
 
-`RegisterType` returns no error. Problems with a declaration are reported
-where they can first be seen:
+`Register` and `RegisterType` return no error. Problems with a declaration
+are reported where they can first be seen:
 
 - A declaration that is wrong on every run is a mistake in the code, and
-  `RegisterType` itself panics, naming the type, on an empty name, more than
-  one subtype, an empty subtype, or a prototype that is not a pointer to a
-  struct embedding `types.ResourceBase`. `xcl.WithRegistry` panics on a nil
-  registry.
+  the declaration itself panics, naming the type, on an empty name, more than
+  one subtype, an empty subtype, a prototype that is not a pointer to a
+  struct, or a plain struct xcl cannot lay out: one declaring an attribute
+  called `meta`, a `Meta` field that is not a `types.Meta` or a `types.Meta`
+  under another name, a `disabled` or `depends_on` field of the wrong type, or
+  label fields that are not strings or do not match the block's labels.
+  `xcl.WithRegistry` panics on a nil registry.
 - Declared types that do not fit together come from how registries are
   combined, so they are an error returned by `NewConfig`, not a panic. A
   declared type that duplicates another declared type, in the same registry
