@@ -104,6 +104,17 @@ const (
 	ScopeChanged = "markup.changed.diff"
 )
 
+// The scopes a diagnostics report is labelled with, for what is wrong. They
+// are the TextMate scopes for invalid and deprecated text, which colour
+// themes already style.
+const (
+	// ScopeError labels an error: its severity, and the source at fault
+	ScopeError = "invalid.illegal.diagnostic"
+
+	// ScopeWarning labels a warning: its severity, and the source it is about
+	ScopeWarning = "invalid.deprecated.diagnostic"
+)
+
 // Renderer turns labelled pieces into output: plain text, terminal colour, or
 // any other format. It is given every piece at once, in order, so it can
 // reason across them, such as by line. The pieces hold every byte of the text,
