@@ -11,6 +11,7 @@ import (
 
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/entity"
+	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/wire"
@@ -764,14 +765,14 @@ func (l *resourceLifecycle) callProvider(operation string, r any, data []byte, c
 
 	if err != nil {
 		emitLifecycle(l.options, meta, operation, events.PhaseError, duration, err, data, r)
-		return duration, reportedError{fmt.Errorf("%s failed for %s: %w", operation, id, err)}
+		return duration, reportedError{&xclerrors.ProviderError{Step: operation, Address: id, Err: err}}
 	}
 
 	if len(result) > 0 {
 		if err := decodeResult(result, r); err != nil {
 			decodeErr := fmt.Errorf("unable to decode %s result: %w", operation, err)
 			emitLifecycle(l.options, meta, operation, events.PhaseError, duration, decodeErr, data, r)
-			return duration, reportedError{fmt.Errorf("%s failed for %s: %w", operation, id, decodeErr)}
+			return duration, reportedError{&xclerrors.ProviderError{Step: operation, Address: id, Err: decodeErr}}
 		}
 	}
 

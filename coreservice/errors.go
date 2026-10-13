@@ -3,7 +3,6 @@ package coreservice
 import (
 	"context"
 	"errors"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -78,12 +77,6 @@ func pairs(kv []string) map[string]string {
 
 	return details
 }
-
-// providerFailure matches the error the parser reports for a failed provider
-// call, "<step> failed for <address>: <the provider's error>", wherever it
-// sits in a message: on its own, or inside the positioned configuration
-// error an apply collects it into.
-var providerFailure = regexp.MustCompile(`(?m)\b(\w+) failed for (\S+): `)
 
 // toProto maps an error to the Error message a binding receives: its stable
 // code, its message, the fields of its detail type, and the errors it
@@ -165,16 +158,19 @@ func toProto(err error) *corepb.Error {
 			out.Details["source"] = strings.Join(source.Lines, "\n")
 		}
 
+		// a provider that failed during a lifecycle step is reported at its
+		// entity's block, as a diagnostic with the provider's error as cause
+		var provider *xclerrors.ProviderError
+		if errors.As(diagnostic.Cause, &provider) {
+			out.Code = CodeProvider
+			out.Details["step"] = provider.Step
+			out.Details["address"] = provider.Address
+		}
+
 	case errors.As(err, &parserError):
 		// a positioned problem in configuration, which a config error
-		// collects as a cause; a provider that failed during a lifecycle
-		// step is reported this way too, positioned at its block
+		// collects as a cause
 		out.Code = CodeConfig
-		if m := providerFailure.FindStringSubmatch(parserError.Message); m != nil {
-			out.Code = CodeProvider
-			out.Details["step"] = m[1]
-			out.Details["address"] = m[2]
-		}
 		out.Details["file"] = parserError.Filename
 		out.Details["line"] = strconv.Itoa(parserError.Line)
 		out.Details["column"] = strconv.Itoa(parserError.Column)
@@ -326,11 +322,12 @@ func toProto(err error) *corepb.Error {
 		out.Code = CodeMaskNotReversible
 
 	default:
-		if m := providerFailure.FindStringSubmatch(err.Error()); m != nil {
+		var provider *xclerrors.ProviderError
+		if errors.As(err, &provider) {
 			// a provider failed during a lifecycle step
 			out.Code = CodeProvider
-			out.Details["step"] = m[1]
-			out.Details["address"] = m[2]
+			out.Details["step"] = provider.Step
+			out.Details["address"] = provider.Address
 		} else {
 			out.Code = CodeInternal
 		}

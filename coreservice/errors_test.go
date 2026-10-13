@@ -293,11 +293,26 @@ func TestErrorCodeConfigCollectsADiagnostic(t *testing.T) {
 }
 
 func TestErrorCodeProvider(t *testing.T) {
-	out := toProto(fmt.Errorf("create failed for resource.x: boom"))
+	out := toProto(fmt.Errorf("apply: %w", &xclerrors.ProviderError{Step: "create", Address: "resource.x", Err: errors.New("boom")}))
 
 	require.Equal(t, CodeProvider, out.GetCode())
 	require.Equal(t, "create", out.GetDetails()["step"])
 	require.Equal(t, "resource.x", out.GetDetails()["address"])
+}
+
+func TestErrorCodeProviderForADiagnosticCausedByAProvider(t *testing.T) {
+	failure := &xclerrors.ProviderError{Step: "create", Address: "resource.x", Err: errors.New("boom")}
+	d := xclerrors.NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "Provider error", Detail: failure.Error()}, nil)
+	d.Entity = "resource.x"
+	d.Cause = failure
+
+	out := toProto(d)
+
+	require.Equal(t, CodeProvider, out.GetCode())
+	require.Equal(t, "create", out.GetDetails()["step"])
+	require.Equal(t, "resource.x", out.GetDetails()["address"])
+	require.Equal(t, "Provider error", out.GetDetails()["summary"])
+	require.Equal(t, "create failed for resource.x: boom", out.GetDetails()["detail"])
 }
 
 func TestErrorCodeCancelled(t *testing.T) {
