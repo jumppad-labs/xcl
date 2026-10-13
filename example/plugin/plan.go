@@ -26,7 +26,7 @@ func plan(out io.Writer, c *xcl.Config, configDir string) error {
 	// as with inspect, colour is decided for out itself, so a plan written to
 	// a file or a pipe is plain text
 	if lipgloss.NewRenderer(out).ColorProfile() != termenv.Ascii {
-		renderer, err := highlight.NewANSIRenderer()
+		renderer, err := highlight.NewANSI()
 		if err != nil {
 			return err
 		}

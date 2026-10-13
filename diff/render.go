@@ -52,7 +52,7 @@ type RenderOption func(*renderOptions)
 // labels them. Placeholders, the = and -> signs and the summary line reach
 // the renderer with the empty scope, so a renderer sees every byte.
 //
-// With highlight.NewANSIRenderer, a theme's markup.inserted, markup.deleted
+// With highlight.ANSI or highlight.NewANSI, a theme's markup.inserted, markup.deleted
 // and markup.changed colours apply, the colours VS Code themes give diffs; a
 // theme without them leaves markers and paths in the default colour. The text
 // is unchanged apart from what the renderer adds, so removing its codes gives

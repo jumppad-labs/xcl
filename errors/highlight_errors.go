@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// ErrInvalidTheme is returned by highlight.NewANSIRenderer when the colour
+// ErrInvalidTheme is returned by highlight.NewANSI when the colour
 // theme it is given cannot be read or is not a valid VS Code colour theme. A
 // bad theme is reported rather than replaced with the default colours. It is
 // matched with errors.Is, and wrapped by an InvalidThemeError detail

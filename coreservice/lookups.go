@@ -131,7 +131,7 @@ func (s *Service) encodeSavedEntity(conf *configuration, req *corepb.EncodeSaved
 
 	options := []xcl.EncodeOption{}
 	if req.GetHighlight() {
-		renderer, err := highlight.NewANSIRenderer()
+		renderer, err := highlight.NewANSI()
 		if err != nil {
 			return nil, err
 		}

@@ -652,7 +652,7 @@ func TestLeakDiffHighlightedRenderingOfChangedCredential(t *testing.T) {
 	result := diffChangedCredential(t)
 	require.Equal(t, 1, result.Summary.Update)
 
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
 	text := string(diff.Render(result, diff.Highlight(renderer)))
@@ -666,7 +666,7 @@ func TestLeakDiffHighlightedRenderingOfChangedCredentialRevealed(t *testing.T) {
 	result := diffChangedCredential(t, diff.RevealSensitive())
 	require.Equal(t, 1, result.Summary.Update)
 
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
 	text := string(diff.Render(result, diff.Highlight(renderer)))

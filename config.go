@@ -111,7 +111,7 @@ var (
 	// or module, or it holds a value that has no configuration form.
 	ErrNotEncodable = xclerrors.ErrNotEncodable
 
-	// ErrInvalidTheme means a colour theme given to highlight.NewANSIRenderer
+	// ErrInvalidTheme means a colour theme given to highlight.NewANSI
 	// cannot be read or is not a valid VS Code colour theme. The
 	// InvalidThemeError detail names the theme and what was wrong with it.
 	ErrInvalidTheme = xclerrors.ErrInvalidTheme

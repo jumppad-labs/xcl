@@ -31,7 +31,7 @@ func inspect(out io.Writer, c *xcl.Config, address string) error {
 	// decision. It is decided for out itself, so output to a file or a pipe
 	// is plain text.
 	if lipgloss.NewRenderer(out).ColorProfile() != termenv.Ascii {
-		renderer, err := highlight.NewANSIRenderer()
+		renderer, err := highlight.NewANSI()
 		if err != nil {
 			return err
 		}

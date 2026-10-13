@@ -536,7 +536,7 @@ func TestRenderHighlightPassesPlaceholdersAndSummaryUnlabelled(t *testing.T) {
 }
 
 func TestRenderHighlightWithANSIRendererWritesEscapeCodes(t *testing.T) {
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
 	output := string(diff.Render(designExampleDiff(), diff.Highlight(renderer)))
@@ -545,7 +545,7 @@ func TestRenderHighlightWithANSIRendererWritesEscapeCodes(t *testing.T) {
 }
 
 func TestRenderHighlightWithANSIRendererStripsBackToPlainOutput(t *testing.T) {
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
 	output := string(diff.Render(designExampleDiff(), diff.Highlight(renderer)))
@@ -555,7 +555,7 @@ func TestRenderHighlightWithANSIRendererStripsBackToPlainOutput(t *testing.T) {
 
 func TestRenderHighlightWithThemeWithoutMarkupRulesLeavesMarkersUncoloured(t *testing.T) {
 	theme := `{"tokenColors": [{"scope": "comment", "settings": {"fontStyle": "italic"}}]}`
-	renderer, err := highlight.NewANSIRenderer(highlight.WithTheme(strings.NewReader(theme)))
+	renderer, err := highlight.NewANSI(highlight.WithTheme(strings.NewReader(theme)))
 	require.NoError(t, err)
 
 	output := string(diff.Render(designExampleDiff(), diff.Highlight(renderer)))
@@ -572,7 +572,7 @@ func TestRenderHighlightWithNilRendererWritesPlainOutput(t *testing.T) {
 }
 
 func TestRenderHighlightWritesMaskedSensitiveValueAsPlaceholder(t *testing.T) {
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
 	output := string(diff.Render(&diff.Diff{

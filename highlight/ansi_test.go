@@ -43,16 +43,27 @@ func readSample(t *testing.T) []byte {
 func renderSampleWithDefaultTheme(t *testing.T) string {
 	t.Helper()
 
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
 	return renderText(renderer, readSample(t))
 }
 
+func TestANSIRendersAsNewANSIWithoutATheme(t *testing.T) {
+	made, err := highlight.NewANSI()
+	require.NoError(t, err)
+
+	require.Equal(t, renderText(made, readSample(t)), renderText(highlight.ANSI, readSample(t)))
+}
+
+func TestANSIColoursTheSample(t *testing.T) {
+	require.Contains(t, renderText(highlight.ANSI, readSample(t)), "\x1b[")
+}
+
 func referenceThemeRenderer(t *testing.T) *highlight.ANSIRenderer {
 	t.Helper()
 
-	renderer, err := highlight.NewANSIRenderer(highlight.WithThemeFile("testdata/reference-theme.json"))
+	renderer, err := highlight.NewANSI(highlight.WithThemeFile("testdata/reference-theme.json"))
 	require.NoError(t, err)
 
 	return renderer
@@ -188,7 +199,7 @@ func TestANSIRendererThemeAppliesUnderline(t *testing.T) {
 
 func TestANSIRendererThemeAppliesStrikethrough(t *testing.T) {
 	theme := `{"tokenColors": [{"scope": "comment", "settings": {"fontStyle": "strikethrough"}}]}`
-	renderer, err := highlight.NewANSIRenderer(highlight.WithTheme(strings.NewReader(theme)))
+	renderer, err := highlight.NewANSI(highlight.WithTheme(strings.NewReader(theme)))
 	require.NoError(t, err)
 
 	output := renderOne(renderer, highlight.ScopeLineComment, "// old")
@@ -198,7 +209,7 @@ func TestANSIRendererThemeAppliesStrikethrough(t *testing.T) {
 
 func TestANSIRendererThemeAppliesEveryFontStyleInOrder(t *testing.T) {
 	theme := `{"tokenColors": [{"scope": "comment", "settings": {"foreground": "#010203", "fontStyle": "strikethrough underline italic bold"}}]}`
-	renderer, err := highlight.NewANSIRenderer(highlight.WithTheme(strings.NewReader(theme)))
+	renderer, err := highlight.NewANSI(highlight.WithTheme(strings.NewReader(theme)))
 	require.NoError(t, err)
 
 	output := renderOne(renderer, highlight.ScopeLineComment, "// all")
@@ -238,7 +249,7 @@ func TestANSIRendererLeavesUnmatchedTokensInTextUncoloured(t *testing.T) {
 }
 
 func TestANSIRendererDefaultLeavesUnmatchedTokenUncoloured(t *testing.T) {
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
 	output := renderOne(renderer, highlight.ScopeOperator, "=")
@@ -248,7 +259,7 @@ func TestANSIRendererDefaultLeavesUnmatchedTokenUncoloured(t *testing.T) {
 
 func TestANSIRendererThemeColoursInserted(t *testing.T) {
 	theme := `{"tokenColors": [{"scope": "markup.inserted", "settings": {"foreground": "#00ff00"}}]}`
-	renderer, err := highlight.NewANSIRenderer(highlight.WithTheme(strings.NewReader(theme)))
+	renderer, err := highlight.NewANSI(highlight.WithTheme(strings.NewReader(theme)))
 	require.NoError(t, err)
 
 	output := renderOne(renderer, highlight.ScopeInserted, "+ added")
@@ -265,7 +276,7 @@ func TestANSIRendererThemeWithoutMarkupRuleLeavesDeletedUncoloured(t *testing.T)
 }
 
 func TestANSIRendererDefaultColoursInsertedGreen(t *testing.T) {
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
 	output := renderOne(renderer, highlight.ScopeInserted, "+ added")
@@ -303,10 +314,10 @@ func TestANSIRendererThemeOutputStripsToInput(t *testing.T) {
 	require.Equal(t, string(readSample(t)), testutil.StripANSI(output))
 }
 
-func TestNewANSIRendererFailsForUnreadableThemeFile(t *testing.T) {
+func TestNewANSIFailsForUnreadableThemeFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing.json")
 
-	renderer, err := highlight.NewANSIRenderer(highlight.WithThemeFile(path))
+	renderer, err := highlight.NewANSI(highlight.WithThemeFile(path))
 
 	require.Nil(t, renderer)
 	require.ErrorIs(t, err, xclerrors.ErrInvalidTheme)
@@ -318,8 +329,8 @@ func TestNewANSIRendererFailsForUnreadableThemeFile(t *testing.T) {
 	require.Equal(t, "it cannot be read", detail.Reason)
 }
 
-func TestNewANSIRendererFailsForInvalidTheme(t *testing.T) {
-	renderer, err := highlight.NewANSIRenderer(highlight.WithTheme(strings.NewReader("{")))
+func TestNewANSIFailsForInvalidTheme(t *testing.T) {
+	renderer, err := highlight.NewANSI(highlight.WithTheme(strings.NewReader("{")))
 
 	require.Nil(t, renderer)
 	require.ErrorIs(t, err, xclerrors.ErrInvalidTheme)
@@ -329,12 +340,12 @@ func TestNewANSIRendererFailsForInvalidTheme(t *testing.T) {
 	require.Equal(t, "theme", detail.Source)
 }
 
-func TestNewANSIRendererFailsForInvalidThemeFile(t *testing.T) {
+func TestNewANSIFailsForInvalidThemeFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bad.json")
 	theme := `{"tokenColors": [{"scope": "comment", "settings": {"foreground": "#zz0000"}}]}`
 	require.NoError(t, os.WriteFile(path, []byte(theme), 0o600))
 
-	renderer, err := highlight.NewANSIRenderer(highlight.WithThemeFile(path))
+	renderer, err := highlight.NewANSI(highlight.WithThemeFile(path))
 
 	require.Nil(t, renderer)
 	require.ErrorIs(t, err, xclerrors.ErrInvalidTheme)
@@ -345,9 +356,9 @@ func TestNewANSIRendererFailsForInvalidThemeFile(t *testing.T) {
 	require.Equal(t, `tokenColors[0].settings.foreground "#zz0000" is not a colour`, detail.Reason)
 }
 
-func TestNewANSIRendererReadsThemeFromReader(t *testing.T) {
+func TestNewANSIReadsThemeFromReader(t *testing.T) {
 	theme := `{"tokenColors": [{"scope": "string", "settings": {"foreground": "#102030"}}]}`
-	renderer, err := highlight.NewANSIRenderer(highlight.WithTheme(strings.NewReader(theme)))
+	renderer, err := highlight.NewANSI(highlight.WithTheme(strings.NewReader(theme)))
 	require.NoError(t, err)
 
 	output := renderOne(renderer, highlight.ScopeString, `"x"`)
@@ -355,12 +366,12 @@ func TestNewANSIRendererReadsThemeFromReader(t *testing.T) {
 	require.Equal(t, "\x1b[38;2;16;32;48m\"x\"\x1b[0m", output)
 }
 
-func TestNewANSIRendererReadsThemeFromFile(t *testing.T) {
+func TestNewANSIReadsThemeFromFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "theme.json")
 	theme := `{"tokenColors": [{"scope": "string", "settings": {"foreground": "#102030"}}]}`
 	require.NoError(t, os.WriteFile(path, []byte(theme), 0o600))
 
-	renderer, err := highlight.NewANSIRenderer(highlight.WithThemeFile(path))
+	renderer, err := highlight.NewANSI(highlight.WithThemeFile(path))
 	require.NoError(t, err)
 
 	output := renderOne(renderer, highlight.ScopeString, `"x"`)

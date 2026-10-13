@@ -109,7 +109,7 @@ func TestEncodeEntityWithANSIHighlightStripsToPlainText(t *testing.T) {
 
 	container := encodeEntityByID(t, c, encodeContainerID)
 
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
 	plain, err := EncodeEntity(container)

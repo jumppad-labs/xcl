@@ -87,7 +87,7 @@ func Handler(w io.Writer, level slog.Level) xcl.EventHandler {
 	if lipgloss.NewRenderer(w).ColorProfile() != termenv.Ascii {
 		// the default theme is built in, so creating the renderer cannot
 		// fail. Were it ever to, the configuration is simply written plain.
-		renderer, err := highlight.NewANSIRenderer()
+		renderer, err := highlight.NewANSI()
 		if err == nil {
 			options = append(options, xcl.Highlight(renderer))
 		}

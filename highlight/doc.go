@@ -14,7 +14,7 @@
 // ScopeInserted, ScopeDeleted and ScopeChanged, so the same renderers and
 // themes colour a rendered diff.
 //
-// NewANSIRenderer returns the built-in terminal renderer. The package never
-// checks whether output is a terminal: whether to colour is the caller's
-// decision.
+// ANSI is the built-in terminal renderer, and NewANSI makes one with a theme
+// of your own. The package never checks whether output is a terminal: whether
+// to colour is the caller's decision.
 package highlight

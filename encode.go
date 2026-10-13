@@ -108,7 +108,7 @@ func ShowReferences() EncodeOption {
 // renderer adds, and highlighting combines with every other option, including
 // ShowReferences, whose expressions are highlighted like any other text.
 //
-// Use highlight.NewANSIRenderer to colour text for a terminal, or write a
+// Use highlight.ANSI to colour text for a terminal, or write a
 // highlight.Renderer for any other format. xcl never checks whether output is
 // a terminal, so whether to ask for colour is the caller's decision. A nil
 // renderer means no highlighting.
