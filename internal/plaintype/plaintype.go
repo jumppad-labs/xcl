@@ -17,12 +17,16 @@
 //     when an entity is made, rather than decoded: configuration cannot set
 //     one, and an expression reads it like any attribute;
 //   - fields tagged `disabled` or `depends_on` mirror the values every block
-//     has, filled from types.ResourceBase rather than decoded twice.
+//     has, filled from types.ResourceBase rather than decoded twice;
+//   - a field called Meta, which must be a types.Meta with no tag, is filled
+//     with the block's metadata, as a type embedding types.ResourceBase has it.
 package plaintype
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 	"sync"
 
 	"github.com/jumppad-labs/xcl/internal/xcl/tags"
@@ -38,6 +42,12 @@ import (
 // be built into one engine type, and an entity of either would convert into
 // both.
 const MarkerField = "XclPlain"
+
+// MetaField is the Go name of a plain type's field for its block's metadata.
+// It must be a types.Meta, and is filled from the entity, never decoded.
+const MetaField = "Meta"
+
+var metaType = reflect.TypeFor[types.Meta]()
 
 // resourceBaseField is the types.ResourceBase every built type starts with,
 // tagged as a hand-written type tags it.
@@ -76,6 +86,9 @@ type Built struct {
 	// nil when it has none
 	disabled  []int
 	dependsOn []int
+
+	// meta is the index path of Plain's Meta field, nil when it has none
+	meta []int
 }
 
 type copiedField struct {
@@ -139,6 +152,27 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 
 			if field.Name == resourceBaseField.Name || field.Name == MarkerField {
 				return fmt.Errorf("field %s of %s: the Go name %s is used by xcl", field.Name, plain, field.Name)
+			}
+
+			// Meta is the block's metadata, as it is for a type embedding
+			// types.ResourceBase: the same name, so code reads x.Meta.ID
+			// either way, and reserved, so the engine type never holds a
+			// second field by that name beside the one it embeds
+			if field.Name == MetaField {
+				if field.Type != metaType {
+					return fmt.Errorf("field %s of %s: a field called Meta is the block's metadata and must be a types.Meta, not %s", field.Name, plain, field.Type)
+				}
+
+				if tagged {
+					return fmt.Errorf("field %s of %s: the block's metadata is filled by xcl, not configuration, and takes no xcl tag", field.Name, plain)
+				}
+
+				b.meta = index
+				continue
+			}
+
+			if field.Type == metaType {
+				return fmt.Errorf("field %s of %s: a types.Meta field is the block's metadata and must be called Meta", field.Name, plain)
 			}
 
 			if tagged && tag != "" {
@@ -304,9 +338,21 @@ func PlainOf(engine reflect.Type) (reflect.Type, bool) {
 	return marker.Type.Elem(), true
 }
 
+// copyMeta copies metadata so that nothing in the copy is shared with the
+// entity: its links, references and properties are maps and slices of their
+// own. A property that is itself a map or slice is still shared.
+func copyMeta(meta types.Meta) types.Meta {
+	meta.Links = slices.Clone(meta.Links)
+	meta.References = maps.Clone(meta.References)
+	meta.Properties = maps.Clone(meta.Properties)
+
+	return meta
+}
+
 // ToPlain copies an entity of the engine type into a new value of the plain
 // type and returns a pointer to it. Labels are filled from the entity's
-// metadata, and the mirror fields from its types.ResourceBase.
+// metadata, the mirror fields from its types.ResourceBase, and a Meta field
+// with a copy of its metadata.
 //
 // The result is a copy: changing it does not change the stored entity.
 func (b *Built) ToPlain(entity any) (any, error) {
@@ -332,6 +378,10 @@ func (b *Built) ToPlain(entity any) (any, error) {
 		target.FieldByIndex(b.labels[1]).SetString(base.Meta.Name)
 	} else if len(b.labels) == 1 {
 		target.FieldByIndex(b.labels[0]).SetString(base.Meta.Name)
+	}
+
+	if b.meta != nil {
+		target.FieldByIndex(b.meta).Set(reflect.ValueOf(copyMeta(base.Meta)))
 	}
 
 	if b.disabled != nil {

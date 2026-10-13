@@ -119,6 +119,18 @@ func TestFindFillsTheDisabledMirror(t *testing.T) {
 	require.True(t, job.Disabled)
 }
 
+func TestFindFillsAPlainTypesMetaField(t *testing.T) {
+	c := setupPlainConfig(t)
+
+	job, err := Find[plain.Job](c, "job.deploy")
+	require.NoError(t, err)
+	require.Equal(t, "job.deploy", job.Meta.ID)
+	require.Equal(t, "job", job.Meta.Type)
+	require.Equal(t, "deploy", job.Meta.Name)
+	require.Equal(t, "main.xcl", filepath.Base(job.Meta.File))
+	require.Equal(t, 25, job.Meta.Line)
+}
+
 func TestFindReturnsAPlainTypeWithoutLabelFields(t *testing.T) {
 	c := setupPlainConfig(t)
 

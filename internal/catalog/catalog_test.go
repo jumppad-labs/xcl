@@ -395,7 +395,7 @@ func TestDeclareTypeAcceptsAPlainStruct(t *testing.T) {
 
 func TestDeclareTypeFailsForAPlainStructItCannotLayOut(t *testing.T) {
 	type withMeta struct {
-		Meta string `xcl:"meta,optional"`
+		Details string `xcl:"meta,optional"`
 	}
 
 	c := New()

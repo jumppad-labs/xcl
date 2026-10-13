@@ -2,6 +2,8 @@
 // types.ResourceBase, for the tests of plain type support.
 package plain
 
+import "github.com/jumppad-labs/xcl/types"
+
 // Agent is a plain block type named by its one label.
 type Agent struct {
 	Name    string   `xcl:"name,label"`
@@ -29,12 +31,13 @@ type Organization struct {
 	Overrides []Override `xcl:"agent,block"`
 }
 
-// Job sees the dependencies and disabled flag every block has.
+// Job sees the dependencies, disabled flag and metadata every block has.
 type Job struct {
 	Name      string   `xcl:"name,label"`
 	Disabled  bool     `xcl:"disabled,optional"`
 	DependsOn []string `xcl:"depends_on,optional"`
 	Command   string   `xcl:"command,optional"`
+	Meta      types.Meta
 }
 
 // Unlabelled has no label field: its name is not wanted.

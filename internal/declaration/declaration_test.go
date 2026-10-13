@@ -80,7 +80,7 @@ func TestValidateAcceptsAPlainType(t *testing.T) {
 
 func TestValidateFailsForAPlainTypeThatCannotBeBuilt(t *testing.T) {
 	type withMeta struct {
-		Meta string `xcl:"meta,optional"`
+		Details string `xcl:"meta,optional"`
 	}
 
 	err := Validate(&withMeta{}, "resource", "thing")

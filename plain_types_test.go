@@ -89,6 +89,18 @@ func TestPlainTypesKeepNestedBlocksInSavedState(t *testing.T) {
 	require.Equal(t, "claude", organization.Overrides[0].Name)
 }
 
+func TestPlainTypesKeepTheirMetaFieldInSavedState(t *testing.T) {
+	dir := t.TempDir()
+	applyPlainWithState(t, dir)
+
+	loaded := loadPlainState(t, dir)
+
+	job, err := Find[plain.Job](loaded, "job.deploy")
+	require.NoError(t, err)
+	require.Equal(t, "job.deploy", job.Meta.ID)
+	require.Equal(t, 25, job.Meta.Line)
+}
+
 func TestEncodeEntityWritesAStoredPlainEntity(t *testing.T) {
 	c := setupPlainConfig(t)
 

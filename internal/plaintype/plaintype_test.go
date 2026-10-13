@@ -152,7 +152,7 @@ func TestBuildWithLabelsIsAValidSchemaType(t *testing.T) {
 
 func TestBuildRefusesALabelNamedAsEveryBlocksOwn(t *testing.T) {
 	type labelledMeta struct {
-		Meta string `xcl:"meta,label"`
+		Label string `xcl:"meta,label"`
 	}
 
 	_, err := Build(reflect.TypeOf(labelledMeta{}), 1)
@@ -194,13 +194,85 @@ func TestBuildRefusesANonStruct(t *testing.T) {
 	require.ErrorContains(t, err, "is not a struct")
 }
 
-func TestBuildRefusesMeta(t *testing.T) {
+func TestBuildRefusesAnAttributeCalledMeta(t *testing.T) {
 	type withMeta struct {
-		Meta string `xcl:"meta,optional"`
+		Details string `xcl:"meta,optional"`
 	}
 
 	_, err := Build(reflect.TypeOf(withMeta{}), 1)
 	require.ErrorContains(t, err, `"meta" is held by every block`)
+}
+
+// withMetadata wants its block's metadata.
+type withMetadata struct {
+	Name   string   `xcl:"name,label"`
+	Models []string `xcl:"models,optional"`
+	Meta   types.Meta
+}
+
+func TestBuildLeavesTheMetaFieldOutOfTheEngineType(t *testing.T) {
+	built := build(t, withMetadata{}, 1)
+
+	field, ok := built.Engine.FieldByName("Meta")
+	require.True(t, ok)
+	require.Equal(t, []int{0, 2}, field.Index, "Meta is the one types.ResourceBase holds")
+}
+
+func TestBuildRefusesAMetaFieldOfAnotherType(t *testing.T) {
+	type wrongMeta struct {
+		Meta map[string]string `xcl:"labels,optional"`
+	}
+
+	_, err := Build(reflect.TypeOf(wrongMeta{}), 1)
+	require.ErrorContains(t, err, "must be a types.Meta")
+}
+
+func TestBuildRefusesATaggedMetaField(t *testing.T) {
+	type taggedMeta struct {
+		Meta types.Meta `xcl:"meta,optional"`
+	}
+
+	_, err := Build(reflect.TypeOf(taggedMeta{}), 1)
+	require.ErrorContains(t, err, "takes no xcl tag")
+}
+
+func TestBuildRefusesAMetaFieldWithAnotherName(t *testing.T) {
+	type renamedMeta struct {
+		Source types.Meta
+	}
+
+	_, err := Build(reflect.TypeOf(renamedMeta{}), 1)
+	require.ErrorContains(t, err, "must be called Meta")
+}
+
+func TestToPlainFillsTheMetaField(t *testing.T) {
+	built := build(t, withMetadata{}, 1)
+	stored := entity(t, built, "", "claude")
+	base := stored.Field(0).Addr().Interface().(*types.ResourceBase)
+	base.Meta.ID = "agent.claude"
+	base.Meta.File = "runner.xcl"
+	base.Meta.Line = 7
+
+	plain, err := built.ToPlain(stored.Addr().Interface())
+	require.NoError(t, err)
+
+	meta := plain.(*withMetadata).Meta
+	require.Equal(t, "agent.claude", meta.ID)
+	require.Equal(t, "runner.xcl", meta.File)
+	require.Equal(t, 7, meta.Line)
+}
+
+func TestToPlainCopiesTheMetaFieldsLinks(t *testing.T) {
+	built := build(t, withMetadata{}, 1)
+	stored := entity(t, built, "", "claude")
+	base := stored.Field(0).Addr().Interface().(*types.ResourceBase)
+	base.Meta.Links = []string{"agent.first"}
+
+	plain, err := built.ToPlain(stored.Addr().Interface())
+	require.NoError(t, err)
+	plain.(*withMetadata).Meta.Links[0] = "changed"
+
+	require.Equal(t, "agent.first", base.Meta.Links[0])
 }
 
 func TestBuildRefusesADisabledMirrorThatIsNotABool(t *testing.T) {
