@@ -1,7 +1,8 @@
 // Command configonly shows XCL used for configuration only: an application
 // reads its configuration into its own Go types and acts on it. The block
-// types are plain Go types declared on a local registry with RegisterType and
-// added with xcl.WithRegistry, there is no plugin and no provider.
+// types are plain Go structs declared on a local registry with
+// registry.Register and added with xcl.WithRegistry, there is no plugin and no
+// provider.
 //
 // The configuration it reads (./config) is a small Kubernetes-like
 // deployment, and the Go types it reads it into are in ./resources. Between
@@ -93,11 +94,11 @@ func loadConfig(dir string, options ...xcl.ConfigOption) (*appConfig, error) {
 	// declares must be declared here, even the ones the program does not
 	// read.
 	local := registry.NewLocal()
-	local.RegisterType(&resources.ConfigMap{}, "config_map")
-	local.RegisterType(&resources.Secret{}, "secret")
-	local.RegisterType(&resources.Deployment{}, "deployment")
-	local.RegisterType(&resources.Service{}, "service")
-	local.RegisterType(&resources.Ingress{}, "ingress")
+	registry.Register[resources.ConfigMap](local, "config_map")
+	registry.Register[resources.Secret](local, "secret")
+	registry.Register[resources.Deployment](local, "deployment")
+	registry.Register[resources.Service](local, "service")
+	registry.Register[resources.Ingress](local, "ingress")
 
 	c, err := xcl.NewConfig(append([]xcl.ConfigOption{xcl.WithRegistry(local)}, options...)...)
 	if err != nil {
