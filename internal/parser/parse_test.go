@@ -1621,6 +1621,48 @@ func TestParseModuleReturnsConfigErrorWhenSourceDoesNotExist(t *testing.T) {
 	require.Contains(t, pe.Message, "unable to obtain contents for module 'gone' source")
 }
 
+func TestParseKeepsTheSourceOfEveryFileItReads(t *testing.T) {
+	root, err := filepath.Abs("../test_fixtures/config/module_reused_twice/reuse.xcl")
+	require.NoError(t, err)
+
+	p, _ := setupParser(t)
+
+	_, err = p.Apply(context.Background(), root)
+	require.NoError(t, err)
+
+	rootSource, err := os.ReadFile(root)
+	require.NoError(t, err)
+	require.Equal(t, rootSource, p.parsedResources.sources[root])
+
+	leaf := ""
+	for file := range p.parsedResources.sources {
+		if filepath.Base(file) == "leaf.xcl" {
+			leaf = file
+		}
+	}
+	require.NotEmpty(t, leaf, "the module's file is kept too")
+	require.Contains(t, string(p.parsedResources.sources[leaf]), `resource "network" "leafnet"`)
+}
+
+func TestParseKeepsWhereEachBlockStarts(t *testing.T) {
+	root, err := filepath.Abs("../test_fixtures/config/module_reused_twice/reuse.xcl")
+	require.NoError(t, err)
+
+	p, _ := setupParser(t)
+
+	_, err = p.Apply(context.Background(), root)
+	require.NoError(t, err)
+
+	header, ok := p.parsedResources.headers["module.second.resource.network.leafnet"]
+	require.True(t, ok)
+	require.Equal(t, "leaf.xcl", filepath.Base(header.Filename))
+	require.Equal(t, 1, header.Start.Line)
+
+	module := p.parsedResources.headers["module.second"]
+	require.Equal(t, root, module.Filename)
+	require.Equal(t, 5, module.Start.Line)
+}
+
 func TestParseModuleParsesSameSourceUsedTwiceAsSiblings(t *testing.T) {
 	f, pathErr := filepath.Abs("../test_fixtures/config/module_reused_twice/reuse.xcl")
 	if pathErr != nil {

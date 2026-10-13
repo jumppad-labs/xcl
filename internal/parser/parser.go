@@ -22,7 +22,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
-	"github.com/jumppad-labs/xcl/internal/xcl/hclparse"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/mask"
@@ -57,16 +56,28 @@ type parsed struct {
 	// iterate in no fixed order, so this is what keeps the entities a parse
 	// produces in declaration order.
 	order []string
+
+	// sources holds the bytes of every file this parse read, by the file
+	// name it was parsed under, so a diagnostic made later in the operation
+	// takes its lines from what was parsed rather than reading the file again.
+	// It is written only while parsing, which is sequential, and only read
+	// after, so it needs no lock.
+	sources map[string][]byte
+
+	// headers holds the range of each resource's block header, by FQRN, so a
+	// diagnostic about a resource can say where its block starts
+	headers map[string]hcl.Range
 }
 
-// store records a parsed resource and its body, keeping the order in which
-// resources were first declared.
-func (p *parsed) store(id string, body *hclsyntax.Body, resource any) {
+// store records a parsed resource, its body and where its block starts,
+// keeping the order in which resources were first declared.
+func (p *parsed) store(id string, block *hclsyntax.Block, resource any) {
 	if _, seen := p.resources[id]; !seen {
 		p.order = append(p.order, id)
 	}
 
-	p.bodies[id] = body
+	p.bodies[id] = block.Body
+	p.headers[id] = block.DefRange()
 	p.resources[id] = resource
 }
 
@@ -655,6 +666,8 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 		resources:     map[string]any{},
 		bodies:        map[string]*hclsyntax.Body{},
 		moduleSources: map[string]bool{},
+		sources:       map[string][]byte{},
+		headers:       map[string]hcl.Range{},
 	}
 
 	ce := errors.NewConfigError()
@@ -736,10 +749,27 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 }
 
 // parseResourcesInFile parses a hcl file and adds any found resources to the config
-func (p *Parser) parseResourcesInFile(file string, module string) []error {
-	parser := hclparse.NewParser()
+// parseFile reads and parses one file of configuration, keeping its bytes in
+// the parse's sources. It parses the file afresh each time it is asked, as
+// hclparse.ParseXCLFile does the first time: a module whose source is
+// entered twice is parsed twice, and reports its problems for each.
+func (p *Parser) parseFile(file string) (*hcl.File, hcl.Diagnostics) {
+	src, err := os.ReadFile(file)
+	if err != nil {
+		return nil, hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  "Failed to read file",
+			Detail:   fmt.Sprintf("The configuration file %q could not be read.", file),
+		}}
+	}
 
-	f, diag := parser.ParseXCLFile(file)
+	p.parsedResources.sources[file] = src
+
+	return hclsyntax.ParseConfig(src, file, hcl.InitialPos)
+}
+
+func (p *Parser) parseResourcesInFile(file string, module string) []error {
+	f, diag := p.parseFile(file)
 	if diag.HasErrors() {
 		// a single malformed input can produce several diagnostics, report every
 		// one of them rather than only the first
@@ -1066,7 +1096,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 	}
 
 	// add the resource to the cache
-	p.parsedResources.store(rtMeta.ID, b.Body, rt)
+	p.parsedResources.store(rtMeta.ID, b, rt)
 
 	return nil
 }
@@ -1158,7 +1188,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 	}
 
 	// add the module to the cache
-	p.parsedResources.store(rtMeta.ID, b.Body, rt)
+	p.parsedResources.store(rtMeta.ID, b, rt)
 
 	// Resolve the module's source as a local directory relative to the file
 	// that declared it, and recurse into that directory's .xcl files, scoping
