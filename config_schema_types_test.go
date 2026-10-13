@@ -203,11 +203,11 @@ app "web" {
 	require.True(t, ok, "Validate should report failure as a *errors.ConfigError")
 	require.NotEmpty(t, ce.Errors)
 
-	pe, ok := ce.Errors[0].(*errors.ParserError)
-	require.True(t, ok, "the problem should be a *errors.ParserError")
-	require.Equal(t, f.configFile, pe.Filename)
-	require.Equal(t, 2, pe.Line)
-	require.Contains(t, pe.Error(), "image")
+	d, ok := ce.Errors[0].(*errors.Diagnostic)
+	require.True(t, ok, "the problem should be a *errors.Diagnostic, got %T", ce.Errors[0])
+	require.Equal(t, f.configFile, d.Subject.Filename)
+	require.Equal(t, 2, d.Subject.Start.Line)
+	require.Contains(t, d.Error(), "image")
 }
 
 // TestSchemaTypeOptionalFieldTakesDefault asserts that an optional attribute

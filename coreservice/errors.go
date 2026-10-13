@@ -116,6 +116,7 @@ func toProto(err error) *corepb.Error {
 	var unrecoverable *xclerrors.UnrecoverableError
 	var maskNotReversible *xclerrors.MaskNotReversibleError
 	var configError *xclerrors.ConfigError
+	var diagnostic *xclerrors.Diagnostic
 	var parserError *xclerrors.ParserError
 
 	switch {
@@ -135,6 +136,33 @@ func toProto(err error) *corepb.Error {
 		out.Code = CodeConfig
 		for _, cause := range configError.Errors {
 			out.Causes = append(out.Causes, toProto(cause))
+		}
+
+	case errors.As(err, &diagnostic):
+		// a problem in configuration, sent as its parts so a binding can show
+		// it as it likes: what, where, in which block and field, and the
+		// source around it
+		out.Code = CodeConfig
+		out.Details["severity"] = "error"
+		if diagnostic.IsWarning() {
+			out.Details["severity"] = "warning"
+		}
+		out.Details["summary"] = diagnostic.Summary
+		out.Details["detail"] = diagnostic.Detail
+		out.Details["entity"] = diagnostic.Entity
+		out.Details["field"] = diagnostic.Field
+
+		if subject := diagnostic.Subject; subject != nil {
+			out.Details["file"] = subject.Filename
+			out.Details["line"] = strconv.Itoa(subject.Start.Line)
+			out.Details["column"] = strconv.Itoa(subject.Start.Column)
+			out.Details["end_line"] = strconv.Itoa(subject.End.Line)
+			out.Details["end_column"] = strconv.Itoa(subject.End.Column)
+		}
+
+		if source := diagnostic.Source; source != nil {
+			out.Details["source_start"] = strconv.Itoa(source.Start)
+			out.Details["source"] = strings.Join(source.Lines, "\n")
 		}
 
 	case errors.As(err, &parserError):

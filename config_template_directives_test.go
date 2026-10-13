@@ -36,13 +36,13 @@ func TestValidateRejectsTemplateDirectiveAtItsPosition(t *testing.T) {
 	require.True(t, ok, "Validate should report failure as a *errors.ConfigError")
 	require.NotEmpty(t, ce.Errors)
 
-	pe, ok := ce.Errors[0].(*errors.ParserError)
-	require.True(t, ok, "the problem should be a *errors.ParserError, got %T: %v", ce.Errors[0], ce.Errors[0])
+	d, ok := ce.Errors[0].(*errors.Diagnostic)
+	require.True(t, ok, "the problem should be a *errors.Diagnostic, got %T: %v", ce.Errors[0], ce.Errors[0])
 
-	require.Equal(t, 2, pe.Line, "the directive is on the second line of the file")
-	require.Equal(t, 13, pe.Column, "the directive follows the opening quote of the subnet value")
-	require.Contains(t, pe.Message, "XCL has no string templating")
-	require.Contains(t, pe.Message, "format")
+	require.Equal(t, 2, d.Subject.Start.Line, "the directive is on the second line of the file")
+	require.Equal(t, 13, d.Subject.Start.Column, "the directive follows the opening quote of the subnet value")
+	require.Contains(t, d.Error(), "XCL has no string templating")
+	require.Contains(t, d.Error(), "format")
 }
 
 func TestApplyFillsInterpolatedReference(t *testing.T) {

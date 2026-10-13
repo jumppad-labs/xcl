@@ -89,6 +89,27 @@ func TestValidateReferenceProblemEmitsValidateErrorEventNamingTheResource(t *tes
 	require.Equal(t, "resource 'resource.container.consul' refers to 'resource.network.nosuch.meta.name', which is not defined anywhere in the configuration", pe.Message)
 }
 
+func TestValidateSchemaProblemEmitsValidateErrorEventNamingTheResource(t *testing.T) {
+	f, err := filepath.Abs("../test_fixtures/config/registered/invalid_attribute/main.xcl")
+	require.NoError(t, err)
+
+	collector := &eventCollector{}
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, collector.collect)
+
+	err = p.Validate(context.Background(), f)
+	require.Error(t, err)
+
+	failed := eventsWith(collector.all(), events.OperationValidate, events.PhaseError)
+	require.Len(t, failed, 1)
+
+	// the problem is at an attribute inside the block, not at its header,
+	// and the event still names the resource it is in
+	event := failed[0]
+	require.Equal(t, f, event.File)
+	require.Equal(t, "resource.database.main", event.ResourceID)
+}
+
 func TestApplyDecodeFailureEmitsApplyErrorEventNamingTheResource(t *testing.T) {
 	h := setupLifecycle(t)
 
@@ -105,7 +126,13 @@ func TestApplyDecodeFailureEmitsApplyErrorEventNamingTheResource(t *testing.T) {
 	p := h.newParser(t, collector.collect)
 
 	_, err = p.Apply(context.Background(), file)
-	require.ErrorContains(t, err, "unable to decode body")
+	require.ErrorContains(t, err, "Unsuitable value type")
+
+	// the problem is at the attribute, not the block
+	var d *errors.Diagnostic
+	require.ErrorAs(t, err, &d)
+	require.Equal(t, 2, d.Subject.Start.Line)
+	require.Equal(t, "subnet", d.Field)
 
 	failed := eventsWith(collector.all(), events.OperationApply, events.PhaseError)
 	require.Len(t, failed, 1)
@@ -115,7 +142,7 @@ func TestApplyDecodeFailureEmitsApplyErrorEventNamingTheResource(t *testing.T) {
 	require.Equal(t, lifecycleNetworkID, event.ResourceID)
 	require.Equal(t, "network.one", event.ResourceType)
 	require.Equal(t, file, event.File)
-	require.ErrorContains(t, event.Error, "unable to decode body")
+	require.ErrorContains(t, event.Error, "Unsuitable value type")
 
 	// the body never decoded, so no provider was called
 	require.Empty(t, h.plugin.GetCalls())

@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/mitchellh/go-wordwrap"
 )
 
@@ -170,21 +169,4 @@ func extractMetaFromResource(resource any) *ResourceMeta {
 	}
 
 	return meta
-}
-
-// NewParserErrorFromHCLDiag creates a ParserError from HCL diagnostics
-func NewParserErrorFromHCLDiag(diag *hcl.Diagnostic, filename string) *ParserError {
-	line := 0
-	column := 0
-	if diag.Subject != nil {
-		line = diag.Subject.Start.Line
-		column = diag.Subject.Start.Column
-	}
-
-	return &ParserError{
-		Filename: filename,
-		Line:     line,
-		Column:   column,
-		Message:  fmt.Sprintf("unable to parse file: %s", diag.Detail),
-	}
 }
