@@ -1,0 +1,3 @@
+agent "claude" {
+  modls = ["opus"]
+}

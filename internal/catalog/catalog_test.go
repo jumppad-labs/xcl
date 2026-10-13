@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -370,10 +371,71 @@ func TestRegisterTypeAcceptsComputedField(t *testing.T) {
 func TestDeclareTypeFailsForAMalformedDeclaration(t *testing.T) {
 	c := New()
 
-	err := c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: &NotAResource{}}, "custom")
-	require.ErrorContains(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	err := c.DeclareType(registry.Type{Type: "resource", Subtype: "thing", Prototype: NotAResource{}}, "custom")
+	require.ErrorContains(t, err, `type "resource.thing" must be a pointer to a struct`)
 
 	require.False(t, c.IsRegisteredType("resource", "thing"))
+}
+
+// plainAgent is a block type of the application's own, with no
+// types.ResourceBase.
+type plainAgent struct {
+	Name   string   `xcl:"name,label"`
+	Models []string `xcl:"models,optional"`
+}
+
+func TestDeclareTypeAcceptsAPlainStruct(t *testing.T) {
+	c := New()
+
+	err := c.DeclareType(registry.Type{Type: "agent", Prototype: &plainAgent{}}, "custom")
+	require.NoError(t, err)
+
+	require.True(t, c.IsRegisteredType("agent", ""))
+}
+
+func TestDeclareTypeFailsForAPlainStructItCannotLayOut(t *testing.T) {
+	type withMeta struct {
+		Details string `xcl:"meta,optional"`
+	}
+
+	c := New()
+
+	err := c.DeclareType(registry.Type{Type: "agent", Prototype: &withMeta{}}, "custom")
+	require.ErrorContains(t, err, `"meta" is held by every block`)
+
+	require.False(t, c.IsRegisteredType("agent", ""))
+}
+
+func TestCreateEntityOfAPlainTypeEmbedsResourceBase(t *testing.T) {
+	c := New()
+	require.NoError(t, c.RegisterType(&plainAgent{}, "agent"))
+
+	entity, err := c.CreateEntity("agent", "", "claude")
+	require.NoError(t, err)
+
+	meta, err := types.GetMeta(entity)
+	require.NoError(t, err)
+	require.Equal(t, "claude", meta.Name)
+	require.Equal(t, "agent", meta.Type)
+}
+
+func TestTypePathFindsAPlainTypeByItsOwnGoType(t *testing.T) {
+	c := New()
+	require.NoError(t, c.RegisterType(&plainAgent{}, "agent"))
+
+	path, ok := c.TypePath(reflect.TypeOf(plainAgent{}))
+	require.True(t, ok)
+	require.Equal(t, []string{"agent"}, path)
+}
+
+func TestDeclareTypeFailsForAPlainStructWhereAnotherTypeIs(t *testing.T) {
+	c := New()
+	require.NoError(t, c.RegisterType(&Thing{}, "agent"))
+
+	err := c.DeclareType(registry.Type{Type: "agent", Prototype: &plainAgent{}}, "custom")
+
+	var clash *xclerrors.TypeNameClashError
+	require.ErrorAs(t, err, &clash)
 }
 
 func TestDeclareTypeFailsForAnUnnamedDeclaration(t *testing.T) {

@@ -256,11 +256,11 @@ func TestLocalRegisterTypePanicsOnEmptySubtype(t *testing.T) {
 	)
 }
 
-func TestLocalRegisterTypePanicsOnNonEntityType(t *testing.T) {
+func TestLocalRegisterTypePanicsOnNonPointerType(t *testing.T) {
 	local := NewLocal()
 
 	require.PanicsWithValue(t,
-		`xcl: registry local: type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`,
+		`xcl: registry local: type "resource.thing" must be a pointer to a struct`,
 		func() {
 			local.RegisterType(Thing{}, "resource", "thing")
 		},

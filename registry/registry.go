@@ -54,8 +54,8 @@ type Type struct {
 	// Subtype is the subtype, empty for a type declared without one
 	Subtype string
 
-	// Prototype is a pointer to a struct embedding types.ResourceBase, blocks
-	// of the type are decoded into new values of its Go type
+	// Prototype is a pointer to a struct, embedding types.ResourceBase or
+	// plain, blocks of the type are decoded into new values of its Go type
 	Prototype any
 }
 

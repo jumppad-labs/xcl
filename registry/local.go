@@ -81,13 +81,16 @@ func (l *Local) Name() string {
 //	local.RegisterType(&Database{}, "database")             // database "main" {}
 //	local.RegisterType(&Database{}, "resource", "database") // resource "database" "main" {}
 //
-// prototype is a pointer to a struct that embeds types.ResourceBase. A
-// declared type has no provider, it is only decoded into.
+// prototype is a pointer to a struct. It may embed types.ResourceBase, or be
+// a plain struct of the application's own: a plain type's blocks are decoded
+// into it all the same, its name and labels go to fields tagged as labels,
+// and its `disabled` and `depends_on` to fields of those names if it has
+// them. A declared type has no provider, it is only decoded into.
 //
 // A declaration that is wrong on every run is a programmer error and panics
 // here, naming the type: an empty name, more than one subtype, an empty
-// subtype, or a prototype that is not a pointer to a struct embedding
-// types.ResourceBase. A declaration that clashes with another one, in this
+// subtype, a prototype that is not a pointer to a struct, or a plain struct
+// xcl cannot lay out, such as one declaring `meta`. A declaration that clashes with another one, in this
 // registry or another, or with a builtin, is returned by xcl.NewConfig. A
 // plugin providing the same block type is reported when plugins load.
 func (l *Local) RegisterType(prototype any, name ...string) {

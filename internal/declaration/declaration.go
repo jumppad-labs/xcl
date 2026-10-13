@@ -7,14 +7,17 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/types"
 )
 
 // Validate checks the shape of a type declaration on its own, without any
 // other declaration: the type must be named, take at most one subtype that
-// is not empty, and prototype must be a non-nil pointer to a struct that
-// embeds types.ResourceBase. The checks that need every declaration, such as
-// duplicates, are made when the type is registered in a catalog.
+// is not empty, and prototype must be a non-nil pointer to a struct. A struct
+// that embeds types.ResourceBase is used as it is; any other is a plain type,
+// and must be one plaintype.Build can build. The checks that need every
+// declaration, such as duplicates, are made when the type is registered in a
+// catalog.
 func Validate(prototype any, name ...string) error {
 	if len(name) == 0 || name[0] == "" {
 		return fmt.Errorf("an entity type must be named")
@@ -38,12 +41,22 @@ func Validate(prototype any, name ...string) error {
 
 	value := reflect.ValueOf(prototype)
 	if prototype == nil || value.Kind() != reflect.Ptr || value.IsNil() || value.Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("type %q must be a pointer to a struct that embeds types.ResourceBase", key)
+		return fmt.Errorf("type %q must be a pointer to a struct", key)
 	}
 
-	if _, err := types.GetMeta(prototype); err != nil {
-		return fmt.Errorf("type %q must be a pointer to a struct that embeds types.ResourceBase: %w", key, err)
+	if IsPlain(prototype) {
+		if _, err := plaintype.Build(value.Elem().Type(), len(name)); err != nil {
+			return fmt.Errorf("type %q: %w", key, err)
+		}
 	}
 
 	return nil
+}
+
+// IsPlain reports whether prototype, a pointer to a struct, is a plain type:
+// one that does not embed types.ResourceBase, which is built into one that
+// does when it is registered.
+func IsPlain(prototype any) bool {
+	_, err := types.GetMeta(prototype)
+	return err != nil
 }

@@ -51,29 +51,67 @@ func TestValidateFailsForAnEmptySubtype(t *testing.T) {
 
 func TestValidateFailsForNonPointer(t *testing.T) {
 	err := Validate(Thing{}, "resource", "thing")
-	require.EqualError(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	require.EqualError(t, err, `type "resource.thing" must be a pointer to a struct`)
 }
 
 func TestValidateFailsForNil(t *testing.T) {
 	err := Validate(nil, "resource", "thing")
-	require.EqualError(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	require.EqualError(t, err, `type "resource.thing" must be a pointer to a struct`)
 }
 
 func TestValidateFailsForNilPointer(t *testing.T) {
 	var thing *Thing
 
 	err := Validate(thing, "resource", "thing")
-	require.EqualError(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	require.EqualError(t, err, `type "resource.thing" must be a pointer to a struct`)
 }
 
 func TestValidateFailsForPointerToNonStruct(t *testing.T) {
 	size := 1
 
 	err := Validate(&size, "resource", "thing")
-	require.EqualError(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`)
+	require.EqualError(t, err, `type "resource.thing" must be a pointer to a struct`)
 }
 
-func TestValidateFailsForTypeWithoutResourceBase(t *testing.T) {
+func TestValidateAcceptsAPlainType(t *testing.T) {
 	err := Validate(&NotAResource{}, "resource", "thing")
-	require.ErrorContains(t, err, `type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase: `)
+	require.NoError(t, err)
+}
+
+func TestValidateFailsForAPlainTypeThatCannotBeBuilt(t *testing.T) {
+	type withMeta struct {
+		Details string `xcl:"meta,optional"`
+	}
+
+	err := Validate(&withMeta{}, "resource", "thing")
+	require.ErrorContains(t, err, `type "resource.thing": `)
+	require.ErrorContains(t, err, `"meta" is held by every block`)
+}
+
+func TestValidateCountsTheSubtypeAsALabel(t *testing.T) {
+	type subtyped struct {
+		Engine string `xcl:"engine,label"`
+		Name   string `xcl:"name,label"`
+	}
+
+	err := Validate(&subtyped{}, "database", "postgres")
+	require.NoError(t, err)
+}
+
+func TestValidateFailsForLabelsTheBlockDoesNotHave(t *testing.T) {
+	type subtyped struct {
+		Engine string `xcl:"engine,label"`
+		Name   string `xcl:"name,label"`
+	}
+
+	err := Validate(&subtyped{}, "database")
+	require.ErrorContains(t, err, "has 2 label fields, a block of its type has 1 labels")
+}
+
+func TestIsPlainForATypeWithoutResourceBase(t *testing.T) {
+	require.True(t, IsPlain(&NotAResource{}))
+}
+
+func TestIsPlainIsFalseForATypeWithResourceBase(t *testing.T) {
+	require.False(t, IsPlain(&Thing{}))
 }

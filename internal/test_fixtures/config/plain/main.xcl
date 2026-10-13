@@ -1,0 +1,37 @@
+agent "claude" {
+  models = ["opus", "sonnet"]
+}
+
+agent "ollama" {
+  enabled = false
+}
+
+database "postgres" "main" {
+  port = 5432
+}
+
+organization "hidden" {
+  capacity = 1
+
+  agent "claude" {
+    models = ["sonnet"]
+  }
+}
+
+job "build" {
+  command = "make"
+}
+
+job "deploy" {
+  depends_on = ["job.build"]
+  command    = "make deploy port=${database.postgres.main.port}"
+}
+
+job "off" {
+  disabled = true
+  command  = "never"
+}
+
+unlabelled "only" {
+  value = "kept ${agent.claude.name} ${database.postgres.main.engine}"
+}

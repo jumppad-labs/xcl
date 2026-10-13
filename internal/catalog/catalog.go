@@ -21,6 +21,7 @@ import (
 	ctyjson "github.com/jumppad-labs/xcl/internal/cty/json"
 	"github.com/jumppad-labs/xcl/internal/declaration"
 	"github.com/jumppad-labs/xcl/internal/functions"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
@@ -229,8 +230,10 @@ func (c *Catalog) RegisterType(prototype any, name ...string) error {
 // references and state, and never trigger a provider call.
 //
 // The type is the keyword its declarations lead with, and a subtype, when
-// given, is the first label. t.Prototype must be a pointer to a struct that
-// embeds types.ResourceBase. A type keyword takes a subtype for every
+// given, is the first label. t.Prototype must be a pointer to a struct. One
+// that embeds types.ResourceBase is held as it is; a plain struct is held as
+// the type plaintype builds from it, and TypePath still answers for the plain
+// type. A type keyword takes a subtype for every
 // registration or for none, so an address can be read by position;
 // "resource" always takes one.
 //
@@ -254,9 +257,22 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 
 	key := types.TypeKey(t.Type, t.Subtype)
 
+	// a plain struct is stored as the type built from it, which embeds
+	// types.ResourceBase as everything that handles entities expects; the
+	// application's type is recovered from it when entities are read back
+	stored := t.Prototype
+	if declaration.IsPlain(t.Prototype) {
+		built, err := plaintype.Build(reflect.TypeOf(t.Prototype).Elem(), len(name))
+		if err != nil {
+			return fmt.Errorf("type %q: %w", key, err)
+		}
+
+		stored = built.New()
+	}
+
 	// a field configuration cannot be decoded into is reported here, where
 	// the type is declared, rather than while configuration is read
-	if err := gohcl.ValidateSchemaType(reflect.TypeOf(t.Prototype)); err != nil {
+	if err := gohcl.ValidateSchemaType(reflect.TypeOf(stored)); err != nil {
 		return &xclerrors.InvalidTypeError{
 			Type:     key,
 			Provider: describeGoType(t.Prototype),
@@ -278,7 +294,7 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 		return err
 	}
 
-	c.typeInfo[key] = types.TypeInfo{Type: t.Type, Subtype: t.Subtype, Prototype: t.Prototype}
+	c.typeInfo[key] = types.TypeInfo{Type: t.Type, Subtype: t.Subtype, Prototype: stored}
 	c.declaredBy[key] = registryName
 
 	return nil
@@ -432,6 +448,12 @@ func (c *Catalog) CreateEntity(entityType, subtype, name string) (any, error) {
 	meta.Type = info.Type
 	meta.Subtype = info.Subtype
 	meta.Properties = make(map[string]any)
+
+	// a plain type's label fields are read by expressions like attributes,
+	// and are its labels, so they are set where meta is
+	if built, ok := plaintype.Lookup(reflect.TypeOf(entity)); ok {
+		built.SetLabels(entity, info.Subtype, name)
+	}
 
 	return entity, nil
 }
@@ -1043,6 +1065,12 @@ func (c *Catalog) TypePath(t reflect.Type) ([]string, bool) {
 		}
 
 		if pt == t {
+			return info.AddressPath(), true
+		}
+
+		// a plain type is held as the type built from it, and is asked for
+		// by the application under its own
+		if plain, ok := plaintype.PlainOf(pt); ok && plain == t {
 			return info.AddressPath(), true
 		}
 	}
