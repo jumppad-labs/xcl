@@ -115,48 +115,104 @@ func Render(d *Diff, options ...RenderOption) []byte {
 		}
 	}
 
+	var out strings.Builder
+	for _, p := range d.Pieces() {
+		if resolved.renderer == nil {
+			out.WriteString(p.Text)
+			continue
+		}
+
+		out.WriteString(resolved.renderer.Render(p.Scope, p.Text))
+	}
+
+	return []byte(out.String())
+}
+
+// Pieces lays d out as text in the style of a git diff, as labelled pieces
+// for a renderer. Markers and paths are labelled highlight.ScopeInserted,
+// highlight.ScopeDeleted or highlight.ScopeChanged, by the kind of change; a
+// replaced resource uses the changed scope. Comment lines are labelled as
+// comments, and block headers and values as configuration, exactly as
+// highlight.Pieces labels them. Indentation, line breaks, placeholders, the =
+// and -> signs and the summary line have the empty scope, so the pieces hold
+// every byte of the text and joining them gives the plain diff.
+//
+// A nil d is laid out as a diff with nothing to change.
+func (d *Diff) Pieces() []highlight.Piece {
 	if d == nil {
 		d = &Diff{}
 	}
 
-	r := &renderer{style: newStyler(resolved.renderer)}
+	l := &layout{}
 
 	for _, resource := range d.Resources {
-		r.resource(resource)
+		l.resource(resource)
 	}
 
-	r.summary(d)
+	l.summary(d)
 
-	return []byte(r.out.String())
+	return l.pieces
 }
 
-// renderer builds the text of a diff, sending every piece through style
-type renderer struct {
-	out   strings.Builder
-	style styler
+// layout builds the pieces of a diff in order
+type layout struct {
+	pieces []highlight.Piece
 }
 
-// write appends pieces to the output
-func (r *renderer) write(pieces ...string) {
-	for _, piece := range pieces {
-		r.out.WriteString(piece)
-	}
-}
-
-// resource writes one resource's block followed by a blank line
-func (r *renderer) resource(resource Resource) {
-	r.write("  ", r.style.comment("# "+resource.Address+" "+actionPhrase(resource)), "\n")
-
-	marker, kind := headerMarker(resource.Action)
-	indent := strings.Repeat(" ", 3-len(marker))
-	header := blockHeader(resource.Address)
-
-	if len(resource.Changes) == 0 {
-		r.write(indent, r.style.marker(kind, marker), r.style.plain(" "), r.style.hcl(header+" {}"), "\n\n")
+// add appends text with scope, joining it to the previous piece when both
+// have the same scope, as highlight.Pieces does
+func (l *layout) add(scope, text string) {
+	if text == "" {
 		return
 	}
 
-	r.write(indent, r.style.marker(kind, marker), r.style.plain(" "), r.style.hcl(header+" {"), "\n")
+	if n := len(l.pieces); n > 0 && l.pieces[n-1].Scope == scope {
+		l.pieces[n-1].Text += text
+		return
+	}
+
+	l.pieces = append(l.pieces, highlight.Piece{Scope: scope, Text: text})
+}
+
+// plain appends text that has no label of its own
+func (l *layout) plain(text string) {
+	l.add("", text)
+}
+
+// marker appends an action or change marker, or a path, of kind
+func (l *layout) marker(kind markKind, text string) {
+	l.add(scopeFor(kind), text)
+}
+
+// hcl appends configuration text, a block header or a value, labelled as
+// configuration
+func (l *layout) hcl(text string) {
+	for _, p := range highlight.Pieces([]byte(text)) {
+		l.add(p.Scope, p.Text)
+	}
+}
+
+// resource lays out one resource's block followed by a blank line
+func (l *layout) resource(resource Resource) {
+	l.plain("  ")
+	l.add(highlight.ScopeHashComment, "# "+resource.Address+" "+actionPhrase(resource))
+	l.plain("\n")
+
+	marker, kind := headerMarker(resource.Action)
+	header := blockHeader(resource.Address)
+
+	l.plain(strings.Repeat(" ", 3-len(marker)))
+	l.marker(kind, marker)
+	l.plain(" ")
+
+	if len(resource.Changes) == 0 {
+		l.hcl(header + " {}")
+		l.plain("\n\n")
+		return
+	}
+
+	l.hcl(header + " {")
+	l.plain("\n")
 
 	width := 0
 	paths := make([]string, len(resource.Changes))
@@ -166,22 +222,23 @@ func (r *renderer) resource(resource Resource) {
 	}
 
 	for i, change := range resource.Changes {
-		r.change(resource.Action, change, paths[i], width)
+		l.change(resource.Action, change, paths[i], width)
 	}
 
-	r.write(closingIndent, r.style.plain("}"), "\n\n")
+	l.plain(closingIndent + "}\n\n")
 }
 
-// change writes one change line, its path padded so the = sits one space
+// change lays out one change line, its path padded so the = sits one space
 // after the longest path in the block
-func (r *renderer) change(action Action, change Change, path string, width int) {
-	padding := strings.Repeat(" ", width-utf8.RuneCountInString(path)+1)
-
-	write := func(kind markKind, value ...string) {
-		r.write(changeIndent, r.style.marker(kind, markerFor(kind)), r.style.plain(" "))
-		r.write(r.style.path(kind, path), r.style.plain(padding+"= "))
-		r.write(value...)
-		r.write("\n")
+func (l *layout) change(action Action, change Change, path string, width int) {
+	line := func(kind markKind, value func()) {
+		l.plain(changeIndent)
+		l.marker(kind, markerFor(kind))
+		l.plain(" ")
+		l.marker(kind, path)
+		l.plain(strings.Repeat(" ", width-utf8.RuneCountInString(path)+1) + "= ")
+		value()
+		l.plain("\n")
 	}
 
 	switch {
@@ -190,42 +247,47 @@ func (r *renderer) change(action Action, change Change, path string, width int) 
 		if action == ActionCreate {
 			kind = markInserted
 		}
-		write(kind, r.style.plain(sensitivePlaceholder))
+		line(kind, func() { l.plain(sensitivePlaceholder) })
 
 	case change.Unknown && change.Before != nil:
-		write(markChanged, r.style.hcl(formatValue(change.Before)), r.style.plain(" -> "+unknownPlaceholder))
+		line(markChanged, func() {
+			l.hcl(formatValue(change.Before))
+			l.plain(" -> " + unknownPlaceholder)
+		})
 
 	case change.Unknown:
-		write(markInserted, r.style.plain(unknownPlaceholder))
+		line(markInserted, func() { l.plain(unknownPlaceholder) })
 
 	case change.Before == nil:
-		write(markInserted, r.style.hcl(formatValue(change.After)))
+		line(markInserted, func() { l.hcl(formatValue(change.After)) })
 
 	case change.After == nil:
-		write(markDeleted, r.style.hcl(formatValue(change.Before)))
+		line(markDeleted, func() { l.hcl(formatValue(change.Before)) })
 
 	default:
-		write(markChanged, r.style.hcl(formatValue(change.Before)), r.style.plain(" -> "), r.style.hcl(formatValue(change.After)))
+		line(markChanged, func() {
+			l.hcl(formatValue(change.Before))
+			l.plain(" -> ")
+			l.hcl(formatValue(change.After))
+		})
 	}
 }
 
-// summary writes the closing summary line
-func (r *renderer) summary(d *Diff) {
+// summary lays out the closing summary line
+func (l *layout) summary(d *Diff) {
 	unchanged := strconv.Itoa(d.Summary.Unchanged)
 
 	if d.Changed() == 0 {
-		r.write(r.style.plain("Diff: no changes, "+unchanged+" unchanged."), "\n")
+		l.plain("Diff: no changes, " + unchanged + " unchanged.\n")
 		return
 	}
 
-	line := "Diff: " +
+	l.plain("Diff: " +
 		strconv.Itoa(d.Summary.Create) + " to create, " +
 		strconv.Itoa(d.Summary.Update) + " to update, " +
 		strconv.Itoa(d.Summary.Replace) + " to replace, " +
 		strconv.Itoa(d.Summary.Delete) + " to delete, " +
-		unchanged + " unchanged."
-
-	r.write(r.style.plain(line), "\n")
+		unchanged + " unchanged.\n")
 }
 
 // actionPhrase returns what the comment line says an apply would do with
@@ -336,58 +398,6 @@ func markerFor(kind markKind) string {
 	}
 
 	return "~"
-}
-
-// styler styles each piece of rendered text. Every piece of output except
-// indentation and line breaks passes through it, so plain and styled output
-// differ only by what the styler adds. Without a renderer it returns every
-// piece unchanged.
-type styler struct {
-	renderer highlight.Renderer
-}
-
-// newStyler returns the styler for a render, colouring through renderer when
-// it is not nil
-func newStyler(renderer highlight.Renderer) styler {
-	return styler{renderer: renderer}
-}
-
-// marker styles an action or change marker of kind
-func (s styler) marker(kind markKind, text string) string {
-	return s.render(scopeFor(kind), text)
-}
-
-// path styles the path of a change line of kind
-func (s styler) path(kind markKind, text string) string {
-	return s.render(scopeFor(kind), text)
-}
-
-// comment styles a comment line
-func (s styler) comment(text string) string {
-	return s.render(highlight.ScopeHashComment, text)
-}
-
-// hcl styles configuration text: a block header or a value
-func (s styler) hcl(text string) string {
-	if s.renderer == nil {
-		return text
-	}
-
-	return string(highlight.Text([]byte(text), s.renderer))
-}
-
-// plain styles text that has no label of its own
-func (s styler) plain(text string) string {
-	return s.render("", text)
-}
-
-// render passes text to the renderer with scope
-func (s styler) render(scope, text string) string {
-	if s.renderer == nil {
-		return text
-	}
-
-	return s.renderer.Render(scope, text)
 }
 
 // scopeFor returns the highlight scope of a change of kind
