@@ -34,38 +34,9 @@ const (
 	markChanged
 )
 
-// renderOptions are the settings of Render, built from RenderOption values
-type renderOptions struct {
-	renderer highlight.Renderer
-}
-
-// RenderOption changes how Render writes a diff. Construct one with
-// Highlight.
-type RenderOption func(*renderOptions)
-
-// Highlight colours the rendered diff through renderer, the same
-// highlight.Renderer the encoder's Highlight option takes. Markers and paths
-// are labelled highlight.ScopeInserted, highlight.ScopeDeleted or
-// highlight.ScopeChanged, by the kind of change; a replaced resource uses the
-// changed scope. Comment lines are labelled as comments, and block headers
-// and values are labelled as configuration text, exactly as highlight.Text
-// labels them. Placeholders, the = and -> signs and the summary line reach
-// the renderer with the empty scope, so a renderer sees every byte.
-//
-// With highlight.ANSI or highlight.NewANSI, a theme's markup.inserted, markup.deleted
-// and markup.changed colours apply, the colours VS Code themes give diffs; a
-// theme without them leaves markers and paths in the default colour. The text
-// is unchanged apart from what the renderer adds, so removing its codes gives
-// back the plain rendering. Sensitive values are hidden exactly as in plain
-// output. xcl never checks whether output is a terminal, so whether to ask
-// for colour is the caller's decision. A nil renderer means no colour.
-func Highlight(renderer highlight.Renderer) RenderOption {
-	return func(o *renderOptions) {
-		o.renderer = renderer
-	}
-}
-
-// Render writes d as text in the style of a git diff, ready to print or log.
+// Pieces lays d out as text in the style of a git diff, as labelled pieces
+// for a renderer: highlight.Text for plain text, ready to print or log,
+// highlight.ANSI for a terminal, or any other highlight.Renderer.
 //
 // Each resource in d.Resources is written in the result's order as a comment
 // line saying what an apply would do with it, a block header marked with the
@@ -99,40 +70,22 @@ func Highlight(renderer highlight.Renderer) RenderOption {
 //
 // A changed sensitive value is written as (sensitive value). Its values are
 // written only when the result carries them, which it does only when the
-// diff ran with RevealSensitive, so Render never shows a value the result
-// does not hold.
+// diff ran with RevealSensitive, so the pieces never hold a value the result
+// does not.
 //
 // The text ends with one summary line giving the number of resources an
 // apply would create, update, replace and delete and the number it would
-// leave unchanged; when nothing would change it is the only line. A nil d
-// renders as a diff with nothing to change. Without Highlight the text is
-// plain, with no escape codes.
-func Render(d *Diff, options ...RenderOption) []byte {
-	resolved := renderOptions{}
-	for _, option := range options {
-		if option != nil {
-			option(&resolved)
-		}
-	}
-
-	renderer := resolved.renderer
-	if renderer == nil {
-		renderer = highlight.Text
-	}
-
-	return renderer.Render(d.Pieces())
-}
-
-// Pieces lays d out as text in the style of a git diff, as labelled pieces
-// for a renderer. Markers and paths are labelled highlight.ScopeInserted,
-// highlight.ScopeDeleted or highlight.ScopeChanged, by the kind of change; a
-// replaced resource uses the changed scope. Comment lines are labelled as
-// comments, and block headers and values as configuration, exactly as
-// highlight.Pieces labels them. Indentation, line breaks, placeholders, the =
-// and -> signs and the summary line have the empty scope, so the pieces hold
-// every byte of the text and joining them gives the plain diff.
+// leave unchanged; when nothing would change it is the only line. A nil d is
+// laid out as a diff with nothing to change.
 //
-// A nil d is laid out as a diff with nothing to change.
+// Markers and paths are labelled highlight.ScopeInserted,
+// highlight.ScopeDeleted or highlight.ScopeChanged, by the kind of change; a
+// replaced resource uses the changed scope, so a theme's markup.inserted,
+// markup.deleted and markup.changed colours apply, the colours VS Code themes
+// give diffs. Comment lines are labelled as comments, and block headers and
+// values as configuration, exactly as highlight.Pieces labels them.
+// Indentation, line breaks, placeholders, the = and -> signs and the summary
+// line have the empty scope, so the pieces hold every byte of the text.
 func (d *Diff) Pieces() []highlight.Piece {
 	if d == nil {
 		d = &Diff{}

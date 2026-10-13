@@ -37,7 +37,13 @@ func text(pieces []highlight.Piece) string {
 func TestPiecesJoinToThePlainDiff(t *testing.T) {
 	d := updated()
 
-	require.Equal(t, string(diff.Render(d)), text(d.Pieces()))
+	expected := "  # resource.container.web will be updated\n" +
+		"  ~ resource \"container\" \"web\" {\n" +
+		"      ~ image = \"nginx\" -> \"caddy\"\n" +
+		"    }\n" +
+		"\n" +
+		"Diff: 0 to create, 1 to update, 0 to replace, 0 to delete, 0 unchanged.\n"
+	require.Equal(t, expected, text(d.Pieces()))
 }
 
 func TestPiecesOfANilDiffSayNothingChanges(t *testing.T) {
