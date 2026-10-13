@@ -99,10 +99,14 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		// evaluate this expression to determine if the resource should be processed.
 		// If we do not do this first we might attempt to interpolate a value on a
 		// resource that does not exist, or is disabled.
-		isDisabled, err := processDisabled(bdy, ctx, r)
-		if err != nil {
-			emitWalkError(options, lifecycle.operation(), rMeta, err)
-			return diags.Append(err)
+		isDisabled, problems := processDisabled(parsedData, rMeta.ID, bdy, ctx, r)
+		if len(problems) > 0 {
+			emitWalkError(options, lifecycle.operation(), rMeta, goerrors.Join(problems...))
+			for _, problem := range problems {
+				diags = diags.Append(problem)
+			}
+
+			return diags
 		}
 
 		// If the type is a module and the module is disabled, we need to
@@ -141,13 +145,15 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 			diag = gohcl.DecodeBody(bdy, ctx, r)
 		}
 		if diag.HasErrors() {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf(`unable to decode body: %s`, diag.Error()),
-			)
+			// each problem on its own, at the attribute it is about
+			problems := parsedData.diagnosticsFor(rMeta.ID, bdy, diag)
 
-			emitWalkError(options, lifecycle.operation(), rMeta, pe)
-			return diags.Append(pe)
+			emitWalkError(options, lifecycle.operation(), rMeta, problems)
+			for _, problem := range problems {
+				diags = diags.Append(problem)
+			}
+
+			return diags
 		}
 
 		// If this is a module, evaluate its "variables" attribute (not HCL-tag
@@ -167,12 +173,14 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 			if mod.Variables != nil {
 				val, valDiags := mod.Variables.Value(ctx)
 				if valDiags.HasErrors() {
-					pe := errors.NewParserErrorFromResource(
-						r,
-						fmt.Sprintf(`unable to evaluate 'variables' for module: %s`, valDiags.Error()),
-					)
-					emitWalkError(options, lifecycle.operation(), rMeta, pe)
-					return diags.Append(pe)
+					problems := parsedData.diagnosticsFor(rMeta.ID, bdy, valDiags)
+
+					emitWalkError(options, lifecycle.operation(), rMeta, problems)
+					for _, problem := range problems {
+						diags = diags.Append(problem)
+					}
+
+					return diags
 				}
 				suppliedVars = val
 			}

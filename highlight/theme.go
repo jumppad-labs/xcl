@@ -119,7 +119,8 @@ func outranks(candidate, best *rule) bool {
 // terminal's 16 palette colours, so the result follows the user's own
 // terminal palette, and scopes it has no rule for keep the default colour.
 // Besides configuration text it colours diff output: inserted green, deleted
-// red and changed yellow.
+// red and changed yellow, and diagnostics: errors bold red and warnings bold
+// yellow.
 func defaultTheme() *theme {
 	basic := func(selector string, code int, style *fontStyle, order int) rule {
 		return rule{
@@ -143,6 +144,8 @@ func defaultTheme() *theme {
 		basic("markup.inserted", 32, nil, 8),
 		basic("markup.deleted", 31, nil, 9),
 		basic("markup.changed", 33, nil, 10),
+		basic("invalid.illegal", 31, &fontStyle{bold: true}, 11),
+		basic("invalid.deprecated", 33, &fontStyle{bold: true}, 12),
 	})
 }
 

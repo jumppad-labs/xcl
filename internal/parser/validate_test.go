@@ -730,11 +730,29 @@ func TestValidateRejectsUnknownAttributeOnRegisteredType(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, f, pe.Filename)
-	require.Equal(t, 5, pe.Line)
-	require.Contains(t, pe.Message, "resource 'resource.database.main'")
-	require.Contains(t, pe.Message, `"colour"`)
+	d := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, f, d.Subject.Filename)
+	require.Equal(t, 5, d.Subject.Start.Line)
+	require.Equal(t, "resource.database.main", d.Entity)
+	require.Equal(t, "colour", d.Field)
+	require.Contains(t, d.Detail, `"colour"`)
+}
+
+func TestValidateRejectsUnknownAttributeWithItsBlockAndSource(t *testing.T) {
+	f, pathErr := filepath.Abs("../test_fixtures/config/registered/invalid_attribute/main.xcl")
+	require.NoError(t, pathErr)
+
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	err := p.Validate(context.Background(), f)
+	d := err.(*errors.ConfigError).Errors[0].(*errors.Diagnostic)
+
+	require.NotNil(t, d.EntityPos)
+	require.Less(t, d.EntityPos.Start.Line, d.Subject.Start.Line, "the block starts before the attribute in it")
+	require.NotNil(t, d.Source)
+	require.Equal(t, 5, d.Source.Start)
+	require.Contains(t, d.Source.Lines[0], "colour")
 }
 
 func TestValidateRejectsUnknownAttributeOnPluginType(t *testing.T) {
@@ -751,11 +769,11 @@ func TestValidateRejectsUnknownAttributeOnPluginType(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, f, pe.Filename)
-	require.Equal(t, 4, pe.Line)
-	require.Contains(t, pe.Message, "resource 'resource.network.main'")
-	require.Contains(t, pe.Message, `"bogus"`)
+	d := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, f, d.Subject.Filename)
+	require.Equal(t, 4, d.Subject.Start.Line)
+	require.Equal(t, "resource.network.main", d.Entity)
+	require.Contains(t, d.Detail, `"bogus"`)
 }
 
 func TestValidateRejectsUndefinedReferenceFromRegisteredType(t *testing.T) {

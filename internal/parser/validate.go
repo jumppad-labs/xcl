@@ -209,7 +209,7 @@ func (p *Parser) validateStructure() []error {
 		}
 
 		problems = append(problems, configuredComputedFields(id, body, resourceType, "")...)
-		problems = append(problems, schemaProblems(id, meta, body, resource)...)
+		problems = append(problems, p.schemaProblems(id, body, resource)...)
 	}
 
 	return problems
@@ -217,8 +217,9 @@ func (p *Parser) validateStructure() []error {
 
 // schemaProblems checks body against the schema implied by the type of
 // resource, without evaluating anything, and reports every problem decoding
-// would find with its shape against the resource
-func schemaProblems(id string, meta *types.Meta, body *hclsyntax.Body, resource any) []error {
+// would find with its shape, each as the diagnostic HCL gave, in the
+// resource id names and at the field it is about
+func (p *Parser) schemaProblems(id string, body *hclsyntax.Body, resource any) []error {
 	problems := []error{}
 
 	for _, d := range gohcl.CheckBody(body, resource) {
@@ -226,21 +227,50 @@ func schemaProblems(id string, meta *types.Meta, body *hclsyntax.Body, resource 
 			continue
 		}
 
-		file, line, column := meta.File, meta.Line, meta.Column
+		problem := errors.NewDiagnostic(d, p.parsedResources.sources)
+		problem.Entity = id
+		if header, ok := p.parsedResources.headers[id]; ok {
+			problem.EntityPos = &header
+		}
 		if d.Subject != nil {
-			line = d.Subject.Start.Line
-			column = d.Subject.Start.Column
+			problem.Field = fieldAt(body, d.Subject.Start, "")
 		}
 
-		problems = append(problems, errors.NewParserError(
-			file,
-			line,
-			column,
-			fmt.Sprintf("resource '%s' %s: %s", id, d.Summary, d.Detail),
-		))
+		problems = append(problems, problem)
 	}
 
 	return problems
+}
+
+// fieldAt returns the path of the attribute or nested block in body that pos
+// falls in, such as image or port[0].host, or empty when it falls in none,
+// such as a missing attribute reported at the body's opening brace. prefix is
+// the path of body itself, ending in a dot when it is not empty.
+func fieldAt(body *hclsyntax.Body, pos hcl.Pos, prefix string) string {
+	for name, attribute := range body.Attributes {
+		if attribute.SrcRange.ContainsPos(pos) {
+			return prefix + name
+		}
+	}
+
+	seen := map[string]int{}
+	for _, block := range body.Blocks {
+		index := seen[block.Type]
+		seen[block.Type]++
+
+		if !block.Range().ContainsPos(pos) {
+			continue
+		}
+
+		path := nestedBlockPath(prefix, block, index, nil)
+		if inner := fieldAt(block.Body, pos, path+"."); inner != "" {
+			return inner
+		}
+
+		return path
+	}
+
+	return ""
 }
 
 // configuredComputedFields reports every computed field of t set in body,

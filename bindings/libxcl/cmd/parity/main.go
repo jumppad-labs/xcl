@@ -332,12 +332,29 @@ func (n *normaliser) outcome(err error) map[string]any {
 }
 
 // problem renders one error: its code, and for a positioned problem its
-// file, line, column and summary
+// file, line, column and summary, and for a diagnostic its detail and the
+// block and field it is in
 func (n *normaliser) problem(err error) map[string]any {
+	var d *xclerrors.Diagnostic
 	var pe *xclerrors.ParserError
 	var ce *xclerrors.ConfigError
 
 	switch {
+	case errors.As(err, &d):
+		record := map[string]any{
+			"code":    "config",
+			"summary": n.text(d.Summary),
+			"detail":  n.text(d.Detail),
+			"entity":  d.Entity,
+			"field":   d.Field,
+		}
+		if d.Subject != nil {
+			record["file"] = n.path(d.Subject.Filename)
+			record["line"] = d.Subject.Start.Line
+			record["column"] = d.Subject.Start.Column
+		}
+
+		return record
 	case errors.As(err, &pe):
 		return map[string]any{
 			"code":    "config",

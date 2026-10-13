@@ -11,6 +11,7 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 )
 
 func TestErrorCodeNilIsNil(t *testing.T) {
@@ -224,6 +225,73 @@ func TestErrorCodeConfig(t *testing.T) {
 	require.Equal(t, "m", cause.GetDetails()["summary"])
 }
 
+// unsupportedDiagnostic is a diagnostic for `modls` on line 2 of main.xcl
+func unsupportedDiagnostic(severity hcl.DiagnosticSeverity) *xclerrors.Diagnostic {
+	d := xclerrors.NewDiagnostic(&hcl.Diagnostic{
+		Severity: severity,
+		Summary:  "Unsupported argument",
+		Detail:   `An argument named "modls" is not expected here.`,
+		Subject: &hcl.Range{
+			Filename: "main.xcl",
+			Start:    hcl.Pos{Line: 2, Column: 3},
+			End:      hcl.Pos{Line: 2, Column: 8},
+		},
+	}, map[string][]byte{"main.xcl": []byte("agent \"claude\" {\n  modls = [\"opus\"]\n}\n")})
+	d.Entity = "agent.claude"
+	d.Field = "modls"
+
+	return d
+}
+
+func TestErrorCodeDiagnostic(t *testing.T) {
+	out := toProto(unsupportedDiagnostic(hcl.DiagError))
+
+	require.Equal(t, CodeConfig, out.GetCode())
+	require.Equal(t, "error", out.GetDetails()["severity"])
+	require.Equal(t, "Unsupported argument", out.GetDetails()["summary"])
+	require.Equal(t, `An argument named "modls" is not expected here.`, out.GetDetails()["detail"])
+	require.Equal(t, "agent.claude", out.GetDetails()["entity"])
+	require.Equal(t, "modls", out.GetDetails()["field"])
+}
+
+func TestErrorCodeDiagnosticSendsItsRange(t *testing.T) {
+	out := toProto(unsupportedDiagnostic(hcl.DiagError))
+
+	require.Equal(t, "main.xcl", out.GetDetails()["file"])
+	require.Equal(t, "2", out.GetDetails()["line"])
+	require.Equal(t, "3", out.GetDetails()["column"])
+	require.Equal(t, "2", out.GetDetails()["end_line"])
+	require.Equal(t, "8", out.GetDetails()["end_column"])
+}
+
+func TestErrorCodeDiagnosticSendsItsSource(t *testing.T) {
+	out := toProto(unsupportedDiagnostic(hcl.DiagError))
+
+	require.Equal(t, "2", out.GetDetails()["source_start"])
+	require.Equal(t, `  modls = ["opus"]`, out.GetDetails()["source"])
+}
+
+func TestErrorCodeDiagnosticWarning(t *testing.T) {
+	out := toProto(unsupportedDiagnostic(hcl.DiagWarning))
+
+	require.Equal(t, "warning", out.GetDetails()["severity"])
+}
+
+func TestErrorCodeDiagnosticMessageIsOneLine(t *testing.T) {
+	out := toProto(unsupportedDiagnostic(hcl.DiagError))
+
+	require.NotContains(t, out.GetMessage(), "\n")
+	require.NotContains(t, out.GetMessage(), "\x1b")
+}
+
+func TestErrorCodeConfigCollectsADiagnostic(t *testing.T) {
+	out := toProto(&xclerrors.ConfigError{Errors: []error{unsupportedDiagnostic(hcl.DiagError)}})
+
+	require.Equal(t, CodeConfig, out.GetCode())
+	require.Len(t, out.GetCauses(), 1)
+	require.Equal(t, "agent.claude", out.GetCauses()[0].GetDetails()["entity"])
+}
+
 func TestErrorCodeProvider(t *testing.T) {
 	out := toProto(fmt.Errorf("create failed for resource.x: boom"))
 
@@ -291,5 +359,6 @@ func TestConfigErrorListsCausesWithFileAndLine(t *testing.T) {
 	require.Equal(t, file, cause.GetDetails()["file"])
 	require.Equal(t, "1", cause.GetDetails()["line"])
 	require.NotEmpty(t, cause.GetDetails()["column"])
-	require.Contains(t, cause.GetDetails()["summary"], "image")
+	require.Equal(t, "Missing required argument", cause.GetDetails()["summary"])
+	require.Contains(t, cause.GetDetails()["detail"], "image")
 }

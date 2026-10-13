@@ -228,7 +228,7 @@ func TestParityInvalidFixtureReportsEveryProblem(t *testing.T) {
 	require.Len(t, problems, 2)
 
 	lines := []float64{}
-	summaries := []string{}
+	text := []string{}
 	for _, p := range problems {
 		problem := p.(map[string]any)
 		require.Equal(t, "config", problem["code"])
@@ -236,12 +236,17 @@ func TestParityInvalidFixtureReportsEveryProblem(t *testing.T) {
 		require.NotZero(t, problem["column"])
 
 		lines = append(lines, problem["line"].(float64))
-		summaries = append(summaries, problem["summary"].(string))
+		text = append(text, problem["summary"].(string))
+
+		// a diagnostic says what in its summary and why in its detail
+		if detail, ok := problem["detail"].(string); ok {
+			text = append(text, detail)
+		}
 	}
 
 	require.ElementsMatch(t, []float64{6, 11}, lines)
 
-	joined := strings.Join(summaries, "\n")
+	joined := strings.Join(text, "\n")
 	require.Contains(t, joined, "endpoint")
 	require.Contains(t, joined, "computed")
 	require.Contains(t, joined, "colour")

@@ -14,7 +14,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/xcl"
-	"github.com/jumppad-labs/xcl/internal/xcl/hclparse"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 )
@@ -138,25 +137,6 @@ func validateResourceName(name string) error {
 	r, _ = regexp.Compile(invalidChars)
 	if r.MatchString(name) {
 		return fmt.Errorf("invalid resource name %s, resources can only contain the characters 0-9 a-z A-Z _ -", name)
-	}
-
-	return nil
-}
-
-func loadVariablesFromFile(ctx *hcl.EvalContext, path string) error {
-	parser := hclparse.NewParser()
-
-	f, diag := parser.ParseXCLFile(path)
-	if diag.HasErrors() {
-		de := errors.NewParserErrorFromHCLDiag(diag[0], path)
-		return de
-	}
-
-	attrs, _ := f.Body.JustAttributes()
-	for name, attr := range attrs {
-		val, _ := attr.Expr.Value(ctx)
-
-		setContextVariable(ctx, name, val)
 	}
 
 	return nil

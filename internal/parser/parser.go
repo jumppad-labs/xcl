@@ -22,7 +22,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
-	"github.com/jumppad-labs/xcl/internal/xcl/hclparse"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/mask"
@@ -57,16 +56,80 @@ type parsed struct {
 	// iterate in no fixed order, so this is what keeps the entities a parse
 	// produces in declaration order.
 	order []string
+
+	// sources holds the bytes of every file this parse read, by the file
+	// name it was parsed under, so a diagnostic made later in the operation
+	// takes its lines from what was parsed rather than reading the file again.
+	// It is written only while parsing, which is sequential, and only read
+	// after, so it needs no lock.
+	sources map[string][]byte
+
+	// headers holds the range of each resource's block header, by FQRN, so a
+	// diagnostic about a resource can say where its block starts
+	headers map[string]hcl.Range
+
+	// variables holds the attributes of each variables file, in the order the
+	// files take precedence, lowest first. Each is evaluated for every
+	// resource that reads variables, and parsed only once.
+	variables []hcl.Attributes
 }
 
-// store records a parsed resource and its body, keeping the order in which
-// resources were first declared.
-func (p *parsed) store(id string, body *hclsyntax.Body, resource any) {
+// diagnosticsFor turns the errors HCL reported for the resource id, whose
+// body is body, into diagnostics: one for each, at the field it is about,
+// with the source around it. A problem HCL gave no position is placed at the
+// resource's header, so none is reported nowhere.
+//
+// Only the first problem at any one range is kept. HCL follows a failure
+// with what it causes at the same place — a function call that fails leaves
+// its value unknown, which is then reported as unsuitable — and the second
+// says nothing the first did not.
+func (p *parsed) diagnosticsFor(id string, body *hclsyntax.Body, diags hcl.Diagnostics) errors.Diagnostics {
+	header, hasHeader := p.headers[id]
+
+	problems := errors.Diagnostics{}
+	reported := map[hcl.Range]bool{}
+	for _, d := range diags {
+		if d.Severity != hcl.DiagError {
+			continue
+		}
+
+		if d.Subject != nil {
+			if reported[*d.Subject] {
+				continue
+			}
+			reported[*d.Subject] = true
+		}
+
+		if d.Subject == nil && hasHeader {
+			placed := *d
+			placed.Subject = &header
+			d = &placed
+		}
+
+		problem := errors.NewDiagnostic(d, p.sources)
+		problem.Entity = id
+		if hasHeader {
+			problem.EntityPos = &header
+		}
+		if d.Subject != nil && body != nil {
+			problem.Field = fieldAt(body, d.Subject.Start, "")
+		}
+
+		problems = append(problems, problem)
+	}
+
+	return problems
+}
+
+// store records a parsed resource, its body and where its block starts,
+// keeping the order in which resources were first declared.
+func (p *parsed) store(id string, block *hclsyntax.Block, resource any) {
 	if _, seen := p.resources[id]; !seen {
 		p.order = append(p.order, id)
 	}
 
-	p.bodies[id] = body
+	p.bodies[id] = block.Body
+	p.headers[id] = block.DefRange()
 	p.resources[id] = resource
 }
 
@@ -655,6 +718,8 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 		resources:     map[string]any{},
 		bodies:        map[string]*hclsyntax.Body{},
 		moduleSources: map[string]bool{},
+		sources:       map[string][]byte{},
+		headers:       map[string]hcl.Range{},
 	}
 
 	ce := errors.NewConfigError()
@@ -691,6 +756,15 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 
 	// Update options with merged list
 	p.options.VariablesFiles = mergedVarsFiles
+
+	// Read every variables file once, here, rather than for each resource
+	// that reads variables, and report a file that is not well formed rather
+	// than leaving its values out without a word
+	for _, file := range mergedVarsFiles {
+		for _, problem := range p.parseVariablesFile(file) {
+			ce.AppendError(problem)
+		}
+	}
 
 	// Get all the xcl files from the paths
 	files, err := findXclFiles(paths...)
@@ -736,20 +810,66 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 }
 
 // parseResourcesInFile parses a hcl file and adds any found resources to the config
-func (p *Parser) parseResourcesInFile(file string, module string) []error {
-	parser := hclparse.NewParser()
+// parseFile reads and parses one file of configuration, keeping its bytes in
+// the parse's sources. It parses the file afresh each time it is asked, as
+// hclparse.ParseXCLFile does the first time: a module whose source is
+// entered twice is parsed twice, and reports its problems for each.
+func (p *Parser) parseFile(file string) (*hcl.File, hcl.Diagnostics) {
+	src, err := os.ReadFile(file)
+	if err != nil {
+		// placed at the start of the file, so the problem still says which
+		// file it is about
+		start := hcl.Range{Filename: file, Start: hcl.InitialPos, End: hcl.InitialPos}
 
-	f, diag := parser.ParseXCLFile(file)
+		return nil, hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  "Failed to read file",
+			Detail:   fmt.Sprintf("The configuration file %q could not be read: %s.", file, err),
+			Subject:  &start,
+		}}
+	}
+
+	p.parsedResources.sources[file] = src
+
+	return hclsyntax.ParseConfig(src, file, hcl.InitialPos)
+}
+
+// parseVariablesFile reads a variables file, keeping its attributes for
+// building each resource's context, and returns its problems: a file that is
+// not well formed, or that holds anything but attributes.
+func (p *Parser) parseVariablesFile(file string) []error {
+	f, diags := p.parseFile(file)
+	if !diags.HasErrors() {
+		var attributes hcl.Attributes
+		attributes, diags = f.Body.JustAttributes()
+		if !diags.HasErrors() {
+			p.parsedResources.variables = append(p.parsedResources.variables, attributes)
+			return nil
+		}
+	}
+
+	problems := []error{}
+	for _, d := range diags {
+		if d.Severity == hcl.DiagError {
+			problems = append(problems, errors.NewDiagnostic(d, p.parsedResources.sources))
+		}
+	}
+
+	return problems
+}
+
+func (p *Parser) parseResourcesInFile(file string, module string) []error {
+	f, diag := p.parseFile(file)
 	if diag.HasErrors() {
 		// a single malformed input can produce several diagnostics, report every
-		// one of them rather than only the first
+		// one of them rather than only the first, each as HCL described it
 		errs := []error{}
 		for _, d := range diag {
-			pe := errors.NewParserErrorFromHCLDiag(d, file)
-			errs = append(errs, pe)
+			problem := errors.NewDiagnostic(d, p.parsedResources.sources)
+			errs = append(errs, problem)
 
 			// the file is not valid syntax, so no problem is in a resource
-			emitParse(&p.options, "", "", file, pe)
+			emitParse(&p.options, "", "", file, problem)
 		}
 
 		return errs
@@ -1066,7 +1186,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 	}
 
 	// add the resource to the cache
-	p.parsedResources.store(rtMeta.ID, b.Body, rt)
+	p.parsedResources.store(rtMeta.ID, b, rt)
 
 	return nil
 }
@@ -1158,7 +1278,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 	}
 
 	// add the module to the cache
-	p.parsedResources.store(rtMeta.ID, b.Body, rt)
+	p.parsedResources.store(rtMeta.ID, b, rt)
 
 	// Resolve the module's source as a local directory relative to the file
 	// that declared it, and recurse into that directory's .xcl files, scoping
@@ -1500,7 +1620,7 @@ func nestedBlockElement(fieldType reflect.Type) reflect.Type {
 
 // processDisabled processes any expression for the disabled attribute
 // and sets the disabled state on the resource
-func processDisabled(bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (bool, error) {
+func processDisabled(parsedData *parsed, id string, bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (bool, []error) {
 	var isDisabled bool
 
 	// This expression could be a reference to another resource or it could be a
@@ -1510,19 +1630,20 @@ func processDisabled(bdy *hclsyntax.Body, ctx *hcl.EvalContext, r dag.Vertex) (b
 		// now we need to evaluate the expression
 		expdiags := gohcl.DecodeExpression(attr.Expr, ctx, &isDisabled)
 		if expdiags.HasErrors() {
-			return isDisabled,
-				errors.NewParserErrorFromResource(
-					r,
-					fmt.Sprintf("unable to decode disabled expression: %s", expdiags.Error()),
-				)
+			problems := []error{}
+			for _, problem := range parsedData.diagnosticsFor(id, bdy, expdiags) {
+				problems = append(problems, problem)
+			}
+
+			return isDisabled, problems
 		}
 
 		err := types.SetDisabled(r, isDisabled)
 		if err != nil {
-			return isDisabled, errors.NewParserErrorFromResource(
+			return isDisabled, []error{errors.NewParserErrorFromResource(
 				r,
 				fmt.Sprintf("failed to set disabled state: %s", err),
-			)
+			)}
 		}
 	}
 
@@ -1631,6 +1752,29 @@ func (p *Parser) emitValidateError(problem error) {
 		Operation: events.OperationValidate,
 		Phase:     events.PhaseError,
 		Error:     problem,
+	}
+
+	// a diagnostic names its block, so the resource is found by its id
+	// rather than by where the problem is, which can be anywhere inside it
+	var d *errors.Diagnostic
+	if stderrors.As(problem, &d) {
+		if d.Subject != nil {
+			e.File = d.Subject.Filename
+		}
+
+		for _, r := range p.parsedResources.resources {
+			meta, err := types.GetMeta(r)
+			if err != nil || d.Entity == "" || meta.ID != d.Entity {
+				continue
+			}
+
+			e.ResourceID = meta.ID
+			e.ResourceType = resourceType(meta)
+			break
+		}
+
+		emit(&p.options, e)
+		return
 	}
 
 	var pe *errors.ParserError
