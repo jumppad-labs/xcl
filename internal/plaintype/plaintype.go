@@ -14,7 +14,8 @@
 //   - an embedded struct tagged `xcl:",remain"` has its fields lifted, so a
 //     struct composed of others is laid out as it reads;
 //   - fields tagged as labels are filled from the block's labels, in order,
-//     rather than decoded as attributes;
+//     when an entity is made, rather than decoded: configuration cannot set
+//     one, and an expression reads it like any attribute;
 //   - fields tagged `disabled` or `depends_on` mirror the values every block
 //     has, filled from types.ResourceBase rather than decoded twice.
 package plaintype
@@ -66,8 +67,10 @@ type Built struct {
 	// path in Plain
 	copied []copiedField
 
-	// labels are the index paths of Plain's label fields, in order
-	labels [][]int
+	// labels are the index paths of Plain's label fields, in order, and
+	// labelFields the indexes of the same fields in Engine
+	labels      [][]int
+	labelFields []int
 
 	// disabled and dependsOn are the index paths of Plain's mirror fields,
 	// nil when it has none
@@ -145,8 +148,15 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 						return fmt.Errorf("field %s of %s: a label is a string, not %s", field.Name, plain, field.Type)
 					}
 
+					if parsed.Name == metaName || parsed.Name == disabledName || parsed.Name == dependsOnName {
+						return fmt.Errorf("field %s of %s: %q is held by every block and cannot name a label", field.Name, plain, parsed.Name)
+					}
+
+					// kept in the engine type, so an expression reads it as it
+					// reads an attribute; the body schema has no labels in it,
+					// so configuration cannot set it
 					b.labels = append(b.labels, index)
-					continue
+					b.labelFields = append(b.labelFields, len(fields))
 
 				case parsed.Kind == tags.KindRemain || parsed.Kind == tags.KindBody:
 					return fmt.Errorf("field %s of %s: a block type's remain and body are xcl's, a plain type cannot take them", field.Name, plain)
@@ -250,6 +260,29 @@ func Lookup(engine reflect.Type) (*Built, bool) {
 // New returns a pointer to a new zero value of the engine type.
 func (b *Built) New() any {
 	return reflect.New(b.Engine).Interface()
+}
+
+// SetLabels fills an entity's label fields from its labels: the subtype and
+// the name for a type with a subtype, the name alone for one without. It is
+// done when the entity is made, before anything is evaluated, so a reference
+// to a label reads the same value as one to meta.name.
+func (b *Built) SetLabels(entity any, subtype, name string) {
+	value := reflect.ValueOf(entity)
+	if value.Kind() == reflect.Pointer {
+		value = value.Elem()
+	}
+
+	if value.Type() != b.Engine {
+		return
+	}
+
+	switch len(b.labelFields) {
+	case 2:
+		value.Field(b.labelFields[0]).SetString(subtype)
+		value.Field(b.labelFields[1]).SetString(name)
+	case 1:
+		value.Field(b.labelFields[0]).SetString(name)
+	}
 }
 
 // PlainOf returns the plain type an engine type was built from, and false for

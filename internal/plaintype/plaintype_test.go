@@ -136,11 +136,47 @@ func TestBuildLiftsTheFieldsOfARemainStruct(t *testing.T) {
 	require.NoError(t, gohcl.ValidateSchemaType(built.Engine))
 }
 
-func TestBuildLeavesLabelsOutOfTheAttributes(t *testing.T) {
+func TestBuildKeepsLabelsInTheEngineType(t *testing.T) {
 	built := build(t, named{}, 1)
 
-	_, ok := built.Engine.FieldByName("Name")
-	require.False(t, ok)
+	name, ok := built.Engine.FieldByName("Name")
+	require.True(t, ok)
+	require.Equal(t, `xcl:"name,label"`, string(name.Tag))
+}
+
+func TestBuildWithLabelsIsAValidSchemaType(t *testing.T) {
+	built := build(t, subtyped{}, 2)
+
+	require.NoError(t, gohcl.ValidateSchemaType(built.Engine))
+}
+
+func TestBuildRefusesALabelNamedAsEveryBlocksOwn(t *testing.T) {
+	type labelledMeta struct {
+		Meta string `xcl:"meta,label"`
+	}
+
+	_, err := Build(reflect.TypeOf(labelledMeta{}), 1)
+	require.ErrorContains(t, err, `"meta" is held by every block and cannot name a label`)
+}
+
+func TestSetLabelsFillsTheName(t *testing.T) {
+	built := build(t, named{}, 1)
+	entity := built.New()
+
+	built.SetLabels(entity, "", "claude")
+
+	require.Equal(t, "claude", reflect.ValueOf(entity).Elem().FieldByName("Name").String())
+}
+
+func TestSetLabelsFillsTheSubtypeAndName(t *testing.T) {
+	built := build(t, subtyped{}, 2)
+	entity := built.New()
+
+	built.SetLabels(entity, "postgres", "main")
+
+	value := reflect.ValueOf(entity).Elem()
+	require.Equal(t, "postgres", value.FieldByName("Engine").String())
+	require.Equal(t, "main", value.FieldByName("Name").String())
 }
 
 func TestBuildLeavesMirrorFieldsOutOfTheAttributes(t *testing.T) {

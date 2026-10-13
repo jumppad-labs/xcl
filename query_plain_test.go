@@ -124,7 +124,31 @@ func TestFindReturnsAPlainTypeWithoutLabelFields(t *testing.T) {
 
 	unlabelled, err := Find[plain.Unlabelled](c, "unlabelled.only")
 	require.NoError(t, err)
-	require.Equal(t, "kept", unlabelled.Value)
+	require.Contains(t, unlabelled.Value, "kept")
+}
+
+func TestAReferenceReadsAPlainTypesLabels(t *testing.T) {
+	c := setupPlainConfig(t)
+
+	unlabelled, err := Find[plain.Unlabelled](c, "unlabelled.only")
+	require.NoError(t, err)
+	require.Equal(t, "kept claude postgres", unlabelled.Value)
+}
+
+func TestConfigurationCannotSetAPlainTypesLabel(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	local := registry.NewLocal()
+	local.RegisterType(&plain.Agent{}, "agent")
+
+	c, err := NewConfig(WithRegistry(local))
+	require.NoError(t, err)
+
+	path, err := filepath.Abs("./internal/test_fixtures/config/plain_label_set/main.xcl")
+	require.NoError(t, err)
+
+	err = c.Apply(path)
+	require.ErrorContains(t, err, `"name"`)
 }
 
 func TestFindReturnsACopyOfAPlainEntity(t *testing.T) {

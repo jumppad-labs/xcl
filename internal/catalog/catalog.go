@@ -449,6 +449,12 @@ func (c *Catalog) CreateEntity(entityType, subtype, name string) (any, error) {
 	meta.Subtype = info.Subtype
 	meta.Properties = make(map[string]any)
 
+	// a plain type's label fields are read by expressions like attributes,
+	// and are its labels, so they are set where meta is
+	if built, ok := plaintype.Lookup(reflect.TypeOf(entity)); ok {
+		built.SetLabels(entity, info.Subtype, name)
+	}
+
 	return entity, nil
 }
 

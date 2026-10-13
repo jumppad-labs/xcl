@@ -33,5 +33,5 @@ job "off" {
 }
 
 unlabelled "only" {
-  value = "kept"
+  value = "kept ${agent.claude.name} ${database.postgres.main.engine}"
 }
