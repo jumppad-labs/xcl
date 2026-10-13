@@ -1,0 +1,31 @@
+runner "nas" {
+  capacity = 3
+  tasks    = ["document"]
+  labels   = { network = "lan" }
+}
+
+agent "claude" {
+  models = ["opus", "sonnet"]
+}
+
+agent "ollama" {
+  enabled = false
+}
+
+agent "retired" {
+  disabled = true
+  models   = ["old"]
+}
+
+database "postgres" "main" {
+  port     = 5432
+  password = "hunter2"
+}
+
+organization "hidden" {
+  capacity = 1
+
+  agent "claude" {
+    models = ["sonnet"]
+  }
+}

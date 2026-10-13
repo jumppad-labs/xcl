@@ -13,7 +13,8 @@ of HCL (blocks, attributes and expressions) and adds what modern configuration n
   in-process or as separate programs, and installed from local paths or signed releases.
 
 It also has variables, outputs, modules, functions and state, so a configuration can be planned, applied, changed and
-destroyed.
+destroyed. Functions come built in, from the application embedding XCL, or from plugins, and are all called the same
+way from configuration.
 
 XCL starts from HCL's syntax but does not aim to be compatible with Terraform configuration or other HCL dialects.
 Where XCL can be clearer or do more, it will diverge.
@@ -167,6 +168,7 @@ reported in one of three places:
 
 The documentation lives at **[xcl.dev](https://xcl.dev)**:
 
+- [Language reference](https://xcl.dev/language/): files, entities, attributes and blocks, references, expressions, variables, modules and functions, with Go and Python types
 - [Registries](https://xcl.dev/registries/): declaring Go types and registering plugins
 - [Installing plugins from GitHub](https://xcl.dev/github-registry/) and the
   [plugin template](https://xcl.dev/plugin-template/)
@@ -187,6 +189,15 @@ Each example under [`example`](./example) is a Go module of its own, and runs wi
 - [`example/remoteplugin`](./example/remoteplugin): the Docker plugin installed from its signed GitHub release.
 
 `make test-examples` builds, vets and tests every example.
+
+## Other languages
+
+The engine is available to Python as the `xcl-lang` package, `pip install xcl-lang`, imported as `xcl`,
+from [jumppad-labs/xcl-python](https://github.com/jumppad-labs/xcl-python):
+the same engine, bundled in the wheel as the `xcl-core` program and run as a
+subprocess on every platform, Alpine included, with no shared library to
+load, and a synchronous and an asyncio API. Go users are unaffected: the Go
+library needs no cgo, and nothing in it changes for the binding.
 
 ## Contributing
 

@@ -11,9 +11,19 @@ import (
 	"github.com/jumppad-labs/xcl/highlight"
 )
 
+// render renders d's pieces through renderer, as plain text when none is
+// given
+func render(d *diff.Diff, renderer ...highlight.Renderer) []byte {
+	if len(renderer) == 0 {
+		return highlight.Text.Render(d.Pieces())
+	}
+
+	return renderer[0].Render(d.Pieces())
+}
+
 // renderOne renders a diff holding only resource, with summary
 func renderOne(resource diff.Resource, summary diff.Summary) string {
-	return string(diff.Render(&diff.Diff{
+	return string(render(&diff.Diff{
 		Summary:   summary,
 		Resources: []diff.Resource{resource},
 	}))
@@ -270,7 +280,7 @@ func TestRenderWritesRevealedSensitiveValues(t *testing.T) {
 }
 
 func TestRenderAlignsEqualsSignsWithinEachBlockIndependently(t *testing.T) {
-	output := string(diff.Render(&diff.Diff{
+	output := string(render(&diff.Diff{
 		Summary: diff.Summary{Create: 1, Update: 1},
 		Resources: []diff.Resource{
 			{
@@ -297,7 +307,7 @@ func TestRenderAlignsEqualsSignsWithinEachBlockIndependently(t *testing.T) {
 }
 
 func TestRenderWritesResourcesInGivenOrder(t *testing.T) {
-	output := string(diff.Render(&diff.Diff{
+	output := string(render(&diff.Diff{
 		Summary: diff.Summary{Create: 1, Delete: 1},
 		Resources: []diff.Resource{
 			{Address: "resource.zeta.last", Action: diff.ActionDelete},
@@ -314,7 +324,7 @@ func TestRenderWritesResourcesInGivenOrder(t *testing.T) {
 }
 
 func TestRenderWritesSummaryWithCounts(t *testing.T) {
-	output := string(diff.Render(&diff.Diff{
+	output := string(render(&diff.Diff{
 		Summary: diff.Summary{Create: 2, Update: 1, Replace: 1, Delete: 1, Unchanged: 3},
 	}))
 
@@ -322,7 +332,7 @@ func TestRenderWritesSummaryWithCounts(t *testing.T) {
 }
 
 func TestRenderWritesOnlyNoChangesLineWhenNothingChanges(t *testing.T) {
-	output := string(diff.Render(&diff.Diff{
+	output := string(render(&diff.Diff{
 		Summary: diff.Summary{Unchanged: 3},
 	}))
 
@@ -330,11 +340,11 @@ func TestRenderWritesOnlyNoChangesLineWhenNothingChanges(t *testing.T) {
 }
 
 func TestRenderOfNilDiffWritesNoChanges(t *testing.T) {
-	require.Equal(t, "Diff: no changes, 0 unchanged.\n", string(diff.Render(nil)))
+	require.Equal(t, "Diff: no changes, 0 unchanged.\n", string(render(nil)))
 }
 
 func TestRenderWritesNoEscapeCodes(t *testing.T) {
-	output := string(diff.Render(designExampleDiff()))
+	output := string(render(designExampleDiff()))
 
 	require.NotContains(t, output, "\x1b")
 }
@@ -365,7 +375,7 @@ func TestRenderWritesDesignExample(t *testing.T) {
 Diff: 1 to create, 2 to update, 1 to replace, 1 to delete, 4 unchanged.
 `
 
-	require.Equal(t, expected, string(diff.Render(designExampleDiff())))
+	require.Equal(t, expected, string(render(designExampleDiff())))
 }
 
 // designExampleDiff builds the diff shown in the design's rendering example
@@ -404,22 +414,22 @@ var sgrCodes = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 // passes unlabelled text through unchanged, so a test can read which scope
 // each piece was given
 func renderMarkerRenderer() highlight.Renderer {
-	return highlight.RendererFunc(func(scope, text string) string {
-		if scope == "" {
-			return text
+	return highlight.PieceFunc(func(p highlight.Piece) string {
+		if p.Scope == "" {
+			return p.Text
 		}
 
-		return "[" + scope + "]" + text + "[/" + scope + "]"
+		return "[" + p.Scope + "]" + p.Text + "[/" + p.Scope + "]"
 	})
 }
 
 // renderOneHighlighted renders a diff holding only resource through the
 // marker renderer
 func renderOneHighlighted(resource diff.Resource, summary diff.Summary) string {
-	return string(diff.Render(&diff.Diff{
+	return string(render(&diff.Diff{
 		Summary:   summary,
 		Resources: []diff.Resource{resource},
-	}, diff.Highlight(renderMarkerRenderer())))
+	}, renderMarkerRenderer()))
 }
 
 // createdImageResource is a created resource with one added string value
@@ -536,46 +546,40 @@ func TestRenderHighlightPassesPlaceholdersAndSummaryUnlabelled(t *testing.T) {
 }
 
 func TestRenderHighlightWithANSIRendererWritesEscapeCodes(t *testing.T) {
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
-	output := string(diff.Render(designExampleDiff(), diff.Highlight(renderer)))
+	output := string(render(designExampleDiff(), renderer))
 
 	require.Contains(t, output, "\x1b[")
 }
 
 func TestRenderHighlightWithANSIRendererStripsBackToPlainOutput(t *testing.T) {
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
-	output := string(diff.Render(designExampleDiff(), diff.Highlight(renderer)))
+	output := string(render(designExampleDiff(), renderer))
 
-	require.Equal(t, string(diff.Render(designExampleDiff())), sgrCodes.ReplaceAllString(output, ""))
+	require.Equal(t, string(render(designExampleDiff())), sgrCodes.ReplaceAllString(output, ""))
 }
 
 func TestRenderHighlightWithThemeWithoutMarkupRulesLeavesMarkersUncoloured(t *testing.T) {
 	theme := `{"tokenColors": [{"scope": "comment", "settings": {"fontStyle": "italic"}}]}`
-	renderer, err := highlight.NewANSIRenderer(highlight.WithTheme(strings.NewReader(theme)))
+	renderer, err := highlight.NewANSI(highlight.WithTheme(strings.NewReader(theme)))
 	require.NoError(t, err)
 
-	output := string(diff.Render(designExampleDiff(), diff.Highlight(renderer)))
+	output := string(render(designExampleDiff(), renderer))
 
 	require.Contains(t, output, "\n      + image   = ")
 	require.Contains(t, output, "\n  ~ resource ")
 	require.Contains(t, output, "\x1b[3m# resource.container.api will be updated\x1b[0m")
 }
 
-func TestRenderHighlightWithNilRendererWritesPlainOutput(t *testing.T) {
-	output := string(diff.Render(designExampleDiff(), diff.Highlight(nil)))
-
-	require.Equal(t, string(diff.Render(designExampleDiff())), output)
-}
-
 func TestRenderHighlightWritesMaskedSensitiveValueAsPlaceholder(t *testing.T) {
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
-	output := string(diff.Render(&diff.Diff{
+	output := string(render(&diff.Diff{
 		Summary: diff.Summary{Update: 1},
 		Resources: []diff.Resource{
 			{
@@ -586,7 +590,7 @@ func TestRenderHighlightWritesMaskedSensitiveValueAsPlaceholder(t *testing.T) {
 				},
 			},
 		},
-	}, diff.Highlight(renderer)))
+	}, renderer))
 
 	require.Contains(t, output, " = (sensitive value)\n")
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/entity"
@@ -255,11 +256,11 @@ func TestLocalRegisterTypePanicsOnEmptySubtype(t *testing.T) {
 	)
 }
 
-func TestLocalRegisterTypePanicsOnNonEntityType(t *testing.T) {
+func TestLocalRegisterTypePanicsOnNonPointerType(t *testing.T) {
 	local := NewLocal()
 
 	require.PanicsWithValue(t,
-		`xcl: registry local: type "resource.thing" must be a pointer to a struct that embeds types.ResourceBase`,
+		`xcl: registry local: type "resource.thing" must be a pointer to a struct`,
 		func() {
 			local.RegisterType(Thing{}, "resource", "thing")
 		},
@@ -454,4 +455,76 @@ func TestExecutableStartFailsForMissingPath(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorContains(t, err, missing)
 	require.Nil(t, host)
+}
+
+// RegisterFunction. A local registry records the Go funcs an application
+// offers to configuration, in order, and hands copies out so a caller cannot
+// change what was registered.
+
+func TestRegisterFunctionRecordsFunction(t *testing.T) {
+	slugify := func(title string) (string, error) {
+		return title, nil
+	}
+
+	local := NewLocal()
+	local.RegisterFunction("slugify", slugify)
+
+	registered := local.Functions()
+
+	require.Len(t, registered, 1)
+	require.Equal(t, "slugify", registered[0].Name)
+	require.NotNil(t, registered[0].Func)
+	require.Equal(t, reflect.ValueOf(slugify).Pointer(), reflect.ValueOf(registered[0].Func).Pointer())
+}
+
+func TestFunctionsKeepRegistrationOrder(t *testing.T) {
+	local := NewLocal()
+	local.RegisterFunction("slugify", func(title string) (string, error) { return title, nil })
+	local.RegisterFunction("shout", func(title string) (string, error) { return title, nil })
+
+	registered := local.Functions()
+
+	require.Len(t, registered, 2)
+	require.Equal(t, "slugify", registered[0].Name)
+	require.Equal(t, "shout", registered[1].Name)
+}
+
+func TestFunctionsReturnsNilWhenNoneRegistered(t *testing.T) {
+	require.Nil(t, NewLocal().Functions())
+}
+
+func TestRegisterFunctionPanicsOnEmptyName(t *testing.T) {
+	local := NewLocal()
+
+	require.Panics(t, func() {
+		local.RegisterFunction("", func(title string) (string, error) { return title, nil })
+	})
+}
+
+func TestRegisterFunctionPanicsOnNilFunc(t *testing.T) {
+	local := NewLocal()
+
+	require.Panics(t, func() {
+		local.RegisterFunction("slugify", nil)
+	})
+}
+
+func TestRegisterFunctionPanicRecordsNothing(t *testing.T) {
+	local := NewLocal()
+
+	require.Panics(t, func() {
+		local.RegisterFunction("slugify", nil)
+	})
+
+	require.Nil(t, local.Functions())
+}
+
+func TestFunctionsReturnsACopy(t *testing.T) {
+	local := NewLocal()
+	local.RegisterFunction("slugify", func(title string) (string, error) { return title, nil })
+
+	registered := local.Functions()
+	registered[0].Name = "changed"
+
+	require.Equal(t, "slugify", local.Functions()[0].Name)
 }

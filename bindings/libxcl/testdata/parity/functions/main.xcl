@@ -1,0 +1,9 @@
+app "a" {
+  name   = slugify("My App")
+  secret = "Hunter Two"
+}
+
+app "b" {
+  name  = slugify(upper(app.a.name))
+  token = slugify(app.a.secret)
+}

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
@@ -202,6 +203,18 @@ func (f *FakeGitHubRelease) PublicKey() string {
 // the release, unless the release was built with SignedByOtherKey
 func (f *FakeGitHubRelease) OtherPublicKey() string {
 	return armoredPublicKey(f.otherKey)
+}
+
+// OtherKeyID is the long key ID, 16 upper-case hex digits, of the key
+// OtherPublicKey returns, as it signs: its signing subkey when it has one,
+// else its primary key
+func (f *FakeGitHubRelease) OtherKeyID() string {
+	key, ok := f.otherKey.SigningKey(time.Now())
+	if !ok {
+		return fmt.Sprintf("%016X", f.otherKey.PrimaryKey.KeyId)
+	}
+
+	return fmt.Sprintf("%016X", key.PublicKey.KeyId)
 }
 
 // Archive is the build for os/arch as it is served, nil when the release has
@@ -423,15 +436,20 @@ func armoredPublicKey(entity *openpgp.Entity) string {
 	return out.String()
 }
 
-// tarGzArchive packs binary at the root of a gzipped tar under name
+// tarGzArchive packs binary at the root of a gzipped tar under name. The
+// gzip stream is stored without compression: every test builds a release of
+// a plugin binary for every platform, and compressing it is what made the
+// registry tests outlast go test's timeout under the race detector.
 func tarGzArchive(t testing.TB, name string, binary []byte) []byte {
 	t.Helper()
 
 	var out bytes.Buffer
-	compressed := gzip.NewWriter(&out)
+	compressed, err := gzip.NewWriterLevel(&out, gzip.NoCompression)
+	require.NoError(t, err)
+
 	archive := tar.NewWriter(compressed)
 
-	err := archive.WriteHeader(&tar.Header{Name: name, Mode: 0755, Size: int64(len(binary)), Typeflag: tar.TypeReg})
+	err = archive.WriteHeader(&tar.Header{Name: name, Mode: 0755, Size: int64(len(binary)), Typeflag: tar.TypeReg})
 	require.NoError(t, err)
 
 	_, err = archive.Write(binary)
@@ -450,14 +468,15 @@ func tarGzArchive(t testing.TB, name string, binary []byte) []byte {
 	return out.Bytes()
 }
 
-// zipArchive packs binary at the root of a zip under name
+// zipArchive packs binary at the root of a zip under name, stored without
+// compression for the same reason as tarGzArchive
 func zipArchive(t testing.TB, name string, binary []byte) []byte {
 	t.Helper()
 
 	var out bytes.Buffer
 	archive := zip.NewWriter(&out)
 
-	header := &zip.FileHeader{Name: name, Method: zip.Deflate}
+	header := &zip.FileHeader{Name: name, Method: zip.Store}
 	header.SetMode(0755)
 
 	writer, err := archive.CreateHeader(header)

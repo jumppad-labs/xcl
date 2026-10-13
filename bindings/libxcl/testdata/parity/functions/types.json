@@ -1,0 +1,7 @@
+[
+  {"schema_version": 1, "type": "app", "fields": [
+    {"name": "name", "type": "string"},
+    {"name": "secret", "type": "string", "optional": true, "sensitive": true},
+    {"name": "token", "type": "string", "optional": true, "sensitive": true}
+  ]}
+]

@@ -164,6 +164,18 @@ func (g *GitHub) Types() []Type {
 	return g.local.Types()
 }
 
+// RegisterFunction offers fn to configuration under name, as
+// Local.RegisterFunction does
+func (g *GitHub) RegisterFunction(name string, fn any) {
+	g.local.RegisterFunction(name, fn)
+}
+
+// Functions returns the functions registered with RegisterFunction, in the
+// order they were registered, or nil when none were
+func (g *GitHub) Functions() []Function {
+	return g.local.Functions()
+}
+
 // Plugins returns one plugin per RegisterPlugin call, and any other plugin
 // registered on the wrapped local registry, in registration order. Nothing is
 // downloaded here: each plugin installs, or finds in the cache, and verifies

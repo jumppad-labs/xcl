@@ -7,7 +7,6 @@ import (
 	"github.com/muesli/termenv"
 
 	"github.com/jumppad-labs/xcl"
-	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/highlight"
 )
 
@@ -21,20 +20,14 @@ func plan(out io.Writer, c *xcl.Config, configDir string) error {
 		return explainPluginLoad(err)
 	}
 
-	var options []diff.RenderOption
-
 	// as with inspect, colour is decided for out itself, so a plan written to
 	// a file or a pipe is plain text
+	var renderer highlight.Renderer = highlight.Text
 	if lipgloss.NewRenderer(out).ColorProfile() != termenv.Ascii {
-		renderer, err := highlight.NewANSIRenderer()
-		if err != nil {
-			return err
-		}
-
-		options = append(options, diff.Highlight(renderer))
+		renderer = highlight.ANSI
 	}
 
-	_, err = out.Write(diff.Render(changes, options...))
+	_, err = out.Write(renderer.Render(changes.Pieces()))
 
 	return err
 }

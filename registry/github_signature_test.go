@@ -68,6 +68,20 @@ func TestGitHubPluginStartWithTrustedKeyRefusesReleaseSignedByOtherKey(t *testin
 	requireNoStagingDirectories(t, cache)
 }
 
+func TestGitHubPluginStartWithTrustedKeyRefusalNamesTheSigningKey(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.SignedByOtherKey())
+	cache := t.TempDir()
+	gh := newSignatureTestRegistry(t, fake.URL(), cache, fake.PublicKey())
+	plugin := widgetPlugin(t, gh)
+
+	host, err := plugin.Start(nil)
+	require.Error(t, err)
+	require.Nil(t, host)
+	require.ErrorIs(t, err, xclerrors.ErrPluginVerification)
+	require.Contains(t, err.Error(), "does not verify against any trusted key")
+	require.Contains(t, err.Error(), "signed by key "+fake.OtherKeyID()+", which is not trusted")
+}
+
 func TestGitHubPluginStartWithTrustedKeyRefusesUnsignedRelease(t *testing.T) {
 	fake := newInstallTestRelease(t, testutil.WithoutSignature())
 	cache := t.TempDir()

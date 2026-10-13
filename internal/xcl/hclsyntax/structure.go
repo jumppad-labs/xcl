@@ -1,5 +1,6 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
+// Modifications Copyright (c) Jumppad Labs
 
 package hclsyntax
 
@@ -202,7 +203,9 @@ func (b *Body) PartialContent(schema *hcl.BodySchema) (*hcl.BodyContent, hcl.Bod
 			continue
 		}
 
-		if len(block.Labels) < len(blockS.LabelNames) {
+		// A block whose labels are optional may carry none of them. One
+		// that carries some but not all is still missing the rest.
+		if len(block.Labels) < len(blockS.LabelNames) && !(blockS.LabelsOptional && len(block.Labels) == 0) {
 			name := block.Type
 			diags = append(diags, &hcl.Diagnostic{
 				Severity: hcl.DiagError,

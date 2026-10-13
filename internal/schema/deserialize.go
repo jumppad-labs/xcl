@@ -11,7 +11,19 @@ import (
 // and dynamically creates a struct.
 // This is a generic function that can create any struct type.
 // typeMapping allows mapping type names to actual reflect.Types for proper type creation
+//
+// A schema v1 document, one carrying "schema_version": 1, is read by
+// BuildTypeV1 instead, so a plugin or host may send either form.
 func CreateInstanceFromSchema(data []byte, typeMapping map[string]reflect.Type) (any, error) {
+	if IsV1(data) {
+		built, _, err := BuildTypeV1(data)
+		if err != nil {
+			return nil, err
+		}
+
+		return reflect.New(built).Interface(), nil
+	}
+
 	e := &Attribute{}
 	err := json.Unmarshal(data, e)
 	if err != nil {

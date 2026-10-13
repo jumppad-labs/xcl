@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
@@ -110,7 +111,7 @@ var (
 	// or module, or it holds a value that has no configuration form.
 	ErrNotEncodable = xclerrors.ErrNotEncodable
 
-	// ErrInvalidTheme means a colour theme given to highlight.NewANSIRenderer
+	// ErrInvalidTheme means a colour theme given to highlight.NewANSI
 	// cannot be read or is not a valid VS Code colour theme. The
 	// InvalidThemeError detail names the theme and what was wrong with it.
 	ErrInvalidTheme = xclerrors.ErrInvalidTheme
@@ -156,6 +157,25 @@ type (
 	// when plugins load for a plugin's type
 	TypeFormError = xclerrors.TypeFormError
 
+	// InvalidTypeError is returned when a Go type has a field configuration
+	// cannot be decoded into, such as a block field that is a string: by
+	// NewConfig for a declared Go type, and when plugins load for a plugin's
+	// type. It names the type, its provider and the field, and is never a
+	// panic
+	InvalidTypeError = xclerrors.InvalidTypeError
+
+	// FunctionNameClashError is returned when a function name is offered
+	// twice, it names both providers and their registries. NewConfig returns
+	// it for an application function named like a builtin or like another
+	// application function, and the first operation that loads plugins for
+	// a clash involving a plugin
+	FunctionNameClashError = xclerrors.FunctionNameClashError
+
+	// InvalidFunctionError is returned by NewConfig for an application
+	// function whose signature cannot be called from configuration, naming
+	// the function and its registry
+	InvalidFunctionError = xclerrors.InvalidFunctionError
+
 	InvalidDecodeTargetError = xclerrors.InvalidDecodeTargetError
 
 	UnregisteredTypeError = xclerrors.UnregisteredTypeError
@@ -183,7 +203,10 @@ type Config struct {
 	eventMask       mask.Masker         // Masks sensitive values in event data, mask.Redact() by default
 	eventMaskOff    bool                // Event data carries real sensitive values, set by WithNoEventMask
 
-	addresses *resources.AddressParser // resolves addresses against the known types
+	// addresses resolves addresses against the known types. It is kept once
+	// the registry's plugins have loaded, and read without a lock, so that
+	// lookups may run concurrently between operations
+	addresses atomic.Pointer[resources.AddressParser]
 }
 
 // addressParser returns a parser that resolves addresses against the types the
@@ -192,9 +215,13 @@ type Config struct {
 //
 // The parser is not kept until the registry's plugins have loaded, the types
 // they provide are not known before then.
+//
+// Lookups may run concurrently, so the parser is published atomically once
+// built. Two lookups that race to build it keep whichever was published
+// first; both resolve the same types.
 func (c *Config) addressParser() *resources.AddressParser {
-	if c.addresses != nil {
-		return c.addresses
+	if kept := c.addresses.Load(); kept != nil {
+		return kept
 	}
 
 	var known []types.TypeInfo
@@ -204,7 +231,9 @@ func (c *Config) addressParser() *resources.AddressParser {
 
 	addresses := resources.NewAddressParser(known)
 	if c.catalog == nil || c.catalog.Loaded() {
-		c.addresses = addresses
+		if !c.addresses.CompareAndSwap(nil, addresses) {
+			return c.addresses.Load()
+		}
 	}
 
 	return addresses
@@ -217,12 +246,15 @@ func (c *Config) addressParser() *resources.AddressParser {
 //
 // Options may be given in any order: NewConfig collects every option first,
 // then builds the Config's own catalog from the registries added with
-// WithRegistry, reading each registry's Types in the order the registries
-// were given. A declared Go type that duplicates another, in one registry or
-// across two, is returned as a *TypeNameClashError naming both and their
-// registries, one with a builtin name as a *TypeNameClashError naming
-// "builtin", and one that uses its type keyword in both forms as a
-// *TypeFormError. Plugins are not loaded here, they load on the first
+// WithRegistry, reading each registry's Types and Functions in the order the
+// registries were given. A declared Go type that duplicates another, in one
+// registry or across two, is returned as a *TypeNameClashError naming both
+// and their registries, one with a builtin name as a *TypeNameClashError
+// naming "builtin", and one that uses its type keyword in both forms as a
+// *TypeFormError. An application function named like a builtin or like
+// another application function is returned as a *FunctionNameClashError, and
+// one whose signature cannot be called from configuration as an
+// *InvalidFunctionError. Plugins are not loaded here, they load on the first
 // operation that needs them.
 func NewConfig(opts ...ConfigOption) (*Config, error) {
 	c := &Config{
@@ -242,6 +274,12 @@ func NewConfig(opts ...ConfigOption) (*Config, error) {
 	for _, r := range c.registries {
 		for _, declared := range r.Types() {
 			if err := c.catalog.DeclareType(declared, r.Name()); err != nil {
+				return nil, err
+			}
+		}
+
+		for _, declared := range r.Functions() {
+			if err := c.catalog.DeclareFunction(declared, r.Name()); err != nil {
 				return nil, err
 			}
 		}
@@ -335,21 +373,25 @@ func (c *Config) Outputs() map[string]any {
 //   - DAG has no cycles
 //   - Resource dependencies are valid
 func (c *Config) Validate(paths ...string) error {
-	return c.run(events.OperationValidate, func(ctx context.Context, emit events.Emit) error {
+	return c.ValidateContext(context.Background(), paths...)
+}
+
+// ValidateContext is Validate under the caller's context. Validate calls no
+// provider, so ctx is observed only before the parse starts: a ctx that is
+// already cancelled returns an error wrapping context.Canceled, or
+// context.DeadlineExceeded when a deadline passed, and a validation that was
+// already running finishes as it would have.
+func (c *Config) ValidateContext(ctx context.Context, paths ...string) error {
+	return c.run(ctx, events.OperationValidate, func(ctx context.Context, emit events.Emit) error {
 		if len(paths) == 0 {
 			return fmt.Errorf("at least one path is required")
 		}
 
-		// Create parser with StateStore
-		p := parser.NewParser(&parser.ParserOptions{
-			EventData:  c.eventData,
-			StateStore: c.stateStore,
-			StateMask:  c.stateMask,
-			EventMask:  c.eventMask,
-			Catalog:    c.catalog,
-			Variables:  convertVariablesToStringMap(c.variables),
-			Emit:       emit,
-		})
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("validate stopped before the configuration was read: %w", err)
+		}
+
+		p := parser.NewParser(c.parserOptions(emit))
 
 		// Validate without resolving: no decode, no DAG walk, no plugins
 		return p.Validate(ctx, paths...)
@@ -369,21 +411,24 @@ func (c *Config) Validate(paths ...string) error {
 // it declares no blocks, which returns ErrEmptyConfiguration: use Destroy to
 // remove everything.
 func (c *Config) Apply(paths ...string) error {
-	return c.run(events.OperationApply, func(ctx context.Context, emit events.Emit) error {
+	return c.ApplyContext(context.Background(), paths...)
+}
+
+// ApplyContext is Apply under the caller's context, so the caller can stop an
+// apply that is in progress. Cancelling ctx starts no further provider call:
+// a call already running finishes, the progress made is saved to the state
+// store exactly as it is after a failed provider call, and ApplyContext
+// returns an error that wraps context.Canceled, or context.DeadlineExceeded
+// when a deadline passed. A ctx that is already cancelled stops the apply
+// before any provider is called. The next apply resumes from the saved
+// progress.
+func (c *Config) ApplyContext(ctx context.Context, paths ...string) error {
+	return c.run(ctx, events.OperationApply, func(ctx context.Context, emit events.Emit) error {
 		if len(paths) == 0 {
 			return fmt.Errorf("at least one path is required")
 		}
 
-		// Create parser with StateStore
-		p := parser.NewParser(&parser.ParserOptions{
-			EventData:  c.eventData,
-			StateStore: c.stateStore,
-			StateMask:  c.stateMask,
-			EventMask:  c.eventMask,
-			Catalog:    c.catalog,
-			Variables:  convertVariablesToStringMap(c.variables),
-			Emit:       emit,
-		})
+		p := parser.NewParser(c.parserOptions(emit))
 
 		// Parser manages State independently (loads from store, parses,
 		// returns new state). A failed or cancelled apply returns the
@@ -436,7 +481,17 @@ func (c *Config) Apply(paths ...string) error {
 // named in the returned error; calling Destroy again retries it. When nothing
 // has been saved Destroy succeeds and writes nothing.
 func (c *Config) Destroy() error {
-	return c.run(events.OperationDestroy, func(ctx context.Context, emit events.Emit) error {
+	return c.DestroyContext(context.Background())
+}
+
+// DestroyContext is Destroy under the caller's context, so the caller can stop
+// a destroy that is in progress. Cancelling ctx starts no further provider
+// call: a destroy already running finishes and is saved, the resources not
+// yet reached stay in the state, and DestroyContext returns an error that
+// wraps context.Canceled, or context.DeadlineExceeded when a deadline passed.
+// Calling Destroy again removes what remains.
+func (c *Config) DestroyContext(ctx context.Context) error {
+	return c.run(ctx, events.OperationDestroy, func(ctx context.Context, emit events.Emit) error {
 		saved := c.entities
 
 		if c.stateStore != nil {
@@ -456,16 +511,8 @@ func (c *Config) Destroy() error {
 			return nil
 		}
 
-		// Create parser with StateStore, destroy saves through it after
-		// every resource
-		p := parser.NewParser(&parser.ParserOptions{
-			EventData:  c.eventData,
-			StateStore: c.stateStore,
-			StateMask:  c.stateMask,
-			EventMask:  c.eventMask,
-			Catalog:    c.catalog,
-			Emit:       emit,
-		})
+		// destroy saves through the parser's state store after every resource
+		p := parser.NewParser(c.parserOptions(emit))
 
 		remaining, err := p.Destroy(ctx, saved)
 		if remaining != nil {
@@ -487,7 +534,20 @@ func (c *Config) Destroy() error {
 // the Config holds nothing. Without a state store there is nothing to read,
 // Load succeeds and keeps what the Config already holds.
 func (c *Config) Load() error {
-	return c.run(events.OperationLoadState, func(ctx context.Context, emit events.Emit) error {
+	return c.LoadContext(context.Background())
+}
+
+// LoadContext is Load under the caller's context. Load calls no provider, so
+// ctx is observed only before the state is read: a ctx that is already
+// cancelled returns an error wrapping context.Canceled, or
+// context.DeadlineExceeded when a deadline passed, and leaves what the Config
+// holds untouched.
+func (c *Config) LoadContext(ctx context.Context) error {
+	return c.run(ctx, events.OperationLoadState, func(ctx context.Context, emit events.Emit) error {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("load stopped before the state was read: %w", err)
+		}
+
 		if c.stateStore == nil {
 			return nil
 		}
@@ -513,6 +573,25 @@ func (c *Config) Load() error {
 	})
 }
 
+// parserOptions builds the options every operation's parser is created with,
+// so Validate, Apply, Diff and Destroy read configuration and variables the
+// same way. Variables are overridden from the environment only through
+// parser.DefaultVariableEnvPrefix, XCL_VAR_<name>; other environment
+// variables are never read. emit receives the parser's events for the
+// operation being run.
+func (c *Config) parserOptions(emit events.Emit) *parser.ParserOptions {
+	return &parser.ParserOptions{
+		EventData:         c.eventData,
+		StateStore:        c.stateStore,
+		StateMask:         c.stateMask,
+		EventMask:         c.eventMask,
+		Catalog:           c.catalog,
+		Variables:         convertVariablesToStringMap(c.variables),
+		VariableEnvPrefix: parser.DefaultVariableEnvPrefix,
+		Emit:              emit,
+	}
+}
+
 // convertVariablesToStringMap converts map[string]any to map[string]string
 // This is needed for parser compatibility
 func convertVariablesToStringMap(vars map[string]any) map[string]string {
@@ -523,8 +602,10 @@ func convertVariablesToStringMap(vars map[string]any) map[string]string {
 	return result
 }
 
-// run runs the work of one Validate, Apply, Diff or Destroy and delivers its
-// events.
+// run runs the work of one Validate, Apply, Diff, Destroy or Load under ctx
+// and delivers its events. ctx is the caller's: cancelling it stops the work
+// from starting new provider calls, and the error the work returns wraps the
+// context's error.
 //
 // Without an event handler the work runs directly with a nil emit, so xcl is
 // silent and nothing extra is started. With one, the work runs on a worker
@@ -544,11 +625,11 @@ func convertVariablesToStringMap(vars map[string]any) map[string]string {
 //
 // A panic raised by a provider on a worker goroutine is not handled here, it
 // behaves as it does without a handler.
-func (c *Config) run(operation string, work func(ctx context.Context, emit events.Emit) error) error {
+func (c *Config) run(ctx context.Context, operation string, work func(ctx context.Context, emit events.Emit) error) error {
 	work = c.withPlugins(work)
 
 	if c.eventHandler == nil {
-		return work(context.Background(), nil)
+		return work(ctx, nil)
 	}
 
 	size := c.eventBufferSize
@@ -564,7 +645,7 @@ func (c *Config) run(operation string, work func(ctx context.Context, emit event
 		stream.Emit(e.WithEntityDecoder(c.decodeEventEntity))
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	started := time.Now()

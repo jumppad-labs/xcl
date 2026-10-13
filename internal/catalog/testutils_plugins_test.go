@@ -53,6 +53,11 @@ func (r failingRegistry) Types() []registry.Type {
 	return nil
 }
 
+// Functions returns nil, the registry offers no functions
+func (r failingRegistry) Functions() []registry.Function {
+	return nil
+}
+
 // Plugins always fails
 func (r failingRegistry) Plugins(ctx context.Context, emit events.Emit) ([]registry.Plugin, error) {
 	return nil, fmt.Errorf("registry %s is unreachable", r.name)

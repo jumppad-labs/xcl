@@ -26,7 +26,10 @@ type Local struct {
 	mu      sync.Mutex
 	pattern string
 	types   []Type
-	entries []localEntry
+
+	// functions are the Go functions registered with RegisterFunction
+	functions []Function
+	entries   []localEntry
 }
 
 // localEntry is one registration, either a plugin or a directory to search
@@ -78,13 +81,16 @@ func (l *Local) Name() string {
 //	local.RegisterType(&Database{}, "database")             // database "main" {}
 //	local.RegisterType(&Database{}, "resource", "database") // resource "database" "main" {}
 //
-// prototype is a pointer to a struct that embeds types.ResourceBase. A
-// declared type has no provider, it is only decoded into.
+// prototype is a pointer to a struct. It may embed types.ResourceBase, or be
+// a plain struct of the application's own: a plain type's blocks are decoded
+// into it all the same, its name and labels go to fields tagged as labels,
+// and its `disabled` and `depends_on` to fields of those names if it has
+// them. A declared type has no provider, it is only decoded into.
 //
 // A declaration that is wrong on every run is a programmer error and panics
 // here, naming the type: an empty name, more than one subtype, an empty
-// subtype, or a prototype that is not a pointer to a struct embedding
-// types.ResourceBase. A declaration that clashes with another one, in this
+// subtype, a prototype that is not a pointer to a struct, or a plain struct
+// xcl cannot lay out, such as one declaring `meta`. A declaration that clashes with another one, in this
 // registry or another, or with a builtin, is returned by xcl.NewConfig. A
 // plugin providing the same block type is reported when plugins load.
 func (l *Local) RegisterType(prototype any, name ...string) {
@@ -114,6 +120,49 @@ func (l *Local) Types() []Type {
 	}
 
 	return append([]Type{}, l.types...)
+}
+
+// RegisterFunction offers fn, a plain Go func, to configuration under name,
+// beside the types declared with RegisterType:
+//
+//	local.RegisterFunction("slugify", func(title string) (string, error) { ... })
+//
+// Configuration then calls it as slugify("My App"), and the entity holds the
+// result. fn takes string, bool and number parameters, or slices and
+// string-keyed maps of those, and returns a result of such a type and an
+// error.
+//
+// A registration that is wrong on every run is a programmer error and panics
+// here: an empty name or a nil fn. A func whose signature cannot be called
+// from configuration, and a name that a builtin or another function already
+// uses, in this registry or another, are returned by xcl.NewConfig. A plugin
+// offering the same name is reported when plugins load.
+func (l *Local) RegisterFunction(name string, fn any) {
+	if name == "" {
+		panic(fmt.Sprintf("xcl: registry %s: a function must be named", LocalName))
+	}
+
+	if fn == nil {
+		panic(fmt.Sprintf("xcl: registry %s: function %q must not be nil", LocalName, name))
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.functions = append(l.functions, Function{Name: name, Func: fn})
+}
+
+// Functions returns the functions registered with RegisterFunction, in the
+// order they were registered, or nil when none were
+func (l *Local) Functions() []Function {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if len(l.functions) == 0 {
+		return nil
+	}
+
+	return append([]Function{}, l.functions...)
 }
 
 // RegisterPlugin registers p, a plugin compiled into the program. A nil p is

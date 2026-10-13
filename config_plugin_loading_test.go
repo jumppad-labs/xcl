@@ -389,7 +389,7 @@ func TestAddressParserIsNotCachedBeforePluginsLoad(t *testing.T) {
 	_, err := c.FindResource("resource.network.one")
 	require.ErrorIs(t, err, ErrNotFound)
 
-	require.Nil(t, c.addresses)
+	require.Nil(t, c.addresses.Load())
 }
 
 func TestAddressParserResolvesWithoutPluginTypesBeforePluginsLoad(t *testing.T) {
@@ -421,5 +421,5 @@ func TestAddressParserKnowsPluginTypesAfterFirstOperation(t *testing.T) {
 	require.Equal(t, "web", fqrn.Module)
 	require.Equal(t, "one", fqrn.Resource)
 
-	require.NotNil(t, c.addresses)
+	require.NotNil(t, c.addresses.Load())
 }

@@ -2,7 +2,7 @@ package highlight
 
 import "strings"
 
-// The scopes Text labels pieces with. They are the names the xcl-vscode
+// The scopes Pieces labels configuration with. They are the names the xcl-vscode
 // grammar (syntaxes/xcl.tmLanguage.json) gives the same text, .xcl suffix
 // included, so they are exactly the names the editor shows and a VS Code
 // colour theme matches against.
@@ -104,42 +104,39 @@ const (
 	ScopeChanged = "markup.changed.diff"
 )
 
-// Renderer turns one labelled piece of configuration text into output. Text
-// calls Render once for every piece of its input, in order, and joins what it
-// returns. scope is the TextMate scope the xcl-vscode grammar gives the
-// piece, one of the Scope constants, or "" for text the grammar leaves
-// unlabelled, such as whitespace, braces and commas. Unlabelled text is passed
-// too, so a renderer for a format that needs escaping sees every byte.
+// Renderer turns labelled pieces into output: plain text, terminal colour, or
+// any other format. It is given every piece at once, in order, so it can
+// reason across them, such as by line. The pieces hold every byte of the text,
+// unlabelled text included, so a renderer for a format that needs escaping
+// sees all of it.
 type Renderer interface {
-	Render(scope, text string) string
+	Render(pieces []Piece) []byte
 }
 
-// RendererFunc lets a plain function act as a Renderer
-type RendererFunc func(scope, text string) string
+// RendererFunc lets a function over every piece act as a Renderer
+type RendererFunc func(pieces []Piece) []byte
 
 // Render calls f
-func (f RendererFunc) Render(scope, text string) string {
-	return f(scope, text)
+func (f RendererFunc) Render(pieces []Piece) []byte {
+	return f(pieces)
 }
 
-// Text returns text with every piece passed through renderer, in order. A
-// renderer that returns each piece unchanged gives back text exactly, so
-// highlighting adds only what the renderer adds. A nil renderer returns text
-// as it is.
-//
-// Text accepts any input, including text that is not valid configuration:
-// what cannot be labelled is passed through with the empty scope.
-func Text(text []byte, renderer Renderer) []byte {
-	if renderer == nil {
-		return text
-	}
+// PieceFunc lets a function over one piece act as a Renderer, for a renderer
+// that styles each piece on its own: Render passes every piece to f in order
+// and joins what it returns.
+type PieceFunc func(piece Piece) string
 
+// Render returns what f returns for each piece, joined
+func (f PieceFunc) Render(pieces []Piece) []byte {
 	var out strings.Builder
-	out.Grow(len(text))
-
-	for _, p := range tokenize(text) {
-		out.WriteString(renderer.Render(p.scope, p.text))
+	for _, p := range pieces {
+		out.WriteString(f(p))
 	}
 
 	return []byte(out.String())
 }
+
+// Text renders pieces as plain text: their text joined, with nothing added.
+var Text Renderer = PieceFunc(func(piece Piece) string {
+	return piece.Text
+})

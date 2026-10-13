@@ -495,7 +495,9 @@ func fromCtyObject(val cty.Value, target reflect.Value, path cty.Path) error {
 				for i := 0; i < ct; i++ {
 					field := target.Type().Field(i)
 					if field.Anonymous {
-						fromCtyObject(val, target.Field(i), path)
+						if err := fromCtyObject(val, target.Field(i), path); err != nil {
+							return err
+						}
 					}
 				}
 
@@ -503,6 +505,16 @@ func fromCtyObject(val cty.Value, target reflect.Value, path cty.Path) error {
 			} else {
 				ev := val.GetAttr(k)
 				targetField := target.Field(fieldIdx)
+
+				// An attribute left out of a value converted against a
+				// constraint with optional attributes arrives null. A field
+				// tagged optional keeps its zero value for it, as it does
+				// when the attribute is left out of a block, rather than
+				// failing because the field cannot hold null.
+				if ev.IsNull() && optionalAttribute(target.Type().Field(fieldIdx)) {
+					continue
+				}
+
 				err := fromCtyValue(ev, targetField, path)
 				if err != nil {
 					return err

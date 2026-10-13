@@ -1,0 +1,24 @@
+app "web" {
+  image    = "nginx"
+  password = "s3cret"
+
+  health {
+    path = "/healthz"
+  }
+
+  volume "data" {
+    source = "/data"
+  }
+
+  volume {
+    source = "/logs"
+  }
+
+  listener "http" {
+    port = 80
+  }
+
+  listener "https" {
+    port = 443
+  }
+}

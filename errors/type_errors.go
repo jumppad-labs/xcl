@@ -67,3 +67,40 @@ func (e *TypeFormError) Error() string {
 
 	return fmt.Sprintf("type %q is declared without a subtype, i.e. '%s \"<name>\" {}', so it can not be registered with one", e.Type, e.Type)
 }
+
+// InvalidTypeError is returned when a Go type declared as an entity type, or
+// provided by a plugin, has a field xcl cannot decode configuration into: a
+// block field that is not a struct, a pointer to one, or a slice or map of
+// them, a map of blocks without string keys, a label field that is not a
+// string, an unexported tagged field, a malformed tag, a second remain or
+// body field, or an attribute whose Go type has no configuration form.
+// NewConfig returns it for a declared type, and the first operation that
+// loads plugins returns it for a plugin's type, so the problem is reported
+// before any configuration is read and never as a panic.
+type InvalidTypeError struct {
+	// Type is the entity type, as its type and subtype joined by a dot, i.e.
+	// "resource.postgres", or its type alone when it has no subtype
+	Type string
+
+	// Provider is what provides the type: a plugin's name, or "type <Go
+	// type>" for a declared type
+	Provider string
+
+	// Registry is the registry Provider came from
+	Registry string
+
+	// Err names the field and the problem
+	Err error
+}
+
+func (e *InvalidTypeError) Error() string {
+	if e.Provider == "" {
+		return fmt.Sprintf("type %q cannot be decoded from configuration: %s", e.Type, e.Err)
+	}
+
+	return fmt.Sprintf("type %q from %s cannot be decoded from configuration: %s", e.Type, describeProvider(e.Provider, e.Registry), e.Err)
+}
+
+func (e *InvalidTypeError) Unwrap() error {
+	return e.Err
+}

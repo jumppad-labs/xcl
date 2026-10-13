@@ -457,3 +457,44 @@ type testTupleStruct struct {
 	Name   string
 	Number int
 }
+
+// optionalEndpoint is a struct whose tls field is tagged optional, so a null
+// tls attribute leaves the field at its zero value
+type optionalEndpoint struct {
+	Port int  `xcl:"port"`
+	TLS  bool `xcl:"tls,optional"`
+}
+
+func TestFromCtyValueLeavesNullOptionalFieldAtZero(t *testing.T) {
+	val := cty.ObjectVal(map[string]cty.Value{
+		"port": cty.NumberIntVal(80),
+		"tls":  cty.NullVal(cty.Bool),
+	})
+
+	var target optionalEndpoint
+	err := FromCtyValue(val, &target)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	if target.Port != 80 {
+		t.Errorf("wrong port %d; want 80", target.Port)
+	}
+
+	if target.TLS {
+		t.Errorf("tls is true; want false (zero value)")
+	}
+}
+
+func TestFromCtyValueRejectsNullRequiredField(t *testing.T) {
+	val := cty.ObjectVal(map[string]cty.Value{
+		"port": cty.NullVal(cty.Number),
+		"tls":  cty.True,
+	})
+
+	var target optionalEndpoint
+	err := FromCtyValue(val, &target)
+	if err == nil {
+		t.Fatalf("expected an error for a null required attribute, got none")
+	}
+}

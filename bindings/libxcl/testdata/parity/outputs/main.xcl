@@ -1,0 +1,19 @@
+app "web" {
+  region = "eu"
+  ports  = [80, 443]
+}
+
+output "region" {
+  value = app.web.region
+}
+
+output "ports" {
+  value = app.web.ports
+}
+
+output "summary" {
+  value = {
+    name  = app.web.meta.name
+    count = len(app.web.ports)
+  }
+}

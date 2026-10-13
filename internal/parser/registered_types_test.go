@@ -76,6 +76,19 @@ func setupRegisteredTypes(t *testing.T) *registeredHarness {
 	// declared server "big" "<name>"
 	reg.RegisterType(&registered.Server{}, registered.TypeServer, registered.SubtypeBig)
 
+	// service and gateway are registered without a subtype, a gateway reaches
+	// into a service with for, index and parenthesised expressions
+	reg.RegisterType(&registered.Service{}, registered.TypeService)
+	reg.RegisterType(&registered.Gateway{}, registered.TypeGateway)
+
+	// proxy is registered without a subtype, its endpoints are written as
+	// object and map attribute values whose tls field is optional
+	reg.RegisterType(&registered.Proxy{}, registered.TypeProxy)
+
+	// app is registered without a subtype, its listener blocks are collected
+	// by name so another entity reaches one as app.web.listener.https.port
+	reg.RegisterType(&registered.WebApp{}, registered.TypeWebApp)
+
 	store, err := state.NewFileStateStore(t.TempDir())
 	require.NoError(t, err)
 
@@ -805,4 +818,87 @@ func TestApplyRejectsASubtypeThatWasNotRegistered(t *testing.T) {
 	_, err := p.Apply(context.Background(), registeredSubtypedInvalid+"unknown_subtype.xcl")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "server.small")
+}
+
+const (
+	registeredForReferencesConfig      = "../test_fixtures/config/for_references/main.xcl"
+	registeredVariableFromEntityConfig = "../test_fixtures/config/variable_from_entity/main.xcl"
+
+	registeredGatewayID = "gateway.edge"
+)
+
+func TestApplyEvaluatesForExpressionOverEntity(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	st, err := p.Apply(context.Background(), registeredForReferencesConfig)
+	require.NoError(t, err)
+
+	r, err := findByID(st.GetResources(), registeredGatewayID)
+	require.NoError(t, err)
+	gateway, ok := r.(*registered.Gateway)
+	require.True(t, ok)
+
+	require.Equal(t, map[string]int{"http": 80, "https": 443}, gateway.Ports)
+	require.Equal(t, 443, gateway.Port)
+	require.Equal(t, "api.local", gateway.Address)
+}
+
+func TestApplyResolvesVariableDefaultBuiltFromEntity(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	st, err := p.Apply(context.Background(), registeredVariableFromEntityConfig)
+	require.NoError(t, err)
+
+	r, err := findByID(st.GetResources(), registeredGatewayID)
+	require.NoError(t, err)
+	gateway, ok := r.(*registered.Gateway)
+	require.True(t, ok)
+
+	require.Equal(t, "http://api.local", gateway.Address)
+}
+
+// An object or map attribute value may leave out the fields its struct type
+// tags optional, as a block may leave out their attributes. A required field
+// left out of a value is still an error.
+
+const (
+	registeredOptionalValuesConfig                = "../test_fixtures/config/optional_attribute_values/main.xcl"
+	registeredOptionalValuesMissingRequiredConfig = "../test_fixtures/config/optional_attribute_values_missing_required/main.xcl"
+
+	registeredProxyID = "proxy.edge"
+)
+
+func TestApplyAllowsOmittedOptionalFieldInObjectAndMapValues(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	st, err := p.Apply(context.Background(), registeredOptionalValuesConfig)
+	require.NoError(t, err)
+	require.NotNil(t, st)
+
+	r, err := findByID(st.GetResources(), registeredProxyID)
+	require.NoError(t, err)
+	proxy, ok := r.(*registered.Proxy)
+	require.True(t, ok, "expected *registered.Proxy, got %T", r)
+
+	// default_endpoint = { port = 8080 } leaves tls out
+	require.Equal(t, registered.Endpoint{Port: 8080, TLS: false}, proxy.Default)
+
+	require.Len(t, proxy.Listeners, 2)
+
+	// http = { port = 80 } leaves tls out, https sets it
+	require.Equal(t, registered.Endpoint{Port: 80, TLS: false}, proxy.Listeners["http"])
+	require.Equal(t, registered.Endpoint{Port: 443, TLS: true}, proxy.Listeners["https"])
+}
+
+func TestApplyRejectsOmittedRequiredFieldInMapValue(t *testing.T) {
+	h := setupRegisteredTypes(t)
+	p := h.newParser(t, nil)
+
+	_, err := p.Apply(context.Background(), registeredOptionalValuesMissingRequiredConfig)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `attribute "port" is required`)
+	require.Contains(t, err.Error(), `element "http"`)
 }

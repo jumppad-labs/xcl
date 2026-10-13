@@ -289,7 +289,9 @@ func configuredComputedFields(id string, body *hclsyntax.Body, t reflect.Type, p
 		counts[block.Type]++
 
 		blockPath := path + block.Type
-		if kind := f.field.Type.Kind(); kind == reflect.Slice || kind == reflect.Array {
+		if name, named := mapBlockName(block, f.field.Type); named {
+			blockPath = fmt.Sprintf("%s[%q]", blockPath, name)
+		} else if kind := f.field.Type.Kind(); kind == reflect.Slice || kind == reflect.Array {
 			blockPath = fmt.Sprintf("%s[%d]", blockPath, index)
 		}
 

@@ -1,0 +1,218 @@
+# Builds the engine program, xcl-core, for eight platforms when a version tag
+# is pushed, attaches the archives, a checksums file and its signature to the
+# GitHub release, then dispatches the xcl-python release for the same tag.
+#
+# Every target is cross-compiled with cgo disabled in one job on one Linux
+# runner, with every C compiler hidden from the path: no C toolchain and no
+# macOS runner is in the release path. The shared library, libxcl, is not
+# released; its toolchain matrix is kept in libxcl-build.yml, run by hand,
+# and go.yml builds and smoke-tests it on every change.
+#
+# The archives follow the asset contract the GitHub plugin registry verifies
+# (registry/github_assets.go): xcl-core_<version>_<os>_<arch>.tar.gz holding
+# xcl-core (.zip holding xcl-core.exe on Windows), with _musl appended to the
+# arch for the musl names, xcl-core_<version>_checksums.txt and
+# xcl-core_<version>_checksums.txt.sig, the version written without the
+# leading v. The program is static, so the two musl archives carry the same
+# Linux binary as their glibc counterparts, under a second name so each wheel
+# takes its own. The checksums are signed with the jumppad-labs release key,
+# the key the registry trusts for plugins.
+#
+# Run by hand with publish left false, the workflow builds every target and
+# keeps the assets as a workflow artifact, so the build can be checked before
+# a real release.
+#
+# Secrets: XCL_RELEASE_GPG_KEY (armoured private key),
+# XCL_RELEASE_GPG_PASSPHRASE, XCL_PYTHON_DISPATCH_TOKEN (a token with
+# contents: read and actions: write on jumppad-labs/xcl-python).
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag to build, e.g. v0.5.0
+        required: true
+        type: string
+      publish:
+        description: Attach the assets to the release and dispatch xcl-python
+        required: false
+        type: boolean
+        default: false
+
+env:
+  GO_VERSION: '1.27.0'
+
+jobs:
+  # the tag being built, and whether the run publishes
+  settings:
+    name: Settings
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.settings.outputs.tag }}
+      version: ${{ steps.settings.outputs.version }}
+      publish: ${{ steps.settings.outputs.publish }}
+    steps:
+      - id: settings
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tag="${{ github.ref_name }}"
+            publish=true
+          else
+            tag="${{ inputs.tag }}"
+            publish="${{ inputs.publish }}"
+          fi
+          case "$tag" in
+            v*) ;;
+            *) echo "the tag must start with v, got $tag"; exit 1 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+  # build every target with cgo disabled and no C compiler reachable, package
+  # each as a release asset, write and sign the checksums, and attach them to
+  # the release when publishing
+  build:
+    name: Build, package and sign
+    needs: settings
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.settings.outputs.version }}
+      TAG: ${{ needs.settings.outputs.tag }}
+      CGO_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.settings.outputs.tag }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      # the runner ships gcc and clang; shims that fail stand in front of
+      # every C compiler for the rest of the job, so a build that needed one
+      # would fail here rather than quietly use it
+      - name: Hide every C compiler
+        run: |
+          mkdir -p "$HOME/no-cc"
+          for tool in cc gcc clang zig c++ g++ clang++ x86_64-linux-gnu-gcc aarch64-linux-gnu-gcc; do
+            printf '#!/bin/sh\necho "%s is not available in the release build" >&2\nexit 127\n' "$tool" > "$HOME/no-cc/$tool"
+            chmod +x "$HOME/no-cc/$tool"
+          done
+          echo "$HOME/no-cc" >> "$GITHUB_PATH"
+
+      - name: Check no C compiler is reachable
+        run: |
+          for tool in cc gcc clang zig; do
+            if "$tool" --version >/dev/null 2>&1; then
+              echo "$tool is reachable: $(command -v "$tool")"; exit 1
+            fi
+          done
+          echo "no C compiler is reachable"
+
+      - name: Build
+        run: |
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            goos="${target%/*}"
+            goarch="${target#*/}"
+            exe=""
+            [ "$goos" = windows ] && exe=.exe
+            make xcl-core \
+              GOOS="$goos" \
+              GOARCH="$goarch" \
+              XCL_CORE_VERSION="$TAG" \
+              XCL_CORE_OUT="$PWD/dist/${goos}_${goarch}/xcl-core$exe"
+          done
+          # the program is static, so musl takes the same Linux binary
+          cp -r dist/linux_amd64 dist/linux_amd64_musl
+          cp -r dist/linux_arm64 dist/linux_arm64_musl
+          ls -la dist/*
+
+      # every target is built by the same make invocation with the tag; the
+      # one this runner can execute is run, and every binary's recorded
+      # build settings must show cgo disabled
+      - name: Check the programs
+        run: |
+          reported="$(dist/linux_amd64/xcl-core --version)"
+          echo "xcl-core --version: $reported"
+          [ "$reported" = "$TAG" ] || { echo "expected $TAG"; exit 1; }
+          for binary in dist/*/xcl-core*; do
+            go version -m "$binary" | grep -q 'CGO_ENABLED=0' || { echo "$binary was not built with cgo disabled"; exit 1; }
+          done
+
+      - name: Archive each build
+        run: |
+          mkdir -p assets
+          for dir in dist/*; do
+            target="${dir#dist/}"
+            case "$target" in
+              windows_*)
+                (cd "$dir" && zip -q "../../assets/xcl-core_${VERSION}_${target}.zip" xcl-core.exe) ;;
+              *)
+                tar -C "$dir" -czf "assets/xcl-core_${VERSION}_${target}.tar.gz" xcl-core ;;
+            esac
+          done
+          ls -la assets
+          [ "$(ls assets | wc -l)" -eq 8 ] || { echo "expected 8 archives"; exit 1; }
+
+      - name: Write the checksums
+        run: |
+          cd assets
+          sha256sum xcl-core_*.tar.gz xcl-core_*.zip > "xcl-core_${VERSION}_checksums.txt"
+          cat "xcl-core_${VERSION}_checksums.txt"
+
+      - name: Sign the checksums
+        env:
+          GPG_KEY: ${{ secrets.XCL_RELEASE_GPG_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.XCL_RELEASE_GPG_PASSPHRASE }}
+        run: |
+          if [ -z "$GPG_KEY" ]; then
+            echo "XCL_RELEASE_GPG_KEY is not set; the checksums cannot be signed"; exit 1
+          fi
+          echo "$GPG_KEY" | gpg --batch --import
+          cd assets
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+            --detach-sign --armor --output "xcl-core_${VERSION}_checksums.txt.sig" "xcl-core_${VERSION}_checksums.txt"
+          gpg --verify "xcl-core_${VERSION}_checksums.txt.sig" "xcl-core_${VERSION}_checksums.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: assets
+          if-no-files-found: error
+
+      - name: Attach the assets to the release
+        if: needs.settings.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" assets/* --clobber
+
+  # tell xcl-python to build and publish the matching package
+  dispatch:
+    name: Dispatch the xcl-python release
+    needs: [settings, build]
+    if: needs.settings.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch
+        env:
+          GH_TOKEN: ${{ secrets.XCL_PYTHON_DISPATCH_TOKEN }}
+          TAG: ${{ needs.settings.outputs.tag }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "XCL_PYTHON_DISPATCH_TOKEN is not set; xcl-python was not dispatched"; exit 1
+          fi
+          gh api "repos/jumppad-labs/xcl-python/dispatches" \
+            --method POST \
+            -f event_type=xcl-release \
+            -F "client_payload[tag]=$TAG"

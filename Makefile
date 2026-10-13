@@ -18,7 +18,65 @@ mocks-clean:
 # Install tools and generate mocks
 setup-mocks: install-mockery mocks
 
-.PHONY: protos install-mockery mocks mocks-clean setup-mocks
+# Generate the Go message types of the CoreService protocol, proto/xcl/core/v1,
+# into coreservice/proto with buf. buf-lint and buf-breaking keep the
+# protocol's names consistent and its fields and methods stable.
+core-protos:
+	buf generate
+
+buf-lint:
+	buf lint
+
+buf-breaking:
+	buf breaking --against '.git#branch=main'
+
+.PHONY: protos install-mockery mocks mocks-clean setup-mocks core-protos buf-lint buf-breaking
+
+# libxcl is the engine built as a C shared library from the nested module
+# bindings/libxcl, for a language binding to load. LIBXCL_VERSION is stamped
+# into the library as the version GetVersion reports, a release sets it to the
+# tag. LIBXCL_OUT is the library's path; the default extension follows GOOS.
+# CC, GOOS and GOARCH pass through for cross builds, e.g.
+# make libxcl CC="zig cc -target x86_64-linux-gnu.2.28" LIBXCL_VERSION=v1.0.0
+LIBXCL_VERSION ?= dev
+LIBXCL_GOOS ?= $(shell go env GOOS)
+ifeq ($(LIBXCL_GOOS),windows)
+LIBXCL_EXT := dll
+else ifeq ($(LIBXCL_GOOS),darwin)
+LIBXCL_EXT := dylib
+else
+LIBXCL_EXT := so
+endif
+LIBXCL_OUT ?= $(CURDIR)/bindings/libxcl/build/libxcl.$(LIBXCL_EXT)
+LIBXCL_LDFLAGS := -s -w -X github.com/jumppad-labs/xcl/coreservice.Version=$(LIBXCL_VERSION)
+
+libxcl:
+	cd bindings/libxcl && CGO_ENABLED=1 go build -buildmode=c-shared -trimpath -ldflags="$(LIBXCL_LDFLAGS)" -o "$(LIBXCL_OUT)" .
+
+# test-libxcl runs the nested module's smoke test through the C ABI, with
+# the library's version stamped exactly as the libxcl target stamps it
+test-libxcl:
+	cd bindings/libxcl && CGO_ENABLED=1 go test -count=1 -ldflags="-X github.com/jumppad-labs/xcl/coreservice.Version=$(LIBXCL_VERSION)" ./...
+
+.PHONY: libxcl test-libxcl
+
+# xcl-core is the engine as a program a binding starts and talks to over its
+# standard input and output, from cmd/xcl-core. It is built with cgo disabled,
+# so any GOOS and GOARCH build from one machine with no C compiler.
+# XCL_CORE_VERSION is stamped into the program exactly as LIBXCL_VERSION is
+# into the library; a release sets it to the tag. XCL_CORE_OUT is the
+# program's path, with .exe when GOOS is windows, e.g.
+# make xcl-core GOOS=windows GOARCH=arm64 XCL_CORE_VERSION=v1.0.0
+XCL_CORE_VERSION ?= dev
+XCL_CORE_GOOS ?= $(if $(GOOS),$(GOOS),$(shell go env GOOS))
+XCL_CORE_GOARCH ?= $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
+XCL_CORE_EXT := $(if $(filter windows,$(XCL_CORE_GOOS)),.exe,)
+XCL_CORE_OUT ?= $(CURDIR)/build/xcl-core$(XCL_CORE_EXT)
+
+xcl-core:
+	CGO_ENABLED=0 GOOS=$(XCL_CORE_GOOS) GOARCH=$(XCL_CORE_GOARCH) go build -trimpath -ldflags="-s -w -X github.com/jumppad-labs/xcl/coreservice.Version=$(XCL_CORE_VERSION)" -o "$(XCL_CORE_OUT)" ./cmd/xcl-core
+
+.PHONY: xcl-core
 # Install and start a real plugin release from github.com. Set
 # XCL_GITHUB_LIVE_PLUGIN=owner/repo@vX.Y.Z, optionally XCL_GITHUB_LIVE_KEY to
 # the path of an armoured public key to trust, and GITHUB_TOKEN or GH_TOKEN

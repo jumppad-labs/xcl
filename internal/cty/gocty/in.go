@@ -380,7 +380,7 @@ func toCtyObject(val reflect.Value, attrTypes map[string]cty.Type, path cty.Path
 						field := val.Type().Field(i)
 						if field.Anonymous {
 							// Get the type for this anonymous field and see if it has this attribute
-							anonType, err := impliedType(field.Type, path)
+							anonType, err := impliedType(field.Type, path, false)
 							if err != nil {
 								continue
 							}

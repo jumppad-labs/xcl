@@ -3,14 +3,15 @@ package xcl
 import (
 	"fmt"
 	"maps"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
-	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/cty"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
@@ -31,12 +32,11 @@ type encodeOptions struct {
 	includeEmpty    bool
 	revealSensitive bool
 	showReferences  bool
-	renderer        highlight.Renderer
 }
 
 // EncodeOption configures how an entity is written as configuration text.
-// Construct one with IncludeComputed, IncludeEmpty, RevealSensitive,
-// ShowReferences or Highlight.
+// Construct one with IncludeComputed, IncludeEmpty, RevealSensitive or
+// ShowReferences.
 type EncodeOption func(*encodeOptions)
 
 // IncludeComputed also writes the fields a provider fills in, such as an
@@ -102,22 +102,6 @@ func ShowReferences() EncodeOption {
 	}
 }
 
-// Highlight passes the finished text through renderer, labelling each token
-// with the TextMate scope the xcl-vscode grammar gives it, such as
-// storage.type.xcl for a block type. The text is unchanged apart from what the
-// renderer adds, and highlighting combines with every other option, including
-// ShowReferences, whose expressions are highlighted like any other text.
-//
-// Use highlight.NewANSIRenderer to colour text for a terminal, or write a
-// highlight.Renderer for any other format. xcl never checks whether output is
-// a terminal, so whether to ask for colour is the caller's decision. A nil
-// renderer means no highlighting.
-func Highlight(renderer highlight.Renderer) EncodeOption {
-	return func(o *encodeOptions) {
-		o.renderer = renderer
-	}
-}
-
 // EncodeEntity returns entity as configuration text in xcl's own syntax,
 // formatted and ready to print or write to a .xcl file.
 //
@@ -133,7 +117,8 @@ func Highlight(renderer highlight.Renderer) EncodeOption {
 // IncludeEmpty is given. Values are written as the
 // literals they resolved to, not as the expressions the original configuration
 // used, unless ShowReferences is given. The text is plain, with no colour or
-// markup, unless Highlight is given.
+// markup; to colour it, render its pieces, such as
+// highlight.ANSI.Render(highlight.Pieces(text)).
 //
 // It fails with ErrNotEncodable when entity is not an entity, when it is a
 // builtin such as a variable, output or module, or when it holds a value that
@@ -195,6 +180,15 @@ func (c *Config) EncodeSavedEntity(data []byte, options ...EncodeOption) ([]byte
 // an entity and its saved data give identical text
 func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 	meta, err := types.GetMeta(entity)
+	if err != nil && entity != nil && plaintype.IsBuilt(reflect.TypeOf(entity)) {
+		// a plain type's value is a copy the application was handed, and
+		// carries neither the block type it was declared as nor its labels
+		return nil, &xclerrors.NotEncodableError{
+			What:   fmt.Sprintf("a value of the plain type %T", entity),
+			Reason: "it is a copy of an entity and does not say what it was declared as, encode the entity itself, as Entities or FindEntitiesByType return it",
+		}
+	}
+
 	if err != nil {
 		return nil, &xclerrors.NotEncodableError{
 			What:   fmt.Sprintf("a value of type %T", entity),
@@ -246,12 +240,6 @@ func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 	// Bytes runs the formatter, so the text is ready to write as it is
 	text := file.Bytes()
 
-	// highlighting runs last, on the final text, so it sees exactly what is
-	// returned and interacts with no other option
-	if opts.renderer != nil {
-		text = highlight.Text(text, opts.renderer)
-	}
-
 	return text, nil
 }
 
@@ -294,8 +282,12 @@ func trimBookkeeping(entity any, body *hclwrite.Body) {
 }
 
 // referencePathSegment matches one segment of a recorded reference's path, a
-// nested block written as <type>[<index>]
+// nested block in a list written as <type>[<index>]
 var referencePathSegment = regexp.MustCompile(`^(.+)\[(\d+)\]$`)
+
+// referencePathNamedSegment matches a nested block in a map of blocks, written
+// as <type>["<name>"]
+var referencePathNamedSegment = regexp.MustCompile(`^(.+?)\[("(?:[^"\\]|\\.)*")\]$`)
 
 // showReferences replaces the value of each attribute the entity recorded a
 // reference for with the text the user wrote. It runs after the resolved text
@@ -340,35 +332,11 @@ func showReferences(meta *types.Meta, body *hclwrite.Body, opts encodeOptions) {
 // nested blocks it sits in, i.e. "network[1].name". It returns nil when the
 // text holds no such block.
 func findReferenceBody(body *hclwrite.Body, path string) (*hclwrite.Body, string) {
-	segments := strings.Split(path, ".")
+	segments := splitReferencePath(path)
 
 	current := body
 	for _, segment := range segments[:len(segments)-1] {
-		match := referencePathSegment.FindStringSubmatch(segment)
-		if match == nil {
-			return nil, ""
-		}
-
-		index, err := strconv.Atoi(match[2])
-		if err != nil {
-			return nil, ""
-		}
-
-		var found *hclwrite.Block
-		position := 0
-		for _, block := range current.Blocks() {
-			if block.Type() != match[1] {
-				continue
-			}
-
-			if position == index {
-				found = block
-				break
-			}
-
-			position++
-		}
-
+		found := findReferenceBlock(current, segment)
 		if found == nil {
 			return nil, ""
 		}
@@ -377,6 +345,85 @@ func findReferenceBody(body *hclwrite.Body, path string) (*hclwrite.Body, string
 	}
 
 	return current, segments[len(segments)-1]
+}
+
+// findReferenceBlock returns the nested block of body that a path segment
+// names: the block of the type at the position among the blocks of its
+// type, for <type>[<index>], or the block of the type carrying the name as
+// its label, for <type>["<name>"]. It returns nil when there is none.
+func findReferenceBlock(body *hclwrite.Body, segment string) *hclwrite.Block {
+	if match := referencePathNamedSegment.FindStringSubmatch(segment); match != nil {
+		name, err := strconv.Unquote(match[2])
+		if err != nil {
+			return nil
+		}
+
+		for _, block := range body.Blocks() {
+			if block.Type() != match[1] {
+				continue
+			}
+
+			if labels := block.Labels(); len(labels) > 0 && labels[0] == name {
+				return block
+			}
+		}
+
+		return nil
+	}
+
+	match := referencePathSegment.FindStringSubmatch(segment)
+	if match == nil {
+		return nil
+	}
+
+	index, err := strconv.Atoi(match[2])
+	if err != nil {
+		return nil
+	}
+
+	position := 0
+	for _, block := range body.Blocks() {
+		if block.Type() != match[1] {
+			continue
+		}
+
+		if position == index {
+			return block
+		}
+
+		position++
+	}
+
+	return nil
+}
+
+// splitReferencePath splits a recorded reference's path on the dots between
+// its segments, leaving a dot inside a quoted block name where it is
+func splitReferencePath(path string) []string {
+	segments := []string{}
+	var current strings.Builder
+	quoted := false
+
+	for i := 0; i < len(path); i++ {
+		c := path[i]
+
+		switch {
+		case quoted && c == '\\' && i+1 < len(path):
+			current.WriteByte(c)
+			i++
+			current.WriteByte(path[i])
+		case c == '"':
+			quoted = !quoted
+			current.WriteByte(c)
+		case c == '.' && !quoted:
+			segments = append(segments, current.String())
+			current.Reset()
+		default:
+			current.WriteByte(c)
+		}
+	}
+
+	return append(segments, current.String())
 }
 
 // holdsSensitiveMarker reports whether the written value of attribute holds

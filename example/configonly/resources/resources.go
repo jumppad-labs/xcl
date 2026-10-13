@@ -4,9 +4,10 @@
 // manifest: there is no apiVersion or kind, attribute names are snake_case,
 // and blocks are linked by reference rather than by matching names by hand.
 //
-// A block type is a Go struct embedding types.ResourceBase, which carries the
-// common block metadata. The xcl tags map configuration to fields, the json
-// tags name the fields the same way when a resource is saved to state.
+// A block type is a plain Go struct. The xcl tags map configuration to
+// fields, the json tags name the fields the same way when a resource is saved
+// to state. A field called Meta, a types.Meta, is filled with the block's
+// metadata, such as its id; the program uses it to say which block it means.
 //
 // Together these types show the three things configuration usually needs:
 //
@@ -23,7 +24,7 @@ import "github.com/jumppad-labs/xcl/types"
 // ahead of time, and a single value can be read from it with
 // `config_map.api.data.db_host`.
 type ConfigMap struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Data map[string]string `xcl:"data" json:"data"`
 }
@@ -36,7 +37,7 @@ type ConfigMap struct {
 // one through a secret_key_ref naming the secret and the key, which are plain
 // strings, so the deployment never becomes sensitive itself.
 type Secret struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Data types.Sensitive[map[string]string] `xcl:"data" json:"data"`
 }
@@ -44,7 +45,7 @@ type Secret struct {
 // Deployment defines the block type `deployment`. It holds repeated container
 // blocks, each of which nests further blocks of its own.
 type Deployment struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Replicas int `xcl:"replicas,optional" json:"replicas,omitempty"`
 
@@ -58,9 +59,9 @@ type Deployment struct {
 }
 
 // Container is the nested `container` block of a deployment. It is not a
-// resource of its own, so it does not embed types.ResourceBase and can not be
-// referenced by its own id, its fields are reached through the deployment
-// that holds it, i.e.
+// resource of its own: it is not registered as a block type, so it has no
+// metadata and can not be referenced by its own id. Its fields are reached
+// through the deployment that holds it, i.e.
 // `deployment.api.container[0].port[0].container_port`.
 type Container struct {
 	Name  string `xcl:"name" json:"name"`
@@ -142,7 +143,7 @@ type Volume struct {
 // does, so the service names the deployment by its id and reads the port out
 // of it, and the two can not drift apart.
 type Service struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Deployment string `xcl:"deployment" json:"deployment"`
 	Port       int    `xcl:"port" json:"port"`
@@ -151,7 +152,7 @@ type Service struct {
 
 // Ingress defines the block type `ingress`, it routes a host to a service
 type Ingress struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Host  string `xcl:"host" json:"host"`
 	Rules []Rule `xcl:"rule,block" json:"rule"`

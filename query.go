@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/types"
@@ -78,6 +79,21 @@ func asType(entity any, want reflect.Type) (any, error) {
 
 	if reflect.TypeOf(entity) == reflect.PointerTo(want) {
 		return entity, nil
+	}
+
+	// an entity of a plain type is held as the type built from it, and is
+	// handed back as the plain type it was declared with, labels included;
+	// like any registered type it converts into nothing else
+	if built, ok := plaintype.Lookup(reflect.TypeOf(entity)); ok {
+		if built.Plain != want {
+			return nil, &xclerrors.TypeMismatchError{
+				Address: entityAddress(entity),
+				Want:    want,
+				Got:     built.Plain.String(),
+			}
+		}
+
+		return built.ToPlain(entity)
 	}
 
 	if err := convertibleTo(entity, want); err != nil {
@@ -210,10 +226,34 @@ func findByType[T any](c *Config, path ...string) ([]*T, error) {
 // Each result is a pointer to want, and nothing matching gives an empty,
 // non-nil result.
 func (c *Config) entitiesOf(want reflect.Type, path ...string) ([]any, error) {
-	if err := addressableType(want); err != nil {
+	if err := c.addressableType(want); err != nil {
 		return nil, err
 	}
 
+	stored, err := c.entitiesByType(path)
+	if err != nil {
+		return nil, err
+	}
+
+	found := make([]any, 0, len(stored))
+
+	for _, e := range stored {
+		typed, err := asType(e, want)
+		if err != nil {
+			return nil, err
+		}
+
+		found = append(found, typed)
+	}
+
+	return found, nil
+}
+
+// entitiesByType is the type and subtype scan shared by the typed and the
+// untyped lookups: the same segment rules, the same errors, and each entity
+// returned as the Config stores it. Nothing matching gives an empty, non-nil
+// result.
+func (c *Config) entitiesByType(path []string) ([]any, error) {
 	if len(path) == 0 {
 		return nil, &xclerrors.NotTypeableError{Segments: path, Use: "All"}
 	}
@@ -238,12 +278,7 @@ func (c *Config) entitiesOf(want reflect.Type, path ...string) ([]any, error) {
 			continue
 		}
 
-		typed, err := asType(e, want)
-		if err != nil {
-			return nil, err
-		}
-
-		found = append(found, typed)
+		found = append(found, e)
 	}
 
 	return found, nil
@@ -326,15 +361,25 @@ func (c *Config) typeable(path []string) error {
 // because it is a block nested inside another declaration rather than a
 // declaration in its own right. Answering such a query with an empty result
 // would read as "you declared none of those", which is not what is true.
-func addressableType(want reflect.Type) error {
-	if _, err := types.GetMeta(reflect.New(want).Interface()); err != nil {
-		return &xclerrors.NotAnEntityError{
-			Type:           want,
-			ReachedThrough: "declaration",
+//
+// A type embedding types.ResourceBase is an entity type wherever it is used.
+// A plain struct is one only when it is registered as a block type: the same
+// struct may just as well be a nested block of another.
+func (c *Config) addressableType(want reflect.Type) error {
+	if _, err := types.GetMeta(reflect.New(want).Interface()); err == nil {
+		return nil
+	}
+
+	if c.catalog != nil {
+		if _, registered := c.catalog.TypePath(want); registered {
+			return nil
 		}
 	}
 
-	return nil
+	return &xclerrors.NotAnEntityError{
+		Type:           want,
+		ReachedThrough: "declaration",
+	}
 }
 
 // All returns every entity of the Go type T, without naming it as a string.
@@ -367,7 +412,7 @@ func all[T any](c *Config) ([]*T, error) {
 // how it was registered, refusing a type with no address of its own and one
 // the registry cannot reach, such as a plugin provided type.
 func (c *Config) typePath(want reflect.Type) ([]string, error) {
-	if err := addressableType(want); err != nil {
+	if err := c.addressableType(want); err != nil {
 		return nil, err
 	}
 

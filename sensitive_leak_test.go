@@ -632,7 +632,7 @@ func TestLeakDiffRenderingOfChangedCredential(t *testing.T) {
 	result := diffChangedCredential(t)
 	require.Equal(t, 1, result.Summary.Update)
 
-	text := string(diff.Render(result))
+	text := string(highlight.Text.Render(result.Pieces()))
 
 	require.NotContains(t, text, diffCredentialBeforePassword)
 	require.NotContains(t, text, diffCredentialAfterPassword)
@@ -643,7 +643,7 @@ func TestLeakDiffRenderingOfChangedCredentialRevealed(t *testing.T) {
 	result := diffChangedCredential(t, diff.RevealSensitive())
 	require.Equal(t, 1, result.Summary.Update)
 
-	text := string(diff.Render(result))
+	text := string(highlight.Text.Render(result.Pieces()))
 
 	require.Contains(t, text, `"`+diffCredentialBeforePassword+`" -> "`+diffCredentialAfterPassword+`"`)
 }
@@ -652,10 +652,10 @@ func TestLeakDiffHighlightedRenderingOfChangedCredential(t *testing.T) {
 	result := diffChangedCredential(t)
 	require.Equal(t, 1, result.Summary.Update)
 
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
-	text := string(diff.Render(result, diff.Highlight(renderer)))
+	text := string(renderer.Render(result.Pieces()))
 
 	require.NotContains(t, text, diffCredentialBeforePassword)
 	require.NotContains(t, text, diffCredentialAfterPassword)
@@ -666,10 +666,10 @@ func TestLeakDiffHighlightedRenderingOfChangedCredentialRevealed(t *testing.T) {
 	result := diffChangedCredential(t, diff.RevealSensitive())
 	require.Equal(t, 1, result.Summary.Update)
 
-	renderer, err := highlight.NewANSIRenderer()
+	renderer, err := highlight.NewANSI()
 	require.NoError(t, err)
 
-	text := string(diff.Render(result, diff.Highlight(renderer)))
+	text := string(renderer.Render(result.Pieces()))
 
 	require.Contains(t, text, diffCredentialBeforePassword)
 	require.Contains(t, text, diffCredentialAfterPassword)
