@@ -209,8 +209,9 @@ func TestErrorCodeMaskNotReversible(t *testing.T) {
 }
 
 func TestErrorCodeConfig(t *testing.T) {
+	at := hcl.Pos{Line: 3, Column: 4}
 	out := toProto(&xclerrors.ConfigError{Errors: []error{
-		&xclerrors.ParserError{Filename: "f", Line: 3, Column: 4, Message: "m"},
+		xclerrors.NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "m", Subject: &hcl.Range{Filename: "f", Start: at, End: at}}, nil),
 	}})
 
 	require.Equal(t, CodeConfig, out.GetCode())

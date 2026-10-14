@@ -116,7 +116,7 @@ and `RegisterType(&PostgreSQL{}, ...)` remains for a type only known at run
 time.
 
 To read configuration through [Viper](https://github.com/spf13/viper), the
-`github.com/jumppad-labs/xcl/viper` module returns a Viper that reads `.xcl`
+`github.com/jumppad-labs/xcl/viper` package returns a Viper that reads `.xcl`
 files into the same plain types, as keys such as `database.postgres.main.port`:
 
 ```go

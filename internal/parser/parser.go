@@ -1670,8 +1670,8 @@ func (p *Parser) getFunctions(file string) map[string]function.Function {
 }
 
 // emitValidateError emits a validate error event for a problem found by
-// validation, naming the resource declared at the problem's position when
-// there is one, otherwise only its file
+// validation, naming the resource it is in when there is one, otherwise only
+// its file
 func (p *Parser) emitValidateError(problem error) {
 	if !emitting(&p.options) {
 		return
@@ -1695,25 +1695,6 @@ func (p *Parser) emitValidateError(problem error) {
 		for _, r := range p.parsedResources.resources {
 			meta, err := types.GetMeta(r)
 			if err != nil || d.Entity == "" || meta.ID != d.Entity {
-				continue
-			}
-
-			e.ResourceID = meta.ID
-			e.ResourceType = resourceType(meta)
-			break
-		}
-
-		emit(&p.options, e)
-		return
-	}
-
-	var pe *errors.ParserError
-	if stderrors.As(problem, &pe) {
-		e.File = pe.Filename
-
-		for _, r := range p.parsedResources.resources {
-			meta, err := types.GetMeta(r)
-			if err != nil || meta.File != pe.Filename || meta.Line != pe.Line || meta.Column != pe.Column {
 				continue
 			}
 

@@ -4,19 +4,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 )
 
 func TestAppendErrorAddsError(t *testing.T) {
 	ce := NewConfigError()
-	ce.AppendError(&ParserError{})
+	ce.AppendError(NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "Boom"}, nil))
 
 	require.Len(t, ce.Errors, 1)
 }
 
-func TestErrorReturnsConcatonatedString(t *testing.T) {
+func TestErrorReturnsOneLineForEachError(t *testing.T) {
 	ce := NewConfigError()
-	ce.AppendError(&ParserError{Message: "boom"})
-	ce.AppendError(&ParserError{Message: "bang"})
+	ce.AppendError(NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "Boom"}, nil))
+	ce.AppendError(NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "Bang"}, nil))
 
-	require.Equal(t, "Error:\n  boom\n\n  :0,0\n\nError:\n  bang\n\n  :0,0\n", ce.Error())
+	require.Equal(t, "Boom\nBang", ce.Error())
 }

@@ -211,7 +211,7 @@ func TestConfigErrorDiagnosticsLeavesOutOtherErrors(t *testing.T) {
 	diagnostic := NewDiagnostic(unsupported(), nil)
 
 	ce := NewConfigError()
-	ce.AppendError(&ParserError{Message: "old style"})
+	ce.AppendError(errors.New("not a diagnostic"))
 	ce.AppendError(diagnostic)
 
 	require.Equal(t, Diagnostics{diagnostic}, ce.Diagnostics())

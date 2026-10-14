@@ -110,7 +110,6 @@ func toProto(err error) *corepb.Error {
 	var maskNotReversible *xclerrors.MaskNotReversibleError
 	var configError *xclerrors.ConfigError
 	var diagnostic *xclerrors.Diagnostic
-	var parserError *xclerrors.ParserError
 
 	switch {
 	case errors.As(err, &coded):
@@ -166,15 +165,6 @@ func toProto(err error) *corepb.Error {
 			out.Details["step"] = provider.Step
 			out.Details["address"] = provider.Address
 		}
-
-	case errors.As(err, &parserError):
-		// a positioned problem in configuration, which a config error
-		// collects as a cause
-		out.Code = CodeConfig
-		out.Details["file"] = parserError.Filename
-		out.Details["line"] = strconv.Itoa(parserError.Line)
-		out.Details["column"] = strconv.Itoa(parserError.Column)
-		out.Details["summary"] = parserError.Message
 
 	case errors.As(err, &notFound):
 		out.Code = CodeNotFound
