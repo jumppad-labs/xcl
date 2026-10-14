@@ -35,13 +35,19 @@ Then protect `main` in each repository: **Settings → Branches → Add branch
 protection rule** (or **Rules → Rulesets**) for `main`:
 
 - Require a pull request before merging.
-- Require status checks to pass before merging, and add:
-  - xcl: `release-label / release-label`, plus the checks that already run on
-    PRs (`build`, `Build on minimum supported Go`, `Build and smoke-test libxcl`,
-    `Test xcl-core on Windows`, and each `Examples` job).
+- Require status checks to pass before merging, and add exactly these:
+  - xcl: `release-label / release-label`, `build`,
+    `Build on minimum supported Go`, `Build and smoke-test libxcl`,
+    `Test xcl-core on Windows`, `example/configonly`, `example/plugin`,
+    `example/plugin/plugins/docker`, `example/prettylog` and
+    `example/remoteplugin`.
   - xcl-python: `release-label / release-label` and `Check the package`.
 
 The check names only appear in the picker after the check has run once on a PR.
+Only require checks that run on pull requests. The picker also offers the
+`Build <platform>` jobs of `libxcl-build.yml`, which only runs by hand. A rule
+that requires them blocks every pull request, waiting for checks that never
+come.
 
 **Check:** open a throwaway PR with no label; it can't be merged. Add
 `no-release` and it can.
