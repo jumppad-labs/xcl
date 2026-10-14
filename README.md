@@ -280,6 +280,28 @@ For example, with xcl-python at v0.1.6 bundling engine v0.1.2:
    it releases xcl v0.1.3, which opens "Use xcl engine v0.1.3" in xcl-python. That passes, merges itself,
    and releases Python v0.1.8 bundling engine v0.1.3.
 
+**Changing xcl and a binding together.** To prove an engine change and the binding fix it needs
+work together before either merges:
+
+1. Open the xcl pull request, say on branch `feature-x`. Its `bindings` check is red, since it tests
+   the binding's `main`.
+2. Open the binding pull request with the fix, and set its `xcl-ref.txt` to `feature-x` (or the xcl
+   pull request's head commit). The binding's CI builds the engine from that ref, so green checks
+   prove the pair. Don't merge it like this: a release downloads the engine from an xcl release,
+   so on `main` the pin must be a released tag.
+3. Merge the xcl pull request with `breaks-bindings`. xcl releases, say v0.9.0, and the binding's
+   "Use xcl engine v0.9.0" pull request opens red.
+4. Move the fix onto it. Either push the binding pull request's commits to the `engine/v0.9.0`
+   branch, keeping the pin at `v0.9.0`, and close the binding pull request. Or set the binding pull
+   request's pin to `v0.9.0`, merge it, and close the engine update. Either way, give it the label
+   the binding's own change needs, not just the engine's.
+
+Every binding gets its own engine update, so bindings can be fixed and released in any order.
+`breaks-bindings` skips every binding's suite, though, so check the last red run's results for each
+language before adding it: one language breaking on purpose can hide another breaking by accident.
+Don't re-run a binding's engine bump for the same tag once someone has pushed a fix to its branch:
+it resets the branch from `main`.
+
 **Adding a language.** A new binding repository provides:
 
 - a reusable test suite workflow, called with the binding ref and the xcl ref to test, ending in one
