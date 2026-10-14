@@ -125,26 +125,29 @@ installation page shows both repositories.
 
 ## 4. Push the xcl-python seed tag
 
-xcl-python has no tags yet, but PyPI already holds 0.5.3, 0.6.0 and 0.7.0.
-Tagging the commit that built 0.7.0 makes the first automatic release 0.7.1 or
-higher.
+xcl-python has no tags yet, but PyPI already holds 0.5.3, 0.6.0, 0.7.0 and
+0.8.0, the last released through xcl's dispatch when xcl `v0.8.0` was
+tagged. Tagging the commit that built 0.8.0 makes the first automatic release
+0.8.1 or higher.
 
-1. Find the xcl-python release run for xcl `v0.7.0` under **xcl-python →
-   Actions → Release** and note the commit it checked out. It is expected to
-   be `a7f4993` or `d39b4de`.
+1. The xcl-python release run for xcl `v0.8.0`
+   ([run 38547006389](https://github.com/jumppad-labs/xcl-python/actions/runs/38547006389))
+   checked out `45f99f3`.
 2. Push the tag:
 
    ```sh
    cd xcl-python
-   git tag v0.7.0 <commit>
-   git push origin v0.7.0
+   git fetch origin
+   git tag v0.8.0 45f99f3
+   git push origin v0.8.0
    ```
 
 Do this **before** the PR "Python releases from its own tags" is merged. At
 this point the Python release still listens only to xcl's dispatch, so this
-tag starts nothing. Afterwards it would rebuild 0.7.0.
+tag starts nothing. Afterwards it would start a release of 0.8.0, which PyPI
+already holds.
 
-**Check:** `git ls-remote --tags origin` in xcl-python shows only `v0.7.0`,
+**Check:** `git ls-remote --tags origin` in xcl-python shows only `v0.8.0`,
 and no Release run started.
 
 ## 5. Allow auto-merge on xcl-python

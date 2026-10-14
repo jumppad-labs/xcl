@@ -227,6 +227,70 @@ subprocess on every platform, Alpine included, with no shared library to
 load, and a synchronous and an asyncio API. Go users are unaffected: the Go
 library needs no cgo, and nothing in it changes for the binding.
 
+Each language package has its own version and bundles the engine release it pins; see
+[Releases](#releases).
+
+## Releases
+
+Releases are automatic. Every pull request carries exactly one release label, and merging it tags and
+releases the next version; nobody tags by hand.
+
+| Label | Use it for | From v0.7.2 |
+|-------|-----------|-------------|
+| `patch` | fixes, and changes that need no action from users | v0.7.3 |
+| `minor` | new features, and, before 1.0, breaking changes | v0.8.0 |
+| `major` | breaking changes after 1.0; below 1.0 it releases 1.0.0 | v1.0.0 |
+| `no-release` | CI, docs and other changes that should not ship | nothing |
+
+A pull request with no release label, or with more than one, fails its `release-label / release-label`
+check and can't be merged. Labels can be changed until the moment of merging; the check re-runs on each
+change.
+
+**What merging does.** The `Tag` workflow finds the merged pull request, works out the next version
+from its label and the latest `v*` tag, and pushes the tag. The tag starts `Release`, which builds,
+signs and publishes the engine archives with notes listing the merged pull requests, then tells each
+language binding about the new engine.
+
+**Language bindings are checked on every pull request.** Every xcl pull request runs the full
+[xcl-python](https://github.com/jumppad-labs/xcl-python) test suite against the pull request's own
+commit, as the `python / ...` checks. The required `bindings` check passes only when they all pass, so a
+change that breaks a binding is found before it merges, not at release time.
+
+When a change has to break a binding on purpose, a maintainer adds the `breaks-bindings` label: the
+binding suite is skipped and `bindings` passes. The binding is then fixed in its own repository, in the
+engine update pull request described below. Only people who can label pull requests can apply it, and
+removing it runs the suite again.
+
+**Languages have their own versions.** Each binding repository uses the same four labels and the same
+automatic tagging, with its own version line. It records the engine release it bundles and tests against
+in `xcl-ref.txt`, its engine pin, so a fix in a binding releases that binding alone, against the engine
+it already pins.
+
+**Engine releases reach every language by themselves.** Each xcl release opens a pull request in each
+binding that moves the pin to the new tag, labelled with the same size as the engine release (an engine
+`patch` gives a binding `patch`, and so on). It merges itself once the binding's checks pass, and
+that merge releases the binding. If the checks fail it stays open for a maintainer to fix on the same
+branch, and nothing is published.
+
+For example, with xcl-python at v0.1.6 bundling engine v0.1.2:
+
+1. A Python-only fix merged in xcl-python with `patch` releases Python v0.1.7, still on engine v0.1.2.
+   Nothing else is released.
+2. An engine fix merged in xcl with `patch` first passes the Python suite against its own commit. Merging
+   it releases xcl v0.1.3, which opens "Use xcl engine v0.1.3" in xcl-python. That passes, merges itself,
+   and releases Python v0.1.8 bundling engine v0.1.3.
+
+**Adding a language.** A new binding repository provides:
+
+- a reusable test suite workflow, called with the binding ref and the xcl ref to test, ending in one
+  `result` job; xcl's `bindings.yml` calls it next to the Python one;
+- three thin workflows: `release-label.yml` and `tag.yml`, which call xcl's shared
+  `release-label-check.yml` and `auto-tag.yml`, and an engine bump workflow, which takes xcl's
+  `xcl-release` dispatch;
+- an entry in the dispatch step of xcl's `release.yml`;
+- the release labels, the rule requiring its checks, auto-merge, and the release bot App and its
+  secrets, as in [`docs/release-setup.md`](./docs/release-setup.md).
+
 ## Contributing
 
 [`docs/`](./docs) holds notes on how xcl is built inside: the parser and entity lifecycle, state, modules and
