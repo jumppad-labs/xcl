@@ -48,6 +48,20 @@ type Service struct {
 	Databases []Database `xcl:"databases,optional"`
 }
 
+// Runner is a singleton: its block has no labels, and there is one of it.
+type Runner struct {
+	Server string `xcl:"server"`
+	Listen string `xcl:"listen,optional"`
+	Meta   types.Meta
+}
+
+// Client reads the runner by reference, an attribute and the whole of it.
+type Client struct {
+	Name   string `xcl:"name,label"`
+	Server string `xcl:"server"`
+	Runner Runner `xcl:"runner,optional"`
+}
+
 // Unlabelled has no label field: its name is not wanted.
 type Unlabelled struct {
 	Value string `xcl:"value,optional"`

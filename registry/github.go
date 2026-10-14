@@ -158,8 +158,14 @@ func (g *GitHub) RegisterType(prototype any, name ...string) {
 	g.local.RegisterType(prototype, name...)
 }
 
-// Types returns the Go types declared with RegisterType, in the order they
-// were registered, or nil when none were
+// RegisterSingleton declares prototype, a plain Go type, as a block type
+// written without labels, as Local.RegisterSingleton does
+func (g *GitHub) RegisterSingleton(prototype any, name string) {
+	g.local.RegisterSingleton(prototype, name)
+}
+
+// Types returns the Go types declared with RegisterType and RegisterSingleton,
+// in the order they were registered, or nil when none were
 func (g *GitHub) Types() []Type {
 	return g.local.Types()
 }

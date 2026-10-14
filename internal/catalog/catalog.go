@@ -251,7 +251,20 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 		name = append(name, t.Subtype)
 	}
 
-	if err := declaration.Validate(t.Prototype, name...); err != nil {
+	// labels is how many labels a block of the type has: none for a
+	// singleton, its name, and its subtype before it when it has one
+	labels := len(name)
+
+	if t.Singleton {
+		if t.Subtype != "" {
+			return fmt.Errorf("type %q is a singleton, which takes no subtype", t.Type)
+		}
+
+		labels = 0
+		if err := declaration.ValidateSingleton(t.Prototype, t.Type); err != nil {
+			return err
+		}
+	} else if err := declaration.Validate(t.Prototype, name...); err != nil {
 		return err
 	}
 
@@ -262,7 +275,7 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 	// application's type is recovered from it when entities are read back
 	stored := t.Prototype
 	if declaration.IsPlain(t.Prototype) {
-		built, err := plaintype.Build(reflect.TypeOf(t.Prototype).Elem(), len(name))
+		built, err := plaintype.Build(reflect.TypeOf(t.Prototype).Elem(), labels)
 		if err != nil {
 			return fmt.Errorf("type %q: %w", key, err)
 		}
@@ -294,7 +307,7 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 		return err
 	}
 
-	c.typeInfo[key] = types.TypeInfo{Type: t.Type, Subtype: t.Subtype, Prototype: stored}
+	c.typeInfo[key] = types.TypeInfo{Type: t.Type, Subtype: t.Subtype, Singleton: t.Singleton, Prototype: stored}
 	c.declaredBy[key] = registryName
 
 	return nil
@@ -373,6 +386,16 @@ func (c *Catalog) takesSubtype(entityType string) (bool, bool) {
 	}
 
 	return false, false
+}
+
+// Singleton reports whether the type keyword entityType is a singleton, whose
+// block has no labels. Only a declared Go type can be one.
+func (c *Catalog) Singleton(entityType string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	info, ok := c.typeInfo[entityType]
+	return ok && info.Singleton
 }
 
 // Types returns the details of every type this catalog knows, from all of its

@@ -69,15 +69,27 @@ func ParseFQRN(fqrn string) (*FQRN, error) {
 	return parseAddress(fqrn, structuralKeywords)
 }
 
+// form is how the body of an address of a type keyword is laid out
+type form int
+
+const (
+	// named is <type>.<name>[.attribute]
+	named form = iota
+	// withSubtype is <type>.<subtype>.<name>[.attribute]
+	withSubtype
+	// singleton is <type>[.attribute]
+	singleton
+)
+
 // structuralKeywords are the leading keywords that always begin an address
-// body, whatever types are registered, each mapped to whether it takes a
-// subtype. They are what ParseFQRN resolves with when no registry is at hand.
-var structuralKeywords = map[string]bool{
-	types.TypeResource: true,
-	TypeOutput:         false,
-	TypeVariable:       false,
-	TypeModule:         false,
-	"local":            false,
+// body, whatever types are registered, each mapped to its form. They are what
+// ParseFQRN resolves with when no registry is at hand.
+var structuralKeywords = map[string]form{
+	types.TypeResource: withSubtype,
+	TypeOutput:         named,
+	TypeVariable:       named,
+	TypeModule:         named,
+	"local":            named,
 }
 
 // AddressParser parses addresses against a known set of types. It exists
@@ -88,20 +100,27 @@ var structuralKeywords = map[string]bool{
 // types settles it, so the parser is constructed with them rather than
 // reaching for a registry it must not depend on.
 type AddressParser struct {
-	// keywords maps every known type keyword to whether it takes a subtype
-	keywords map[string]bool
+	// keywords maps every known type keyword to its form
+	keywords map[string]form
 }
 
 // NewAddressParser returns a parser that recognises the given types in
 // addition to the structural keywords.
 func NewAddressParser(known []types.TypeInfo) *AddressParser {
-	keywords := map[string]bool{}
-	for k, takesSubtype := range structuralKeywords {
-		keywords[k] = takesSubtype
+	keywords := map[string]form{}
+	for k, f := range structuralKeywords {
+		keywords[k] = f
 	}
 
 	for _, info := range known {
-		keywords[info.Type] = info.Subtype != ""
+		switch {
+		case info.Singleton:
+			keywords[info.Type] = singleton
+		case info.Subtype != "":
+			keywords[info.Type] = withSubtype
+		default:
+			keywords[info.Type] = named
+		}
 	}
 
 	return &AddressParser{keywords: keywords}
@@ -115,7 +134,7 @@ func (p *AddressParser) Parse(address string) (*FQRN, error) {
 // parseAddress splits an address into its parts. keywords is consulted only to
 // decide where a module prefix ends and the body begins; the body itself is
 // read positionally, so a type the caller has not declared still parses.
-func parseAddress(fqrn string, keywords map[string]bool) (*FQRN, error) {
+func parseAddress(fqrn string, keywords map[string]form) (*FQRN, error) {
 	if fqrn == "" {
 		return nil, errors.New(formatErrorString(fqrn))
 	}
@@ -153,12 +172,21 @@ func parseAddress(fqrn string, keywords map[string]bool) (*FQRN, error) {
 		body = rest[bodyStart:]
 	}
 
+	if f, ok := keywords[body[0]]; ok && f == singleton {
+		// a singleton has no name, i.e. runner[.attribute]
+		return &FQRN{
+			Module:    moduleName,
+			Type:      body[0],
+			Attribute: strings.Join(body[1:], "."),
+		}, nil
+	}
+
 	if len(body) < 2 {
 		return nil, errors.New(formatErrorString(fqrn))
 	}
 
 	switch {
-	case keywords[body[0]]:
+	case keywords[body[0]] == withSubtype:
 		// a type that takes a subtype, i.e.
 		// resource.<subtype>.<name>[.attribute]
 		if len(body) < 3 {
@@ -290,6 +318,11 @@ func (f FQRN) String() string {
 		return fmt.Sprintf("%s%s.%s.%s%s", modulePart, f.Type, f.Subtype, f.Resource, attrPart)
 	}
 
+	// a singleton has no name
+	if f.Resource == "" {
+		return fmt.Sprintf("%s%s%s", modulePart, f.Type, attrPart)
+	}
+
 	return fmt.Sprintf("%s%s.%s%s", modulePart, f.Type, f.Resource, attrPart)
 }
 
@@ -313,6 +346,11 @@ func (f FQRN) StringWithoutAttribute() string {
 
 	if f.Subtype != "" {
 		return fmt.Sprintf("%s%s.%s.%s", modulePart, f.Type, f.Subtype, f.Resource)
+	}
+
+	// a singleton has no name
+	if f.Resource == "" {
+		return modulePart + f.Type
 	}
 
 	return fmt.Sprintf("%s%s.%s", modulePart, f.Type, f.Resource)

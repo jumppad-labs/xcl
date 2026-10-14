@@ -97,8 +97,9 @@ type copiedField struct {
 }
 
 // Build makes the engine type for plain, a struct type that does not embed
-// types.ResourceBase. labels is how many labels a block of the type has: one
-// for a type declared without a subtype, two for one declared with one.
+// types.ResourceBase. labels is how many labels a block of the type has: none
+// for a singleton, one for a type declared without a subtype, two for one
+// declared with one.
 //
 // The error names the field at fault: a reserved name, a label count that does
 // not match, a mirror field of the wrong type, an embedded field that is not a

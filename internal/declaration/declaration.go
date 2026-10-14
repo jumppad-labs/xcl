@@ -39,13 +39,30 @@ func Validate(prototype any, name ...string) error {
 
 	key := types.TypeKey(entityType, sub)
 
+	return validatePrototype(prototype, key, len(name))
+}
+
+// ValidateSingleton checks the shape of a singleton declaration, a type whose
+// block has no labels: it must be named, and prototype must be as Validate
+// requires, with no label fields when it is a plain type.
+func ValidateSingleton(prototype any, name string) error {
+	if name == "" {
+		return fmt.Errorf("an entity type must be named")
+	}
+
+	return validatePrototype(prototype, name, 0)
+}
+
+// validatePrototype checks that prototype is a non-nil pointer to a struct,
+// and that a plain one can be built for a block of key with labels labels
+func validatePrototype(prototype any, key string, labels int) error {
 	value := reflect.ValueOf(prototype)
 	if prototype == nil || value.Kind() != reflect.Ptr || value.IsNil() || value.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("type %q must be a pointer to a struct", key)
 	}
 
 	if IsPlain(prototype) {
-		if _, err := plaintype.Build(value.Elem().Type(), len(name)); err != nil {
+		if _, err := plaintype.Build(value.Elem().Type(), labels); err != nil {
 			return fmt.Errorf("type %q: %w", key, err)
 		}
 	}

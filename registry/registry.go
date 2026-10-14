@@ -54,6 +54,11 @@ type Type struct {
 	// Subtype is the subtype, empty for a type declared without one
 	Subtype string
 
+	// Singleton is true for a type whose block has no labels, i.e. runner {}:
+	// a module holds at most one, and it is addressed by its type alone, i.e.
+	// runner.server. A singleton has no subtype
+	Singleton bool
+
 	// Prototype is a pointer to a struct, embedding types.ResourceBase or
 	// plain, blocks of the type are decoded into new values of its Go type
 	Prototype any

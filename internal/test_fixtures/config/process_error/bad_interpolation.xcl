@@ -1,14 +1,14 @@
-resource "network" "test" {
+resource "network" "interpolation" {
   subnet = "hello erik"
 }
 
 // These fixtures define the various types of expressions that can be used within
 // hcl config
-resource "container" "consul" {
+resource "container" "interpolation" {
   command = ["consul", "agent", "-dev", "-client", "0.0.0.0"]
 
   network {
-    name = resource.network.test.nam // missing property
+    name = resource.network.interpolation.nam // missing property
   }
 
   volume {

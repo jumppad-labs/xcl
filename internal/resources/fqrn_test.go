@@ -525,6 +525,42 @@ func TestAddressParserRejectsATypeWithASubtypeButNoName(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestAddressParserReadsASingletonAsTypeAndAttribute(t *testing.T) {
+	parser := NewAddressParser([]types.TypeInfo{{Type: "runner", Singleton: true}})
+
+	fqrn, err := parser.Parse("runner.server")
+	require.NoError(t, err)
+
+	require.Equal(t, "runner", fqrn.Type)
+	require.Empty(t, fqrn.Subtype)
+	require.Empty(t, fqrn.Resource)
+	require.Equal(t, "server", fqrn.Attribute)
+	require.Equal(t, "runner.server", fqrn.String())
+}
+
+func TestAddressParserReadsASingletonOnItsOwn(t *testing.T) {
+	parser := NewAddressParser([]types.TypeInfo{{Type: "runner", Singleton: true}})
+
+	fqrn, err := parser.Parse("runner")
+	require.NoError(t, err)
+
+	require.Equal(t, "runner", fqrn.Type)
+	require.Empty(t, fqrn.Attribute)
+	require.Equal(t, "runner", fqrn.StringWithoutAttribute())
+}
+
+func TestAddressParserReadsASingletonInAModule(t *testing.T) {
+	parser := NewAddressParser([]types.TypeInfo{{Type: "runner", Singleton: true}})
+
+	fqrn, err := parser.Parse("module.nas.runner.listen")
+	require.NoError(t, err)
+
+	require.Equal(t, "nas", fqrn.Module)
+	require.Equal(t, "runner", fqrn.Type)
+	require.Equal(t, "listen", fqrn.Attribute)
+	require.Equal(t, "module.nas.runner.listen", fqrn.String())
+}
+
 func TestFQRNStringWritesTheSubtypeOfAnyType(t *testing.T) {
 	fqrn := FQRN{Module: "m1", Type: "server", Subtype: "big", Resource: "web", Attribute: "address"}
 

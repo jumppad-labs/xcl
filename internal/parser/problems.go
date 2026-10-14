@@ -89,6 +89,22 @@ func invalidName(err error) problem {
 	return problem{summary: "Invalid name", detail: err.Error(), cause: err}
 }
 
+// duplicateBlock is the problem with a block declaring the entity id, which a
+// block at earlier already declares
+func duplicateBlock(id string, singleton bool, earlier hcl.Range) problem {
+	if singleton {
+		return problem{
+			summary: "Duplicate block",
+			detail:  fmt.Sprintf("%s is declared once, it is already declared at %s", id, earlier),
+		}
+	}
+
+	return problem{
+		summary: "Duplicate block",
+		detail:  fmt.Sprintf("%s is already declared at %s, each entity is declared once", id, earlier),
+	}
+}
+
 // missingMeta is the problem with an entity xcl made but can not read the
 // meta of, which never happens to a type it accepted
 func missingMeta(err error) problem {

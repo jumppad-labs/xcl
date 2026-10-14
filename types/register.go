@@ -61,6 +61,11 @@ type TypeInfo struct {
 	// declared with only a name
 	Subtype string
 
+	// Singleton is true for a type declared without a name: its block has no
+	// labels, i.e. runner {}, a module holds at most one, and it is addressed
+	// by its type alone, i.e. runner.server. A singleton has no subtype
+	Singleton bool
+
 	// Builtin is true for the types xcl interprets itself: variable, output,
 	// module and root. They carry no subtype
 	Builtin bool

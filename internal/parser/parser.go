@@ -885,8 +885,8 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 
 	for _, b := range body.Blocks {
 
-		// check the resource has a name
-		if len(b.Labels) == 0 {
+		// check the resource has a name, which a singleton never has
+		if len(b.Labels) == 0 && !p.isSingleton(b.Type) {
 			de := p.inBlock(b, module, nil, problem{
 				summary: "Missing name",
 				detail:  fmt.Sprintf("resource '%s' has no name, please specify resources using the syntax 'resource_type \"name\" {}'", b.Type),
@@ -959,6 +959,12 @@ func (p *Parser) takesSubtype(entityType string) (bool, bool) {
 	return p.catalog.TakesSubtype(entityType)
 }
 
+// isSingleton reports whether the type keyword entityType is a singleton,
+// whose block has no labels
+func (p *Parser) isSingleton(entityType string) bool {
+	return p.catalog != nil && p.catalog.Singleton(entityType)
+}
+
 // isReferenceRoot reports whether name, the first segment of a traversal in an
 // expression, names something a reference can point at: one of the builtin
 // keywords, "resource", or the type of any known entity
@@ -983,6 +989,8 @@ func (p *Parser) blockResource(b *hclsyntax.Block, module string) (string, strin
 	takes, _ := p.takesSubtype(b.Type)
 
 	switch {
+	case p.isSingleton(b.Type) && len(b.Labels) == 0:
+		return fqrn.String(), fqrn.String()
 	case takes && len(b.Labels) == 2:
 		fqrn.Subtype = b.Labels[0]
 		fqrn.Resource = b.Labels[1]
@@ -1041,7 +1049,15 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 		subtype := ""
 		name := ""
 
+		singleton := p.isSingleton(b.Type)
+
 		switch {
+		case singleton && len(b.Labels) == 0:
+		case singleton:
+			return fail(problem{
+				summary: "Invalid block labels",
+				detail:  fmt.Sprintf(`invalid format for '%s', it is declared without labels and there is one of it, i.e. '%s {}'`, b.Type, b.Type),
+			})
 		case takes && len(b.Labels) == 2:
 			subtype = b.Labels[0]
 			name = b.Labels[1]
@@ -1059,8 +1075,10 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 			})
 		}
 
-		if err := validateResourceName(name); err != nil {
-			return fail(invalidName(err))
+		if !singleton {
+			if err := validateResourceName(name); err != nil {
+				return fail(invalidName(err))
+			}
 		}
 
 		rt, err = p.catalog.CreateEntity(b.Type, subtype, name)
@@ -1092,6 +1110,10 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 	// Set the ID from the FQRN
 	fqrn := resources.FQRNFromResource(rt)
 	rtMeta.ID = fqrn.String()
+
+	if earlier, declared := p.parsedResources.headers[rtMeta.ID]; declared {
+		return fail(duplicateBlock(rtMeta.ID, p.isSingleton(rtMeta.Type), earlier))
+	}
 
 	// We now need to get all the dependent resources for this resource
 	// so that we can build the dependency graph

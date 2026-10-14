@@ -1008,7 +1008,7 @@ func TestParseFileReturnsConfigErrorWhenFunctionError(t *testing.T) {
 	d, ok := ce.Errors[0].(*errors.Diagnostic)
 	require.True(t, ok, "the problem is a %T", ce.Errors[0])
 	require.Equal(t, "Error in function call", d.Summary)
-	require.Equal(t, "resource.container.consul", d.Entity)
+	require.Equal(t, "resource.container.function", d.Entity)
 	require.Equal(t, "network[0].name", d.Field)
 }
 
