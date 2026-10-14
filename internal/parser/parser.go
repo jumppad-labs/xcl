@@ -987,7 +987,8 @@ func (p *Parser) blockResource(b *hclsyntax.Block, module string) (string, strin
 	takes, _ := p.takesSubtype(b.Type)
 
 	switch {
-	case p.isSingleton(b.Type) && len(b.Labels) == 0:
+	case p.isSingleton(b.Type):
+		// a singleton is its type, whatever labels it was wrongly given
 		return fqrn.String(), fqrn.String()
 	case takes && len(b.Labels) == 2:
 		fqrn.Subtype = b.Labels[0]

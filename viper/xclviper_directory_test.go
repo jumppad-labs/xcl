@@ -3,8 +3,12 @@ package xclviper
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/jumppad-labs/xcl"
+	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
@@ -94,6 +98,56 @@ func TestUnmarshalsAListOfReferencesInOrder(t *testing.T) {
 	require.Len(t, agents, 2)
 	require.Equal(t, "local", agents[0].Name)
 	require.Equal(t, "claude", agents[1].Name)
+}
+
+func TestLetsTheEnvironmentOverrideASingletonsKey(t *testing.T) {
+	t.Setenv("MAALSTROM_RUNNER_SERVER", "https://maalstrom.internal")
+
+	v, err := readDirectory(t)
+	require.NoError(t, err)
+
+	v.SetEnvPrefix("MAALSTROM")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+
+	require.Equal(t, "https://maalstrom.internal", v.GetString("runner.server"))
+}
+
+func TestUnmarshalsASingletonAndTasks(t *testing.T) {
+	v, err := readDirectory(t)
+	require.NoError(t, err)
+
+	var settings struct {
+		Runner struct {
+			Server string `mapstructure:"server"`
+		} `mapstructure:"runner"`
+		Task map[string]struct {
+			Agents []struct {
+				Name string `mapstructure:"name"`
+			} `mapstructure:"agents"`
+		} `mapstructure:"task"`
+	}
+	require.NoError(t, v.Unmarshal(&settings))
+
+	require.Equal(t, "https://maalstrom.app", settings.Runner.Server)
+	require.Equal(t, "local", settings.Task["document"].Agents[0].Name)
+}
+
+func TestReportsASingletonGivenALabelAtTheSingleton(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "runner.xcl"), []byte("runner \"nas\" {\n  server = \"https://maalstrom.app\"\n}\n"), 0o644))
+
+	v := New(Type[daemon]("runner"))
+
+	err := Read(v, dir)
+
+	var d *xclerrors.Diagnostic
+	require.ErrorAs(t, err, &d)
+
+	report := string(highlight.Text.Render(xcl.DiagnosticPieces(xclerrors.Diagnostics{d}, 0)))
+	require.Contains(t, report, "Error: Unexpected label")
+	require.Contains(t, report, "line 1, in runner:")
+	require.Contains(t, report, `runner takes no labels, there is one of it: write it as runner { … }, without "nas".`)
 }
 
 func TestReadsASingleFile(t *testing.T) {

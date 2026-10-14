@@ -155,6 +155,8 @@ func TestSingletonWithLabelIsRefused(t *testing.T) {
 	require.Equal(t, "Unexpected label", d.Summary)
 	require.Equal(t, `runner takes no labels, there is one of it: write it as runner { … }, without "nas".`, d.Detail)
 
+	require.Equal(t, "runner", d.Entity)
+
 	// placed at the label, "nas" on line 2 from column 8
 	require.Equal(t, 2, d.Subject.Start.Line)
 	require.Equal(t, 8, d.Subject.Start.Column)
