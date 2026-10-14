@@ -1,0 +1,56 @@
+# The shared release-label check. Every repository taking part in automated
+# releases calls it for its pull requests, so they all apply the same rule:
+# a pull request carries exactly one of the labels major, minor, patch or
+# no-release. The rule itself lives in internal/release and runs through
+# cmd/xcl-release; this workflow only feeds it the pull request's labels.
+#
+# Call it from a workflow triggered by pull_request with the types opened,
+# reopened, synchronize, labeled and unlabeled, so a label change is checked
+# without a new push:
+#
+#   jobs:
+#     release-label:
+#       uses: jumppad-labs/xcl/.github/workflows/release-label-check.yml@main
+#
+# The required check is named "<caller job> / release-label".
+
+name: Release label check
+
+on:
+  workflow_call:
+    inputs:
+      xcl-ref:
+        description: The xcl ref whose xcl-release command checks the labels
+        required: false
+        type: string
+        default: main
+
+env:
+  GO_VERSION: '1.27.0'
+
+jobs:
+  release-label:
+    name: release-label
+    runs-on: ubuntu-latest
+    steps:
+      # a called workflow checks out its caller by default, so xcl is named
+      - uses: actions/checkout@v4
+        with:
+          repository: jumppad-labs/xcl
+          ref: ${{ inputs.xcl-ref }}
+          path: xcl
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: xcl/go.sum
+
+      # the labels arrive through the environment, never interpolated into
+      # the script, since anyone who can label a pull request names them
+      - name: Check the release label
+        working-directory: xcl
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          mapfile -t labels < <(jq -r '.[]' <<< "$LABELS")
+          go run ./cmd/xcl-release labels "${labels[@]}"

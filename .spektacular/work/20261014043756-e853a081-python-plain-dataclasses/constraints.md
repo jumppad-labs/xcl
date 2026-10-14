@@ -1,0 +1,3 @@
+- The Python model of a block type must follow the Go plain-struct model: no base type, type names given at registration, and metadata, disabled and dependencies available only when the type declares them.
+- The removal is a clean break: the old base class and class label are not kept as deprecated aliases or optional sugar.
+- The change must require no change to the xcl engine or its protocol. The Python package ships with the next xcl release, against the engine of that release, through the existing linked release.

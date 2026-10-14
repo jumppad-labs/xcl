@@ -1,69 +1,86 @@
-# Working context
+# Working context: ci-release-automation
 
-## Spec DONE: 20261011211634-a8895873-python-out-of-process-engine (final, design ref libxcl.md)
+Spec: `20261014052450-0b131707-ci-release-automation`. Started 2026-10-14 after parking
+`20261014043756-e853a081-python-plain-dataclasses` (see its work folder, PARKED.md). The user wants
+to build and deploy this CI/release automation first, then use the parked Python spec as the first
+real test of it.
 
-## Spec in progress: python-release-hardening (see name below)
-- Scope: win_amd64 wheel crash (0xC0000005 in parity program with zig-built DLL; win_arm64 via llvm-mingw works → try llvm-mingw or a Windows runner for x86-64); CI: tomllib on 3.10 (tests/integration/docker_helpers.py) and tests/unit/test_schema.py hardcoded ../xcl instead of XCL_SRC; a signed test plugin release replacing xcl-plugin-docker in GitHub-registry/e2e tests (user: 'I really don't think testing with actual docker is a good idea for an end to end test. We should create a test plugin that can be used'); flip xcl-python xcl-ref.txt back to main once f-libxcl merges. Depends on python-support; before docs specs. User: no need to keep asking → draft, review, write.
+Repos involved: xcl (`/home/nicj/code/github.com/jumppad-labs/xcl`, engine + Go library) and
+xcl-python (`/home/nicj/code/github.com/jumppad-labs/xcl-python`), with more language bindings
+expected ("we are going to have many languages in the future").
+`spektacular repo list` currently errors (xcl-vscode location missing on disk).
 
-### Problem and motivation
-- xcl-lang 0.4.0 release run 38174452936 (xcl-python) built 6 wheels + sdist but both musl wheels failed: a Go c-shared library cannot be dlopen'd on musl (`initial-exec TLS resolves to dynamic definition`, golang/go#54805, open; fix CL 696635 unmerged; arm64 dynamic-TLS CL landed 2025, x86-64 pending). Reproduced with Go 1.25 (apk) and 1.27 (zig cc musl) builds.
-- User: "I am not dropping musl, alpine is a common docker container and python apps will need to run on that platform. If we have to add the out of process we have to."
-- User asked what Temporal does: Temporal ships musl wheels because its core is Rust (no TLS issue); not applicable to a Go engine.
-- Go apps on Alpine are unaffected (pure Go). Only hosts that dlopen after process start (Python cffi, Node koffi) hit it.
+## Problem
 
-### Design (settled, written)
-- design/libxcl.md (source "design") revised 2026-10-11 with `spektacular design author`: "Deferred: the out-of-process transport" → "The out-of-process transport"; decision "The out-of-process transport for musl". Key points: cmd/xcl-core static binary in the root module, CGO_ENABLED=0, serves coreservice over stdio; frames `Request{id,handle,method,payload}` / `Response{id,status,payload}` 4-byte big-endian length prefix, in proto/xcl/core/v1/transport.proto; out-of-order responses, one reader thread demuxing by id; transport chosen by wheel contents (xcl/_lib/libxcl.* → in-process; xcl/_bin/xcl-core → subprocess; neither → EngineNotFoundError); XCL_TRANSPORT=subprocess override when both present; one xcl-core per host process, started lazily with `xcl-core --serve`, stderr inherited, GetVersion first, SIGTERM/TerminateProcess on last release/atexit, EngineExitedError on exit with calls outstanding, ForkedProcessError in forked child; xcl-core built for all eight targets in the CGO_ENABLED=0 job, archives `xcl-core_<version>_<os>_<arch>` listed in the signed libxcl checksums; only musl wheels bundle it in the first release; parity suite over both transports; open question: ship xcl-core in every wheel later.
-- Rejected: drop musl; LD_PRELOAD; subprocess-only everywhere; both engines in every wheel with runtime probing.
+- Today: package version == xcl tag; Python checks the engine reports exactly its own version
+  (`xcl-python/xcl/_client.py:76`). Tagging xcl dispatches xcl-python's release, which builds
+  whatever is on xcl-python `main`. A Python-only change can only ship via an xcl tag, which (with
+  many languages) re-releases every language. User: "if we have to make changes to python. This
+  causes a release to every single language."
+- xcl's CI never runs the Python suite; an xcl change that breaks Python is found only when
+  `xcl-ref.txt` is bumped or at release time, after the xcl tag exists.
+- Tagging is manual.
 
-### Scope decisions
-- Interview answers: first publishable Python release v0.5.0 (v0.4.0 stays libxcl-only, tag not moved); one short Alpine/subprocess note in the website Python install section; xcl-core in non-musl wheels is OUT (non-goal). Interview written to .spektacular/work/<spec>/interview.md; epic already lists this spec with depends_on [] — record depends_on python-support + reorder before docs specs at the end.
-- Epic 20261010160411-19b965db-language-reference; add this spec (and python-release-hardening) before language-reference and using-xcl-with-go. Depends on python-support (done, merged).
-- Separate spec python-release-hardening to follow: win_amd64 wheel crashed 0xC0000005 in parity program (zig-built DLL; llvm-mingw arm64 DLL fine); CI bugs: `tomllib` in tests/integration/docker_helpers.py breaks 3.10 (spec says 3.10+), tests/unit/test_schema.py hardcodes ../xcl instead of XCL_SRC; user: "I really don't think testing with actual docker is a good idea for an end to end test. We should create a test plugin that can be used" (a signed test-plugin release replacing xcl-plugin-docker in GitHub-registry/e2e tests).
-- xcl-lang 0.4.0 stays unpublished until musl works; tag v0.4.0 + libxcl GitHub release (8 archives, signed) stay.
+## Decisions (user confirmed)
 
-## Epic implement run (spek-implement-epic, 2026-10-11) — orchestrator notes
-- Order was: language-surface → python-support → language-reference → using-xcl-with-go. User answers: commit dirty plugin repos first (done); xcl-python initial commit (done); questions go to the user (reachable via Claude remote); orchestrator cuts release tags.
-- language-surface: DONE 16/16, merged (xcl b2373cc on f-libxcl; plugin-template, plugin-docker, website, vscode mains ahead, NOT pushed — user: wait until release stuff works). Tagged xcl v0.3.0 (6cdf936) and pushed.
-- python-support: DONE 23/23, merged (xcl 93e1904, xcl-python 81673e5). Spec amended: PyPI name `xcl` taken → `xcl-lang` (import `xcl`). Secrets XCL_RELEASE_GPG_KEY/PASSPHRASE/XCL_PYTHON_DISPATCH_TOKEN on xcl (PAT needs Contents: write — fixed by user); PyPI pending publisher xcl-lang + GH env pypi on xcl-python. Tagged v0.4.0 on 93e1904, pushed; libxcl release: macos-13 retired → commit 6b1f5a0 on f-libxcl (darwin_amd64 on macos-latest), re-dispatched run 38173939423 green (8 archives attached). Pushed xcl f-libxcl and xcl-python main. xcl-python commits cf45747 (xcl-ref.txt=f-libxcl, macos-15-intel) and 26e578a (checkout path xcl-src; musl jobs via docker run + .github/scripts/musl-wheel.sh). Flip xcl-ref.txt back to main once f-libxcl merges.
-- language-reference: child FAILED on session rate limit (429, resets 11:30pm London) while waiting for my option-1 answer (sent, queued). Restart a child to resume its lane later (implement new → resume report → goto). Finding: set-typed output values read back sorted into lists (library gap). Previously: child running (worktrees xcl + xcl-website, branch spek/20261010160411-19b965db-language-reference); tasks 1–11 done; task 12 verifying examples; user chose: verify Python vs local v0.4.0 build + xcl-python main (answer sent). Finding: Validate doesn't catch reference cycles, only Apply ("multiple roots") — library gap.
-- using-xcl-with-go: blocked on language-reference (and the two new specs once added).
-- Follow-ups: darwin_amd64 on macos-latest (done in 6b1f5a0); hero badge etc. handled by language-reference.
-- Knowledge candidates from children: parser.recover flag never reset; ParserError.Message carries Detail only; Config.Diff skips provider-less entities; cty Function.Call doesn't convert args; example/plugin own module; runtime/cgo.Handle unusable with CGO_ENABLED=0; _test.go can't import "C"; output entity JSON has empty "CtyValue"; diff.Diff not unmarshallable; functions evaluated on every decode pass; GH registry cache keeps sidecars (exec bit); docker is podman shim ignoring DOCKER_HOST; local libxcl needs glibc 2.34 (release uses zig -gnu.2.28); tests/parity/types.py shadows stdlib types; repository_dispatch needs Contents: write; Alpine job containers unsupported on arm64 runners; actions/checkout path must not collide with the package dir; Go c-shared cannot be dlopen'd on musl.
-- Sections overview..non_goals written to work files; user: 'This is all ok' (blanket approval for remaining drafts). Design ref libxcl.md recorded on the spec.
-- Spec at verification: staged .spektacular/tmp/spec_template.md, reviewer subagent running. User: 'No need to keep asking' → apply real fixes without per-item confirmation, then spec file write, rm work dir, goto split (decline split: tightly coupled), then finish; then spec 2 python-release-hardening; then epic write to add both specs with depends_on (ooe: python-support; hardening: python-support; language-reference + using-xcl-with-go gain depends_on both).
-- Both specs final: 20261011211634-a8895873-python-out-of-process-engine, 20261011232013-da18c586-python-release-hardening. Epic rewritten: order LS → PS → OOE, RH (both depend on PS) → language-reference, using-xcl-with-go (depend on all four). Epic implement now blocked by epic_unplanned (OOE, RH) → next: "plan this epic" (spek-plan-epic), then "implement this epic" picks up: language-reference in_progress (resume child), OOE/RH, then docs. Restarting language-reference child now (rate limit reset) to finish task 12.
-- language-reference: DONE 12/12, merged (xcl 67680bc on f-libxcl; xcl-website c90a70d on main, not pushed). Worktrees removed. Epic implement run ENDS here: remaining 3 specs blocked (OOE/RH unplanned; using-xcl-with-go behind them). Next: "plan this epic", then "implement this epic". Library gaps from LR child recorded in its plan changelog (Validate misses cycles; sets via output; root output.<name> ref; field-less entity type; EncodeEntity list-block; coreservice.buildGitHubRegistry panics → SIGABRT in Python; several Python package gaps). Pushes still on hold: xcl-website, xcl-vscode, xcl-plugin-template, xcl-plugin-docker mains.
-- User asked "why not do everything with the CoreService approach?" → analysis of limitations per host (Java/.NET/Node fine; only no-spawn platforms iOS/store sandbox/browser/edge fail, and dlopen fails there too). User: yes, subprocess-only; "when Go fixes the upstream we could potentially move back to linked C". design/libxcl.md REVISED AGAIN (2026-10-12): subprocess xcl-core is the shipped transport in every SDK on every platform; libxcl kept buildable + CI smoke-tested, selectable from a source build with XCL_TRANSPORT=inprocess, NOT released; decision "Subprocess as the default transport, and the way back in process"; hazards table rewritten; Node via child_process; release matrix = one CGO_ENABLED=0 job; xcl-core_<v>_<os>_<arch>[_musl] archives with their own checksums file; libxcl toolchain matrix moves to a manual workflow. Next: reshape the two specs (OOE → "engine as subprocess everywhere"; hardening drops the Windows DLL item) via spec file read/write (specs are final; rewrite with `spektacular spec file write`, or amend?) — they are unplanned, so a plain rewrite is fine.
-- Specs rewritten in store (2026-10-12): OOE = engine program is the shipped transport on all 8 platforms, libxcl source-build option (XCL_TRANSPORT=inprocess) + CI smoke test, release = one cgo-disabled job, no libxcl archives, v0.5.0; RH = Windows DLL item removed (now covered by OOE), rest unchanged. Epic summary row for OOE still says "for the musl wheels" — update. Then: "plan this epic".
+- **PR checks**: xcl PRs run every dependent language's build/test suite against the PR's head
+  SHA; "only if everything is green can we merge" (required checks). Direction: each binding
+  publishes a reusable workflow taking the xcl ref; xcl's PR workflow calls it.
+- **Auto-tagging**: every PR gets one label `major` / `minor` / `patch`; on merge the next semver
+  tag is pushed automatically and everything downstream is automatic. `major` = 1.0.0. An override
+  label for maintenance/docs PRs that does not release.
+- **Independent binding versions** (replaces strict lockstep): each binding repo has its own semver
+  and the same label-driven auto-tagging. `xcl-ref.txt` pins the engine the binding tests against
+  and bundles; the engine check compares against the pin, not the package version.
+- **Engine release propagation**: an xcl tag opens a bump PR in each binding moving the pin to the
+  new tag; it runs the binding's CI and auto-merges when green, with a label mirroring the engine
+  bump (engine patch -> binding patch, engine minor -> binding minor); that merge auto-tags and
+  releases the binding.
+- User's worked example (confirmed, numbers corrected): Python v0.1.6 on engine v0.1.2. Python-only
+  fix with `patch` -> Python v0.1.7 on engine v0.1.2, nothing else releases. Engine fix on xcl with
+  `patch`: PR runs xcl tests + Python suite against PR SHA; merge -> xcl v0.1.3 -> bump PR in
+  xcl-python -> green, auto-merge -> Python v0.1.8 bundling engine v0.1.3.
+- **Documentation**: "we need this process documented in the README.md too".
 
-## Epic plan run (spek-plan-epic, 2026-10-12) — orchestrator notes
-- Epic: 20261010160411-19b965db-language-reference. Root: /home/nicj/code/github.com/jumppad-labs/xcl.
-- At start: plan done for language-surface, python-support, language-reference, using-xcl-with-go. Ready: python-out-of-process-engine (OOE), python-release-hardening (RH); both depend only on python-support (done). Started children for both in parallel.
-- OOE: DONE (plan final). Knowledge candidates: go-plugin v1.6.3 hands os.Stdin to plugins; site had no Python install section. Design note: frame status uint32 vs int32.
-- Questions put to the user:
-  - RH (discovery): register new repo xcl-plugin-test at ~/code/github.com/jumppad-labs/xcl-plugin-test for the signed test plugin? ANSWER: yes, xcl-plugin-test at that path (sent to RH child). RH child also found extra CI failures (Windows .exe fixtures, SIGINT test on Windows, macOS stall-threshold test) it will cover. RH and OOE both touch xcl-python ci.yml, Makefile, tests/integration/conftest.py, tests/parity/conftest.py → epic order needed.
-  - Bug seen: `spektacular repo add --dry-run` writes config + footprint; location gets /.spektacular appended (child reverted).
-- RH: DONE (plan final). Registered xcl-plugin-test (config.yaml one entry, uncommitted). Knowledge candidates: repo add --dry-run writes / location gets /.spektacular appended; xcl-python CI failure map (run 38174422045).
-- Step 6 disagreements put to user (2026-10-12): (1) CHANGELOG — RH changes xcl registry message but has no CHANGELOG entry; propose add `## <RH spec>` entry, Breaking: None. (2) Strict mode vs route skips — RH XCL_TEST_STRICT=1 fails harness skips incl. engine; OOE skips in-process route where libxcl not built (only Linux CI builds it); propose strict fails only skips of the engine the job is meant to provide (subprocess everywhere, in-process on the Linux libxcl job). (3) Windows interrupt — OOE: Ctrl-C not simulated on Windows; RH: CTRL_BREAK_EVENT into new process group; propose RH approach, OOE engine ignores both (Go reports CTRL_BREAK as os.Interrupt) and its Windows note points at it. ANSWERS: all three proposals accepted; sent to both children to apply to their plan docs.
-- Engine signal aligned: RH uses OOE's XCL_TEST_ENGINES (subprocess / +inprocess) and tests/engines.py::skip_missing_engine.
-- Summary written: OOE + RH sections, decisions (3 new entries). epic order added: RH depends on OOE (shared xcl-python CI/test files, xcl CHANGELOG). Now at Step 7 review with the user. Knowledge candidates to offer: go-plugin stdin gotcha; repo add --dry-run writes / location suffix; xcl-python CI failure map; site had no Python install section. Design note to raise: frame status uint32 vs int32.
-- Step 7 review: user "Looks right" (no changes, keep order). Knowledge saved: xcl gotchas/go-plugin-inherits-stdin.md. Others declined. Epic plan run COMPLETE; next: "implement this epic".
-- 2026-10-12: user created jumppad-labs/xcl-plugin-test from template (public, secrets GPG_PRIVATE_KEY/GPG_PASSPHRASE set) and cloned it locally, which wiped the footprint → repaired with `repo add` (root path). Walking user through human tasks one by one: (1) commit+push footprint in xcl-plugin-test [given now]; (2) tag xcl-plugin-test v0.1.0 after agent builds plugin (RH impl); (3) cut xcl v0.5.0 after OOE impl; (4) enable GitHub Pages on xcl-python + run docs workflow (using-xcl-with-go impl). Also on hold: pushes of xcl-website/xcl-vscode/plugin-template/plugin-docker mains; xcl planning changes (config.yaml entry + 2 plans) uncommitted.
-- 2026-10-12: user: host BOTH Go and Python API references on xcl.dev, generated in the xcl-website deploy action (Python dep OK; Go docs there despite pkg.go.dev). Spec using-xcl-with-go unchanged (only says "generated API docs"). Plan revision agent running: /api/go/, /api/python/, generated from the advertised release pin, integrated look preferred, drop xcl-python Pages human task + pdoc workflow, xcl-python keeps README link. After it finishes: update epic summary section for using-xcl-with-go + decisions entry; re-run epic order.
-- uxg plan revised (doc2go v0.12.2 embed for Go, pdoc 16.0.0 content-only for Python, /api/go/ /api/python/, release pin src/config/release.json, "API" nav dropdown, footer links; xcl-python only README link; Pages human task removed; target release now v0.5.0, pip name xcl-lang). Epic summary section + decisions entry written; epic order added nothing. Remaining person tasks: (1) commit+push xcl-plugin-test footprint; (2) tag xcl-plugin-test v0.1.0; (3) cut xcl v0.5.0.
+## Interview answers
 
-## Epic implement run #2 (spek-implement-epic, 2026-10-13) — orchestrator notes
-- Epic 20261010160411-19b965db-language-reference. At start: done LS, PS, LR; ready OOE; blocked RH (on OOE), using-xcl-with-go (on OOE, RH). Not dirty, no problems.
-- OOE: worktrees created (xcl, xcl-python, xcl-website); child started (start).
-- OOE: DONE 10/10 agent tasks, merged (worktree commits xcl c875112, xcl-python f6d56b0, xcl-website 96579c5). Human task "Cut v0.5.0" outstanding (merge done → push xcl f-libxcl, tag v0.5.0); 10 spec items await GitHub runs/release. Known: Alpine CI test_schema.py ../xcl failure fixed by RH. Knowledge candidates: apk add go pulls gcc; cancel doesn't interrupt running provider call; SIGKILLed xcl-core orphans plugins; SIGPIPE needs signal.Notify; local make buf-breaking fails on plugins/plugin.proto; go version -m lacks ldflags.
-- 2026-10-13: user pushed xcl f-libxcl and tagged v0.5.1 (v0.5.0 was already taken by 9927404, before OOE). xcl Release v0.5.1 green (38371326868). xcl-python Release (dispatch 38371728353) FAILED: xcl-python main not pushed (ahead 2: f6d56b0, 26065a0) so old workflow looked for libxcl_* archives. Fix: push xcl-python main, `gh workflow run release.yml -R jumppad-labs/xcl-python -f tag=v0.5.1`.
-- Go CI `build` failures fixed in xcl working tree (uncommitted, user commits): (1) coreservice/operations.go race — Finished task posted before inProgress cleared → host's next call refused operation_in_progress; now cleared first; deterministic test TestFinishedTaskQueuedAfterOperationEnds (fails 3/3 without fix). (2) registry -race timeout 10m (pre-existing) — internal/testutil/github_release.go fake archives now uncompressed (gzip.NoCompression, zip.Store): registry 10m+ → 42s. Full `go test ./... -race` passes locally.
-- Version follow-up after release green: spec says v0.5.0 → v0.5.1 in website badge/install, xcl CHANGELOG heading, uxg plan release pin. Then tick OOE human task, start RH.
-- 2026-10-13: user tagged v0.5.2 (a9c9f9c "Fix tests"), pushed xcl-python main, re-ran xcl-python Release 38374732233: all 8 wheels + sdist built; Publish FAILED (gh-action-pypi-publish v1.12.4 twine rejects Metadata-Version 2.5 from hatchling). Nothing uploaded, 0.5.2 still free on PyPI. Fixed in xcl-python working tree: action → v1.14.2 (supports 2.5); user to commit/push and re-run `gh workflow run release.yml -R jumppad-labs/xcl-python -f tag=v0.5.2`. xcl f-libxcl origin still at fc2ca8f (a9c9f9c unpushed) at last check.
-- 2026-10-13: user tagged v0.5.3 on a9c9f9c and pushed f-libxcl. xcl-python publish-action bump (v1.14.2) still uncommitted at that time — told user to push before dispatch.
-- Go CI on a9c9f9c: tests pass; 'buf breaking' fails (main has no proto/). Fixed in xcl working tree: .github/workflows/go.yml skips buf breaking when main has no .proto in proto/ (uncommitted).
-- 2026-10-13 09:35: xcl-python e948dc0 pushed (publish action v1.14.2); Release re-run 38377379298 tag=v0.5.3 watching. xcl 1a88a89 pushed (go.yml buf-breaking skip); Go CI 38377258845. Release version is v0.5.3 (xcl release green, 8 xcl-core archives).
-- 2026-10-13: xcl-lang 0.5.3 PUBLISHED (xcl-python Release 38377379298 green: 8 wheels + sdist, 8 install checks). Go CI 38377258845 green. OOE plan: release task ticked + changelog entry "(done, as v0.5.3)" via plan file write → OOE implement done. Edited xcl CHANGELOG.md "From v0.5.3" and xcl-website badge v0.5.3 (uncommitted); user chose to commit them before RH starts. Waiting on user, then: epic worktree RH + start child (tell it: macOS test_engine_killed_fails_waiting_call_with_signal returncode 137 vs -9 is a new CI failure to fix; CI failure map from run 38374692116). uxg child: release is v0.5.3.
-- 2026-10-13: user committed+pushed version edits (xcl b384f8e, xcl-website 4476b9e). RH worktrees created (xcl, xcl-python, xcl-plugin-test); RH child started (start), told: release is v0.5.3, post-OOE fixes, CI failure map incl. new macOS 137 test.
-- RH: DONE (agent tasks), merged (worktree commits xcl 5994ff7, xcl-python 2a25ffc, xcl-plugin-test c27dde0). Open human task "Publish the first signed test plugin release": existing v0.1.0 on xcl-plugin-test was cut from template commit (assets xcl-plugin-template_0.1.0_*) → user: push xcl-plugin-test main, wait CI green, `gh release delete v0.1.0 -R jumppad-labs/xcl-plugin-test --cleanup-tag --yes`, `git tag -d v0.1.0`, `make release VERSION=v0.1.0`, check 6 xcl-plugin-test_0.1.0_* archives + checksums + .sig (issuer F775DA00AFD4B502). Tamper test needs xcl key-naming change on f-libxcl (push xcl). Knowledge candidates: variable needs default; macOS sys.executable stub reports 128+n; types.Sensitive NewSensitive/Reveal; Config.ResourceCount deprecated.
-- RH human task ticked (plugin v0.1.0 verified: 6 archives, sig F775DA00AFD4B502 good, not draft) → RH done. using-xcl-with-go ready; worktrees created; child started. xcl f-libxcl still unpushed (ahead 3) at this point; xcl-python CI 38384148884 may fail key-naming tamper test until pushed + rerun.
+- Coordinated breaking changes: **manual override label** on the xcl PR (not same-branch-name).
+- Skip label: **`no-release`**.
+- Docs: **full process in xcl README + short pointer section in each binding README**.
+- Other repos (plugins, website, vscode): **none for now**; only xcl and xcl-python.
+
+## Gotchas to carry into technical approach
+
+- Tags pushed with GITHUB_TOKEN don't trigger other workflows: use a GitHub App token or call the
+  release workflow directly.
+- Release notes from changelog entries since the last tag.
+- Pre-1.0: `major` label means 1.0.0.
+
+## Spec finished, plan started (2026-10-14)
+
+- Spec committed; review fixes applied (signing/PyPI + first-version-above-PyPI moved to
+  Constraints; engine major -> binding major, 1.0.0 below 1.0; override label name left to plan).
+- Split offer declined ("No epic"); raised hivecommons/spektacular#87 about split criteria.
+- Specs pushed on xcl branch `specs/ci-release-and-python-dataclasses` (no PR; user didn't want one).
+- Git has no identity configured on this machine; commits use
+  `-c user.name="Nicholas Jackson" -c user.email="jackson.nic@gmail.com"`.
+- Plan workflow started for the CI spec; we're on branch specs/ci-release-and-python-dataclasses.
+
+## Plan: discovery done (2026-10-14)
+
+- Fixed registry: xcl-vscode had no footprint; `repo add` with location = repo ROOT (`../../xcl-vscode`)
+  created `xcl-vscode/.spektacular/` (uncommitted there). Passing the `.spektacular` path nests it.
+  `repo add --dry-run` wrote files anyway (Spektacular bug, not yet reported).
+- Facts: no labels/branch protection/rulesets, auto-merge off on xcl and xcl-python; xcl-python
+  has no tags; PyPI has 0.5.3, 0.6.0, 0.7.0.
+- Key gotchas: GITHUB_TOKEN tag pushes / PR opens / auto-merge pushes don't trigger workflows;
+  skipped jobs count as passing required checks; checkout in a called workflow defaults to the
+  caller repo. Convention: no tests that read CI workflow files.
+
+## Plan written, walkthrough in progress (2026-10-14)
+
+- Plan, context, research committed (20 tasks, 4 milestones). Now at the mandatory walkthrough;
+  needs explicit user sign-off before `plan goto finished`.
+- Key plan choices: override label `breaks-bindings`; Go command `cmd/xcl-release` (+`internal/release`)
+  for label/version logic; App-token tag push keeps tag-triggered release.yml (PyPI trusted
+  publisher untouched); `__engine_version__` pin stamp; seed tag v0.7.0 on xcl-python.

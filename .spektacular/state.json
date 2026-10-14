@@ -1,24 +1,31 @@
 {
-  "kind": "spec",
+  "kind": "plan",
   "current_step": "finished",
   "completed_steps": [
     "new",
-    "interview",
     "overview",
-    "requirements",
-    "acceptance_criteria",
-    "constraints",
-    "technical_approach",
-    "success_metrics",
-    "non_goals",
+    "discovery",
+    "architecture",
+    "components",
+    "data_structures",
+    "implementation_detail",
+    "dependencies",
+    "testing_approach",
+    "milestones",
+    "tasks",
+    "open_questions",
+    "out_of_scope",
+    "assemble",
     "verification",
-    "split",
+    "write_plan",
+    "write_context",
+    "write_research",
+    "walkthrough",
     "finished"
   ],
-  "created_at": "2026-10-11T23:20:13.214174113Z",
-  "updated_at": "2026-10-11T23:22:38.056876429Z",
+  "created_at": "2026-10-14T05:44:02.715028254Z",
+  "updated_at": "2026-10-14T06:01:45.534490795Z",
   "data": {
-    "epic": "20261010160411-19b965db-language-reference",
-    "name": "20261011232013-da18c586-python-release-hardening"
+    "name": "20261014052450-0b131707-ci-release-automation"
   }
 }

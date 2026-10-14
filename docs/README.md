@@ -7,6 +7,10 @@ not at end users writing `.xcl` config.
 
 ## Start here
 
+- [Release automation setup](release-setup.md) — the one-off repository and
+  organisation settings behind automated releases: labels, required checks,
+  the release bot, the xcl-python seed tag and auto-merge.
+
 - [Overview](overview.md) — the big picture: how a `Config.Apply()` call
   flows from HCL files to running providers, how `Config.Destroy()` tears
   everything down from the saved state, and how the packages fit together.

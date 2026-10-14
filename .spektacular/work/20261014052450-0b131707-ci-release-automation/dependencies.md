@@ -1,0 +1,10 @@
+- **Design documents this plan was built on:** none. The spec carries no design references.
+- **GitHub Actions and branch protection** (external platform, mandated by the spec's constraint). Provide reusable workflows, required status checks and auto-merge. Needs settings changes on both repos: labels, protection, `allow_auto_merge`.
+- **A GitHub App for release automation** (external, new; **must exist before the auto-tag and engine-bump workflows can work**). Installed on xcl and xcl-python with contents, pull-requests and workflows write access. Its ID and private key are stored as secrets in both repos. Minted in workflows with `actions/create-github-app-token`.
+- **`XCL_PYTHON_DISPATCH_TOKEN`** (existing secret on xcl). Still used for the release dispatch to xcl-python; no change. It may later be replaced by the App token.
+- **xcl Release workflow** (existing). Builds, signs and publishes `xcl-core`. Its dispatch gains the bump size; otherwise unchanged.
+- **xcl-python Release workflow and PyPI trusted publishing** (existing). The trigger changes to xcl-python's own tag. It must remain the top-level workflow named in the PyPI trusted publisher, so no PyPI-side change is needed.
+- **jumppad-labs release GPG key** (existing secrets `XCL_RELEASE_GPG_KEY` and `XCL_RELEASE_GPG_PASSPHRASE`, and the public key in xcl-python's tests). Unchanged.
+- **GitHub CLI and `--generate-notes`** (existing, used by the xcl release). Provides the PR list for release notes; xcl-python adopts it as well.
+- **Prior plans** `python-out-of-process-engine` and `python-release-hardening` (landed). They produced the current release and dispatch pipeline this plan modifies; nothing further needs to land first.
+- **Downstream:** the parked spec `python-plain-dataclasses` depends on this plan landing first. It is the first change intended to ship through the new process.
