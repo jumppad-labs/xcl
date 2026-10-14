@@ -1,0 +1,58 @@
+# Runs every language binding's test suite against this pull request's own
+# commit, so an engine change that breaks a binding is caught before it
+# merges. Each binding publishes its suite as a reusable workflow that takes
+# the xcl ref to build the engine from; today that is xcl-python's test.yml.
+#
+# The required check is the bindings job. It always runs and passes when
+# every binding suite passed, or when the pull request carries the label
+# breaks-bindings: a maintainer's statement that the change knowingly breaks
+# a binding, which is then fixed in that binding's engine update pull
+# request. With the label set the suites do not run at all.
+#
+# Label changes re-run this workflow, so adding or removing breaks-bindings
+# is re-evaluated at once; any other label change re-runs the suites too,
+# which costs time but means the gate can never pass because a job it
+# depends on was skipped.
+#
+# To add a language, call its suite as another job and add that job to the
+# needs of bindings.
+
+name: Bindings
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+concurrency:
+  group: bindings-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaks-bindings') }}
+    uses: jumppad-labs/xcl-python/.github/workflows/test.yml@main
+    with:
+      python-ref: main
+      xcl-ref: ${{ github.event.pull_request.head.sha }}
+
+  bindings:
+    name: bindings
+    needs: [python]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check every binding passed, or the break is acknowledged
+        env:
+          OVERRIDE: ${{ contains(github.event.pull_request.labels.*.name, 'breaks-bindings') }}
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "binding results: $RESULTS"
+          if [ "$OVERRIDE" = true ]; then
+            echo "breaks-bindings is set: merging is allowed although the bindings were not tested"
+            exit 0
+          fi
+          if [ "$(jq -r 'map(select(. != "success")) | length' <<< "$RESULTS")" != 0 ]; then
+            echo "a language binding failed against this change; fix it, or add breaks-bindings if the break is intended"
+            exit 1
+          fi
