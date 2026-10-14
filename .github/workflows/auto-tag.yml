@@ -1,0 +1,135 @@
+# The shared auto-tag. Every repository taking part in automated releases
+# calls it on each push to main. It finds the pull request the pushed commit
+# came from, reads its release label, and for major, minor or patch pushes
+# the next version tag; no-release, and a push that came from no pull
+# request, tag nothing. The decisions are xcl-release's (internal/release).
+#
+# The tag is created with a token of the xcl release bot GitHub App. A tag
+# created with the built-in GITHUB_TOKEN starts no workflows, so the
+# repository's own release.yml, triggered by a v* tag, would never run.
+#
+# Call it from a workflow triggered by push to main, one run at a time so
+# two merges never compute the same version:
+#
+#   on:
+#     push:
+#       branches: [main]
+#   concurrency:
+#     group: auto-tag
+#     cancel-in-progress: false
+#   jobs:
+#     tag:
+#       uses: jumppad-labs/xcl/.github/workflows/auto-tag.yml@main
+#       secrets: inherit
+#
+# The caller's repository needs the secrets RELEASE_APP_ID and
+# RELEASE_APP_PRIVATE_KEY, and the App installed on it.
+
+name: Auto-tag
+
+on:
+  workflow_call:
+    inputs:
+      xcl-ref:
+        description: The xcl ref whose xcl-release command decides the version
+        required: false
+        type: string
+        default: main
+    secrets:
+      RELEASE_APP_ID:
+        required: true
+      RELEASE_APP_PRIVATE_KEY:
+        required: true
+    outputs:
+      tag:
+        description: The tag pushed, empty when nothing was released
+        value: ${{ jobs.tag.outputs.tag }}
+      size:
+        description: The release size, major, minor, patch or no-release; empty without a pull request
+        value: ${{ jobs.tag.outputs.size }}
+
+env:
+  GO_VERSION: '1.27.0'
+
+jobs:
+  tag:
+    name: tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
+      size: ${{ steps.size.outputs.size }}
+    steps:
+      - name: Find the merged pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+            --jq '[.[] | select(.merged_at != null and .base.ref == "main")][0] // empty')"
+          if [ -z "$pr" ]; then
+            echo "$GITHUB_SHA came from no merged pull request; nothing to release"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "pull request #$(jq -r .number <<< "$pr")"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          jq -r '.labels[].name' <<< "$pr" > "$RUNNER_TEMP/labels"
+
+      # a called workflow checks out its caller by default, so xcl is named
+      - uses: actions/checkout@v4
+        if: steps.pr.outputs.found == 'true'
+        with:
+          repository: jumppad-labs/xcl
+          ref: ${{ inputs.xcl-ref }}
+          path: xcl
+
+      - uses: actions/setup-go@v5
+        if: steps.pr.outputs.found == 'true'
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: xcl/go.sum
+
+      - name: Read the release size
+        id: size
+        if: steps.pr.outputs.found == 'true'
+        working-directory: xcl
+        run: |
+          mapfile -t labels < "$RUNNER_TEMP/labels"
+          size="$(go run ./cmd/xcl-release labels "${labels[@]}")"
+          echo "release size: $size"
+          echo "size=$size" >> "$GITHUB_OUTPUT"
+
+      - name: Work out the next version
+        id: next
+        if: steps.size.outputs.size != '' && steps.size.outputs.size != 'no-release'
+        working-directory: xcl
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIZE: ${{ steps.size.outputs.size }}
+        run: |
+          mapfile -t tags < <(gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v" \
+            --jq '.[].ref | sub("^refs/tags/"; "")')
+          tag="$(go run ./cmd/xcl-release next --size "$SIZE" "${tags[@]}")"
+          echo "next version: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/create-github-app-token@v1
+        id: app
+        if: steps.next.outputs.tag != ''
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Push the tag
+        if: steps.next.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA" > /dev/null
+          echo "pushed $TAG at $GITHUB_SHA"

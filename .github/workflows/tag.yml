@@ -1,0 +1,20 @@
+# Tags each merge to main with the next version its pull request's release
+# label asks for, using the shared auto-tag. The tag starts release.yml.
+# Merges are tagged one at a time, so two never get the same version.
+
+name: Tag
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: auto-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    uses: ./.github/workflows/auto-tag.yml
+    with:
+      xcl-ref: ${{ github.sha }}
+    secrets: inherit
