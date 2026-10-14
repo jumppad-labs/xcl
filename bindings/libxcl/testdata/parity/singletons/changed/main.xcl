@@ -1,0 +1,9 @@
+runner {
+  server = "https://maalstrom.internal"
+  listen = "127.0.0.1:7660"
+}
+
+agent "claude" {
+  model  = "claude/opus"
+  server = runner.server
+}

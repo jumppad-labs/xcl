@@ -46,6 +46,7 @@ func (p *gadgetProvider) Init(state plugins.State, functions plugins.ProviderFun
 
 func (p *gadgetProvider) Create(ctx context.Context, g *Gadget) (*Gadget, error) {
 	g.Described = describe(g)
+	plugins.Logger(ctx).Info("created gadget", "handle", g.Handle)
 	return g, nil
 }
 
@@ -54,15 +55,25 @@ func (p *gadgetProvider) Destroy(ctx context.Context, g *Gadget, force bool) err
 	return nil
 }
 
+// Read reports a gadget configured with the size Lost as gone, so it is
+// created again
 func (p *gadgetProvider) Read(ctx context.Context, old *Gadget, new *Gadget) (*Gadget, error) {
+	if new.Size == Lost {
+		return nil, plugins.ErrNotFound
+	}
+
 	new.Described = old.Described
 	return new, nil
 }
 
 func (p *gadgetProvider) Update(ctx context.Context, g *Gadget, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Gadget, error) {
 	g.Described = describe(g)
+	plugins.Logger(ctx).Info("updated gadget", "handle", g.Handle, "changes", len(changes))
 	return g, nil
 }
+
+// Lost is the size of a gadget Read reports as gone
+const Lost = 99
 
 func (p *gadgetProvider) Functions() plugins.ProviderFunctions {
 	return nil
@@ -108,13 +119,72 @@ func (p *hubProvider) Functions() plugins.ProviderFunctions {
 	return nil
 }
 
-// Plugin registers gadget and hub
+// Gizmo is the block type gizmo "small", written gizmo "small" "<label>" {},
+// so it takes two label fields, the subtype and the label. It holds a secret
+// and nested parts the provider gives serials to
+type Gizmo struct {
+	Size   string                  `xcl:"size,label" json:"size"`
+	Handle string                  `xcl:"handle,label" json:"handle"`
+	Secret types.Sensitive[string] `xcl:"secret" json:"secret"`
+	Parts  []Part                  `xcl:"part,block" json:"part,omitempty"`
+
+	// SecretLength is computed: the length of the secret the provider read
+	SecretLength int `xcl:"secret_length,optional,computed" json:"secret_length,omitempty"`
+}
+
+// Part is a nested part of a gizmo, paired by its name
+type Part struct {
+	Name string `xcl:"name,key" json:"name"`
+
+	// Serial is computed: the provider gives each part one at create
+	Serial string `xcl:"serial,optional,computed" json:"serial,omitempty"`
+}
+
+type gizmoProvider struct {
+	plugins.DefaultChanged[*Gizmo]
+}
+
+func (p *gizmoProvider) Init(state plugins.State, functions plugins.ProviderFunctions, log logger.Logger) error {
+	return nil
+}
+
+func (p *gizmoProvider) Create(ctx context.Context, g *Gizmo) (*Gizmo, error) {
+	g.SecretLength = len(g.Secret.Reveal())
+	for i := range g.Parts {
+		g.Parts[i].Serial = g.Size + "-" + g.Handle + "-" + g.Parts[i].Name
+	}
+
+	return g, nil
+}
+
+func (p *gizmoProvider) Destroy(ctx context.Context, g *Gizmo, force bool) error {
+	return nil
+}
+
+func (p *gizmoProvider) Read(ctx context.Context, old *Gizmo, new *Gizmo) (*Gizmo, error) {
+	return new, nil
+}
+
+func (p *gizmoProvider) Update(ctx context.Context, g *Gizmo, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Gizmo, error) {
+	g.SecretLength = len(g.Secret.Reveal())
+	return g, nil
+}
+
+func (p *gizmoProvider) Functions() plugins.ProviderFunctions {
+	return nil
+}
+
+// Plugin registers gadget, hub and gizmo
 type Plugin struct {
 	plugins.PluginBase
 }
 
 func (p *Plugin) Init(log logger.Logger, state plugins.State) error {
 	if err := plugins.RegisterResourceProvider(&p.PluginBase, log, state, "gadget", "", &Gadget{}, &gadgetProvider{}); err != nil {
+		return err
+	}
+
+	if err := plugins.RegisterResourceProvider(&p.PluginBase, log, state, "gizmo", "small", &Gizmo{}, &gizmoProvider{}); err != nil {
 		return err
 	}
 

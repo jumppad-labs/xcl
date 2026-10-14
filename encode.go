@@ -209,11 +209,16 @@ func encodeEntity(entity any, opts encodeOptions) ([]byte, error) {
 	}
 
 	// an entity is led by its type and labelled with its subtype, where it
-	// has one, and its name
-	block := hclwrite.NewBlock(meta.Type, []string{meta.Name})
+	// has one, and its name; a singleton has neither
+	labels := []string{}
 	if meta.Subtype != "" {
-		block = hclwrite.NewBlock(meta.Type, []string{meta.Subtype, meta.Name})
+		labels = append(labels, meta.Subtype)
 	}
+	if meta.Name != "" {
+		labels = append(labels, meta.Name)
+	}
+
+	block := hclwrite.NewBlock(meta.Type, labels)
 
 	err = gohcl.EncodeBody(entity, block.Body(), gohcl.EncodeOptions{
 		IncludeComputed: opts.includeComputed,

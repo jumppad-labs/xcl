@@ -1,0 +1,10 @@
+[
+  {"schema_version": 1, "type": "runner", "singleton": true, "fields": [
+    {"name": "server", "type": "string"},
+    {"name": "listen", "type": "string", "optional": true}
+  ]},
+  {"schema_version": 1, "type": "agent", "fields": [
+    {"name": "model", "type": "string"},
+    {"name": "server", "type": "string", "optional": true}
+  ]}
+]

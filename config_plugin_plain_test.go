@@ -1,6 +1,7 @@
 package xcl
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -194,6 +195,124 @@ func TestAReaderFindsAPluginsPlainTypeByItsPath(t *testing.T) {
 	hub, err := FindOne[plainplugin.Hub](reader.config, "hub")
 	require.NoError(t, err)
 	require.Equal(t, "10.0.0.1", hub.Dialled)
+}
+
+// gizmoConfig declares a gizmo, of a type with a subtype and two label fields,
+// with a secret and two parts
+const gizmoConfig = `
+gizmo "small" "spinner" {
+  secret = "s3cret"
+
+  part {
+    name = "axle"
+  }
+
+  part {
+    name = "wheel"
+  }
+}
+`
+
+func TestExternalPluginPlainTypeFillsTwoLabelFields(t *testing.T) {
+	binary := buildPlainPlugin(t)
+	isolateHome(t)
+
+	f := newPersonConfig(t, externalPlainRegistry(binary), writePlainPluginConfig(t, gizmoConfig), t.TempDir())
+	require.NoError(t, f.config.Apply(f.configFile))
+
+	gizmo, err := Find[plainplugin.Gizmo](f.config, "gizmo.small.spinner")
+	require.NoError(t, err)
+	require.Equal(t, "small", gizmo.Size)
+	require.Equal(t, "spinner", gizmo.Handle)
+}
+
+func TestExternalPluginPlainTypeReceivesItsSecret(t *testing.T) {
+	binary := buildPlainPlugin(t)
+	isolateHome(t)
+
+	f := newPersonConfig(t, externalPlainRegistry(binary), writePlainPluginConfig(t, gizmoConfig), t.TempDir())
+	require.NoError(t, f.config.Apply(f.configFile))
+
+	gizmo, err := Find[plainplugin.Gizmo](f.config, "gizmo.small.spinner")
+	require.NoError(t, err)
+
+	// the provider computed this from the secret's real value
+	require.Equal(t, len("s3cret"), gizmo.SecretLength)
+	require.Equal(t, "(sensitive)", gizmo.Secret.String())
+}
+
+func TestExternalPluginPlainTypeKeepsComputedValuesOfNestedBlocks(t *testing.T) {
+	binary := buildPlainPlugin(t)
+	isolateHome(t)
+
+	stateDir := t.TempDir()
+	configFile := writePlainPluginConfig(t, gizmoConfig)
+
+	first := newPersonConfig(t, externalPlainRegistry(binary), configFile, stateDir)
+	require.NoError(t, first.config.Apply(first.configFile))
+
+	second := newPersonConfig(t, externalPlainRegistry(binary), configFile, stateDir)
+
+	changes, err := second.config.Diff([]string{configFile})
+	require.NoError(t, err)
+	require.Equal(t, 0, changes.Changed())
+
+	require.NoError(t, second.config.Apply(second.configFile))
+
+	gizmo, err := Find[plainplugin.Gizmo](second.config, "gizmo.small.spinner")
+	require.NoError(t, err)
+	require.Equal(t, []plainplugin.Part{
+		{Name: "axle", Serial: "small-spinner-axle"},
+		{Name: "wheel", Serial: "small-spinner-wheel"},
+	}, gizmo.Parts)
+}
+
+func TestExternalPluginPlainTypeIsUpdatedInPlace(t *testing.T) {
+	binary := buildPlainPlugin(t)
+	isolateHome(t)
+
+	stateDir := t.TempDir()
+	configFile := writePlainPluginConfig(t, `gadget "lamp" { size = 3 }`)
+
+	first := newPersonConfig(t, externalPlainRegistry(binary), configFile, stateDir)
+	require.NoError(t, first.config.Apply(first.configFile))
+
+	require.NoError(t, os.WriteFile(configFile, []byte(`gadget "lamp" { size = 4 }`), 0o644))
+
+	recorder := &eventRecorder{}
+	second := newPersonConfig(t, externalPlainRegistry(binary), configFile, stateDir, WithEventHandler(recorder.Record))
+	require.NoError(t, second.config.Apply(second.configFile))
+
+	require.Len(t, pluginLogsWithMessage(recorder, "updated gadget"), 1)
+	require.Empty(t, pluginLogsWithMessage(recorder, "created gadget"))
+
+	gadget, err := Find[plainplugin.Gadget](second.config, "gadget.lamp")
+	require.NoError(t, err)
+	require.Equal(t, "lamp of size 4", gadget.Described)
+	require.Equal(t, "gadget.lamp", gadget.Meta.ID)
+}
+
+func TestExternalPluginPlainTypeReadAsGoneIsCreatedAgain(t *testing.T) {
+	binary := buildPlainPlugin(t)
+	isolateHome(t)
+
+	stateDir := t.TempDir()
+	configFile := writePlainPluginConfig(t, `gadget "lamp" { size = 3 }`)
+
+	first := newPersonConfig(t, externalPlainRegistry(binary), configFile, stateDir)
+	require.NoError(t, first.config.Apply(first.configFile))
+
+	require.NoError(t, os.WriteFile(configFile, []byte(fmt.Sprintf(`gadget "lamp" { size = %d }`, plainplugin.Lost)), 0o644))
+
+	recorder := &eventRecorder{}
+	second := newPersonConfig(t, externalPlainRegistry(binary), configFile, stateDir, WithEventHandler(recorder.Record))
+	require.NoError(t, second.config.Apply(second.configFile))
+
+	require.Len(t, pluginLogsWithMessage(recorder, "created gadget"), 1)
+
+	gadget, err := Find[plainplugin.Gadget](second.config, "gadget.lamp")
+	require.NoError(t, err)
+	require.Equal(t, fmt.Sprintf("lamp of size %d", plainplugin.Lost), gadget.Described)
 }
 
 func TestDestroyRemovesExternalPluginSingleton(t *testing.T) {
