@@ -87,12 +87,10 @@ func (p *Parser) validateProperties() []error {
 				continue
 			}
 
-			problems = append(problems, errors.NewParserError(
-				meta.File,
-				meta.Line,
-				meta.Column,
-				propertyProblem(link, missing),
-			))
+			problems = append(problems, p.parsedResources.inEntity(id, p.referenceAt(id, link), problem{
+				summary: "Unsupported attribute",
+				detail:  propertyProblem(link, missing),
+			}))
 		}
 	}
 
@@ -111,10 +109,8 @@ func (p *Parser) validateProperties() []error {
 // also as undefined. User written depends_on entries are among the links, so
 // they are held to the same rule.
 //
-// Problems are reported against the resource that holds the reference. The
-// references themselves are collected without their source positions, so the
-// position given is that of the resource block rather than of the reference
-// within it - enough to place the problem on the right resource.
+// Problems are reported in the resource that holds the reference, at the
+// reference as written.
 func (p *Parser) validateReferences() []error {
 	problems := []error{}
 
@@ -132,12 +128,10 @@ func (p *Parser) validateReferences() []error {
 		for _, link := range meta.Links {
 			fqrn, parseErr := p.addressParser().Parse(link)
 			if parseErr == nil && crossesModuleBoundary(fqrn) {
-				problems = append(problems, errors.NewParserError(
-					meta.File,
-					meta.Line,
-					meta.Column,
-					fmt.Sprintf("resource '%s' refers to '%s', which is inside module '%s'; only a module's outputs can be referenced from outside it", meta.ID, link, fqrn.Module),
-				))
+				problems = append(problems, p.parsedResources.inEntity(id, p.referenceAt(id, link), problem{
+					summary: "Reference into a module",
+					detail:  fmt.Sprintf("resource '%s' refers to '%s', which is inside module '%s'; only a module's outputs can be referenced from outside it", meta.ID, link, fqrn.Module),
+				}))
 
 				continue
 			}
@@ -146,12 +140,10 @@ func (p *Parser) validateReferences() []error {
 				continue
 			}
 
-			problems = append(problems, errors.NewParserError(
-				meta.File,
-				meta.Line,
-				meta.Column,
-				fmt.Sprintf("resource '%s' refers to '%s', which is not defined anywhere in the configuration", meta.ID, link),
-			))
+			problems = append(problems, p.parsedResources.inEntity(id, p.referenceAt(id, link), problem{
+				summary: "Reference to an undefined entity",
+				detail:  fmt.Sprintf("resource '%s' refers to '%s', which is not defined anywhere in the configuration", meta.ID, link),
+			}))
 		}
 	}
 
@@ -183,8 +175,7 @@ func (p *Parser) validateStructure() []error {
 	for _, id := range p.sortedResourceIDs() {
 		resource := p.parsedResources.resources[id]
 
-		meta, err := types.GetMeta(resource)
-		if err != nil {
+		if _, err := types.GetMeta(resource); err != nil {
 			continue
 		}
 
@@ -195,12 +186,10 @@ func (p *Parser) validateStructure() []error {
 				continue
 			}
 
-			problems = append(problems, errors.NewParserError(
-				meta.File,
-				meta.Line,
-				meta.Column,
-				fmt.Sprintf("resource '%s' field '%s' is computed and must be optional", id, computed.path),
-			))
+			problems = append(problems, p.parsedResources.inEntity(id, nil, problem{
+				summary: "Invalid type",
+				detail:  fmt.Sprintf("resource '%s' field '%s' is computed and must be optional", id, computed.path),
+			}))
 		}
 
 		body, ok := p.parsedResources.bodies[id]
@@ -208,7 +197,7 @@ func (p *Parser) validateStructure() []error {
 			continue
 		}
 
-		problems = append(problems, configuredComputedFields(id, body, resourceType, "")...)
+		problems = append(problems, p.parsedResources.configuredComputedFields(id, body, resourceType, "")...)
 		problems = append(problems, p.schemaProblems(id, body, resource)...)
 	}
 
@@ -276,7 +265,7 @@ func fieldAt(body *hclsyntax.Body, pos hcl.Pos, prefix string) string {
 // configuredComputedFields reports every computed field of t set in body,
 // including inside nested blocks and object values. path is the hcl path of
 // body within the resource, ending in a dot when it is not empty.
-func configuredComputedFields(id string, body *hclsyntax.Body, t reflect.Type, path string) []error {
+func (p *parsed) configuredComputedFields(id string, body *hclsyntax.Body, t reflect.Type, path string) []error {
 	problems := []error{}
 
 	fields := map[string]structField{}
@@ -301,11 +290,11 @@ func configuredComputedFields(id string, body *hclsyntax.Body, t reflect.Type, p
 		}
 
 		if isComputed(f.field) {
-			problems = append(problems, computedFieldProblem(id, path+attribute.Name, attribute.NameRange))
+			problems = append(problems, p.computedFieldProblem(id, path+attribute.Name, attribute.NameRange))
 			continue
 		}
 
-		problems = append(problems, configuredComputedValues(id, attribute.Expr, f.field.Type, path+attribute.Name)...)
+		problems = append(problems, p.configuredComputedValues(id, attribute.Expr, f.field.Type, path+attribute.Name)...)
 	}
 
 	counts := map[string]int{}
@@ -326,7 +315,7 @@ func configuredComputedFields(id string, body *hclsyntax.Body, t reflect.Type, p
 		}
 
 		if isComputed(f.field) {
-			problems = append(problems, computedFieldProblem(id, blockPath, block.TypeRange))
+			problems = append(problems, p.computedFieldProblem(id, blockPath, block.TypeRange))
 			continue
 		}
 
@@ -335,7 +324,7 @@ func configuredComputedFields(id string, body *hclsyntax.Body, t reflect.Type, p
 			continue
 		}
 
-		problems = append(problems, configuredComputedFields(id, block.Body, element, blockPath+".")...)
+		problems = append(problems, p.configuredComputedFields(id, block.Body, element, blockPath+".")...)
 	}
 
 	return problems
@@ -343,7 +332,7 @@ func configuredComputedFields(id string, body *hclsyntax.Body, t reflect.Type, p
 
 // configuredComputedValues reports every computed field set inside an object or
 // tuple expression assigned to a field of type t
-func configuredComputedValues(id string, expr hclsyntax.Expression, t reflect.Type, path string) []error {
+func (p *parsed) configuredComputedValues(id string, expr hclsyntax.Expression, t reflect.Type, path string) []error {
 	problems := []error{}
 
 	t = dereference(t)
@@ -356,7 +345,7 @@ func configuredComputedValues(id string, expr hclsyntax.Expression, t reflect.Ty
 		}
 
 		for i, item := range tuple.Exprs {
-			problems = append(problems, configuredComputedValues(id, item, t.Elem(), fmt.Sprintf("%s[%d]", path, i))...)
+			problems = append(problems, p.configuredComputedValues(id, item, t.Elem(), fmt.Sprintf("%s[%d]", path, i))...)
 		}
 
 	case reflect.Map:
@@ -367,7 +356,7 @@ func configuredComputedValues(id string, expr hclsyntax.Expression, t reflect.Ty
 
 		for _, item := range object.Items {
 			key := objectKey(item.KeyExpr)
-			problems = append(problems, configuredComputedValues(id, item.ValueExpr, t.Elem(), fmt.Sprintf("%s[%s]", path, key))...)
+			problems = append(problems, p.configuredComputedValues(id, item.ValueExpr, t.Elem(), fmt.Sprintf("%s[%s]", path, key))...)
 		}
 
 	case reflect.Struct:
@@ -394,11 +383,11 @@ func configuredComputedValues(id string, expr hclsyntax.Expression, t reflect.Ty
 			}
 
 			if isComputed(f.field) {
-				problems = append(problems, computedFieldProblem(id, path+"."+name, item.KeyExpr.Range()))
+				problems = append(problems, p.computedFieldProblem(id, path+"."+name, item.KeyExpr.Range()))
 				continue
 			}
 
-			problems = append(problems, configuredComputedValues(id, item.ValueExpr, f.field.Type, path+"."+name)...)
+			problems = append(problems, p.configuredComputedValues(id, item.ValueExpr, f.field.Type, path+"."+name)...)
 		}
 	}
 
@@ -421,11 +410,9 @@ func objectKey(expr hclsyntax.Expression) string {
 }
 
 // computedFieldProblem reports a computed field set in configuration
-func computedFieldProblem(id string, path string, at hcl.Range) error {
-	return errors.NewParserError(
-		at.Filename,
-		at.Start.Line,
-		at.Start.Column,
-		fmt.Sprintf("resource '%s' sets computed field '%s', computed fields are set by the provider and cannot be configured", id, path),
-	)
+func (p *parsed) computedFieldProblem(id string, path string, at hcl.Range) error {
+	return p.inEntity(id, &at, problem{
+		summary: "Computed field set",
+		detail:  fmt.Sprintf("resource '%s' sets computed field '%s', computed fields are set by the provider and cannot be configured", id, path),
+	})
 }

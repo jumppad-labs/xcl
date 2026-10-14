@@ -35,11 +35,13 @@ func TestValidateReferencesReturnsConfigErrorWhenResourceIsNotDefined(t *testing
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "container.xcl"), pe.Filename)
-	require.Equal(t, 5, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'resource.container.consul' refers to 'resource.network.nosuch.meta.name', which is not defined anywhere in the configuration", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "container.xcl"), pe.Subject.Filename)
+	require.Equal(t, 5, pe.EntityPos.Start.Line)
+	require.Equal(t, 9, pe.Subject.Start.Line)
+	require.Equal(t, 18, pe.Subject.Start.Column)
+	require.Equal(t, "network[0].name", pe.Field)
+	require.Equal(t, "resource 'resource.container.consul' refers to 'resource.network.nosuch.meta.name', which is not defined anywhere in the configuration", pe.Detail)
 }
 
 func TestValidateReferencesReturnsConfigErrorWhenVariableIsNotDefined(t *testing.T) {
@@ -56,11 +58,12 @@ func TestValidateReferencesReturnsConfigErrorWhenVariableIsNotDefined(t *testing
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "container.xcl"), pe.Filename)
-	require.Equal(t, 1, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'resource.container.consul' refers to 'variable.missing_var', which is not defined anywhere in the configuration", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "container.xcl"), pe.Subject.Filename)
+	require.Equal(t, 1, pe.EntityPos.Start.Line)
+	require.Equal(t, 5, pe.Subject.Start.Line)
+	require.Equal(t, 11, pe.Subject.Start.Column)
+	require.Equal(t, "resource 'resource.container.consul' refers to 'variable.missing_var', which is not defined anywhere in the configuration", pe.Detail)
 }
 
 func TestValidateReferencesReturnsConfigErrorWhenOutputIsNotDefined(t *testing.T) {
@@ -77,11 +80,12 @@ func TestValidateReferencesReturnsConfigErrorWhenOutputIsNotDefined(t *testing.T
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "output.xcl"), pe.Filename)
-	require.Equal(t, 5, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'output.network_name' refers to 'output.no_such_output', which is not defined anywhere in the configuration", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "output.xcl"), pe.Subject.Filename)
+	require.Equal(t, 5, pe.EntityPos.Start.Line)
+	require.Equal(t, 6, pe.Subject.Start.Line)
+	require.Equal(t, 11, pe.Subject.Start.Column)
+	require.Equal(t, "resource 'output.network_name' refers to 'output.no_such_output', which is not defined anywhere in the configuration", pe.Detail)
 }
 
 func TestValidateReferencesReturnsConfigErrorWhenModuleIsNotDefined(t *testing.T) {
@@ -98,11 +102,12 @@ func TestValidateReferencesReturnsConfigErrorWhenModuleIsNotDefined(t *testing.T
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "output.xcl"), pe.Filename)
-	require.Equal(t, 5, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'output.module_thing' refers to 'module.nosuch.output.thing', which is not defined anywhere in the configuration", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "output.xcl"), pe.Subject.Filename)
+	require.Equal(t, 5, pe.EntityPos.Start.Line)
+	require.Equal(t, 6, pe.Subject.Start.Line)
+	require.Equal(t, 11, pe.Subject.Start.Column)
+	require.Equal(t, "resource 'output.module_thing' refers to 'module.nosuch.output.thing', which is not defined anywhere in the configuration", pe.Detail)
 }
 
 func TestValidateReferencesReportsEveryUndefinedReferenceAcrossFiles(t *testing.T) {
@@ -124,23 +129,26 @@ func TestValidateReferencesReportsEveryUndefinedReferenceAcrossFiles(t *testing.
 	// resource id order, which is why output.bad comes before the containers.
 	require.Len(t, ce.Errors, 3)
 
-	first := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "b.xcl"), first.Filename)
-	require.Equal(t, 9, first.Line)
-	require.Equal(t, 1, first.Column)
-	require.Equal(t, "resource 'output.bad' refers to 'resource.container.ghost.meta.name', which is not defined anywhere in the configuration", first.Message)
+	first := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "b.xcl"), first.Subject.Filename)
+	require.Equal(t, 9, first.EntityPos.Start.Line)
+	require.Equal(t, 10, first.Subject.Start.Line)
+	require.Equal(t, 11, first.Subject.Start.Column)
+	require.Equal(t, "resource 'output.bad' refers to 'resource.container.ghost.meta.name', which is not defined anywhere in the configuration", first.Detail)
 
-	second := ce.Errors[1].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "a.xcl"), second.Filename)
-	require.Equal(t, 5, second.Line)
-	require.Equal(t, 1, second.Column)
-	require.Equal(t, "resource 'resource.container.first' refers to 'resource.network.nosuch.meta.name', which is not defined anywhere in the configuration", second.Message)
+	second := ce.Errors[1].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "a.xcl"), second.Subject.Filename)
+	require.Equal(t, 5, second.EntityPos.Start.Line)
+	require.Equal(t, 9, second.Subject.Start.Line)
+	require.Equal(t, 18, second.Subject.Start.Column)
+	require.Equal(t, "resource 'resource.container.first' refers to 'resource.network.nosuch.meta.name', which is not defined anywhere in the configuration", second.Detail)
 
-	third := ce.Errors[2].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "b.xcl"), third.Filename)
-	require.Equal(t, 1, third.Line)
-	require.Equal(t, 1, third.Column)
-	require.Equal(t, "resource 'resource.container.second' refers to 'variable.missing_var', which is not defined anywhere in the configuration", third.Message)
+	third := ce.Errors[2].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "b.xcl"), third.Subject.Filename)
+	require.Equal(t, 1, third.EntityPos.Start.Line)
+	require.Equal(t, 5, third.Subject.Start.Line)
+	require.Equal(t, 11, third.Subject.Start.Column)
+	require.Equal(t, "resource 'resource.container.second' refers to 'variable.missing_var', which is not defined anywhere in the configuration", third.Detail)
 }
 
 func TestValidateReferencesAcceptsReferenceToResourceDeclaredInAnotherFile(t *testing.T) {
@@ -279,11 +287,12 @@ func TestValidateReferencesReturnsConfigErrorWhenModuleDoesNotDeclareOutput(t *t
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
-	require.Equal(t, 5, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'output.module_thing' refers to 'module.consul.output.nosuch_output', which is not defined anywhere in the configuration", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Subject.Filename)
+	require.Equal(t, 5, pe.EntityPos.Start.Line)
+	require.Equal(t, 6, pe.Subject.Start.Line)
+	require.Equal(t, 11, pe.Subject.Start.Column)
+	require.Equal(t, "resource 'output.module_thing' refers to 'module.consul.output.nosuch_output', which is not defined anywhere in the configuration", pe.Detail)
 }
 
 func TestParseReturnsConfigErrorWhenModuleContentsCannotBeObtained(t *testing.T) {
@@ -395,11 +404,12 @@ func TestValidatePropertiesReturnsConfigErrorWhenPropertyDoesNotExist(t *testing
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "container.xcl"), pe.Filename)
-	require.Equal(t, 10, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "reference 'resource.container.consul.volume[0].destnation' names property 'destnation', which does not exist", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "container.xcl"), pe.Subject.Filename)
+	require.Equal(t, 10, pe.EntityPos.Start.Line)
+	require.Equal(t, 11, pe.Subject.Start.Line)
+	require.Equal(t, 11, pe.Subject.Start.Column)
+	require.Equal(t, "reference 'resource.container.consul.volume[0].destnation' names property 'destnation', which does not exist", pe.Detail)
 }
 
 func TestValidatePropertiesReportsEveryPropertyProblemAcrossFiles(t *testing.T) {
@@ -420,23 +430,26 @@ func TestValidatePropertiesReportsEveryPropertyProblemAcrossFiles(t *testing.T) 
 	// to fix one and rerun to discover the next.
 	require.Len(t, ce.Errors, 3)
 
-	first := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "a.xcl"), first.Filename)
-	require.Equal(t, 10, first.Line)
-	require.Equal(t, 1, first.Column)
-	require.Equal(t, "reference 'resource.container.first.volume[0].destnation' names property 'destnation', which does not exist", first.Message)
+	first := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "a.xcl"), first.Subject.Filename)
+	require.Equal(t, 10, first.EntityPos.Start.Line)
+	require.Equal(t, 11, first.Subject.Start.Line)
+	require.Equal(t, 11, first.Subject.Start.Column)
+	require.Equal(t, "reference 'resource.container.first.volume[0].destnation' names property 'destnation', which does not exist", first.Detail)
 
-	second := ce.Errors[1].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "b.xcl"), second.Filename)
-	require.Equal(t, 9, second.Line)
-	require.Equal(t, 1, second.Column)
-	require.Equal(t, "reference 'resource.container.second.meta.nam' names property 'nam', which does not exist", second.Message)
+	second := ce.Errors[1].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "b.xcl"), second.Subject.Filename)
+	require.Equal(t, 9, second.EntityPos.Start.Line)
+	require.Equal(t, 10, second.Subject.Start.Line)
+	require.Equal(t, 11, second.Subject.Start.Column)
+	require.Equal(t, "reference 'resource.container.second.meta.nam' names property 'nam', which does not exist", second.Detail)
 
-	third := ce.Errors[2].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "b.xcl"), third.Filename)
-	require.Equal(t, 13, third.Line)
-	require.Equal(t, 1, third.Column)
-	require.Equal(t, "reference 'resource.container.second.resources.nosuch' names property 'nosuch', which does not exist", third.Message)
+	third := ce.Errors[2].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "b.xcl"), third.Subject.Filename)
+	require.Equal(t, 13, third.EntityPos.Start.Line)
+	require.Equal(t, 14, third.Subject.Start.Line)
+	require.Equal(t, 11, third.Subject.Start.Column)
+	require.Equal(t, "reference 'resource.container.second.resources.nosuch' names property 'nosuch', which does not exist", third.Detail)
 }
 
 func TestValidatePropertiesAcceptsSelectionsFollowedByRealProperties(t *testing.T) {
@@ -555,11 +568,11 @@ func TestValidateRejectsConfiguredComputedField(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, f, pe.Filename)
-	require.Contains(t, pe.Message, "resource.network.main")
-	require.Contains(t, pe.Message, "provider_id")
-	require.Equal(t, "resource 'resource.network.main' sets computed field 'provider_id', computed fields are set by the provider and cannot be configured", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, f, pe.Subject.Filename)
+	require.Contains(t, pe.Detail, "resource.network.main")
+	require.Contains(t, pe.Detail, "provider_id")
+	require.Equal(t, "resource 'resource.network.main' sets computed field 'provider_id', computed fields are set by the provider and cannot be configured", pe.Detail)
 
 	// validation stops the apply before the provider receives any call
 	require.Empty(t, testPlugin.GetCalls())
@@ -580,10 +593,10 @@ func TestValidateRejectsConfiguredNestedComputedField(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Contains(t, pe.Message, "resource.container.app")
-	require.Contains(t, pe.Message, "network[1].assigned_address")
-	require.Equal(t, "resource 'resource.container.app' sets computed field 'network[1].assigned_address', computed fields are set by the provider and cannot be configured", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Contains(t, pe.Detail, "resource.container.app")
+	require.Contains(t, pe.Detail, "network[1].assigned_address")
+	require.Equal(t, "resource 'resource.container.app' sets computed field 'network[1].assigned_address', computed fields are set by the provider and cannot be configured", pe.Detail)
 
 	require.Empty(t, testPlugin.GetCalls())
 }
@@ -604,10 +617,10 @@ func TestValidateReportsConfiguredComputedFieldAtAttributePosition(t *testing.T)
 
 	// assigned_address is written on line 14 of the fixture, inside the second
 	// network block, indented by four spaces
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, f, pe.Filename)
-	require.Equal(t, 14, pe.Line)
-	require.Equal(t, 5, pe.Column)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, f, pe.Subject.Filename)
+	require.Equal(t, 14, pe.Subject.Start.Line)
+	require.Equal(t, 5, pe.Subject.Start.Column)
 }
 
 func TestValidateAcceptsUnsetComputedField(t *testing.T) {
@@ -705,12 +718,12 @@ func TestValidateRejectsNonOptionalComputedField(t *testing.T) {
 
 	// the problem is with the type rather than the configuration, so it is
 	// reported at the resource block
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, f, pe.Filename)
-	require.Equal(t, 1, pe.Line)
-	require.Contains(t, pe.Message, "is computed and must be optional")
-	require.Contains(t, pe.Message, "secret")
-	require.Equal(t, "resource 'resource.bad_computed.x' field 'secret' is computed and must be optional", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, f, pe.Subject.Filename)
+	require.Equal(t, 1, pe.Subject.Start.Line)
+	require.Contains(t, pe.Detail, "is computed and must be optional")
+	require.Contains(t, pe.Detail, "secret")
+	require.Equal(t, "resource 'resource.bad_computed.x' field 'secret' is computed and must be optional", pe.Detail)
 }
 
 func TestValidateRejectsUnknownAttributeOnRegisteredType(t *testing.T) {
@@ -789,10 +802,10 @@ func TestValidateRejectsUndefinedReferenceFromRegisteredType(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, f, pe.Filename)
-	require.Contains(t, pe.Message, "resource 'resource.database.main'")
-	require.Contains(t, pe.Message, "resource.database.missing")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, f, pe.Subject.Filename)
+	require.Contains(t, pe.Detail, "resource 'resource.database.main'")
+	require.Contains(t, pe.Detail, "resource.database.missing")
 }
 
 func TestValidateAcceptsValidRegisteredTypeConfiguration(t *testing.T) {
@@ -836,10 +849,10 @@ func TestApplyRejectsUndefinedReferenceNamingTheResourceThatMadeIt(t *testing.T)
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, f, pe.Filename)
-	require.Contains(t, pe.Message, "resource 'resource.database.main'")
-	require.Contains(t, pe.Message, "resource.database.missing")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, f, pe.Subject.Filename)
+	require.Contains(t, pe.Detail, "resource 'resource.database.main'")
+	require.Contains(t, pe.Detail, "resource.database.missing")
 }
 
 // A module's outputs are the only way to reach inside it. A reference to
@@ -860,14 +873,15 @@ func TestValidateRejectsAReferenceToAModuleResource(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
-	require.Equal(t, 7, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'output.x' refers to 'module.m.resource.network.n.subnet', which is inside module 'm'; only a module's outputs can be referenced from outside it", pe.Message)
-	require.Contains(t, pe.Message, "module.m.resource.network.n.subnet")
-	require.Contains(t, pe.Message, "only a module's outputs")
-	require.NotContains(t, pe.Message, "not defined")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Subject.Filename)
+	require.Equal(t, 7, pe.EntityPos.Start.Line)
+	require.Equal(t, 8, pe.Subject.Start.Line)
+	require.Equal(t, 11, pe.Subject.Start.Column)
+	require.Equal(t, "resource 'output.x' refers to 'module.m.resource.network.n.subnet', which is inside module 'm'; only a module's outputs can be referenced from outside it", pe.Detail)
+	require.Contains(t, pe.Detail, "module.m.resource.network.n.subnet")
+	require.Contains(t, pe.Detail, "only a module's outputs")
+	require.NotContains(t, pe.Detail, "not defined")
 }
 
 func TestValidateAcceptsAReferenceToAModuleOutput(t *testing.T) {
@@ -896,12 +910,13 @@ func TestValidateRejectsAReferenceToAModuleVariable(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
-	require.Equal(t, 7, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'output.x' refers to 'module.m.variable.v', which is inside module 'm'; only a module's outputs can be referenced from outside it", pe.Message)
-	require.NotContains(t, pe.Message, "not defined")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Subject.Filename)
+	require.Equal(t, 7, pe.EntityPos.Start.Line)
+	require.Equal(t, 8, pe.Subject.Start.Line)
+	require.Equal(t, 11, pe.Subject.Start.Column)
+	require.Equal(t, "resource 'output.x' refers to 'module.m.variable.v', which is inside module 'm'; only a module's outputs can be referenced from outside it", pe.Detail)
+	require.NotContains(t, pe.Detail, "not defined")
 }
 
 func TestValidateRejectsADependsOnNamingAModuleInternal(t *testing.T) {
@@ -918,12 +933,14 @@ func TestValidateRejectsADependsOnNamingAModuleInternal(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
-	require.Equal(t, 7, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'resource.network.consumer' refers to 'module.m.resource.network.n', which is inside module 'm'; only a module's outputs can be referenced from outside it", pe.Message)
-	require.NotContains(t, pe.Message, "not defined")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Subject.Filename)
+	require.Equal(t, 7, pe.EntityPos.Start.Line)
+	require.Equal(t, 8, pe.Subject.Start.Line)
+	require.Equal(t, 16, pe.Subject.Start.Column)
+	require.Equal(t, "depends_on", pe.Field)
+	require.Equal(t, "resource 'resource.network.consumer' refers to 'module.m.resource.network.n', which is inside module 'm'; only a module's outputs can be referenced from outside it", pe.Detail)
+	require.NotContains(t, pe.Detail, "not defined")
 }
 
 func TestValidateAcceptsADependsOnNamingAChildModule(t *testing.T) {
@@ -952,12 +969,13 @@ func TestValidateRejectsAReferenceToAGrandchildModuleOutput(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
-	require.Equal(t, 8, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'output.x' refers to 'module.a.b.output.value', which is inside module 'a.b'; only a module's outputs can be referenced from outside it", pe.Message)
-	require.NotContains(t, pe.Message, "not defined")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Subject.Filename)
+	require.Equal(t, 8, pe.EntityPos.Start.Line)
+	require.Equal(t, 9, pe.Subject.Start.Line)
+	require.Equal(t, 11, pe.Subject.Start.Column)
+	require.Equal(t, "resource 'output.x' refers to 'module.a.b.output.value', which is inside module 'a.b'; only a module's outputs can be referenced from outside it", pe.Detail)
+	require.NotContains(t, pe.Detail, "not defined")
 }
 
 func TestValidateRejectsAReferenceToAGrandchildModule(t *testing.T) {
@@ -974,12 +992,13 @@ func TestValidateRejectsAReferenceToAGrandchildModule(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
-	require.Equal(t, 7, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "resource 'resource.network.consumer' refers to 'module.a.b', which is inside module 'a'; only a module's outputs can be referenced from outside it", pe.Message)
-	require.NotContains(t, pe.Message, "not defined")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Subject.Filename)
+	require.Equal(t, 7, pe.EntityPos.Start.Line)
+	require.Equal(t, 8, pe.Subject.Start.Line)
+	require.Equal(t, 16, pe.Subject.Start.Column)
+	require.Equal(t, "resource 'resource.network.consumer' refers to 'module.a.b', which is inside module 'a'; only a module's outputs can be referenced from outside it", pe.Detail)
+	require.NotContains(t, pe.Detail, "not defined")
 }
 
 func TestValidateAcceptsAReExportedGrandchildOutput(t *testing.T) {

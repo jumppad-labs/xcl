@@ -3,7 +3,6 @@ package parser
 import (
 	"fmt"
 
-	"github.com/jumppad-labs/xcl/errors"
 	dagpkg "github.com/jumppad-labs/xcl/internal/dag"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/types"
@@ -91,11 +90,11 @@ func buildDependencyGraph(rp ResourceProvider, addresses *resources.AddressParse
 
 		deps, err := getResourceDependencies(rp, addresses, node, meta, requireParentModule)
 		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				node,
-				fmt.Sprintf("unable to get dependencies: %s", err),
-			)
-			return nil, pe
+			return nil, inResource(node, problem{
+				summary: "Unable to order the entity",
+				detail:  fmt.Sprintf("The entities it depends on could not be found: %s", err),
+				cause:   err,
+			})
 		}
 
 		// nil entries are references that did not resolve to an entity, and

@@ -1032,9 +1032,9 @@ func TestParseFileReturnsConfigErrorWhenResourceInterpolationError(t *testing.T)
 	// property that does not exist.
 	require.NotEmpty(t, ce.Errors)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Contains(t, pe.Message, "nam")
-	require.Contains(t, pe.Message, "does not exist")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Contains(t, pe.Detail, "nam")
+	require.Contains(t, pe.Detail, "does not exist")
 }
 
 func TestParseFileReturnsConfigErrorWhenInvalidFileFails(t *testing.T) {
@@ -1451,10 +1451,12 @@ func TestParseFileToleratesUninterpolatableValue(t *testing.T) {
 
 	// this file is well formed, its only fault is a value that cannot yet be
 	// interpolated. The parse stage must not report it as a malformed file, so
-	// none of the reported problems may be a syntax diagnostic.
+	// every reported problem is in an entity, which a syntax error never is.
+	require.NotEmpty(t, ce.Errors)
 	for _, e := range ce.Errors {
-		_, isSyntax := e.(*errors.Diagnostic)
-		require.False(t, isSyntax, "a well formed file was reported as malformed: %v", e)
+		d, ok := e.(*errors.Diagnostic)
+		require.True(t, ok, "%T is not a diagnostic", e)
+		require.NotEmpty(t, d.Entity, "a well formed file was reported as malformed: %v", e)
 	}
 }
 

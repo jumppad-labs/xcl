@@ -203,7 +203,7 @@ func (f *namedBlocksFixture) applyConfig(t *testing.T, contents string) *Config 
 	return c
 }
 
-// requireParserError returns the one ParserError a failed operation reports
+// requireDiagnostic returns the one diagnostic a failed operation reports
 func requireDiagnostic(t *testing.T, err error) *errors.Diagnostic {
 	t.Helper()
 

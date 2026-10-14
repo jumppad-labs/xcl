@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/xcl"
@@ -73,6 +74,16 @@ func (p *Parser) inDeclaration(resource any, b *hclsyntax.Block) placer {
 	}
 }
 
+// unreadable is the diagnostic for files of the extension that could not be
+// listed, which is in no file and no entity
+func unreadable(extension string, err error) *errors.Diagnostic {
+	return problem{
+		summary: "Unable to read the configuration",
+		detail:  fmt.Sprintf("error finding %s files: %s", extension, err),
+		cause:   err,
+	}.diagnostic(nil, "", nil, nil, nil)
+}
+
 // invalidName is the problem with a block whose name is not valid
 func invalidName(err error) problem {
 	return problem{summary: "Invalid name", detail: err.Error(), cause: err}
@@ -98,6 +109,59 @@ func invalidReferences(at placer, a *hclsyntax.Attribute, err error) *errors.Dia
 		detail:  fmt.Sprintf("The references in %s could not be read: %s", a.Name, err),
 		cause:   err,
 	})
+}
+
+// referenceAt returns where the entity id writes link: the reference in its
+// body, or its depends_on when no reference is, or nil when it has neither,
+// so a problem with the link is placed at the block's header
+func (p *Parser) referenceAt(id, link string) *hcl.Range {
+	body := p.parsedResources.bodies[id]
+	if body == nil {
+		return nil
+	}
+
+	if at := p.traversalOf(body, link); at != nil {
+		return at
+	}
+
+	if dependsOn, ok := body.Attributes["depends_on"]; ok {
+		at := dependsOn.Expr.Range()
+		return &at
+	}
+
+	return nil
+}
+
+// traversalOf returns the first traversal in body, in the order it was
+// written, that refers to link, as referencesIn reads one
+func (p *Parser) traversalOf(body *hclsyntax.Body, link string) *hcl.Range {
+	attributes := make([]*hclsyntax.Attribute, 0, len(body.Attributes))
+	for _, a := range body.Attributes {
+		attributes = append(attributes, a)
+	}
+
+	sort.Slice(attributes, func(i, j int) bool {
+		return attributes[i].SrcRange.Start.Byte < attributes[j].SrcRange.Start.Byte
+	})
+
+	for _, a := range attributes {
+		for _, traversal := range hclsyntax.Variables(a.Expr) {
+			at := traversal.SourceRange()
+
+			reference, err := processScopeTraversal(&hclsyntax.ScopeTraversalExpr{Traversal: traversal, SrcRange: at}, p.isReferenceRoot)
+			if err == nil && reference == link {
+				return &at
+			}
+		}
+	}
+
+	for _, block := range body.Blocks {
+		if at := p.traversalOf(block.Body, link); at != nil {
+			return at
+		}
+	}
+
+	return nil
 }
 
 // inEntity makes the diagnostic for problem in the parsed entity id: at

@@ -728,8 +728,7 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 	// These have lower precedence than manually specified VariablesFiles
 	discoveredVarsFiles, err := findVarsFiles(paths...)
 	if err != nil {
-		ce.AppendError(errors.NewParserError("", 0, 0,
-			fmt.Sprintf("error finding .vars files: %s", err)))
+		ce.AppendError(unreadable(".vars", err))
 		return nil, nil, ce
 	}
 
@@ -769,8 +768,7 @@ func (p *Parser) parseAndValidate(paths ...string) (*State, *State, error) {
 	// Get all the xcl files from the paths
 	files, err := findXclFiles(paths...)
 	if err != nil {
-		ce.AppendError(errors.NewParserError("", 0, 0,
-			fmt.Sprintf("error finding .xcl files: %s", err)))
+		ce.AppendError(unreadable(".xcl", err))
 		return nil, nil, ce
 	}
 
@@ -1570,10 +1568,12 @@ func processDisabled(parsedData *parsed, id string, bdy *hclsyntax.Body, ctx *hc
 
 		err := types.SetDisabled(r, isDisabled)
 		if err != nil {
-			return isDisabled, []error{errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("failed to set disabled state: %s", err),
-			)}
+			disabled := attr.Expr.Range()
+			return isDisabled, []error{parsedData.inEntity(id, &disabled, problem{
+				summary: "Internal error",
+				detail:  fmt.Sprintf("failed to set disabled state: %s", err),
+				cause:   err,
+			})}
 		}
 	}
 

@@ -87,9 +87,9 @@ func TestValidateReportsEnvironmentVariableWithoutPrefixAsUnknownVariable(t *tes
 	require.True(t, ok, "Validate should report failure as a *errors.ConfigError")
 	require.Len(t, ce.Errors, 1)
 
-	pe, ok := ce.Errors[0].(*errors.ParserError)
-	require.True(t, ok, "the problem should be a *errors.ParserError")
-	require.Equal(t, "resource 'resource.network.main' refers to 'variable.PATH', which is not defined anywhere in the configuration", pe.Message)
+	pe, ok := ce.Errors[0].(*errors.Diagnostic)
+	require.True(t, ok, "the problem should be a *errors.Diagnostic")
+	require.Equal(t, "resource 'resource.network.main' refers to 'variable.PATH', which is not defined anywhere in the configuration", pe.Detail)
 }
 
 func TestDiffReadsPrefixedEnvironmentVariable(t *testing.T) {
