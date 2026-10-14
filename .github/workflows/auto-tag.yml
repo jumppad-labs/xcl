@@ -19,8 +19,15 @@
 #     cancel-in-progress: false
 #   jobs:
 #     tag:
+#       permissions:
+#         contents: read
+#         pull-requests: read
 #       uses: jumppad-labs/xcl/.github/workflows/auto-tag.yml@main
 #       secrets: inherit
+#
+# The permissions are needed where the repository's default token reads
+# contents only: a called workflow can not be given more than its caller has,
+# and GitHub refuses to start the run, with no log, when it asks for more.
 #
 # The caller's repository needs the secrets RELEASE_APP_ID and
 # RELEASE_APP_PRIVATE_KEY, and the App installed on it.
