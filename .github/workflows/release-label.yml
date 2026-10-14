@@ -1,0 +1,16 @@
+# Checks that every pull request carries exactly one release label, using the
+# shared check in release-label-check.yml. It is checked against this pull
+# request's own copy of the rule, so a change to the rule is checked by itself.
+
+name: Release label
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+jobs:
+  release-label:
+    uses: ./.github/workflows/release-label-check.yml
+    with:
+      xcl-ref: ${{ github.event.pull_request.head.sha }}
