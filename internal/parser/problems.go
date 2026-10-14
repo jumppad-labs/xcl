@@ -114,17 +114,28 @@ func unexpectedLabels(b *hclsyntax.Block) problem {
 // labels, when the type takes them: a label, and a subtype before it when
 // takesSubtype
 func missingLabels(entityType string, takesSubtype bool) problem {
+	summary := "Missing label"
 	if takesSubtype {
-		return problem{
-			summary: "Missing labels",
-			detail:  fmt.Sprintf(`%s takes a subtype and a label: write it as %s "<subtype>" "<label>" { … }.`, entityType, entityType),
-		}
+		summary = "Missing labels"
 	}
 
-	return problem{
-		summary: "Missing label",
-		detail:  fmt.Sprintf(`%s takes a label: write it as %s "<label>" { … }.`, entityType, entityType),
+	return problem{summary: summary, detail: labelsTaken(entityType, takesSubtype)}
+}
+
+// wrongLabels is the problem with a block of entityType written with labels,
+// but not as many as the type takes
+func wrongLabels(entityType string, takesSubtype bool) problem {
+	return problem{summary: "Invalid block labels", detail: labelsTaken(entityType, takesSubtype)}
+}
+
+// labelsTaken says which labels a block of entityType takes, and how to
+// write them
+func labelsTaken(entityType string, takesSubtype bool) string {
+	if takesSubtype {
+		return fmt.Sprintf(`%s takes a subtype and a label: write it as %s "<subtype>" "<label>" { … }.`, entityType, entityType)
 	}
+
+	return fmt.Sprintf(`%s takes a label: write it as %s "<label>" { … }.`, entityType, entityType)
 }
 
 // labelsRange is the range of a block's labels, from the first to the last

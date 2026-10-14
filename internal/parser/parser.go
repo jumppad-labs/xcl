@@ -1057,17 +1057,11 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 			subtype = b.Labels[0]
 			name = b.Labels[1]
 		case takes:
-			return fail(problem{
-				summary: "Invalid block labels",
-				detail:  fmt.Sprintf(`invalid format for '%s', it is declared with a subtype and a name, i.e. '%s "subtype" "name" {}'`, b.Type, b.Type),
-			})
+			return fail(wrongLabels(b.Type, true))
 		case len(b.Labels) == 1:
 			name = b.Labels[0]
 		default:
-			return fail(problem{
-				summary: "Invalid block labels",
-				detail:  fmt.Sprintf(`invalid format for '%s', it is declared with only a name, i.e. '%s "name" {}'`, b.Type, b.Type),
-			})
+			return fail(wrongLabels(b.Type, false))
 		}
 
 		if !singleton {

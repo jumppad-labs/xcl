@@ -799,7 +799,7 @@ func TestApplyRejectsATypeWithASubtypeDeclaredWithOnlyAName(t *testing.T) {
 
 	_, err := p.Apply(context.Background(), registeredSubtypedInvalid+"missing_subtype.xcl")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), `invalid format for 'server', it is declared with a subtype and a name`)
+	require.Contains(t, err.Error(), `server takes a subtype and a label: write it as server "<subtype>" "<label>" { … }.`)
 }
 
 func TestApplyRejectsATypeWithoutASubtypeDeclaredWithOne(t *testing.T) {
@@ -808,7 +808,7 @@ func TestApplyRejectsATypeWithoutASubtypeDeclaredWithOne(t *testing.T) {
 
 	_, err := p.Apply(context.Background(), registeredSubtypedInvalid+"extra_subtype.xcl")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), `invalid format for 'cache', it is declared with only a name`)
+	require.Contains(t, err.Error(), `cache takes a label: write it as cache "<label>" { … }.`)
 }
 
 func TestApplyRejectsASubtypeThatWasNotRegistered(t *testing.T) {

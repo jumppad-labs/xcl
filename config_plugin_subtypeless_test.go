@@ -191,7 +191,7 @@ func TestInProcessPluginTypeWithoutSubtypeRejectsSubtypeLabel(t *testing.T) {
 	f := newPersonConfig(t, inProcessWidgetRegistry(provider), subtypelessFixture(t, "subtypeless_with_subtype"), t.TempDir())
 
 	err := f.config.Apply(f.configFile)
-	require.ErrorContains(t, err, "invalid format for 'widget', it is declared with only a name")
+	require.ErrorContains(t, err, `widget takes a label: write it as widget "<label>" { … }.`)
 	require.Equal(t, 0, f.config.ResourceCount())
 }
 
