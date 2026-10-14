@@ -16,8 +16,17 @@ func NewConfigError() *ConfigError {
 	}
 }
 
-// AppendError adds a new parse error to the list of errors
+// AppendError adds a new parse error to the list of errors. Diagnostics are
+// added one by one, so each is a problem of its own.
 func (p *ConfigError) AppendError(err error) {
+	if diagnostics, ok := err.(Diagnostics); ok {
+		for _, d := range diagnostics {
+			p.Errors = append(p.Errors, d)
+		}
+
+		return
+	}
+
 	p.Errors = append(p.Errors, err)
 }
 

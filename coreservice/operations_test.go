@@ -862,18 +862,19 @@ func TestFailedProviderReportedInFinished(t *testing.T) {
 	require.Contains(t, failure.GetMessage(), "create failed for resource.network.one: boom")
 	require.Len(t, failure.GetCauses(), 1)
 
-	// the parser reports the failed create as a positioned problem in the
-	// configuration, so the cause is a provider error that names the step
-	// and the address and is positioned at the block that failed, with the
-	// provider's message as its summary
+	// the parser reports the failed create as a diagnostic at the block that
+	// failed, so the cause is a provider error that names the step and the
+	// address, with the provider's message as its detail
 	cause := failure.GetCauses()[0]
 	require.Equal(t, CodeProvider, cause.GetCode())
 	require.Equal(t, "create", cause.GetDetails()["step"])
 	require.Equal(t, "resource.network.one", cause.GetDetails()["address"])
+	require.Equal(t, "resource.network.one", cause.GetDetails()["entity"])
 	require.Equal(t, "1", cause.GetDetails()["line"])
 	require.Equal(t, "1", cause.GetDetails()["column"])
 	require.NotEmpty(t, cause.GetDetails()["file"])
-	require.Contains(t, cause.GetDetails()["summary"], "create failed for resource.network.one: boom")
+	require.Equal(t, "Provider error", cause.GetDetails()["summary"])
+	require.Contains(t, cause.GetDetails()["detail"], "create failed for resource.network.one: boom")
 }
 
 func TestValidateInvalidConfigFinishedHasConfigError(t *testing.T) {

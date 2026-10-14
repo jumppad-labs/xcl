@@ -84,9 +84,9 @@ func TestValidateReferenceProblemEmitsValidateErrorEventNamingTheResource(t *tes
 	require.Equal(t, "resource.container.consul", event.ResourceID)
 	require.Equal(t, "container.consul", event.ResourceType)
 
-	pe, ok := event.Error.(*errors.ParserError)
+	pe, ok := event.Error.(*errors.Diagnostic)
 	require.True(t, ok, "validate error is a %T", event.Error)
-	require.Equal(t, "resource 'resource.container.consul' refers to 'resource.network.nosuch.meta.name', which is not defined anywhere in the configuration", pe.Message)
+	require.Equal(t, "resource 'resource.container.consul' refers to 'resource.network.nosuch.meta.name', which is not defined anywhere in the configuration", pe.Detail)
 }
 
 func TestValidateSchemaProblemEmitsValidateErrorEventNamingTheResource(t *testing.T) {

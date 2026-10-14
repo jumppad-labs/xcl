@@ -39,6 +39,12 @@ type Diagnostic struct {
 	// Source is the configuration around the fault, or nil when the source
 	// was not to hand
 	Source *SourceLines
+
+	// Cause is the error the problem was found through, such as the error a
+	// provider returned or a file that could not be read, or nil when the
+	// problem is the configuration itself. It answers errors.Is and errors.As
+	// through Unwrap.
+	Cause error
 }
 
 // SourceLines are whole lines of configuration, as they were read.
@@ -150,6 +156,11 @@ func (d *Diagnostic) Error() string {
 	}
 
 	return line.String()
+}
+
+// Unwrap returns the error the problem was found through, or nil
+func (d *Diagnostic) Unwrap() error {
+	return d.Cause
 }
 
 // oneLine joins the lines of text with spaces

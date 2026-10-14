@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jumppad-labs/xcl/errors"
-	"github.com/jumppad-labs/xcl/internal/convert"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/xcl"
@@ -217,101 +215,6 @@ func setContextVariable(ctx *hcl.EvalContext, key string, value cty.Value) {
 	ctx.Variables["variable"] = cty.ObjectVal(valMap)
 }
 
-// setContextVariablesFromList sets context variables for all resources in the values list
-// This is used to populate the evaluation context with linked resource values
-func setContextVariablesFromList(s ResourceProvider, addresses *resources.AddressParser, r any, values []string, ctx *hcl.EvalContext) *errors.ParserError {
-	for _, v := range values {
-		rMeta, err := types.GetMeta(r)
-		if err != nil {
-			pe := errors.NewParserError(
-				"",
-				0,
-				0,
-				fmt.Sprintf("resource does not have ResourceBase embedded: %s", err),
-			)
-			return pe
-		}
-
-		fqrn, err := addresses.Parse(v)
-		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("error parsing resource link %s", err),
-			)
-			return pe
-		}
-
-		// Get the value from the linked resource
-		l, err := findRelative(s, addresses, v, rMeta.Module)
-		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("unable to find dependent resource \"%s\" %s", v, err),
-			)
-			return pe
-		}
-
-		var ctyRes cty.Value
-
-		// Convert resource to cty type
-		lMeta, err := types.GetMeta(l)
-		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("linked resource does not have ResourceBase embedded: %s", err),
-			)
-			return pe
-		}
-
-		switch lMeta.Type {
-		case resources.TypeOutput:
-			out := l.(*types.Output)
-			ctyRes = out.CtyValue
-		case resources.TypeVariable:
-			// For variables, only set if not already in context
-			// This preserves variable file/env overrides from buildContextForResource
-			// while still allowing variables to be referenced before they're processed
-			variable := l.(*resources.Variable)
-
-			// Check if this variable is already in the context
-			if varObj, ok := ctx.Variables["variable"]; ok && !varObj.IsNull() && varObj.Type().IsObjectType() {
-				varMap := varObj.AsValueMap()
-				if _, exists := varMap[lMeta.Name]; exists {
-					// Variable already in context, don't overwrite it
-					continue
-				}
-			}
-
-			// Variable not in context yet, use Default value
-			ctyRes = variable.Default
-		default:
-			ctyRes, err = convert.GoToCtyValue(l)
-		}
-
-		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("unable to convert reference %s to context variable: %s", v, err),
-			)
-			return pe
-		}
-
-		// Remove the attributes to get a pure resource ref
-		fqrn.Attribute = ""
-
-		err = setContextVariableFromPath(ctx, fqrn.String(), ctyRes)
-		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("unable to set context variable: %s", err),
-			)
-			return pe
-		}
-	}
-
-	return nil
-}
-
 // setContextVariableFromPath sets a context variable using a nested structure based
 // on the given path. Will create any child maps needed to satisfy the path.
 // i.e "resources.foo.bar" set to "true" would return
@@ -512,11 +415,7 @@ func getResourceDependencies(rp ResourceProvider, addresses *resources.AddressPa
 		var err error
 		fqdn, err := addresses.Parse(d)
 		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				resource,
-				fmt.Sprintf("invalid dependency: %s, error: %s", d, err),
-			)
-			return nil, pe
+			return nil, fmt.Errorf("invalid dependency %s: %w", d, err)
 		}
 
 		// when the dependency is a module, depend on all resources in the module
@@ -562,11 +461,7 @@ func getResourceDependencies(rp ResourceProvider, addresses *resources.AddressPa
 		}
 
 		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				resource,
-				fmt.Sprintf("unable to find parent module: '%s', error: %s", fqdnString, err),
-			)
-			return nil, pe
+			return nil, fmt.Errorf("unable to find parent module '%s': %w", fqdnString, err)
 		}
 
 		dependencies[d] = true

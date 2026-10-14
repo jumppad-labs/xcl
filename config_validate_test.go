@@ -384,11 +384,12 @@ func TestValidateRejectsConfiguredComputedField(t *testing.T) {
 	require.True(t, ok, "Validate should report failure as a *errors.ConfigError")
 	require.Len(t, ce.Errors, 1)
 
-	pe, ok := ce.Errors[0].(*errors.ParserError)
-	require.True(t, ok, "the problem should be a *errors.ParserError")
-	require.Equal(t, path, pe.Filename)
-	require.Equal(t, 3, pe.Line)
-	require.Equal(t, "resource 'resource.network.main' sets computed field 'provider_id', computed fields are set by the provider and cannot be configured", pe.Message)
+	pe, ok := ce.Errors[0].(*errors.Diagnostic)
+	require.True(t, ok, "the problem should be a *errors.Diagnostic")
+	require.Equal(t, path, pe.Subject.Filename)
+	require.Equal(t, 3, pe.Subject.Start.Line)
+	require.Equal(t, "provider_id", pe.Field)
+	require.Equal(t, "resource 'resource.network.main' sets computed field 'provider_id', computed fields are set by the provider and cannot be configured", pe.Detail)
 }
 
 // TestApplyCreatesNothingWhenComputedFieldIsConfigured asserts that applying a

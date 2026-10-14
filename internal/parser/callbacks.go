@@ -87,10 +87,11 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 
 		ctx, err := buildContextForResource(parsedData, r, addresses, options, functions, unknown)
 		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("failed to build resource context: %s", err),
-			)
+			pe := parsedData.inEntity(rMeta.ID, nil, problem{
+				summary: "Unable to evaluate the block",
+				detail:  fmt.Sprintf("The values the block is evaluated with could not be built: %s", err),
+				cause:   err,
+			})
 			emitWalkError(options, lifecycle.operation(), rMeta, pe)
 			return diags.Append(pe)
 		}
@@ -205,13 +206,13 @@ func walkCallback(parsedData *parsed, rp ResourceProvider, addresses *resources.
 		}
 
 		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("provider lifecycle error: %s", err),
-			)
 			// keep the provider's error, so callers can still match it with
 			// errors.Is and errors.As
-			pe.Cause = err
+			pe := parsedData.inEntity(rMeta.ID, nil, problem{
+				summary: "Provider error",
+				detail:  err.Error(),
+				cause:   err,
+			})
 			return diags.Append(pe)
 		}
 
@@ -261,7 +262,11 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 
 		disabled, err := types.GetDisabled(r)
 		if err != nil {
-			pe := errors.NewParserErrorFromResource(r, err.Error())
+			pe := inResource(r, problem{
+				summary: "Unable to read the entity",
+				detail:  fmt.Sprintf("Whether the entity is disabled could not be read: %s", err),
+				cause:   err,
+			})
 			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil, r)
 			return diags.Append(pe)
 		}
@@ -284,10 +289,10 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 		// Get the provider for this resource
 		adapter := d.resolver.GetProviderForResource(r)
 		if adapter == nil {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("no provider found for resource type %s", rMeta.AddressType()),
-			)
+			pe := inResource(r, problem{
+				summary: "No provider",
+				detail:  fmt.Sprintf("No provider is loaded for the type %s, so the entity can not be destroyed.", rMeta.AddressType()),
+			})
 			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil, r)
 			diags = diags.Append(pe)
 
@@ -301,10 +306,11 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 		// Serialize the resource to JSON for provider call
 		resourceJSON, err := wire.Marshal(r)
 		if err != nil {
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("failed to serialize resource for destroy: %s", err),
-			)
+			pe := inResource(r, problem{
+				summary: "Unable to encode the entity",
+				detail:  fmt.Sprintf("The entity could not be encoded for its provider to destroy: %s", err),
+				cause:   err,
+			})
 			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, 0, pe, nil, r)
 			diags = diags.Append(pe)
 
@@ -326,10 +332,12 @@ func destroyWalkCallback(d *destroyer) func(v dag.Vertex) (diags dag.Diagnostics
 		if err != nil {
 			emitLifecycle(d.options, rMeta, events.OperationDestroy, events.PhaseError, duration, err, resourceJSON, r)
 
-			pe := errors.NewParserErrorFromResource(
-				r,
-				fmt.Sprintf("destroy failed for %s: %s", resourceID, err),
-			)
+			failure := &errors.ProviderError{Step: events.OperationDestroy, Address: resourceID, Err: err}
+			pe := inResource(r, problem{
+				summary: "Provider error",
+				detail:  failure.Error(),
+				cause:   failure,
+			})
 			diags = diags.Append(pe)
 
 			if saveErr := d.failedToDestroy(r); saveErr != nil {

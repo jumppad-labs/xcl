@@ -1032,9 +1032,9 @@ func TestParseFileReturnsConfigErrorWhenResourceInterpolationError(t *testing.T)
 	// property that does not exist.
 	require.NotEmpty(t, ce.Errors)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Contains(t, pe.Message, "nam")
-	require.Contains(t, pe.Message, "does not exist")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Contains(t, pe.Detail, "nam")
+	require.Contains(t, pe.Detail, "does not exist")
 }
 
 func TestParseFileReturnsConfigErrorWhenInvalidFileFails(t *testing.T) {
@@ -1345,17 +1345,19 @@ func TestParseFileReportsEveryMalformedBlockInFile(t *testing.T) {
 	// parsing must not stop at the first.
 	require.Len(t, ce.Errors, 2)
 
-	first := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, f, first.Filename)
-	require.Equal(t, 3, first.Line)
-	require.Equal(t, 1, first.Column)
-	require.Contains(t, first.Message, "has no name")
+	first := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, f, first.Subject.Filename)
+	require.Equal(t, 3, first.Subject.Start.Line)
+	require.Equal(t, 1, first.Subject.Start.Column)
+	require.Equal(t, "Missing name", first.Summary)
+	require.Contains(t, first.Detail, "has no name")
+	require.NotNil(t, first.Source)
 
-	second := ce.Errors[1].(*errors.ParserError)
-	require.Equal(t, f, second.Filename)
-	require.Equal(t, 7, second.Line)
-	require.Equal(t, 1, second.Column)
-	require.Contains(t, second.Message, "has no name")
+	second := ce.Errors[1].(*errors.Diagnostic)
+	require.Equal(t, f, second.Subject.Filename)
+	require.Equal(t, 7, second.Subject.Start.Line)
+	require.Equal(t, 1, second.Subject.Start.Column)
+	require.Contains(t, second.Detail, "has no name")
 }
 
 func TestParseFileReportsEveryDiagnosticForSingleMalformation(t *testing.T) {
@@ -1449,10 +1451,12 @@ func TestParseFileToleratesUninterpolatableValue(t *testing.T) {
 
 	// this file is well formed, its only fault is a value that cannot yet be
 	// interpolated. The parse stage must not report it as a malformed file, so
-	// none of the reported problems may be a syntax diagnostic.
+	// every reported problem is in an entity, which a syntax error never is.
+	require.NotEmpty(t, ce.Errors)
 	for _, e := range ce.Errors {
-		_, isSyntax := e.(*errors.Diagnostic)
-		require.False(t, isSyntax, "a well formed file was reported as malformed: %v", e)
+		d, ok := e.(*errors.Diagnostic)
+		require.True(t, ok, "%T is not a diagnostic", e)
+		require.NotEmpty(t, d.Entity, "a well formed file was reported as malformed: %v", e)
 	}
 }
 
@@ -1523,15 +1527,16 @@ func TestParseResourceReturnsConfigErrorWhenTypeIsNotRegistered(t *testing.T) {
 	// registered type and must not be reported
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
+	pe := ce.Errors[0].(*errors.Diagnostic)
 
 	// the report must name both the resource and the type that could not be
 	// checked, not the literal block keyword 'resource'
 	require.Equal(
 		t,
 		"unable to create resource 'example' of type 'nosuchtype': type resource.nosuchtype not found in any registered plugin",
-		pe.Message,
+		pe.Detail,
 	)
+	require.Equal(t, "resource.nosuchtype.example", pe.Entity)
 }
 
 func TestParseResourceWithUnregisteredTypeReportsWhereItAppears(t *testing.T) {
@@ -1548,12 +1553,12 @@ func TestParseResourceWithUnregisteredTypeReportsWhereItAppears(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
+	pe := ce.Errors[0].(*errors.Diagnostic)
 
 	// the offending block starts on line 5 of the fixture, at column 1
-	require.Equal(t, f, pe.Filename)
-	require.Equal(t, 5, pe.Line)
-	require.Equal(t, 1, pe.Column)
+	require.Equal(t, f, pe.Subject.Filename)
+	require.Equal(t, 5, pe.Subject.Start.Line)
+	require.Equal(t, 1, pe.Subject.Start.Column)
 }
 
 func TestParseModuleReturnsConfigErrorWhenModuleSourcesItself(t *testing.T) {
@@ -1588,14 +1593,16 @@ func TestParseModuleReturnsConfigErrorWhenModuleSourcesItself(t *testing.T) {
 	ce := result.err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Contains(t, pe.Message, "module 'inner' source")
-	require.Contains(t, pe.Message, "includes itself")
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Contains(t, pe.Detail, "module 'inner' source")
+	require.Contains(t, pe.Detail, "includes itself")
 
-	// the failure is reported against the module block that re-entered, which
-	// is the one declared on line 1 of the module's own source file
-	require.Equal(t, 1, pe.Line)
-	require.Equal(t, 1, pe.Column)
+	// the failure is reported at the source of the module block that
+	// re-entered, which is the one declared on line 1 of the module's own
+	// source file
+	require.Equal(t, 1, pe.EntityPos.Start.Line)
+	require.Equal(t, 1, pe.EntityPos.Start.Column)
+	require.Equal(t, "source", pe.Field)
 }
 
 func TestParseModuleReturnsConfigErrorWhenModulesIncludeEachOther(t *testing.T) {
@@ -1629,13 +1636,13 @@ func TestParseModuleReturnsConfigErrorWhenModulesIncludeEachOther(t *testing.T) 
 	ce := result.err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
+	pe := ce.Errors[0].(*errors.Diagnostic)
 
 	// parsing starts at a/a.xcl, which enters b, whose module block re-enters
 	// a, whose module block then sources b a second time. The re-entry is
 	// detected there, on the 'b_module' block declared in directory a.
-	require.Contains(t, pe.Message, "module 'b_module' source")
-	require.Contains(t, pe.Message, "includes itself")
+	require.Contains(t, pe.Detail, "module 'b_module' source")
+	require.Contains(t, pe.Detail, "includes itself")
 }
 
 func TestParseModuleReturnsConfigErrorWhenSourceDoesNotExist(t *testing.T) {
@@ -1652,14 +1659,15 @@ func TestParseModuleReturnsConfigErrorWhenSourceDoesNotExist(t *testing.T) {
 	ce := err.(*errors.ConfigError)
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
+	pe := ce.Errors[0].(*errors.Diagnostic)
 
-	// reported against the module block itself, naming the module whose
+	// reported at the source of the module block, naming the module whose
 	// contents could not be obtained
-	require.Equal(t, f, pe.Filename)
-	require.Equal(t, 1, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Contains(t, pe.Message, "unable to obtain contents for module 'gone' source")
+	require.Equal(t, f, pe.Subject.Filename)
+	require.Equal(t, 1, pe.EntityPos.Start.Line)
+	require.Equal(t, 1, pe.EntityPos.Start.Column)
+	require.Equal(t, "source", pe.Field)
+	require.Contains(t, pe.Detail, "unable to obtain contents for module 'gone' source")
 }
 
 // writeVariablesConfig writes a directory holding a variable, an output that
@@ -1781,4 +1789,51 @@ func TestParseModuleParsesSameSourceUsedTwiceAsSiblings(t *testing.T) {
 
 	second := findResource[structs.Network](t, c.GetResources(), "module.second.resource.network.leafnet")
 	require.Equal(t, "10.7.0.0/16", second.Subnet)
+}
+
+// applyProblem writes source to a file, applies it, and returns the one
+// diagnostic the apply reports
+func applyProblem(t *testing.T, source string) *errors.Diagnostic {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "main.xcl")
+	require.NoError(t, os.WriteFile(path, []byte(source), 0644))
+
+	p, _ := setupParser(t)
+	_, err := p.Apply(context.Background(), path)
+	require.IsType(t, &errors.ConfigError{}, err)
+
+	ce := err.(*errors.ConfigError)
+	require.Len(t, ce.Errors, 1)
+	require.IsType(t, &errors.Diagnostic{}, ce.Errors[0])
+
+	return ce.Errors[0].(*errors.Diagnostic)
+}
+
+func TestParseReportsAnInvalidDependencyAtDependsOn(t *testing.T) {
+	d := applyProblem(t, `resource "network" "one" {
+  subnet     = "10.0.0.0/16"
+  depends_on = ["not an address"]
+}
+`)
+
+	require.Equal(t, "Invalid dependency", d.Summary)
+	require.Contains(t, d.Detail, `"not an address" is not the address of an entity`)
+	require.Equal(t, "resource.network.one", d.Entity)
+	require.Equal(t, "depends_on", d.Field)
+	require.Equal(t, 3, d.Subject.Start.Line)
+	require.Equal(t, 1, d.EntityPos.Start.Line)
+	require.Equal(t, []string{`  depends_on = ["not an address"]`}, d.Source.Lines)
+}
+
+func TestParseReportsAModuleSourceThatIsNotALiteralAtTheSource(t *testing.T) {
+	d := applyProblem(t, `module "m" {
+  source = var.dir
+}
+`)
+
+	require.Equal(t, "Variables not allowed", d.Summary)
+	require.Equal(t, "module.m", d.Entity)
+	require.Equal(t, "source", d.Field)
+	require.Equal(t, 2, d.Subject.Start.Line)
 }

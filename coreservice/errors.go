@@ -3,7 +3,6 @@ package coreservice
 import (
 	"context"
 	"errors"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -79,12 +78,6 @@ func pairs(kv []string) map[string]string {
 	return details
 }
 
-// providerFailure matches the error the parser reports for a failed provider
-// call, "<step> failed for <address>: <the provider's error>", wherever it
-// sits in a message: on its own, or inside the positioned configuration
-// error an apply collects it into.
-var providerFailure = regexp.MustCompile(`(?m)\b(\w+) failed for (\S+): `)
-
 // toProto maps an error to the Error message a binding receives: its stable
 // code, its message, the fields of its detail type, and the errors it
 // collects as causes. Anything not matched is CodeInternal.
@@ -117,7 +110,6 @@ func toProto(err error) *corepb.Error {
 	var maskNotReversible *xclerrors.MaskNotReversibleError
 	var configError *xclerrors.ConfigError
 	var diagnostic *xclerrors.Diagnostic
-	var parserError *xclerrors.ParserError
 
 	switch {
 	case errors.As(err, &coded):
@@ -165,20 +157,14 @@ func toProto(err error) *corepb.Error {
 			out.Details["source"] = strings.Join(source.Lines, "\n")
 		}
 
-	case errors.As(err, &parserError):
-		// a positioned problem in configuration, which a config error
-		// collects as a cause; a provider that failed during a lifecycle
-		// step is reported this way too, positioned at its block
-		out.Code = CodeConfig
-		if m := providerFailure.FindStringSubmatch(parserError.Message); m != nil {
+		// a provider that failed during a lifecycle step is reported at its
+		// entity's block, as a diagnostic with the provider's error as cause
+		var provider *xclerrors.ProviderError
+		if errors.As(diagnostic.Cause, &provider) {
 			out.Code = CodeProvider
-			out.Details["step"] = m[1]
-			out.Details["address"] = m[2]
+			out.Details["step"] = provider.Step
+			out.Details["address"] = provider.Address
 		}
-		out.Details["file"] = parserError.Filename
-		out.Details["line"] = strconv.Itoa(parserError.Line)
-		out.Details["column"] = strconv.Itoa(parserError.Column)
-		out.Details["summary"] = parserError.Message
 
 	case errors.As(err, &notFound):
 		out.Code = CodeNotFound
@@ -326,11 +312,12 @@ func toProto(err error) *corepb.Error {
 		out.Code = CodeMaskNotReversible
 
 	default:
-		if m := providerFailure.FindStringSubmatch(err.Error()); m != nil {
+		var provider *xclerrors.ProviderError
+		if errors.As(err, &provider) {
 			// a provider failed during a lifecycle step
 			out.Code = CodeProvider
-			out.Details["step"] = m[1]
-			out.Details["address"] = m[2]
+			out.Details["step"] = provider.Step
+			out.Details["address"] = provider.Address
 		} else {
 			out.Code = CodeInternal
 		}

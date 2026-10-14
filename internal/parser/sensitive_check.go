@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
@@ -133,7 +132,7 @@ func (c *sensitivityChecker) checkBody(id string, meta *types.Meta, body *hclsyn
 		judged := c.expression(attribute.Expr, meta.Module)
 
 		for _, field := range plainFieldsReached(judged, f.field.Type, path+attribute.Name) {
-			problems = append(problems, sensitiveFieldProblem(id, field, attribute.Expr.Range()))
+			problems = append(problems, c.sensitiveFieldProblem(id, field, attribute.Expr.Range()))
 		}
 	}
 
@@ -238,13 +237,11 @@ func sortedPartNames(s *sensitivity) []string {
 }
 
 // sensitiveFieldProblem reports a sensitive value assigned to a plain field
-func sensitiveFieldProblem(id string, field string, at hcl.Range) error {
-	return errors.NewParserError(
-		at.Filename,
-		at.Start.Line,
-		at.Start.Column,
-		fmt.Sprintf("field %q of %s is not declared sensitive and cannot be assigned a sensitive value", field, id),
-	)
+func (c *sensitivityChecker) sensitiveFieldProblem(id string, field string, at hcl.Range) error {
+	return c.parser.parsedResources.inEntity(id, &at, problem{
+		summary: "Sensitive value in a plain field",
+		detail:  fmt.Sprintf("field %q of %s is not declared sensitive and cannot be assigned a sensitive value", field, id),
+	})
 }
 
 // expression predicts the sensitivity of expr, written in module fromModule.

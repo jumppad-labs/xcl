@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 )
 
 // queryErrorFixture stands in for a registered resource type wherever a test
@@ -268,11 +270,20 @@ func TestInvalidDecodeTargetErrorNamesATypedNilPointer(t *testing.T) {
 }
 
 // Traversal. ConfigError is what Apply and Destroy return, and a consumer meets
-// a query failure through it, usually with a ParserError in between.
+// a query failure through it, usually with a diagnostic in between.
+
+// problem is a diagnostic about resource.container.web, found through cause
+func problem(cause error) *Diagnostic {
+	d := NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "Unable to resolve reference"}, nil)
+	d.Entity = "resource.container.web"
+	d.Cause = cause
+
+	return d
+}
 
 func TestConfigErrorIsFindsASentinelAmongItsErrors(t *testing.T) {
 	ce := NewConfigError()
-	ce.AppendError(&ParserError{Message: "unrelated"})
+	ce.AppendError(problem(nil))
 	ce.AppendError(&NotUniqueError{Segments: []string{"resource", "container"}, Count: 2})
 
 	require.ErrorIs(t, ce, ErrNotUnique)
@@ -280,7 +291,7 @@ func TestConfigErrorIsFindsASentinelAmongItsErrors(t *testing.T) {
 
 func TestConfigErrorAsRecoversADetailAmongItsErrors(t *testing.T) {
 	ce := NewConfigError()
-	ce.AppendError(&ParserError{Message: "unrelated"})
+	ce.AppendError(problem(nil))
 	ce.AppendError(&NotUniqueError{Segments: []string{"resource", "container"}, Count: 2})
 
 	var detail *NotUniqueError
@@ -288,20 +299,16 @@ func TestConfigErrorAsRecoversADetailAmongItsErrors(t *testing.T) {
 	require.Equal(t, 2, detail.Count)
 }
 
-func TestConfigErrorIsReachesThroughAParserErrorToASentinel(t *testing.T) {
-	cause := &NotFoundError{Address: "resource.container.web"}
-
+func TestConfigErrorIsReachesThroughADiagnosticToASentinel(t *testing.T) {
 	ce := NewConfigError()
-	ce.AppendError(NewParserErrorWrapping("main.xcl", 10, 2, cause, "unable to resolve reference"))
+	ce.AppendError(problem(&NotFoundError{Address: "resource.container.web"}))
 
 	require.ErrorIs(t, ce, ErrNotFound)
 }
 
-func TestConfigErrorAsReachesThroughAParserErrorToADetail(t *testing.T) {
-	cause := &NotFoundError{Address: "resource.container.web"}
-
+func TestConfigErrorAsReachesThroughADiagnosticToADetail(t *testing.T) {
 	ce := NewConfigError()
-	ce.AppendError(NewParserErrorWrapping("main.xcl", 10, 2, cause, "unable to resolve reference"))
+	ce.AppendError(problem(&NotFoundError{Address: "resource.container.web"}))
 
 	var detail *NotFoundError
 	require.True(t, errors.As(ce, &detail))
@@ -316,57 +323,23 @@ func TestConfigErrorWithNoErrorsDoesNotMatchASentinel(t *testing.T) {
 	})
 }
 
-func TestParserErrorWithNoCauseUnwrapsToNil(t *testing.T) {
-	pe := NewParserError("main.xcl", 10, 2, "something went wrong")
+func TestADiagnosticWithNoCauseDoesNotMatchASentinel(t *testing.T) {
+	d := problem(nil)
 
-	require.Nil(t, pe.Unwrap())
+	require.NotErrorIs(t, d, ErrNotFound)
+	require.NotErrorIs(t, d, ErrUnknownType)
+	require.NotErrorIs(t, d, ErrNotTypeable)
+	require.NotErrorIs(t, d, ErrNotRegistered)
+	require.NotErrorIs(t, d, ErrTypeMismatch)
+	require.NotErrorIs(t, d, ErrNotAnEntity)
+	require.NotErrorIs(t, d, ErrNotUnique)
 }
 
-func TestParserErrorWithNoCauseDoesNotMatchASentinel(t *testing.T) {
-	pe := NewParserError("main.xcl", 10, 2, "something went wrong")
-
-	require.NotErrorIs(t, pe, ErrNotFound)
-	require.NotErrorIs(t, pe, ErrUnknownType)
-	require.NotErrorIs(t, pe, ErrNotTypeable)
-	require.NotErrorIs(t, pe, ErrNotRegistered)
-	require.NotErrorIs(t, pe, ErrTypeMismatch)
-	require.NotErrorIs(t, pe, ErrNotAnEntity)
-	require.NotErrorIs(t, pe, ErrNotUnique)
-}
-
-func TestParserErrorWrappingCarriesTheCause(t *testing.T) {
-	cause := &NotFoundError{Address: "resource.container.web"}
-	pe := NewParserErrorWrapping("main.xcl", 10, 2, cause, "unable to resolve reference")
-
-	require.Same(t, cause, pe.Unwrap())
-	require.ErrorIs(t, pe, ErrNotFound)
-}
-
-// The cause is carried alongside the message, never folded into it. The
-// messages were kept byte identical on purpose, so this pins them: anyone
-// tempted to "tidy" the cause into the text breaks this test rather than every
-// consumer reading the output.
-func TestParserErrorMessageIsUnchangedByCarryingACause(t *testing.T) {
-	plain := NewParserError("main.xcl", 10, 2, "unable to resolve reference")
-	wrapping := NewParserErrorWrapping(
-		"main.xcl", 10, 2,
-		&NotFoundError{Address: "resource.container.web"},
-		"unable to resolve reference",
-	)
-
-	require.Equal(t, plain.Error(), wrapping.Error())
-}
-
-func TestConfigErrorStringIsUnchangedByAParserErrorCarryingACause(t *testing.T) {
-	plain := NewConfigError()
-	plain.AppendError(NewParserError("main.xcl", 10, 2, "unable to resolve reference"))
-
-	wrapping := NewConfigError()
-	wrapping.AppendError(NewParserErrorWrapping(
-		"main.xcl", 10, 2,
-		&NotFoundError{Address: "resource.container.web"},
-		"unable to resolve reference",
-	))
+// The cause is carried alongside the message, never folded into it, so the
+// text a person reads says what the diagnostic says and nothing more.
+func TestADiagnosticMessageIsUnchangedByCarryingACause(t *testing.T) {
+	plain := problem(nil)
+	wrapping := problem(&NotFoundError{Address: "resource.container.web"})
 
 	require.Equal(t, plain.Error(), wrapping.Error())
 }

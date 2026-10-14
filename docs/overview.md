@@ -113,6 +113,22 @@ decoding bodies, walking the DAG or reaching a provider. A nil error means the
 configuration is valid; otherwise the returned `*errors.ConfigError` collects
 every problem found.
 
+Every problem an operation reports is an `*errors.Diagnostic`
+([`errors/diagnostic.go`](../errors/diagnostic.go)): a syntax error, something
+the schema does not allow, a value of the wrong type, a reference to something
+undefined, a `.vars` file that is not well formed, and a provider that failed
+during apply or destroy alike. It embeds the `hcl.Diagnostic` it was made from
+and adds the block it is in (`Entity`, such as `agent.claude`), the field
+within it (`Field`, such as `workspace[0].directory`), where the block starts
+(`EntityPos`), the lines of source around the fault (`Source`), read when the
+problem was found, and the error it was found through (`Cause`), which
+`errors.Is` and `errors.As` reach. A provider failure's cause is an
+`*errors.ProviderError` naming the step and the address.
+`ConfigError.Diagnostics()` returns them in order. A diagnostic's `Error` is
+one line; `xcl.DiagnosticPieces` ([`diagnostics.go`](../diagnostics.go)) lays
+diagnostics out as a report with their source, as labelled pieces for any
+`highlight.Renderer`.
+
 Validation runs three stages in order — structure, then references, then
 properties — and each gathers all of its own findings before the next is
 considered. A later stage is skipped when an earlier one found anything, because
