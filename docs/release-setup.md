@@ -64,7 +64,10 @@ gh label create breaks-bindings --repo jumppad-labs/xcl --color D93F0B \
 
 Add the `bindings` check to xcl's required checks for `main`.
 
-On **xcl-python**, add `test / result` to the required checks for `main`.
+On **xcl-python**, add `test / result` to the required checks for `main`, and remove
+`Check the package`: once the suite is a reusable workflow every job is
+reported as `test / <job>`, so the old name never reports again and would
+block every pull request.
 
 Require only these gate checks, never the individual matrix jobs. The gates
 always run and summarise everything before them.
