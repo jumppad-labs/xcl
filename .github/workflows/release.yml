@@ -1,6 +1,7 @@
 # Builds the engine program, xcl-core, for eight platforms when a version tag
 # is pushed, attaches the archives, a checksums file and its signature to the
-# GitHub release, then dispatches the xcl-python release for the same tag.
+# GitHub release, then dispatches xcl-python with the tag and the size of the
+# release (major, minor or patch) relative to the previous version tag.
 #
 # Every target is cross-compiled with cgo disabled in one job on one Linux
 # runner, with every C compiler hidden from the path: no C toolchain and no
@@ -197,17 +198,46 @@ jobs:
           fi
           gh release upload "$TAG" assets/* --clobber
 
-  # tell xcl-python to build and publish the matching package
+  # tell xcl-python about the release: the tag, and whether it was a major,
+  # minor or patch release, worked out from the previous version tag so the
+  # binding can mirror it
   dispatch:
     name: Dispatch the xcl-python release
     needs: [settings, build]
     if: needs.settings.outputs.publish == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Work out the release size
+        id: size
+        env:
+          TAG: ${{ needs.settings.outputs.tag }}
+        run: |
+          previous="$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vxF "$TAG" \
+            | while read -r tag; do
+                if [ "$(printf '%s\n%s\n' "$tag" "$TAG" | sort -V | tail -n1)" = "$TAG" ]; then echo "$tag"; break; fi
+              done)"
+          if [ -z "$previous" ]; then
+            size=minor
+          else
+            size="$(go run ./cmd/xcl-release bump "$previous" "$TAG")"
+          fi
+          echo "$TAG is a $size release after ${previous:-no earlier version}"
+          echo "size=$size" >> "$GITHUB_OUTPUT"
+
       - name: Dispatch
         env:
           GH_TOKEN: ${{ secrets.XCL_PYTHON_DISPATCH_TOKEN }}
           TAG: ${{ needs.settings.outputs.tag }}
+          SIZE: ${{ steps.size.outputs.size }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
             echo "XCL_PYTHON_DISPATCH_TOKEN is not set; xcl-python was not dispatched"; exit 1
@@ -215,4 +245,5 @@ jobs:
           gh api "repos/jumppad-labs/xcl-python/dispatches" \
             --method POST \
             -f event_type=xcl-release \
-            -F "client_payload[tag]=$TAG"
+            -F "client_payload[tag]=$TAG" \
+            -F "client_payload[bump]=$SIZE"
