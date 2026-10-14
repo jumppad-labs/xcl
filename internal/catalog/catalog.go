@@ -337,7 +337,7 @@ func (c *Catalog) typeOf(entityType, subtype string) (types.TypeInfo, bool) {
 	for _, loaded := range c.hosts {
 		for _, t := range loaded.host.GetTypes() {
 			if t.Type == entityType && t.SubType == subtype {
-				return types.TypeInfo{Type: t.Type, Subtype: t.SubType}, true
+				return types.TypeInfo{Type: t.Type, Subtype: t.SubType, Singleton: t.Singleton}, true
 			}
 		}
 	}
@@ -380,13 +380,24 @@ func (c *Catalog) takesSubtype(entityType string) (bool, bool) {
 }
 
 // Singleton reports whether the type keyword entityType is a singleton, whose
-// block has no labels. Only a declared Go type can be one.
+// block has no labels: a declared type, or one a loaded plugin provides.
 func (c *Catalog) Singleton(entityType string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	info, ok := c.typeInfo[entityType]
-	return ok && info.Singleton
+	if info, ok := c.typeInfo[entityType]; ok {
+		return info.Singleton
+	}
+
+	for _, loaded := range c.hosts {
+		for _, t := range loaded.host.GetTypes() {
+			if t.Type == entityType && t.SubType == "" {
+				return t.Singleton
+			}
+		}
+	}
+
+	return false
 }
 
 // Types returns the details of every type this catalog knows, from all of its
@@ -406,7 +417,7 @@ func (c *Catalog) Types() []types.TypeInfo {
 				continue
 			}
 
-			all = append(all, types.TypeInfo{Type: t.Type, Subtype: t.SubType})
+			all = append(all, types.TypeInfo{Type: t.Type, Subtype: t.SubType, Singleton: t.Singleton})
 		}
 	}
 

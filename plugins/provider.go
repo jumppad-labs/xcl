@@ -15,7 +15,8 @@ import (
 // ResourceProvider defines the generic interface that all resource providers must implement.
 // It provides lifecycle management for resources including creation, destruction,
 // reading, and change detection operations.
-// T must be a type that has embedded types.ResourceBase.
+// T is a pointer to a plain struct, laid out as a type a Go application
+// declares, or to a struct embedding types.ResourceBase.
 type ResourceProvider[T any] interface {
 	// Init initializes the provider with state access, provider functions, and a logger.
 	// This method is called once when the provider is created and should be used

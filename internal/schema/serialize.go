@@ -3,6 +3,8 @@ package schema
 import (
 	"encoding/json"
 	"reflect"
+
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 )
 
 /*
@@ -39,6 +41,12 @@ func serializeAttribute(v reflect.Value, currentDepth, maxDepth int) (*Attribute
 		}
 
 		for i := 0; i < v.NumField(); i++ {
+			// the marker naming a plain type is the plugin's own Go type,
+			// which the host has no way to build; it is never configuration
+			if v.Type().Field(i).Name == plaintype.MarkerField {
+				continue
+			}
+
 			fe, err := serializeAttribute(v.Field(i), currentDepth+1, maxDepth)
 			if err != nil {
 				return nil, err

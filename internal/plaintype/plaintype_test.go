@@ -384,6 +384,46 @@ func TestIsBuiltIsFalseForATypeNeverBuilt(t *testing.T) {
 	require.False(t, IsBuilt(reflect.TypeOf(neverBuilt{})))
 }
 
+func TestFromPlainCopiesTheFieldsBack(t *testing.T) {
+	built := build(t, agent{}, 1)
+	stored := entity(t, built, "", "claude")
+
+	err := built.FromPlain(stored.Addr().Interface(), &agent{Models: []string{"haiku"}})
+	require.NoError(t, err)
+	require.Equal(t, []string{"haiku"}, stored.FieldByName("Models").Interface())
+}
+
+func TestFromPlainKeepsTheEntitysMetaWithoutAMetaField(t *testing.T) {
+	built := build(t, agent{}, 1)
+	stored := entity(t, built, "", "claude")
+	base := stored.Field(0).Addr().Interface().(*types.ResourceBase)
+	base.Meta.ID = "agent.claude"
+
+	err := built.FromPlain(stored.Addr().Interface(), agent{})
+	require.NoError(t, err)
+	require.Equal(t, "agent.claude", base.Meta.ID)
+}
+
+func TestFromPlainCopiesTheMetaFieldBack(t *testing.T) {
+	built := build(t, withMetadata{}, 1)
+	stored := entity(t, built, "", "claude")
+	base := stored.Field(0).Addr().Interface().(*types.ResourceBase)
+
+	plain := &withMetadata{Meta: types.Meta{ID: "agent.claude", Properties: map[string]any{"id": "abc"}}}
+
+	err := built.FromPlain(stored.Addr().Interface(), plain)
+	require.NoError(t, err)
+	require.Equal(t, "abc", base.Meta.Properties["id"])
+}
+
+func TestFromPlainRefusesAnotherType(t *testing.T) {
+	built := build(t, agent{}, 1)
+	stored := entity(t, built, "", "claude")
+
+	err := built.FromPlain(stored.Addr().Interface(), &lookalike{})
+	require.Error(t, err)
+}
+
 func TestToPlainCopiesTheFields(t *testing.T) {
 	built := build(t, agent{}, 1)
 	stored := entity(t, built, "", "claude")

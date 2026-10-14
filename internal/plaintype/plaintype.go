@@ -362,6 +362,48 @@ func copyMeta(meta types.Meta) types.Meta {
 	return meta
 }
 
+// FromPlain copies a value of the plain type, or a pointer to one, back into
+// entity, a pointer to an entity of the engine type: its fields, and its Meta
+// field and mirror fields where it has them. Labels are left alone, as
+// configuration cannot change them, and so is anything of the entity's the
+// plain type cannot hold.
+func (b *Built) FromPlain(entity any, plain any) error {
+	target := reflect.ValueOf(entity)
+	if target.Kind() != reflect.Pointer || target.Elem().Type() != b.Engine {
+		return fmt.Errorf("%T is not a pointer to an entity of %s", entity, b.Plain)
+	}
+	target = target.Elem()
+
+	source := reflect.ValueOf(plain)
+	if source.Kind() == reflect.Pointer {
+		source = source.Elem()
+	}
+
+	if source.Type() != b.Plain {
+		return fmt.Errorf("%T is not a %s", plain, b.Plain)
+	}
+
+	for _, f := range b.copied {
+		target.Field(f.engine).Set(source.FieldByIndex(f.plain))
+	}
+
+	base := target.Field(0).Addr().Interface().(*types.ResourceBase)
+
+	if b.meta != nil {
+		base.Meta = copyMeta(source.FieldByIndex(b.meta).Interface().(types.Meta))
+	}
+
+	if b.disabled != nil {
+		base.Disabled = source.FieldByIndex(b.disabled).Bool()
+	}
+
+	if b.dependsOn != nil {
+		base.DependsOn = append([]string(nil), source.FieldByIndex(b.dependsOn).Interface().([]string)...)
+	}
+
+	return nil
+}
+
 // ToPlain copies an entity of the engine type into a new value of the plain
 // type and returns a pointer to it. Labels are filled from the entity's
 // metadata, the mirror fields from its types.ResourceBase, and a Meta field

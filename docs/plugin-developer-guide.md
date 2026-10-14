@@ -45,6 +45,39 @@ the lifecycle methods; log from those through the call's context (see
 nil when it offers none; see [Offering a function](#offering-a-function).
 The rest of this guide is about the lifecycle methods.
 
+## The entity type
+
+`T` is a plain struct of your own, laid out as a Go application lays out the
+types it declares:
+
+```go
+type Container struct {
+    Name  string `xcl:"name,label" json:"name"`
+    Image string `xcl:"image" json:"image"`
+    Meta  types.Meta
+}
+
+plugins.RegisterResourceProvider(&p.PluginBase, log, state, "container", "", &Container{}, &ContainerProvider{})
+```
+
+- A field tagged as a label is filled from the block's label: `container "web"
+  {}` gives `Name` the value `web`. A type registered with a subtype takes
+  two label fields, the subtype and the label. Configuration cannot set them.
+- A field called `Meta`, a `types.Meta` with no tag, receives the entity's
+  metadata, such as `Meta.ID`. Changes the provider makes to
+  `Meta.Properties` are kept.
+- Fields tagged `disabled` (a `bool`) or `depends_on` (a `[]string`) receive
+  the values every block has.
+- A type with neither label fields nor a `Meta` field cannot read a label,
+  so it is a singleton: its block is written without labels, `hub { … }`, a
+  module holds one of it, and it is addressed by its type alone, `hub.address`.
+  A singleton takes no subtype.
+
+xcl stores the entity as a type built from yours, and converts it to and
+from your struct around every provider call, so the provider only ever sees
+`T`. A struct embedding `types.ResourceBase` is still accepted and used as it
+is; it is always named.
+
 ## The two copies of an entity
 
 Every call on an entity that already exists works with two copies of it:
@@ -87,8 +120,7 @@ A field holding a password, token or other secret is declared with the type
 
 ```go
 type Database struct {
-    types.ResourceBase `xcl:",remain"`
-
+    Name     string                  `xcl:"name,label" json:"name"`
     Username string                  `xcl:"username" json:"username"`
     Password types.Sensitive[string] `xcl:"password" json:"password"`
 }
@@ -702,8 +734,7 @@ by the network:
 
 ```go
 type Container struct {
-    types.ResourceBase `xcl:",remain"`
-
+    Name  string `xcl:"name,label" json:"name"`
     Image string `xcl:"image" json:"image"`
 
     // set by the provider in Create

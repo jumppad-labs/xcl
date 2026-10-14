@@ -232,9 +232,10 @@ func (w *grpcPluginWrapper) GetTypes() []RegisteredType {
 	types := make([]RegisteredType, len(resp.Types))
 	for i, t := range resp.Types {
 		types[i] = RegisteredType{
-			Type:    t.Type,
-			SubType: t.SubType,
-			Schema:  t.Schema,
+			Type:      t.Type,
+			SubType:   t.SubType,
+			Schema:    t.Schema,
+			Singleton: t.Singleton,
 			// Note: Adapter is set to nil for remote plugins as it's handled by the gRPC wrapper
 		}
 	}
@@ -423,10 +424,11 @@ func (h *GRPCPluginHost) GetTypes() []RegisteredType {
 		adapter := NewGRPCResourceProviderAdapter(wrapper, t.Type, t.SubType)
 
 		h.cachedTypes[i] = RegisteredType{
-			Type:    t.Type,
-			SubType: t.SubType,
-			Schema:  t.Schema,
-			Adapter: adapter,
+			Type:      t.Type,
+			SubType:   t.SubType,
+			Schema:    t.Schema,
+			Singleton: t.Singleton,
+			Adapter:   adapter,
 		}
 	}
 

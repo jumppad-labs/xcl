@@ -585,8 +585,8 @@ registry.Register[Cache](local, "cache")                     // cache "main" {}
 c, err := xcl.NewConfig(xcl.WithRegistry(local))
 ```
 
-A declared type is a plain struct of the application's own, or a struct
-embedding `types.ResourceBase` as a plugin's types do. A plain struct is
+A declared type, or a plugin's, is a plain struct of its own, or a struct
+embedding `types.ResourceBase`. A plain struct is
 stored as a type built from it that embeds `types.ResourceBase`, so
 everything that handles entities sees an ordinary block type, and every
 query hands back the plain struct, as a copy:
@@ -597,7 +597,15 @@ query hands back the plain struct, as a copy:
 - a field tagged `disabled` (a `bool`) or `depends_on` (a `[]string`)
   receives the values every block has;
 - a field called `Meta`, which must be a `types.Meta` with no tag, receives a
-  copy of the block's metadata.
+  copy of the block's metadata;
+- a type with neither label fields nor a `Meta` field cannot read a label, so
+  it is a singleton: its block is written without labels, `runner { … }`, a
+  module holds one of it, it is addressed by its type alone, `runner.server`,
+  and it takes no subtype. A plugin tells the host which of its types are
+  singletons when it lists them.
+
+A plugin's provider is given the plain struct, converted from and back to the
+stored type around every call.
 
 The type is the keyword a block leads with and the subtype its first label.
 A type keyword takes a subtype for every registration or for none, so the
