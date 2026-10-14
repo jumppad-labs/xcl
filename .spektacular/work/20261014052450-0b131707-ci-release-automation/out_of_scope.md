@@ -1,0 +1,8 @@
+- **Plugin repos, xcl-website and xcl-vscode.** They adopt neither the labels nor the cross-repo checks. A later spec can bring them in using the same shared workflows.
+- **New languages.** The design is built to take them through the reusable suite contract and the thin per-repo workflows, but none are added here.
+- **Engine version ranges.** Each language package bundles and runs exactly its pinned engine.
+- **How artefacts are built.** Engine compilation, signing, the wheel platform matrix and the in-process shared library build are unchanged.
+- **The Python API.** The plain-dataclasses change is the parked spec `20261014043756-e853a081-python-plain-dataclasses`, which ships after this plan as the first real use of the process.
+- **Same-branch-name coordination.** Coordinated breaking changes use the `breaks-bindings` override, not automatic branch matching.
+- **Replacing `XCL_PYTHON_DISPATCH_TOKEN` with the App token.** It still works and is left as is; swapping it is an optional later tidy-up.
+- **Avoiding suite re-runs on unrelated label changes.** Accepted for correctness; a gate that replays the previous result is a possible later optimisation.

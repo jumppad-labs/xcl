@@ -1,0 +1,13 @@
+**New pattern: release machinery as reusable workflows owned by the engine repo.** Until now each repo's workflows were self-contained. This plan introduces shared workflows in xcl (release-label check, auto-tag) that every participating repo calls by reference, plus a per-binding reusable test suite that xcl calls. The shape a developer sees in each binding repo is three thin caller workflows (label check, tag on merge, engine bump) and one substantive reusable suite. Adding a language means copying those thin callers and implementing the suite contract, not designing CI again.
+
+**New pattern: never-skipped gate jobs as the required checks.** Every check a branch rule requires is a final job that always runs and computes its own conclusion from the jobs before it (and, for the bindings gate, from the override label). Matrix jobs are never required individually, so their names can change without touching branch protection, and a skipped job can never satisfy a rule by accident.
+
+**Existing pattern kept: tag-triggered releases.** Both `release.yml` files stay top-level workflows started by a `v*` tag push, so their build, sign, verify and publish steps, the existing manual dry-run mode, and PyPI trusted publishing are untouched. The auto-tag pushes the tag with the App token precisely so this pattern still works.
+
+**Code-shape change in xcl-python CI.** The current `ci.yml` jobs move bodily into the reusable suite. `ci.yml` shrinks to a caller. Inside the suite, every checkout names its repository and ref explicitly, and the xcl ref comes from an input that falls back to the pin file, replacing the hard-coded read of the pin.
+
+**Code-shape change in the Python version check.** The version module gains the pinned engine value. The client's check, the release's "engine reports the expected version" step, the PyPI install check, and the development engine and shared-library builds all switch from the package version to that value. The error type and message shape stay; only the expected side changes. Tests that built fake engines reporting the package version now report the pin.
+
+**Bot-authored changes.** The engine-bump PR is the first change in these repos authored by automation. It uses a predictable branch name per engine tag (so a re-run updates the same PR instead of opening another), a label mirroring the engine bump, and auto-merge, so a maintainer only sees it when it is red.
+
+**Documentation.** xcl's README gains a "Releases" section covering labels, the bindings check and override, auto-tagging, and engine propagation with the worked example from the spec. xcl-python's README gains a short "Releases and the engine pin" section that links to it.

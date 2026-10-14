@@ -55,3 +55,32 @@ expected ("we are going to have many languages in the future").
   release workflow directly.
 - Release notes from changelog entries since the last tag.
 - Pre-1.0: `major` label means 1.0.0.
+
+## Spec finished, plan started (2026-10-14)
+
+- Spec committed; review fixes applied (signing/PyPI + first-version-above-PyPI moved to
+  Constraints; engine major -> binding major, 1.0.0 below 1.0; override label name left to plan).
+- Split offer declined ("No epic"); raised hivecommons/spektacular#87 about split criteria.
+- Specs pushed on xcl branch `specs/ci-release-and-python-dataclasses` (no PR; user didn't want one).
+- Git has no identity configured on this machine; commits use
+  `-c user.name="Nicholas Jackson" -c user.email="jackson.nic@gmail.com"`.
+- Plan workflow started for the CI spec; we're on branch specs/ci-release-and-python-dataclasses.
+
+## Plan: discovery done (2026-10-14)
+
+- Fixed registry: xcl-vscode had no footprint; `repo add` with location = repo ROOT (`../../xcl-vscode`)
+  created `xcl-vscode/.spektacular/` (uncommitted there). Passing the `.spektacular` path nests it.
+  `repo add --dry-run` wrote files anyway (Spektacular bug, not yet reported).
+- Facts: no labels/branch protection/rulesets, auto-merge off on xcl and xcl-python; xcl-python
+  has no tags; PyPI has 0.5.3, 0.6.0, 0.7.0.
+- Key gotchas: GITHUB_TOKEN tag pushes / PR opens / auto-merge pushes don't trigger workflows;
+  skipped jobs count as passing required checks; checkout in a called workflow defaults to the
+  caller repo. Convention: no tests that read CI workflow files.
+
+## Plan written, walkthrough in progress (2026-10-14)
+
+- Plan, context, research committed (20 tasks, 4 milestones). Now at the mandatory walkthrough;
+  needs explicit user sign-off before `plan goto finished`.
+- Key plan choices: override label `breaks-bindings`; Go command `cmd/xcl-release` (+`internal/release`)
+  for label/version logic; App-token tag push keeps tag-triggered release.yml (PyPI trusted
+  publisher untouched); `__engine_version__` pin stamp; seed tag v0.7.0 on xcl-python.
