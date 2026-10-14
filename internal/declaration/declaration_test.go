@@ -74,8 +74,13 @@ func TestValidateFailsForPointerToNonStruct(t *testing.T) {
 }
 
 func TestValidateAcceptsAPlainType(t *testing.T) {
-	err := Validate(&NotAResource{}, "resource", "thing")
+	err := Validate(&NotAResource{}, "thing")
 	require.NoError(t, err)
+}
+
+func TestValidateFailsForASubtypeOfAPlainTypeWithoutAName(t *testing.T) {
+	err := Validate(&NotAResource{}, "resource", "thing")
+	require.ErrorContains(t, err, "takes no subtype")
 }
 
 func TestValidateFailsForAPlainTypeThatCannotBeBuilt(t *testing.T) {

@@ -115,14 +115,24 @@ declaration is also a method, `local.Register[PostgreSQL]("database", "postgres"
 and `RegisterType(&PostgreSQL{}, ...)` remains for a type only known at run
 time.
 
+A plain type that cannot read a name, having neither label fields nor a `Meta`
+field, is a singleton: its block is written without labels,
+`runner { server = "..." }`, it is addressed by its type alone, as
+`runner.server`, and a second `runner` block in the same module is an error. A
+singleton takes no subtype.
+
 To read configuration through [Viper](https://github.com/spf13/viper), the
 `github.com/jumppad-labs/xcl/viper` package returns a Viper that reads `.xcl`
-files into the same plain types, as keys such as `database.postgres.main.port`:
+files into the same plain types, as keys such as `database.postgres.main.port`
+and, for a singleton, `runner.server`. `xclviper.Read` reads a file or a whole
+directory of them:
 
 ```go
-v := xclviper.New(xclviper.Type[PostgreSQL]("database", "postgres"))
-v.SetConfigFile("config.xcl")
-err := v.ReadInConfig()
+v := xclviper.New(
+	xclviper.Type[Runner]("runner"),
+	xclviper.Type[PostgreSQL]("database", "postgres"),
+)
+err := xclviper.Read(v, "./config")
 ```
 
 **No state.** Without `WithStatePath` or `WithStateStore` nothing is

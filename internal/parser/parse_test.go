@@ -1349,15 +1349,15 @@ func TestParseFileReportsEveryMalformedBlockInFile(t *testing.T) {
 	require.Equal(t, f, first.Subject.Filename)
 	require.Equal(t, 3, first.Subject.Start.Line)
 	require.Equal(t, 1, first.Subject.Start.Column)
-	require.Equal(t, "Missing name", first.Summary)
-	require.Contains(t, first.Detail, "has no name")
+	require.Equal(t, "Missing labels", first.Summary)
+	require.Equal(t, `resource takes a subtype and a label: write it as resource "<subtype>" "<label>" { … }.`, first.Detail)
 	require.NotNil(t, first.Source)
 
 	second := ce.Errors[1].(*errors.Diagnostic)
 	require.Equal(t, f, second.Subject.Filename)
 	require.Equal(t, 7, second.Subject.Start.Line)
 	require.Equal(t, 1, second.Subject.Start.Column)
-	require.Contains(t, second.Detail, "has no name")
+	require.Equal(t, "Missing labels", second.Summary)
 }
 
 func TestParseFileReportsEveryDiagnosticForSingleMalformation(t *testing.T) {

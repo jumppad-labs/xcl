@@ -163,7 +163,7 @@ func TestAListOfReferencesToAPlainTypeFillsEachMeta(t *testing.T) {
 func TestFindReturnsAPlainTypeWithoutLabelFields(t *testing.T) {
 	c := setupPlainConfig(t)
 
-	unlabelled, err := Find[plain.Unlabelled](c, "unlabelled.only")
+	unlabelled, err := Find[plain.Unlabelled](c, "unlabelled")
 	require.NoError(t, err)
 	require.Contains(t, unlabelled.Value, "kept")
 }
@@ -171,7 +171,7 @@ func TestFindReturnsAPlainTypeWithoutLabelFields(t *testing.T) {
 func TestAReferenceReadsAPlainTypesLabels(t *testing.T) {
 	c := setupPlainConfig(t)
 
-	unlabelled, err := Find[plain.Unlabelled](c, "unlabelled.only")
+	unlabelled, err := Find[plain.Unlabelled](c, "unlabelled")
 	require.NoError(t, err)
 	require.Equal(t, "kept claude postgres", unlabelled.Value)
 }

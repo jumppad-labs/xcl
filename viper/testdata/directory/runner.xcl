@@ -1,0 +1,8 @@
+runner {
+  server = "https://maalstrom.app"
+  listen = "127.0.0.1:7660"
+}
+
+task "document" {
+  agents = [agent.local, agent.claude]
+}

@@ -9,6 +9,7 @@ import (
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plain"
 	"github.com/jumppad-labs/xcl/registry"
+	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,11 +45,11 @@ runner {
 }
 `
 
-// singletonRegistry declares the runner as a singleton and the client beside
-// it
+// singletonRegistry declares the runner, a singleton as it has no label
+// fields and no Meta field, and the client beside it
 func singletonRegistry() *registry.Local {
 	local := registry.NewLocal()
-	registry.RegisterSingleton[plain.Runner](local, "runner")
+	registry.Register[plain.Runner](local, "runner")
 	registry.Register[plain.Client](local, "client")
 
 	return local
@@ -79,8 +80,22 @@ func TestSingletonIsDeclaredWithoutLabels(t *testing.T) {
 
 	require.Equal(t, "https://maalstrom.app", runner.Server)
 	require.Equal(t, "127.0.0.1:7660", runner.Listen)
-	require.Equal(t, "runner", runner.Meta.ID)
-	require.Empty(t, runner.Meta.Name)
+}
+
+func TestSingletonIsIdentifiedByItsType(t *testing.T) {
+	path := writeSingletonConfig(t, singletonConfig)
+
+	c, err := NewConfig(WithRegistry(singletonRegistry()), WithStatePath(t.TempDir()))
+	require.NoError(t, err)
+	require.NoError(t, c.Apply(path))
+
+	entity, err := c.FindOneEntity("runner")
+	require.NoError(t, err)
+
+	meta, err := types.GetMeta(entity)
+	require.NoError(t, err)
+	require.Equal(t, "runner", meta.ID)
+	require.Empty(t, meta.Name)
 }
 
 func TestSingletonIsFoundByItsAddress(t *testing.T) {
@@ -137,9 +152,13 @@ func TestSingletonWithLabelIsRefused(t *testing.T) {
 	require.Error(t, err)
 
 	d := requireDiagnostic(t, err)
-	require.Contains(t, d.Error(), "Invalid block labels")
-	require.Contains(t, d.Error(), "runner {}")
+	require.Equal(t, "Unexpected label", d.Summary)
+	require.Equal(t, `runner takes no labels, there is one of it: write it as runner { … }, without "nas".`, d.Detail)
+
+	// placed at the label, "nas" on line 2 from column 8
 	require.Equal(t, 2, d.Subject.Start.Line)
+	require.Equal(t, 8, d.Subject.Start.Column)
+	require.Equal(t, 13, d.Subject.End.Column)
 }
 
 func TestSingletonDeclaredTwiceIsRefused(t *testing.T) {
@@ -159,8 +178,8 @@ func TestSingletonDeclaredTwiceIsRefused(t *testing.T) {
 
 func TestNewConfigFailsOnSingletonAndSubtypeUnderOneKeyword(t *testing.T) {
 	local := registry.NewLocal()
-	registry.RegisterSingleton[plain.Runner](local, "runner")
-	local.RegisterType(&plain.Database{}, "runner", "big")
+	registry.Register[plain.Runner](local, "runner")
+	registry.Register[plain.Database](local, "runner", "big")
 
 	c, err := NewConfig(WithRegistry(local))
 	require.Nil(t, c)
@@ -172,10 +191,72 @@ func TestNewConfigFailsOnSingletonAndSubtypeUnderOneKeyword(t *testing.T) {
 	require.False(t, form.TakesSubtype)
 }
 
-func TestRegisterSingletonPanicsOnLabelField(t *testing.T) {
+func TestRegisterPanicsOnASubtypeForASingleton(t *testing.T) {
 	local := registry.NewLocal()
 
-	require.Panics(t, func() {
-		registry.RegisterSingleton[plain.Agent](local, "runner")
-	})
+	require.PanicsWithValue(t,
+		`xcl: registry local: type "runner.big": plain.Runner has no label fields and no Meta field, so its block is written without labels, and its type takes no subtype`,
+		func() {
+			registry.Register[plain.Runner](local, "runner", "big")
+		})
+}
+
+// runnerSchemaDocument declares the runner as a singleton in a schema, as a
+// host in another language does
+const runnerSchemaDocument = `{"schema_version": 1, "type": "runner", "singleton": true, "fields": [
+  {"name": "server", "type": "string"}
+]}`
+
+func TestSchemaTypeMarkedSingletonIsDeclaredWithoutLabels(t *testing.T) {
+	local := newSchemaRegistry(t, runnerSchemaDocument)
+	path := writeSingletonConfig(t, `runner { server = "https://maalstrom.app" }`)
+
+	c, err := NewConfig(WithRegistry(local), WithStatePath(t.TempDir()))
+	require.NoError(t, err)
+	require.NoError(t, c.Apply(path))
+
+	runner := findAsMap(t, c, "runner")
+	require.Equal(t, "https://maalstrom.app", runner["server"])
+}
+
+func TestSchemaTypeMarkedSingletonSurvivesSavedState(t *testing.T) {
+	path := writeSingletonConfig(t, `runner { server = "https://maalstrom.app" }`)
+	dir := t.TempDir()
+
+	c, err := NewConfig(WithRegistry(newSchemaRegistry(t, runnerSchemaDocument)), WithStatePath(dir))
+	require.NoError(t, err)
+	require.NoError(t, c.Apply(path))
+
+	loaded, err := NewConfig(WithRegistry(newSchemaRegistry(t, runnerSchemaDocument)), WithStatePath(dir))
+	require.NoError(t, err)
+	require.NoError(t, loaded.Load())
+
+	runner := findAsMap(t, loaded, "runner")
+	require.Equal(t, "https://maalstrom.app", runner["server"])
+	require.NotContains(t, runner, "XclSingleton")
+}
+
+func TestSchemaTypeMarkedSingletonTakesNoSubtype(t *testing.T) {
+	_, err := registry.TypeFromSchema([]byte(`{"schema_version": 1, "type": "runner", "subtype": "big", "singleton": true, "fields": []}`))
+	require.ErrorContains(t, err, "a singleton takes no subtype")
+}
+
+func TestATypeWithAMetaFieldIsNamed(t *testing.T) {
+	type named struct {
+		Value string `xcl:"value,optional"`
+		Meta  types.Meta
+	}
+
+	local := registry.NewLocal()
+	registry.Register[named](local, "named")
+
+	path := writeSingletonConfig(t, `named "one" { value = "kept" }`)
+
+	c, err := NewConfig(WithRegistry(local))
+	require.NoError(t, err)
+	require.NoError(t, c.Apply(path))
+
+	found, err := Find[named](c, "named.one")
+	require.NoError(t, err)
+	require.Equal(t, "one", found.Meta.Name)
 }

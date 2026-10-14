@@ -21,10 +21,15 @@ const SchemaVersion1 = 1
 // ResourceBase (depends_on, disabled, meta) is never listed. Every block type
 // has it and BuildTypeV1 adds it.
 type SchemaV1 struct {
-	SchemaVersion int       `json:"schema_version"`
-	Type          string    `json:"type"`
-	Subtype       string    `json:"subtype,omitempty"`
-	Fields        []FieldV1 `json:"fields"`
+	SchemaVersion int    `json:"schema_version"`
+	Type          string `json:"type"`
+	Subtype       string `json:"subtype,omitempty"`
+
+	// Singleton marks a type whose block is written without labels, i.e.
+	// runner {}, of which a module holds one. A singleton has no subtype
+	Singleton bool `json:"singleton,omitempty"`
+
+	Fields []FieldV1 `json:"fields"`
 }
 
 // FieldV1 is one field of a SchemaV1 block type.
@@ -106,6 +111,10 @@ func ParseV1(data []byte) (*SchemaV1, error) {
 		return nil, fmt.Errorf("schema names no type")
 	}
 
+	if s.Singleton && s.Subtype != "" {
+		return nil, fmt.Errorf("schema for type %s: a singleton takes no subtype", types.TypeKey(s.Type, s.Subtype))
+	}
+
 	return s, nil
 }
 
@@ -128,7 +137,33 @@ func BuildTypeV1(data []byte) (reflect.Type, *SchemaV1, error) {
 		return nil, nil, fmt.Errorf("schema for type %s: %w", types.TypeKey(s.Type, s.Subtype), err)
 	}
 
+	if s.Singleton {
+		fields = append(fields, singletonField)
+	}
+
 	return reflect.StructOf(fields), s, nil
+}
+
+// SingletonField is the name of the field that marks a type built from a
+// schema as a singleton. It is a zero length array: it takes no space, has
+// no xcl tag so configuration never sees it, and is left out of JSON.
+const SingletonField = "XclSingleton"
+
+// singletonMarker is the element type of the singleton field, so only a type
+// this package built carries it
+type singletonMarker struct{}
+
+var singletonField = reflect.StructField{
+	Name: SingletonField,
+	Type: reflect.ArrayOf(0, reflect.TypeFor[singletonMarker]()),
+	Tag:  `json:"-"`,
+}
+
+// IsSingleton reports whether t, a struct type built from a schema, was
+// built from one marked as a singleton
+func IsSingleton(t reflect.Type) bool {
+	field, ok := t.FieldByName(SingletonField)
+	return ok && field.Type == singletonField.Type
 }
 
 // resourceBaseField is the anonymous types.ResourceBase every built block

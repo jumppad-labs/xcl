@@ -251,20 +251,7 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 		name = append(name, t.Subtype)
 	}
 
-	// labels is how many labels a block of the type has: none for a
-	// singleton, its name, and its subtype before it when it has one
-	labels := len(name)
-
-	if t.Singleton {
-		if t.Subtype != "" {
-			return fmt.Errorf("type %q is a singleton, which takes no subtype", t.Type)
-		}
-
-		labels = 0
-		if err := declaration.ValidateSingleton(t.Prototype, t.Type); err != nil {
-			return err
-		}
-	} else if err := declaration.Validate(t.Prototype, name...); err != nil {
+	if err := declaration.Validate(t.Prototype, name...); err != nil {
 		return err
 	}
 
@@ -272,15 +259,19 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 
 	// a plain struct is stored as the type built from it, which embeds
 	// types.ResourceBase as everything that handles entities expects; the
-	// application's type is recovered from it when entities are read back
+	// application's type is recovered from it when entities are read back.
+	// One that cannot read a name is a singleton, as is a type built from a
+	// schema marked as one
 	stored := t.Prototype
+	singleton := schema.IsSingleton(reflect.TypeOf(t.Prototype).Elem())
 	if declaration.IsPlain(t.Prototype) {
-		built, err := plaintype.Build(reflect.TypeOf(t.Prototype).Elem(), labels)
+		built, err := plaintype.Build(reflect.TypeOf(t.Prototype).Elem(), len(name))
 		if err != nil {
 			return fmt.Errorf("type %q: %w", key, err)
 		}
 
 		stored = built.New()
+		singleton = built.Singleton()
 	}
 
 	// a field configuration cannot be decoded into is reported here, where
@@ -307,7 +298,7 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 		return err
 	}
 
-	c.typeInfo[key] = types.TypeInfo{Type: t.Type, Subtype: t.Subtype, Singleton: t.Singleton, Prototype: stored}
+	c.typeInfo[key] = types.TypeInfo{Type: t.Type, Subtype: t.Subtype, Singleton: singleton, Prototype: stored}
 	c.declaredBy[key] = registryName
 
 	return nil

@@ -885,12 +885,10 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 
 	for _, b := range body.Blocks {
 
-		// check the resource has a name, which a singleton never has
+		// check the block has its labels, which a singleton never has
 		if len(b.Labels) == 0 && !p.isSingleton(b.Type) {
-			de := p.inBlock(b, module, nil, problem{
-				summary: "Missing name",
-				detail:  fmt.Sprintf("resource '%s' has no name, please specify resources using the syntax 'resource_type \"name\" {}'", b.Type),
-			})
+			takes, _ := p.takesSubtype(b.Type)
+			de := p.inBlock(b, module, nil, missingLabels(b.Type, takes))
 
 			emitParse(&p.options, "", "", file, de)
 			blockErrors = append(blockErrors, de)
@@ -1054,10 +1052,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 		switch {
 		case singleton && len(b.Labels) == 0:
 		case singleton:
-			return fail(problem{
-				summary: "Invalid block labels",
-				detail:  fmt.Sprintf(`invalid format for '%s', it is declared without labels and there is one of it, i.e. '%s {}'`, b.Type, b.Type),
-			})
+			return p.inBlock(b, moduleName, labelsRange(b), unexpectedLabels(b))
 		case takes && len(b.Labels) == 2:
 			subtype = b.Labels[0]
 			name = b.Labels[1]

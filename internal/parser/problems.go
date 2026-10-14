@@ -3,6 +3,8 @@ package parser
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/xcl"
@@ -87,6 +89,48 @@ func unreadable(extension string, err error) *errors.Diagnostic {
 // invalidName is the problem with a block whose name is not valid
 func invalidName(err error) problem {
 	return problem{summary: "Invalid name", detail: err.Error(), cause: err}
+}
+
+// unexpectedLabels is the problem with a singleton's block written with
+// labels, i.e. runner "nas" {}: there is one of it, and it takes none
+func unexpectedLabels(b *hclsyntax.Block) problem {
+	written := make([]string, len(b.Labels))
+	for i, label := range b.Labels {
+		written[i] = strconv.Quote(label)
+	}
+
+	summary := "Unexpected label"
+	if len(b.Labels) > 1 {
+		summary = "Unexpected labels"
+	}
+
+	return problem{
+		summary: summary,
+		detail:  fmt.Sprintf("%s takes no labels, there is one of it: write it as %s { … }, without %s.", b.Type, b.Type, strings.Join(written, " ")),
+	}
+}
+
+// missingLabels is the problem with a block of entityType written without
+// labels, when the type takes them: a label, and a subtype before it when
+// takesSubtype
+func missingLabels(entityType string, takesSubtype bool) problem {
+	if takesSubtype {
+		return problem{
+			summary: "Missing labels",
+			detail:  fmt.Sprintf(`%s takes a subtype and a label: write it as %s "<subtype>" "<label>" { … }.`, entityType, entityType),
+		}
+	}
+
+	return problem{
+		summary: "Missing label",
+		detail:  fmt.Sprintf(`%s takes a label: write it as %s "<label>" { … }.`, entityType, entityType),
+	}
+}
+
+// labelsRange is the range of a block's labels, from the first to the last
+func labelsRange(b *hclsyntax.Block) *hcl.Range {
+	r := hcl.RangeBetween(b.LabelRanges[0], b.LabelRanges[len(b.LabelRanges)-1])
+	return &r
 }
 
 // duplicateBlock is the problem with a block declaring the entity id, which a

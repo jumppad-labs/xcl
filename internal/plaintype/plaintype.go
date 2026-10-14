@@ -97,14 +97,15 @@ type copiedField struct {
 }
 
 // Build makes the engine type for plain, a struct type that does not embed
-// types.ResourceBase. labels is how many labels a block of the type has: none
-// for a singleton, one for a type declared without a subtype, two for one
-// declared with one.
+// types.ResourceBase. labels is how many labels a block of the type has when
+// it is named: one for a type declared without a subtype, two for one
+// declared with one. A type with neither label fields nor a Meta field cannot
+// read a name, so it is a singleton, see Singleton, and takes no subtype.
 //
 // The error names the field at fault: a reserved name, a label count that does
-// not match, a mirror field of the wrong type, an embedded field that is not a
-// remain struct, or a second field with the same Go name once embedded fields
-// are lifted.
+// not match, a subtype for a singleton, a mirror field of the wrong type, an
+// embedded field that is not a remain struct, or a second field with the same
+// Go name once embedded fields are lifted.
 func Build(plain reflect.Type, labels int) (*Built, error) {
 	if plain.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("%s is not a struct", plain)
@@ -241,6 +242,10 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 		return nil, fmt.Errorf("%s has %d label fields, a block of its type has %d labels", plain, len(b.labels), labels)
 	}
 
+	if b.Singleton() && labels == 2 {
+		return nil, fmt.Errorf("%s has no label fields and no Meta field, so its block is written without labels, and its type takes no subtype", plain)
+	}
+
 	fields = append(fields, reflect.StructField{
 		Name: MarkerField,
 		Type: reflect.ArrayOf(0, plain),
@@ -252,6 +257,13 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 	plains.Store(plain, true)
 
 	return b, nil
+}
+
+// Singleton reports whether the plain type is a singleton: one with neither
+// label fields nor a Meta field, which cannot read a name, so its block is
+// written without labels, i.e. runner {}, and a module holds one of it.
+func (b *Built) Singleton() bool {
+	return len(b.labels) == 0 && b.meta == nil
 }
 
 // plains holds every plain type Build has built, so a value of one can be

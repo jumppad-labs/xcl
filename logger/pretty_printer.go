@@ -12,6 +12,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jumppad-labs/xcl/internal/plaintype"
+	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/mitchellh/go-wordwrap"
@@ -476,6 +477,11 @@ func (p *ResourcePrinter) addResourceFields(resource any, fields *[]struct {
 		// Skip the marker naming a plain type, which is xcl's and not
 		// configuration
 		if field.Name == plaintype.MarkerField {
+			continue
+		}
+
+		// Skip the marker of a singleton built from a schema, likewise
+		if field.Name == schema.SingletonField {
 			continue
 		}
 

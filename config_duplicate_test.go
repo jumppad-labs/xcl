@@ -29,6 +29,26 @@ agent "claude" {
 }
 `
 
+func TestValidateRefusesABlockWithoutItsLabel(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	local := registry.NewLocal()
+	registry.Register[plain.Agent](local, "agent")
+
+	path := filepath.Join(t.TempDir(), "main.xcl")
+	require.NoError(t, os.WriteFile(path, []byte(`agent { models = ["opus"] }`), 0o644))
+
+	c, err := NewConfig(WithRegistry(local))
+	require.NoError(t, err)
+
+	err = c.Validate(path)
+	require.Error(t, err)
+
+	d := requireDiagnostic(t, err)
+	require.Equal(t, "Missing label", d.Summary)
+	require.Equal(t, `agent takes a label: write it as agent "<label>" { … }.`, d.Detail)
+}
+
 func TestValidateRefusesAnEntityDeclaredTwice(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 

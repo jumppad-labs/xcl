@@ -109,28 +109,8 @@ func (l *Local) RegisterType(prototype any, name ...string) {
 	l.types = append(l.types, declared)
 }
 
-// RegisterSingleton declares prototype, a plain Go type, as a block type
-// written without labels, of which a module holds at most one:
-//
-//	local.RegisterSingleton(&Runner{}, "runner") // runner {}
-//
-// It is addressed by its type alone, i.e. runner.server. prototype is as
-// RegisterType takes it, without label fields when it is a plain struct. A
-// declaration that is wrong on every run panics here, as RegisterType's do;
-// one that clashes with another is returned by xcl.NewConfig.
-func (l *Local) RegisterSingleton(prototype any, name string) {
-	if err := declaration.ValidateSingleton(prototype, name); err != nil {
-		panic(fmt.Sprintf("xcl: registry %s: %s", LocalName, err))
-	}
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.types = append(l.types, Type{Type: name, Singleton: true, Prototype: prototype})
-}
-
-// Types returns the Go types declared with RegisterType and RegisterSingleton,
-// in the order they were registered, or nil when none were
+// Types returns the Go types declared with RegisterType, in the order they
+// were registered, or nil when none were
 func (l *Local) Types() []Type {
 	l.mu.Lock()
 	defer l.mu.Unlock()
