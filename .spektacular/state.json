@@ -15,10 +15,9 @@
     "split",
     "finished"
   ],
-  "created_at": "2026-10-11T23:20:13.214174113Z",
-  "updated_at": "2026-10-11T23:22:38.056876429Z",
+  "created_at": "2026-10-14T05:24:50.317701281Z",
+  "updated_at": "2026-10-14T05:42:02.65641008Z",
   "data": {
-    "epic": "20261010160411-19b965db-language-reference",
-    "name": "20261011232013-da18c586-python-release-hardening"
+    "name": "20261014052450-0b131707-ci-release-automation"
   }
 }

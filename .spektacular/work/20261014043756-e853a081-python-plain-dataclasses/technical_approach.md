@@ -1,0 +1,8 @@
+- Registration takes the block's type and optional subtype alongside the class, in the same shape as Go's `Register[T](registry, type, subtype)`.
+- Each configuration builds its own type-to-class map from its registries; untyped lookups use it, and the process-wide class registry goes away.
+- An event carries what it needs to hydrate its entity with the emitting configuration's classes.
+- The metadata, disabled and dependency fields are recognised by name on a plain data class, following the Go plain-struct rule, and are excluded from the declared schema.
+- Field shapes stay inferred from annotations; the field-options helper remains only for renaming, treating a data class as an object value, and marking a block's name label.
+- The removed names stay importable just long enough to raise a clear migration error.
+- Ship order: merge the xcl parity-fixture change; point xcl-python's tested xcl ref at it and merge the Python change; move the ref to the new tag when xcl is tagged; update the website alongside.
+- Risk: the breaking change touches every existing test, the README and the website's Python tabs; the plan should treat that migration as real work.
