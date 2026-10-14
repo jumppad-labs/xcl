@@ -12,6 +12,13 @@ concurrency:
   group: auto-tag
   cancel-in-progress: false
 
+# the shared auto-tag reads the merged pull request's labels; a called
+# workflow can only use the permissions its caller grants, and the
+# repository's default token can read contents alone
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   tag:
     uses: ./.github/workflows/auto-tag.yml

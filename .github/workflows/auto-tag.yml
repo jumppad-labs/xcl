@@ -17,11 +17,16 @@
 #   concurrency:
 #     group: auto-tag
 #     cancel-in-progress: false
+#   permissions:
+#     contents: read
+#     pull-requests: read
 #   jobs:
 #     tag:
 #       uses: jumppad-labs/xcl/.github/workflows/auto-tag.yml@main
 #       secrets: inherit
 #
+# The permissions are required: a called workflow cannot use more than its
+# caller grants, and without pull-requests: read the run fails to start.
 # The caller's repository needs the secrets RELEASE_APP_ID and
 # RELEASE_APP_PRIVATE_KEY, and the App installed on it.
 
