@@ -1,31 +1,23 @@
 {
-  "kind": "plan",
+  "kind": "spec",
   "current_step": "finished",
   "completed_steps": [
     "new",
+    "interview",
     "overview",
-    "discovery",
-    "architecture",
-    "components",
-    "data_structures",
-    "implementation_detail",
-    "dependencies",
-    "testing_approach",
-    "milestones",
-    "tasks",
-    "open_questions",
-    "out_of_scope",
-    "assemble",
+    "requirements",
+    "acceptance_criteria",
+    "constraints",
+    "technical_approach",
+    "success_metrics",
+    "non_goals",
     "verification",
-    "write_plan",
-    "write_context",
-    "write_research",
-    "walkthrough",
+    "split",
     "finished"
   ],
-  "created_at": "2026-10-14T05:44:02.715028254Z",
-  "updated_at": "2026-10-14T06:01:45.534490795Z",
+  "created_at": "2026-10-14T11:28:37.466019625Z",
+  "updated_at": "2026-10-14T11:46:05.87143606Z",
   "data": {
-    "name": "20261014052450-0b131707-ci-release-automation"
+    "name": "20261014112837-57d1afde-python-plain-dataclasses"
   }
 }

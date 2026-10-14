@@ -165,7 +165,7 @@ The workflow YAML itself is not tested by any test that reads it (project conven
 
 **Validation point:** On each repo, a PR with no label is blocked, adding one label unblocks it, and adding a second blocks it again. The label-decision unit tests pass in xcl's CI.
 
-#### - [ ] Task: Release decision command
+#### - [x] Task: Release decision command
 **Id:** 699b935b-aab4-49f8-a96c-8f0cdd8b1341
 **Repo:** xcl
 **Depends on:** none
@@ -176,13 +176,13 @@ Adds a small command to xcl that holds the two release decisions: whether a PR's
 *Technical detail:* [context.md#task-release-decision-command](./context.md#task-release-decision-command)
 
 **Acceptance criteria**:
-- [ ] A PR with exactly one of `major`, `minor`, `patch` or `no-release` is accepted, and one with none, two, or only unrelated labels is rejected with a message saying which.
-- [ ] From `v0.7.0`, `patch` gives `v0.7.1`, `minor` gives `v0.8.0` and `major` gives `v1.0.0`; above 1.0, `major` advances the major number.
-- [ ] `no-release` gives no version, and a repository with no version tags is reported as needing a seed tag.
-- [ ] Tags that are not plain versions are ignored when finding the latest one.
-- [ ] The bump size between two versions is reported as major, minor or patch.
+- [x] A PR with exactly one of `major`, `minor`, `patch` or `no-release` is accepted, and one with none, two, or only unrelated labels is rejected with a message saying which.
+- [x] From `v0.7.0`, `patch` gives `v0.7.1`, `minor` gives `v0.8.0` and `major` gives `v1.0.0`; above 1.0, `major` advances the major number.
+- [x] `no-release` gives no version, and a repository with no version tags is reported as needing a seed tag.
+- [x] Tags that are not plain versions are ignored when finding the latest one.
+- [x] The bump size between two versions is reported as major, minor or patch.
 
-#### - [ ] Task: Shared release-label check for xcl
+#### - [x] Task: Shared release-label check for xcl
 **Id:** 828f193f-0ff6-46cb-bfbb-4618dde9043c
 **Repo:** xcl
 **Depends on:**
@@ -194,11 +194,11 @@ Adds the shared label check that any participating repository can call. It runs 
 *Technical detail:* [context.md#task-shared-release-label-check-for-xcl](./context.md#task-shared-release-label-check-for-xcl)
 
 **Acceptance criteria**:
-- [ ] Every xcl PR shows a "release label" check that is red without a release label and green with exactly one.
-- [ ] Adding or removing a label re-runs the check without a new push.
-- [ ] Another repository can use the same check by referring to it, with no copy of its logic.
+- [x] Every xcl PR shows a "release label" check that is red without a release label and green with exactly one.
+- [x] Adding or removing a label re-runs the check without a new push.
+- [x] Another repository can use the same check by referring to it, with no copy of its logic.
 
-#### - [ ] Task: Release-label check on xcl-python
+#### - [x] Task: Release-label check on xcl-python
 **Id:** 8d5b6c9c-55e8-4cac-91a3-1075f28a8f09
 **Repo:** xcl-python
 **Depends on:**
@@ -210,9 +210,9 @@ Makes xcl-python call xcl's shared label check for its pull requests, so both re
 *Technical detail:* [context.md#task-release-label-check-on-xcl-python](./context.md#task-release-label-check-on-xcl-python)
 
 **Acceptance criteria**:
-- [ ] Every xcl-python PR shows the same "release label" check, behaving as it does on xcl.
+- [x] Every xcl-python PR shows the same "release label" check, behaving as it does on xcl.
 
-#### - [ ] Task: Labels and label rule on xcl
+#### - [x] Task: Labels and label rule on xcl
 **Id:** 8828f594-b3c0-470a-9c3d-9e194d85f0e9
 **Repo:** xcl
 **Depends on:**
@@ -224,10 +224,10 @@ Creates the four release labels on xcl and protects `main` so the release-label 
 *Technical detail:* [context.md#task-labels-and-label-rule-on-xcl](./context.md#task-labels-and-label-rule-on-xcl)
 
 **Acceptance criteria**:
-- [ ] xcl has the labels `major`, `minor`, `patch` and `no-release`.
-- [ ] An xcl PR can't be merged while its release-label check is red.
+- [x] xcl has the labels `major`, `minor`, `patch` and `no-release`.
+- [x] An xcl PR can't be merged while its release-label check is red.
 
-#### - [ ] Task: Labels and label rule on xcl-python
+#### - [x] Task: Labels and label rule on xcl-python
 **Id:** 31fbb5e2-6d78-4147-93c7-bbe2eb1af0ae
 **Repo:** xcl-python
 **Depends on:**
@@ -239,8 +239,8 @@ Creates the four release labels on xcl-python and protects `main` so the release
 *Technical detail:* [context.md#task-labels-and-label-rule-on-xcl-python](./context.md#task-labels-and-label-rule-on-xcl-python)
 
 **Acceptance criteria**:
-- [ ] xcl-python has the labels `major`, `minor`, `patch` and `no-release`.
-- [ ] An xcl-python PR can't be merged while its release-label check is red.
+- [x] xcl-python has the labels `major`, `minor`, `patch` and `no-release`.
+- [x] An xcl-python PR can't be merged while its release-label check is red.
 
 ### Milestone 2: Engine pull requests are checked against Python
 
@@ -248,7 +248,7 @@ Creates the four release labels on xcl-python and protects `main` so the release
 
 **Validation point:** A harmless xcl PR shows a green Python check. A deliberately breaking draft PR shows red and can't merge, and turns mergeable once `breaks-bindings` is added. xcl-python PRs still run their full suite.
 
-#### - [ ] Task: Reusable Python test suite
+#### - [x] Task: Reusable Python test suite
 **Id:** b5ff6015-12a9-4963-b38a-3a4b4a5b701a
 **Repo:** xcl-python
 **Depends on:** none
@@ -259,11 +259,11 @@ Turns xcl-python's existing CI jobs into one reusable suite that can test any xc
 *Technical detail:* [context.md#task-reusable-python-test-suite](./context.md#task-reusable-python-test-suite)
 
 **Acceptance criteria**:
-- [ ] xcl-python PRs still run every platform, Python version, Alpine and in-process job they run today.
-- [ ] One "result" check summarises the suite, and is red if any job failed or was cancelled.
-- [ ] The suite can be started from another repository with a chosen xcl commit, and then tests xcl-python `main` against that commit.
+- [x] xcl-python PRs still run every platform, Python version, Alpine and in-process job they run today.
+- [x] One "result" check summarises the suite, and is red if any job failed or was cancelled.
+- [x] The suite can be started from another repository with a chosen xcl commit, and then tests xcl-python `main` against that commit.
 
-#### - [ ] Task: Bindings check on xcl pull requests
+#### - [x] Task: Bindings check on xcl pull requests
 **Id:** 7eb07133-4391-4146-bec2-7305bd75098e
 **Repo:** xcl
 **Depends on:**
@@ -280,7 +280,7 @@ Runs the Python suite against every xcl PR's own commit and adds a single "bindi
 - [ ] Removing `breaks-bindings` runs the suite again and the gate follows its result.
 - [ ] Changing any other label never leaves the gate green when the suite is red.
 
-#### - [ ] Task: Require the bindings gate on xcl
+#### - [x] Task: Require the bindings gate on xcl
 **Id:** e0e8b774-7843-4f0b-a63f-2d12aaa37810
 **Repo:** xcl
 **Depends on:**
@@ -293,9 +293,9 @@ Creates the `breaks-bindings` label on xcl and adds the "bindings" gate to `main
 *Technical detail:* [context.md#task-require-the-bindings-gate-on-xcl](./context.md#task-require-the-bindings-gate-on-xcl)
 
 **Acceptance criteria**:
-- [ ] An xcl PR with a red bindings gate can't be merged, and only people who can label PRs can apply `breaks-bindings`.
+- [x] An xcl PR with a red bindings gate can't be merged, and only people who can label PRs can apply `breaks-bindings`.
 
-#### - [ ] Task: Require the test result on xcl-python
+#### - [x] Task: Require the test result on xcl-python
 **Id:** 70865473-b724-471e-b760-c98819de1160
 **Repo:** xcl-python
 **Depends on:**
@@ -308,7 +308,7 @@ Adds the suite's single result check to xcl-python's required checks, so nothing
 *Technical detail:* [context.md#task-require-the-test-result-on-xcl-python](./context.md#task-require-the-test-result-on-xcl-python)
 
 **Acceptance criteria**:
-- [ ] An xcl-python PR with a failing suite can't be merged.
+- [x] An xcl-python PR with a failing suite can't be merged.
 
 ### Milestone 3: Merging releases automatically, and Python versions independently
 
@@ -316,7 +316,7 @@ Adds the suite's single result check to xcl-python's required checks, so nothing
 
 **Validation point:** A `patch` PR merged on xcl-python publishes the next Python patch to PyPI, with no xcl tag, and the installed package reports the pinned engine. A `no-release` merge creates no tag. An xcl `patch` merge produces the next xcl tag, a signed release, and generated notes.
 
-#### - [ ] Task: Release App on xcl
+#### - [x] Task: Release App on xcl
 **Id:** 7577a52a-6f60-4f51-8d45-55a5b14bbe76
 **Repo:** xcl
 **Depends on:** none
@@ -327,10 +327,10 @@ Creates the jumppad-labs release GitHub App, installs it on xcl and xcl-python, 
 *Technical detail:* [context.md#task-release-app-on-xcl](./context.md#task-release-app-on-xcl)
 
 **Acceptance criteria**:
-- [ ] The App is installed on xcl and xcl-python with the permissions listed in the technical detail.
-- [ ] xcl has the secrets `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY`.
+- [x] The App is installed on xcl and xcl-python with the permissions listed in the technical detail.
+- [x] xcl has the secrets `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY`.
 
-#### - [ ] Task: Release App secrets on xcl-python
+#### - [x] Task: Release App secrets on xcl-python
 **Id:** 5715f137-a3e9-436f-92cc-7c3eb5e3fbf2
 **Repo:** xcl-python
 **Depends on:**
@@ -342,7 +342,7 @@ Stores the release App's ID and private key as secrets on xcl-python.
 *Technical detail:* [context.md#task-release-app-secrets-on-xcl-python](./context.md#task-release-app-secrets-on-xcl-python)
 
 **Acceptance criteria**:
-- [ ] xcl-python has the secrets `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY`.
+- [x] xcl-python has the secrets `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY`.
 
 #### - [ ] Task: Auto-tag on merge
 **Id:** 5ea16ccb-c247-4391-9f8d-0e6dee7ad720
@@ -357,11 +357,11 @@ Adds the shared auto-tag workflow and calls it from xcl on every push to `main`.
 *Technical detail:* [context.md#task-auto-tag-on-merge](./context.md#task-auto-tag-on-merge)
 
 **Acceptance criteria**:
-- [ ] Merging a `patch`, `minor` or `major` PR on xcl creates the next tag, and the signed engine release runs for it with no manual step.
-- [ ] Merging a `no-release` PR creates no tag.
+- [x] Merging a `patch`, `minor` or `major` PR on xcl creates the next tag, and the signed engine release runs for it with no manual step.
+- [x] Merging a `no-release` PR creates no tag.
 - [ ] Two merges in quick succession get two consecutive versions, never the same one.
 
-#### - [ ] Task: Python checks against its pinned engine
+#### - [x] Task: Python checks against its pinned engine
 **Id:** 8017cbb4-a82a-4327-a7a2-b352892858c2
 **Repo:** xcl-python
 **Depends on:** none
@@ -372,11 +372,11 @@ Separates the engine version from the package version. The package records the e
 *Technical detail:* [context.md#task-python-checks-against-its-pinned-engine](./context.md#task-python-checks-against-its-pinned-engine)
 
 **Acceptance criteria**:
-- [ ] A package whose version differs from its engine's runs when the engine matches the pin.
-- [ ] It refuses an engine that doesn't match the pin, naming the expected and actual versions.
-- [ ] `xcl.engine_version()` still reports the running engine, and development builds and the full test suite still pass.
+- [x] A package whose version differs from its engine's runs when the engine matches the pin.
+- [x] It refuses an engine that doesn't match the pin, naming the expected and actual versions.
+- [x] `xcl.engine_version()` still reports the running engine, and development builds and the full test suite still pass.
 
-#### - [ ] Task: Seed tag for xcl-python
+#### - [x] Task: Seed tag for xcl-python
 **Id:** 69655b3f-f8d2-411b-a194-17f0070210f5
 **Repo:** xcl-python
 **Depends on:** none
@@ -387,9 +387,9 @@ Tags the xcl-python commit that produced the 0.7.0 package on PyPI as `v0.7.0`, 
 *Technical detail:* [context.md#task-seed-tag-for-xcl-python](./context.md#task-seed-tag-for-xcl-python)
 
 **Acceptance criteria**:
-- [ ] xcl-python has a `v0.7.0` tag on the commit that shipped 0.7.0, and no other version tags.
+- [x] xcl-python has a `v0.8.0` tag on the commit that shipped 0.8.0, and no other version tags (moved from `v0.7.0`; see the changelog).
 
-#### - [ ] Task: Python releases from its own tags
+#### - [x] Task: Python releases from its own tags
 **Id:** 81b6a536-fbd2-4b76-9645-9c1a7d8f65b4
 **Repo:** xcl-python
 **Depends on:**
@@ -404,10 +404,10 @@ Moves the Python release from xcl's dispatch to xcl-python's own tags, and adds 
 *Technical detail:* [context.md#task-python-releases-from-its-own-tags](./context.md#task-python-releases-from-its-own-tags)
 
 **Acceptance criteria**:
-- [ ] Merging a `patch` PR on xcl-python publishes the next patch to PyPI with no xcl tag or release.
-- [ ] The installed package reports and checks the pinned engine, not its own version.
-- [ ] The xcl-python GitHub release lists the merged PRs and names the bundled engine.
-- [ ] The xcl release dispatch no longer publishes Python by itself.
+- [x] Merging a `patch` PR on xcl-python publishes the next patch to PyPI with no xcl tag or release.
+- [x] The installed package reports and checks the pinned engine, not its own version.
+- [x] The xcl-python GitHub release lists the merged PRs and names the bundled engine.
+- [x] The xcl release dispatch no longer publishes Python by itself.
 
 ### Milestone 4: Engine releases reach Python by themselves, and the process is documented
 
@@ -415,7 +415,7 @@ Moves the Python release from xcl's dispatch to xcl-python's own tags, and adds 
 
 **Validation point:** An xcl `patch` release is followed, with no maintainer action, by a merged pin-update PR and a published Python patch bundling the new engine. A pin-update PR forced red stays open and unpublished. Both README sections are reviewed.
 
-#### - [ ] Task: Engine release tells bindings its size
+#### - [x] Task: Engine release tells bindings its size
 **Id:** eb9aaca4-4d9d-467b-a20d-aa6db201cc17
 **Repo:** xcl
 **Depends on:**
@@ -427,8 +427,8 @@ Makes the xcl release include the bump size, worked out from the previous tag, i
 *Technical detail:* [context.md#task-engine-release-tells-bindings-its-size](./context.md#task-engine-release-tells-bindings-its-size)
 
 **Acceptance criteria**:
-- [ ] An xcl release tells xcl-python both the new tag and whether it was a major, minor or patch release.
-- [ ] The engine archives, signature and generated release notes are produced exactly as before.
+- [x] An xcl release tells xcl-python both the new tag and whether it was a major, minor or patch release.
+- [x] The engine archives, signature and generated release notes are produced exactly as before.
 
 #### - [ ] Task: Engine update pull requests in xcl-python
 **Id:** 96df2316-c5ca-4ffb-994f-9cfa219cb3be
@@ -447,7 +447,7 @@ When xcl releases, xcl-python opens a pull request that moves its engine pin to 
 - [ ] When its checks pass it merges by itself and a Python release follows.
 - [ ] When its checks fail it stays open and nothing is published.
 
-#### - [ ] Task: Allow auto-merge on xcl-python
+#### - [x] Task: Allow auto-merge on xcl-python
 **Id:** 6b084007-03f2-4d30-b38d-df65a8b51697
 **Repo:** xcl-python
 **Depends on:**
@@ -459,9 +459,9 @@ Turns on "Allow auto-merge" for xcl-python, so the engine update PRs can merge t
 *Technical detail:* [context.md#task-allow-auto-merge-on-xcl-python](./context.md#task-allow-auto-merge-on-xcl-python)
 
 **Acceptance criteria**:
-- [ ] xcl-python allows auto-merge, and auto-merge waits for the required checks.
+- [x] xcl-python allows auto-merge, and auto-merge waits for the required checks.
 
-#### - [ ] Task: Document the release process in xcl
+#### - [x] Task: Document the release process in xcl
 **Id:** b40284cd-3208-44dd-94aa-3ed44163b66e
 **Repo:** xcl
 **Depends on:**
@@ -474,9 +474,9 @@ Adds a "Releases" section to xcl's README covering the release labels, the bindi
 *Technical detail:* [context.md#task-document-the-release-process-in-xcl](./context.md#task-document-the-release-process-in-xcl)
 
 **Acceptance criteria**:
-- [ ] A contributor can learn from xcl's README which label to use, what happens when they merge, how to override a binding failure, and how an engine fix reaches Python.
+- [x] A contributor can learn from xcl's README which label to use, what happens when they merge, how to override a binding failure, and how an engine fix reaches Python.
 
-#### - [ ] Task: Document releases and the engine pin in xcl-python
+#### - [x] Task: Document releases and the engine pin in xcl-python
 **Id:** 334cfd14-110e-46b4-b4b9-34786b1c8fa7
 **Repo:** xcl-python
 **Depends on:**
@@ -488,8 +488,8 @@ Adds a short section to xcl-python's README on its release labels, its own versi
 *Technical detail:* [context.md#task-document-releases-and-the-engine-pin-in-xcl-python](./context.md#task-document-releases-and-the-engine-pin-in-xcl-python)
 
 **Acceptance criteria**:
-- [ ] xcl-python's README explains its labels and engine pin and links to xcl's release section.
-- [ ] Nothing in xcl-python's README still says the package version equals the engine version.
+- [x] xcl-python's README explains its labels and engine pin and links to xcl's release section.
+- [x] Nothing in xcl-python's README still says the package version equals the engine version.
 
 ## Open Questions
 
@@ -507,3 +507,247 @@ Adds a short section to xcl-python's README on its release labels, its own versi
 - **Same-branch-name coordination.** Coordinated breaking changes use the `breaks-bindings` override, not automatic branch matching.
 - **Replacing `XCL_PYTHON_DISPATCH_TOKEN` with the App token.** It still works and is left as is; swapping it is an optional later tidy-up.
 - **Avoiding suite re-runs on unrelated label changes.** Accepted for correctness; a gate that replays the previous result is a possible later optimisation.
+
+## Changelog
+
+
+### 2026-10-14 — Task: Release decision command
+
+**What was done**: Added `internal/release`, which decides the release size from a PR's labels, the next version from the existing tags, and the bump size between two tags, and the `xcl-release` command (`labels`, `next`, `bump`) that the release workflows will run. 47 unit tests cover the rules and the command.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl: internal/release/labels.go`
+- `xcl: internal/release/version.go`
+- `xcl: internal/release/labels_test.go`
+- `xcl: internal/release/version_test.go`
+- `xcl: cmd/xcl-release/main.go`
+- `xcl: cmd/xcl-release/main_test.go`
+
+**Discoveries**: Version parsing rejects leading zeros and pre-release tags, so a tag like `v0.9.0-rc1` never becomes the base for the next version.
+
+### 2026-10-14 — Task: Shared release-label check for xcl
+
+**What was done**: Added the reusable `release-label-check.yml`, which checks out xcl and runs `xcl-release labels` against the calling PR's labels, and `release-label.yml`, which runs it on every xcl PR open, push and label change against the PR's own copy of the rule.
+
+**Deviations**: The reusable workflow takes an `xcl-ref` input (default `main`). xcl's own caller passes the PR head SHA so the check works on the PR that introduces it and checks rule changes against themselves. Acceptance criteria are left unchecked until the check has been seen running on a real PR after push.
+
+**Files changed**:
+- `xcl: .github/workflows/release-label-check.yml`
+- `xcl: .github/workflows/release-label.yml`
+
+**Discoveries**: Labels are passed to the script through an environment variable and split with `jq`, never interpolated into the shell, since anyone who can label a PR chooses the text. A hostile label name was tested and is passed through as plain data.
+
+### 2026-10-14 — Task: Release-label check on xcl-python
+
+**What was done**: Added `release-label.yml` to xcl-python, which calls xcl's shared release-label check on every PR open, push and label change.
+
+**Deviations**: None. Acceptance is observed live: the check can only run once xcl's shared workflow is on xcl `main`.
+
+**Files changed**:
+- `xcl-python: .github/workflows/release-label.yml`
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Labels and label rule on xcl
+
+**What was done**: The maintainer created the four release labels on xcl and xcl-python, and an active ruleset "Main" on xcl requiring `release-label / release-label`, `build`, `Build on minimum supported Go`, `Build and smoke-test libxcl`, `Test xcl-core on Windows` and the five example jobs. PR jumppad-labs/xcl#19 was blocked without a label, went green with `no-release`, and was merged.
+
+**Deviations**: The first version of the ruleset also required the `Build <platform>` jobs from `libxcl-build.yml`, which run only by hand, and blocked #19. They were removed, and `docs/release-setup.md` now lists the exact check names with a warning.
+
+**Files changed**:
+- `xcl: docs/release-setup.md`
+
+**Discoveries**: The required-check picker offers every check name the repo has ever seen, including jobs from manual-only workflows. Requiring one blocks every PR with no error, just a check that never reports.
+
+### 2026-10-14 — Task: Labels and label rule on xcl-python
+
+**What was done**: The maintainer created the four release labels on xcl-python and an active ruleset "main" requiring `release-label / release-label` and `Check the package`. PR jumppad-labs/xcl-python#6 failed the label check with no label, which proves the cross-repo call to xcl's shared check works. It passed with `no-release` and was merged.
+
+**Deviations**: None.
+
+**Files changed**:
+- None (repository settings only).
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Reusable Python test suite
+
+**What was done**: Moved every xcl-python CI job into the reusable `test.yml`, with `python-ref` and `xcl-ref` inputs, explicit repositories on every checkout, and a final `result` gate that fails unless every job succeeded. `ci.yml` now calls it with its own commit and the pinned engine. On jumppad-labs/xcl-python#7 all 25 checks passed, including `test / result`, and it was merged.
+
+**Deviations**: Wrapping the jobs in a called workflow renames every check to `test / <job>`, so the required `Check the package` check never reported again. The ruleset was changed to require `test / result` before #7 could merge, and `docs/release-setup.md` now says to make that swap.
+
+**Files changed**:
+- `xcl-python: .github/workflows/test.yml`
+- `xcl-python: .github/workflows/ci.yml`
+- `xcl: docs/release-setup.md`
+
+**Discoveries**: Moving jobs into a reusable workflow renames their checks to `<caller job> / <job>`, so any required check pointing at the old name silently blocks every PR. Require a single gate job instead of individual jobs.
+
+### 2026-10-14 — Task: Bindings check on xcl pull requests
+
+**What was done**: Added `bindings.yml` to xcl. It calls xcl-python's `test.yml@main` with the PR's head commit as `xcl-ref`, and has a `bindings` gate that always runs. The gate passes when the suite passes or the PR carries `breaks-bindings`, and fails on a failed, cancelled or skipped suite. On jumppad-labs/xcl#20 the suite built the engine from the PR's own commit (`ff69b39`), and `python / result` and `bindings` both passed.
+
+**Deviations**: None. The first run on #20 was cancelled by the concurrency group, because opening a PR with a label fires `opened` and `labeled` together. Its gate correctly reported a failure, and the second run's pass replaced it. The red-PR and override criteria remain to be observed on a deliberately breaking draft PR.
+
+**Files changed**:
+- `xcl: .github/workflows/bindings.yml`
+
+**Discoveries**: Opening a PR with a label already set starts two runs; the cancelled one briefly shows a red gate until the second finishes. This is harmless, but expected noise for anyone watching.
+
+### 2026-10-14 — Task: Require the bindings gate on xcl
+
+**What was done**: The maintainer created the `breaks-bindings` label on xcl and added `bindings` to the `Main` ruleset's required checks, after jumppad-labs/xcl#20 was merged.
+
+**Deviations**: None.
+
+**Files changed**:
+- None (repository settings only).
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Require the test result on xcl-python
+
+**What was done**: The maintainer replaced `Check the package` with `test / result` in xcl-python's `main` ruleset, alongside `release-label / release-label`. This was needed for jumppad-labs/xcl-python#7 to merge.
+
+**Deviations**: Done during the reusable-suite task rather than after it, because the old required check name stopped reporting once the suite moved into `test.yml`.
+
+**Files changed**:
+- None (repository settings only).
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Python checks against its pinned engine
+
+**What was done**: Added `__engine_version__` to `xcl/_version.py`. The client check now compares the engine with it, and `EngineVersionError` carries `expected`. `make engine`/`make libxcl` stamp development engines with it, and the install check reads `ENGINE_TAG`. Tests were updated, with new cases for package and engine versions that differ. Locally the full suite gives 267 passed and 1 skipped (the in-process route was not selected).
+
+**Deviations**: The current xcl-dispatched release (`release.yml` wheels and sdist, and `musl-wheel.sh`) now also stamps `__engine_version__` with the xcl tag, so a release between this change and "Python releases from its own tags" still passes the check. That task replaces it with the pin from `xcl-ref.txt`. `tests/integration/test_load.py` also assumed engine = package version and was updated.
+
+**Files changed**:
+- `xcl-python: xcl/_version.py`
+- `xcl-python: xcl/_client.py`
+- `xcl-python: xcl/_errors.py`
+- `xcl-python: Makefile`
+- `xcl-python: .github/workflows/release.yml`
+- `xcl-python: .github/scripts/musl-wheel.sh`
+- `xcl-python: .github/scripts/install_check.py`
+- `xcl-python: tests/fakes.py`
+- `xcl-python: tests/unit/test_client.py`
+- `xcl-python: tests/integration/test_engine_process.py`
+- `xcl-python: tests/integration/test_load.py`
+
+**Discoveries**: `engine_version()` runs the version check, so it raises on a mismatched engine unless the client was built with `check_version=False`.
+
+### 2026-10-14 — Task: Engine release tells bindings its size
+
+**What was done**: The xcl release's dispatch job now checks out the tags, finds the previous version tag, runs `xcl-release bump`, and sends `client_payload[bump]` with the tag. If there's no earlier version, it sends `minor`. I checked the size logic against the real tags (v0.7.0 minor, v0.5.3 patch) and future ones (v0.7.1 patch, v0.8.0 minor, v1.0.0 major).
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl: .github/workflows/release.yml`
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Release App on xcl
+
+**What was done**: The maintainer created the `xcl release bot` GitHub App, installed it on xcl and xcl-python, and set `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY` on xcl.
+
+**Deviations**: None.
+
+**Files changed**:
+- None (organisation and repository settings only).
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Release App secrets on xcl-python
+
+**What was done**: The maintainer set `RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY` on xcl-python.
+
+**Deviations**: None.
+
+**Files changed**:
+- None (repository settings only).
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Auto-tag on merge (observed)
+
+**What was done**: xcl #26 (`minor`, by a collaborator, carrying the same permission fix as our #24) merged and its Tag run pushed `v0.8.0`, which started the signed engine release. On xcl-python, merging #10 (`no-release`) ran Tag and pushed nothing. #24 was closed as superseded.
+
+**Deviations**: The permission fix landed through #26 rather than #24. The concurrent-merge criterion is still to be observed.
+
+**Files changed**:
+- `xcl:.github/workflows/tag.yml`, `xcl:.github/workflows/auto-tag.yml` (via #26).
+
+**Discoveries**: A PR opened with a label already set starts two Bindings runs (`opened` and `labeled`). Concurrency cancels the first, whose ~23 python jobs show as 1-second failures; the later run's `bindings` gate is the one that counts.
+
+### 2026-10-14 — Task: Seed tag for xcl-python
+
+**What was done**: The maintainer pushed `v0.8.0` on `45f99f3`, before the release moved to xcl-python's own tags.
+
+**Deviations**: Seeded at `v0.8.0` instead of `v0.7.0`. xcl `v0.8.0` was tagged while xcl-python still released on xcl's dispatch, so xcl-lang 0.8.0 was already on PyPI (release run 38547006389, built from `45f99f3`). `docs/release-setup.md` step 4 was updated to match (xcl #27).
+
+**Files changed**:
+- None (tag only).
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Python releases from its own tags
+
+**What was done**: `release.yml` now starts from a `v*` tag (or by hand). It takes the package version from the tag and the engine from `xcl-ref.txt` at that tag, stamps `__engine_version__` with the pin, verifies and bundles the pinned engine, and adds a `github-release` job. A new `tag.yml` calls xcl's shared auto-tag. The `repository_dispatch` trigger was removed (xcl-python #10). Merging #12 (`patch`) tagged `v0.8.1` and published xcl-lang 0.8.1 bundling engine `v0.8.0`. All install checks passed, and the GitHub release lists #9, #10 and #12 and names the engine.
+
+**Deviations**: Release notes start from the previous version tag (`--notes-start-tag`), since xcl-python had tags but no GitHub releases.
+
+**Files changed**:
+- `xcl-python:.github/workflows/release.yml`
+- `xcl-python:.github/workflows/tag.yml` (new)
+- `xcl-python:.github/scripts/musl-wheel.sh`
+
+**Discoveries**: PyPI trusted publishing accepted the tag-triggered run with no change on the PyPI side, which resolves that open question.
+
+### 2026-10-14 — Task: Allow auto-merge on xcl-python
+
+**What was done**: The maintainer set `allow_auto_merge=true` on xcl-python.
+
+**Deviations**: None.
+
+**Files changed**:
+- None (repository settings only).
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Document releases and the engine pin in xcl-python
+
+**What was done**: Install now describes the engine pin and `xcl.engine_version()` instead of "the package version is the xcl release it bundles". A new "Releases and the engine pin" subsection under Development links to xcl's Releases section (xcl-python #12).
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-python:README.md`
+
+**Discoveries**: macOS `test_aio.py:458` has a 50 ms cancel window that flaked at 55 ms on #11's CI.
+
+### 2026-10-14 — Task: Document the release process in xcl
+
+**What was done**: The README gained a Releases section covering the labels table, what merging does, the bindings check and `breaks-bindings`, independent language versions and the engine pin, engine update PRs with the worked example, and what a new language must provide. "Other languages" now links to it. `docs/release-setup.md` step 4 now seeds at `v0.8.0` (xcl #27, `no-release`; its merge ran Tag and pushed nothing, confirming `no-release` on xcl).
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl:README.md`
+- `xcl:docs/release-setup.md`
+
+**Discoveries**: None.
+
+### 2026-10-14 — Task: Engine update pull requests in xcl-python (merged, awaiting first engine release)
+
+**What was done**: Added `engine-bump.yml` (xcl-python #11). On `xcl-release` dispatch, or by hand, it writes the tag to `xcl-ref.txt` on `engine/<tag>` as the App's bot user, opens or updates a PR labelled with the mirrored size, and enables auto-merge (`--merge`). Its merge (`no-release`) created no tag.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-python:.github/workflows/engine-bump.yml` (new)
+
+**Discoveries**: None. The acceptance criteria are not yet observed; the next xcl release exercises them.
