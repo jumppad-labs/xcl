@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/internal/declaration"
 	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/schema"
@@ -111,6 +112,24 @@ func asType(entity any, want reflect.Type) (any, error) {
 		}
 	}
 
+	// a plugin's entity asked for as a plain struct, its plugin's own type,
+	// is copied into the type built from it and handed back as the plain
+	// struct, so its labels and Meta are filled as they are for any plain
+	// type
+	if built, ok := plainFor(entity, want); ok {
+		stored := built.New()
+		if err := schema.UnmarshalUntyped(entity, stored); err != nil {
+			return nil, fmt.Errorf("%w: %w", &xclerrors.TypeMismatchError{
+				Address: entityAddress(entity),
+				Want:    want,
+				Got:     describeType(entity),
+			}, err)
+		}
+
+		// the copy is as the entity's JSON has it, metadata included
+		return built.ToPlain(stored)
+	}
+
 	typed := reflect.New(want).Interface()
 	if err := schema.UnmarshalUntyped(entity, typed); err != nil {
 		// the copy is the last word on whether the entity can be a T, so a
@@ -125,6 +144,32 @@ func asType(entity any, want reflect.Type) (any, error) {
 	}
 
 	return typed, nil
+}
+
+// plainFor builds want, a plain struct, as a block type of entity's shape,
+// one label with a subtype's two, and reports false for a want that embeds
+// types.ResourceBase or cannot be built so
+func plainFor(entity any, want reflect.Type) (*plaintype.Built, bool) {
+	if want.Kind() != reflect.Struct || !declaration.IsPlain(reflect.New(want).Interface()) {
+		return nil, false
+	}
+
+	meta, err := types.GetMeta(entity)
+	if err != nil {
+		return nil, false
+	}
+
+	labels := 1
+	if meta.Subtype != "" {
+		labels = 2
+	}
+
+	built, err := plaintype.Build(want, labels)
+	if err != nil {
+		return nil, false
+	}
+
+	return built, true
 }
 
 // convertibleTo refuses a conversion the entity's own Go type rules out.
@@ -226,7 +271,7 @@ func findByType[T any](c *Config, path ...string) ([]*T, error) {
 // Each result is a pointer to want, and nothing matching gives an empty,
 // non-nil result.
 func (c *Config) entitiesOf(want reflect.Type, path ...string) ([]any, error) {
-	if err := c.addressableType(want); err != nil {
+	if err := c.addressableType(want, path...); err != nil {
 		return nil, err
 	}
 
@@ -363,9 +408,11 @@ func (c *Config) typeable(path []string) error {
 // would read as "you declared none of those", which is not what is true.
 //
 // A type embedding types.ResourceBase is an entity type wherever it is used.
-// A plain struct is one only when it is registered as a block type: the same
-// struct may just as well be a nested block of another.
-func (c *Config) addressableType(want reflect.Type) error {
+// A plain struct is one only when it is registered as a block type, or when
+// path names a type a plugin provides, whose plain struct this process may
+// never have registered: the same struct may just as well be a nested block
+// of another.
+func (c *Config) addressableType(want reflect.Type, path ...string) error {
 	if _, err := types.GetMeta(reflect.New(want).Interface()); err == nil {
 		return nil
 	}
@@ -373,6 +420,18 @@ func (c *Config) addressableType(want reflect.Type) error {
 	if c.catalog != nil {
 		if _, registered := c.catalog.TypePath(want); registered {
 			return nil
+		}
+
+		if len(path) > 0 {
+			subtype := ""
+			if len(path) > 1 {
+				subtype = path[1]
+			}
+
+			// a plugin's type is known with no Go type behind it
+			if info, known := c.catalog.Type(path[0], subtype); known && info.Prototype == nil {
+				return nil
+			}
 		}
 	}
 

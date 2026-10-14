@@ -13,12 +13,15 @@ import (
 	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
+	"github.com/jumppad-labs/xcl/types"
 )
 
-// Gadget is the block type gadget, written gadget "<label>" {}
+// Gadget is the block type gadget, written gadget "<label>" {}. It reads its
+// metadata, which xcl fills and the provider never changes
 type Gadget struct {
 	Handle string `xcl:"handle,label" json:"handle"`
 	Size   int    `xcl:"size,optional" json:"size,omitempty"`
+	Meta   types.Meta
 
 	// Described is computed: the provider writes the label and the size it
 	// received

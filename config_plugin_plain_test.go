@@ -144,6 +144,58 @@ func TestReapplyLeavesExternalPluginPlainTypesAsTheyAre(t *testing.T) {
 	require.Equal(t, "lamp of size 3", gadget.Described)
 }
 
+func TestPlanAfterApplyChangesNothingForInProcessPluginPlainTypes(t *testing.T) {
+	isolateHome(t)
+
+	f := newPersonConfig(t, inProcessPlainRegistry(), writePlainPluginConfig(t, plainPluginConfig), t.TempDir())
+	require.NoError(t, f.config.Apply(f.configFile))
+
+	// a plain type's Meta differs between the saved and the planned entity,
+	// and is not a change
+	changes, err := f.config.Diff([]string{f.configFile})
+	require.NoError(t, err)
+	require.Equal(t, 0, changes.Changed())
+}
+
+func TestPlanAfterApplyChangesNothingForExternalPluginPlainTypes(t *testing.T) {
+	binary := buildPlainPlugin(t)
+	isolateHome(t)
+
+	f := newPersonConfig(t, externalPlainRegistry(binary), writePlainPluginConfig(t, plainPluginConfig), t.TempDir())
+	require.NoError(t, f.config.Apply(f.configFile))
+
+	changes, err := f.config.Diff([]string{f.configFile})
+	require.NoError(t, err)
+	require.Equal(t, 0, changes.Changed())
+}
+
+func TestAReaderFindsAPluginsPlainTypeByItsPath(t *testing.T) {
+	binary := buildPlainPlugin(t)
+	isolateHome(t)
+
+	stateDir := t.TempDir()
+	configFile := writePlainPluginConfig(t, plainPluginConfig)
+
+	applier := newPersonConfig(t, externalPlainRegistry(binary), configFile, stateDir)
+	require.NoError(t, applier.config.Apply(applier.configFile))
+
+	// a separate program reading what was applied, which never registered
+	// the plain types itself
+	reader := newPersonConfig(t, externalPlainRegistry(binary), configFile, stateDir)
+	require.NoError(t, reader.config.Load())
+
+	gadgets, err := FindByType[plainplugin.Gadget](reader.config, "gadget")
+	require.NoError(t, err)
+	require.Len(t, gadgets, 1)
+	require.Equal(t, "lamp", gadgets[0].Handle)
+	require.Equal(t, "gadget.lamp", gadgets[0].Meta.ID)
+	require.Equal(t, "lamp of size 3", gadgets[0].Described)
+
+	hub, err := FindOne[plainplugin.Hub](reader.config, "hub")
+	require.NoError(t, err)
+	require.Equal(t, "10.0.0.1", hub.Dialled)
+}
+
 func TestDestroyRemovesExternalPluginSingleton(t *testing.T) {
 	binary := buildPlainPlugin(t)
 	isolateHome(t)

@@ -254,7 +254,7 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 
 	b.Engine = reflect.StructOf(fields)
 	built.Store(b.Engine, b)
-	plains.Store(plain, true)
+	plains.Store(plain, b)
 
 	return b, nil
 }
@@ -266,9 +266,25 @@ func (b *Built) Singleton() bool {
 	return len(b.labels) == 0 && b.meta == nil
 }
 
-// plains holds every plain type Build has built, so a value of one can be
-// recognised for what it is where the engine type is not to hand.
+// plains holds every plain type Build has built, with how it was built, so a
+// value of one can be recognised for what it is where the engine type is not
+// to hand.
 var plains sync.Map
+
+// LookupPlain returns how plain, or the type a pointer to it points at, was
+// built, and false for a type Build has not built.
+func LookupPlain(plain reflect.Type) (*Built, bool) {
+	for plain.Kind() == reflect.Pointer {
+		plain = plain.Elem()
+	}
+
+	b, ok := plains.Load(plain)
+	if !ok {
+		return nil, false
+	}
+
+	return b.(*Built), true
+}
 
 // IsBuilt reports whether plain, or the type a pointer to it points at, has
 // been built as a plain block type: a value of it is a copy of an entity,
