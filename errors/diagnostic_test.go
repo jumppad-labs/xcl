@@ -197,6 +197,16 @@ func TestADiagnosticWithoutACauseUnwrapsToNil(t *testing.T) {
 	require.Nil(t, NewDiagnostic(unsupported(), nil).Unwrap())
 }
 
+func TestConfigErrorTakesDiagnosticsOneByOne(t *testing.T) {
+	first := NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "First"}, nil)
+	second := NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "Second"}, nil)
+
+	ce := NewConfigError()
+	ce.AppendError(Diagnostics{first, second})
+
+	require.Equal(t, []error{first, second}, ce.Errors)
+}
+
 func TestConfigErrorDiagnosticsLeavesOutOtherErrors(t *testing.T) {
 	diagnostic := NewDiagnostic(unsupported(), nil)
 

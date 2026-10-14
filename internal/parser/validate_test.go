@@ -305,11 +305,12 @@ func TestParseReturnsConfigErrorWhenModuleContentsCannotBeObtained(t *testing.T)
 	// relative spelling written in the configuration.
 	missingDir := filepath.Join(filepath.Dir(dir), "no_such_module_directory")
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
-	require.Equal(t, 1, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "unable to obtain contents for module 'missing' source '"+missingDir+"': lstat "+missingDir+": no such file or directory", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Subject.Filename)
+	require.Equal(t, 1, pe.EntityPos.Start.Line)
+	require.Equal(t, 1, pe.EntityPos.Start.Column)
+	require.Equal(t, "source", pe.Field)
+	require.Equal(t, "unable to obtain contents for module 'missing' source '"+missingDir+"': lstat "+missingDir+": no such file or directory", pe.Detail)
 }
 
 func TestParseDoesNotReportReferencesIntoModuleWhoseContentsCannotBeObtained(t *testing.T) {
@@ -333,13 +334,9 @@ func TestParseDoesNotReportReferencesIntoModuleWhoseContentsCannotBeObtained(t *
 	// before reference validation runs at all.
 	require.Len(t, ce.Errors, 1)
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Contains(t, pe.Message, "unable to obtain contents for module 'missing'")
-	require.NotContains(t, pe.Message, "not defined anywhere in the configuration")
-
-	for _, e := range ce.Errors {
-		require.NotContains(t, e.(*errors.ParserError).Message, "not defined anywhere in the configuration")
-	}
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Contains(t, pe.Detail, "unable to obtain contents for module 'missing'")
+	require.NotContains(t, pe.Detail, "not defined anywhere in the configuration")
 }
 
 func TestParseReturnsConfigErrorWhenModuleSourceIsNotOnTheLocalFilesystem(t *testing.T) {
@@ -363,11 +360,12 @@ func TestParseReturnsConfigErrorWhenModuleSourceIsNotOnTheLocalFilesystem(t *tes
 	joinedSource := filepath.Join(dir, "github.com/jumppad-labs/example")
 	firstMissingSegment := filepath.Join(dir, "github.com")
 
-	pe := ce.Errors[0].(*errors.ParserError)
-	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Filename)
-	require.Equal(t, 1, pe.Line)
-	require.Equal(t, 1, pe.Column)
-	require.Equal(t, "unable to obtain contents for module 'remote' source '"+joinedSource+"': lstat "+firstMissingSegment+": no such file or directory", pe.Message)
+	pe := ce.Errors[0].(*errors.Diagnostic)
+	require.Equal(t, filepath.Join(dir, "main.xcl"), pe.Subject.Filename)
+	require.Equal(t, 1, pe.EntityPos.Start.Line)
+	require.Equal(t, 1, pe.EntityPos.Start.Column)
+	require.Equal(t, "source", pe.Field)
+	require.Equal(t, "unable to obtain contents for module 'remote' source '"+joinedSource+"': lstat "+firstMissingSegment+": no such file or directory", pe.Detail)
 }
 
 // Property validation is stage three, and it runs only once structure and

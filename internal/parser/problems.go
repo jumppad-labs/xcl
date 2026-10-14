@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
@@ -51,6 +53,51 @@ func (p *Parser) inBlock(b *hclsyntax.Block, module string, subject *hcl.Range, 
 	_, entity := p.blockResource(b, module)
 
 	return pr.diagnostic(p.parsedResources.sources, entity, &header, b.Body, subject)
+}
+
+// placer makes the diagnostic for a problem at subject within one block, or
+// at the block's header when subject is nil
+type placer func(subject *hcl.Range, pr problem) *errors.Diagnostic
+
+// inDeclaration returns the placer for the block b, which declares resource
+func (p *Parser) inDeclaration(resource any, b *hclsyntax.Block) placer {
+	id := ""
+	if meta, err := types.GetMeta(resource); err == nil {
+		id = meta.ID
+	}
+
+	header := b.DefRange()
+
+	return func(subject *hcl.Range, pr problem) *errors.Diagnostic {
+		return pr.diagnostic(p.parsedResources.sources, id, &header, b.Body, subject)
+	}
+}
+
+// invalidName is the problem with a block whose name is not valid
+func invalidName(err error) problem {
+	return problem{summary: "Invalid name", detail: err.Error(), cause: err}
+}
+
+// missingMeta is the problem with an entity xcl made but can not read the
+// meta of, which never happens to a type it accepted
+func missingMeta(err error) problem {
+	return problem{
+		summary: "Internal error",
+		detail:  fmt.Sprintf("unable to get resource meta: %s", err),
+		cause:   err,
+	}
+}
+
+// invalidReferences is the problem with the attribute a, whose references
+// could not be read, placed at its value
+func invalidReferences(at placer, a *hclsyntax.Attribute, err error) *errors.Diagnostic {
+	value := a.Expr.Range()
+
+	return at(&value, problem{
+		summary: "Invalid reference",
+		detail:  fmt.Sprintf("The references in %s could not be read: %s", a.Name, err),
+		cause:   err,
+	})
 }
 
 // inEntity makes the diagnostic for problem in the parsed entity id: at

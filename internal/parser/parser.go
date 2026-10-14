@@ -889,12 +889,10 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 
 		// check the resource has a name
 		if len(b.Labels) == 0 {
-			de := errors.NewParserError(
-				file,
-				b.TypeRange.Start.Line,
-				b.TypeRange.Start.Column,
-				fmt.Sprintf("resource '%s' has no name, please specify resources using the syntax 'resource_type \"name\" {}'", b.Type),
-			)
+			de := p.inBlock(b, module, nil, problem{
+				summary: "Missing name",
+				detail:  fmt.Sprintf("resource '%s' has no name, please specify resources using the syntax 'resource_type \"name\" {}'", b.Type),
+			})
 
 			emitParse(&p.options, "", "", file, de)
 			blockErrors = append(blockErrors, de)
@@ -924,12 +922,10 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 			// "resource" always is, any other keyword only once something
 			// is registered under it
 			if _, known := p.takesSubtype(b.Type); !known {
-				de := errors.NewParserError(
-					file,
-					b.TypeRange.Start.Line,
-					b.TypeRange.Start.Column,
-					fmt.Sprintf("unable to process stanza '%s' in file %s at %d,%d , '%s' is not a known type", b.Type, file, b.Range().Start.Line, b.Range().Start.Column, b.Type),
-				)
+				de := p.inBlock(b, module, nil, problem{
+					summary: "Unknown block type",
+					detail:  fmt.Sprintf("'%s' is not a known type: it is not a builtin block, and no type is registered under it.", b.Type),
+				})
 
 				emitParse(&p.options, "", "", file, de)
 				blockErrors = append(blockErrors, de)
@@ -1009,74 +1005,32 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 	var rt any
 	var err error
 
+	fail := func(pr problem) error {
+		return p.inBlock(b, moduleName, nil, pr)
+	}
+
 	switch b.Type {
-	case resources.TypeOutput:
-		// If the type is output check there is one label
+	case resources.TypeOutput, resources.TypeVariable:
+		// an output or a variable has one label, its name
 		if len(b.Labels) != 1 {
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = `invalid formatting for 'output' stanza, resources should have a name and a type, i.e. 'output "name" {}'`
-
-			return de
+			return fail(problem{
+				summary: "Invalid block labels",
+				detail:  fmt.Sprintf(`invalid formatting for '%s' stanza, resources should have a name and a type, i.e. '%s "name" {}'`, b.Type, b.Type),
+			})
 		}
 
 		name := b.Labels[0]
 		if err := validateResourceName(name); err != nil {
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = err.Error()
-
-			return de
+			return fail(invalidName(err))
 		}
 
-		rt, err = p.createBuiltinResource(resources.TypeOutput, name)
+		rt, err = p.createBuiltinResource(b.Type, name)
 		if err != nil {
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = fmt.Sprintf(`unable to create output, this error should never happen %s`, err)
-			de.Cause = err
-
-			return de
-		}
-	case resources.TypeVariable:
-		// If the type is variable check there is one label
-		if len(b.Labels) != 1 {
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = `invalid formatting for 'variable' stanza, resources should have a name and a type, i.e. 'variable "name" {}'`
-
-			return de
-		}
-
-		name := b.Labels[0]
-		if err := validateResourceName(name); err != nil {
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = err.Error()
-
-			return de
-		}
-
-		rt, err = p.createBuiltinResource(resources.TypeVariable, name)
-		if err != nil {
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = fmt.Sprintf(`unable to create variable, this error should never happen %s`, err)
-			de.Cause = err
-
-			return de
+			return fail(problem{
+				summary: "Internal error",
+				detail:  fmt.Sprintf(`unable to create %s, this error should never happen %s`, b.Type, err),
+				cause:   err,
+			})
 		}
 
 	default:
@@ -1094,33 +1048,21 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 			subtype = b.Labels[0]
 			name = b.Labels[1]
 		case takes:
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = fmt.Sprintf(`invalid format for '%s', it is declared with a subtype and a name, i.e. '%s "subtype" "name" {}'`, b.Type, b.Type)
-
-			return de
+			return fail(problem{
+				summary: "Invalid block labels",
+				detail:  fmt.Sprintf(`invalid format for '%s', it is declared with a subtype and a name, i.e. '%s "subtype" "name" {}'`, b.Type, b.Type),
+			})
 		case len(b.Labels) == 1:
 			name = b.Labels[0]
 		default:
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = fmt.Sprintf(`invalid format for '%s', it is declared with only a name, i.e. '%s "name" {}'`, b.Type, b.Type)
-
-			return de
+			return fail(problem{
+				summary: "Invalid block labels",
+				detail:  fmt.Sprintf(`invalid format for '%s', it is declared with only a name, i.e. '%s "name" {}'`, b.Type, b.Type),
+			})
 		}
 
 		if err := validateResourceName(name); err != nil {
-			de := &errors.ParserError{}
-			de.Line = b.TypeRange.Start.Line
-			de.Column = b.TypeRange.Start.Column
-			de.Filename = file
-			de.Message = err.Error()
-
-			return de
+			return fail(invalidName(err))
 		}
 
 		rt, err = p.catalog.CreateEntity(b.Type, subtype, name)
@@ -1130,28 +1072,18 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 				typeName = subtype
 			}
 
-			de := errors.NewParserErrorWrapping(
-				file,
-				b.TypeRange.Start.Line,
-				b.TypeRange.Start.Column,
-				err,
-				fmt.Sprintf("unable to create resource '%s' of type '%s': %s", name, typeName, err),
-			)
-
-			return de
+			return fail(problem{
+				summary: "Unknown type",
+				detail:  fmt.Sprintf("unable to create resource '%s' of type '%s': %s", name, typeName, err),
+				cause:   err,
+			})
 		}
 	}
 
 	// We now have an entity, get the meta
 	rtMeta, err := types.GetMeta(rt)
 	if err != nil {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf("unable to get resource meta for resource %s: %s", b.Labels[0], err)
-		de.Cause = err
-		return de
+		return fail(missingMeta(err))
 	}
 
 	rtMeta.Module = moduleName
@@ -1167,13 +1099,7 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 	// so that we can build the dependency graph
 	err = p.getUniqueResourceLinks(rt, b, src)
 	if err != nil {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf("error creating resource '%s' in file %s: %s", b.Labels[0], file, err)
-		de.Cause = err
-		return de
+		return err
 	}
 
 	// if we have an output, get the description
@@ -1202,55 +1128,43 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 	// fail fires the module's parse error and returns it, every problem with
 	// the module block itself goes through it
 	resourceType, resourceID := p.blockResource(b, parentModule)
-	fail := func(err error) []error {
+	failWith := func(err error) []error {
 		emitParse(&p.options, resourceType, resourceID, file, err)
 		return []error{err}
 	}
 
+	// fail reports pr at subject, or at the module's header when subject is
+	// nil
+	fail := func(subject *hcl.Range, pr problem) []error {
+		return failWith(p.inBlock(b, parentModule, subject, pr))
+	}
+
 	// If the type is module there should be one label for the instance name
 	if len(b.Labels) != 1 {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = `invalid formatting for 'module' stanza, resources should have a name and a type, i.e. 'module "name" {}'`
-
-		return fail(de)
+		return fail(nil, problem{
+			summary: "Invalid block labels",
+			detail:  `invalid formatting for 'module' stanza, resources should have a name and a type, i.e. 'module "name" {}'`,
+		})
 	}
 
 	name := b.Labels[0]
 	if err := validateResourceName(name); err != nil {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = err.Error()
-
-		return fail(de)
+		return fail(nil, invalidName(err))
 	}
 
 	rt, err := p.createBuiltinResource(resources.TypeModule, name)
 	if err != nil {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf(`unable to create module, this error should never happen %s`, err)
-		de.Cause = err
-
-		return fail(de)
+		return fail(nil, problem{
+			summary: "Internal error",
+			detail:  fmt.Sprintf(`unable to create module, this error should never happen %s`, err),
+			cause:   err,
+		})
 	}
 
 	// We now have an entity, get the meta
 	rtMeta, err := types.GetMeta(rt)
 	if err != nil {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf("unable to get resource meta for resource %s: %s", b.Labels[0], err)
-		de.Cause = err
-		return fail(de)
+		return fail(nil, missingMeta(err))
 	}
 
 	rtMeta.Module = parentModule
@@ -1268,13 +1182,7 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 	// resource type
 	err = p.getUniqueResourceLinks(rt, b, src)
 	if err != nil {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf("error creating resource '%s' in file %s: %s", b.Labels[0], file, err)
-		de.Cause = err
-		return fail(de)
+		return failWith(err)
 	}
 
 	// add the module to the cache
@@ -1285,22 +1193,24 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 	// every resource discovered there under this module's own instance name.
 	sourceAttr, ok := b.Body.Attributes["source"]
 	if !ok {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf(`module '%s' has no 'source' attribute`, name)
-		return fail(de)
+		return fail(nil, problem{
+			summary: "Missing required argument",
+			detail:  fmt.Sprintf(`module '%s' has no 'source' attribute`, name),
+		})
 	}
 
+	// source is read before anything is evaluated, so it can only be a
+	// literal; each problem HCL finds with it is reported where it is
 	sourceVal, diags := sourceAttr.Expr.Value(nil)
 	if diags.HasErrors() {
-		de := &errors.ParserError{}
-		de.Line = sourceAttr.SrcRange.Start.Line
-		de.Column = sourceAttr.SrcRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf(`unable to resolve 'source' for module '%s': %s`, name, diags.Error())
-		return fail(de)
+		problems := errors.Diagnostics{}
+		for _, d := range diags {
+			if d.Severity == hcl.DiagError {
+				problems = append(problems, p.inBlock(b, parentModule, d.Subject, problem{summary: d.Summary, detail: d.Detail}))
+			}
+		}
+
+		return failWith(problems)
 	}
 
 	sourceDir := filepath.Join(filepath.Dir(file), sourceVal.AsString())
@@ -1314,26 +1224,24 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 	// different spellings of the same directory is recognised as the same
 	// source. A source that cannot be resolved is reported against the module,
 	// like any other module whose contents cannot be obtained.
+	source := sourceAttr.Expr.Range()
+
 	canonicalSource, err := canonicalPath(sourceDir)
 	if err != nil {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf(`unable to obtain contents for module '%s' source '%s': %s`, name, sourceDir, err)
-		de.Cause = err
-		return fail(de)
+		return fail(&source, problem{
+			summary: "Module source not found",
+			detail:  fmt.Sprintf(`unable to obtain contents for module '%s' source '%s': %s`, name, sourceDir, err),
+			cause:   err,
+		})
 	}
 
 	// A module whose source transitively includes itself would recurse until
 	// the stack is exhausted. Report it against the module instead.
 	if p.parsedResources.moduleSources[canonicalSource] {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf(`module '%s' source '%s' includes itself`, name, sourceDir)
-		return fail(de)
+		return fail(&source, problem{
+			summary: "Module includes itself",
+			detail:  fmt.Sprintf(`module '%s' source '%s' includes itself`, name, sourceDir),
+		})
 	}
 
 	p.parsedResources.moduleSources[canonicalSource] = true
@@ -1341,13 +1249,11 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 
 	childFiles, err := findXclFiles(sourceDir)
 	if err != nil {
-		de := &errors.ParserError{}
-		de.Line = b.TypeRange.Start.Line
-		de.Column = b.TypeRange.Start.Column
-		de.Filename = file
-		de.Message = fmt.Sprintf(`unable to discover files for module '%s' source '%s': %s`, name, sourceDir, err)
-		de.Cause = err
-		return fail(de)
+		return fail(&source, problem{
+			summary: "Unable to read the module source",
+			detail:  fmt.Sprintf(`unable to discover files for module '%s' source '%s': %s`, name, sourceDir, err),
+			cause:   err,
+		})
 	}
 
 	// the module block itself has parsed, the resources in its source fire
@@ -1370,15 +1276,24 @@ func (p *Parser) parseModule(file string, b *hclsyntax.Block, parentModule strin
 // these are either manaully set using the depends_on attribute or automatically
 // inferred from the interpolations in the resource. src is the text of the
 // file b was parsed from
+//
+// A problem is returned as a diagnostic at the attribute it is about, or as
+// diagnostics when there are several.
 func (p *Parser) getUniqueResourceLinks(resource any, b *hclsyntax.Block, src []byte) error {
-	dr, err := p.getDependentResources(resource, b, src)
+	at := p.inDeclaration(resource, b)
+
+	dr, err := p.getDependentResources(resource, b, src, at)
 	if err != nil {
 		return err
 	}
 
 	for _, d := range dr {
 		if err := types.AppendUniqueLink(resource, d); err != nil {
-			return fmt.Errorf("failed to add dependency %s: %w", d, err)
+			return at(nil, problem{
+				summary: "Unable to record a dependency",
+				detail:  fmt.Sprintf("The dependency on %s could not be recorded: %s", d, err),
+				cause:   err,
+			})
 		}
 	}
 
@@ -1393,29 +1308,49 @@ func (p *Parser) getUniqueResourceLinks(resource any, b *hclsyntax.Block, src []
 	if attr, ok := body.Attributes["depends_on"]; ok {
 		dependsOnVal, diags := attr.Expr.Value(&hcl.EvalContext{})
 		if diags.HasErrors() {
-			return fmt.Errorf("unable to read depends_on attribute: %s", diags.Error())
+			problems := errors.Diagnostics{}
+			for _, d := range diags {
+				if d.Severity == hcl.DiagError {
+					problems = append(problems, at(d.Subject, problem{summary: d.Summary, detail: d.Detail}))
+				}
+			}
+
+			return problems
 		}
 
 		// depends on is a slice of string, each entry is validated as an
 		// address and added to the links in its canonical form, while the
 		// dependency list keeps the strings exactly as written
+		dependsOn := attr.Expr.Range()
 		dependsOnSlice := dependsOnVal.AsValueSlice()
 		written := make([]string, 0, len(dependsOnSlice))
 		for _, d := range dependsOnSlice {
 			fqdn, err := p.addressParser().Parse(d.AsString())
 			if err != nil {
-				return fmt.Errorf("invalid dependency %s, %s", d.AsString(), err)
+				return at(&dependsOn, problem{
+					summary: "Invalid dependency",
+					detail:  fmt.Sprintf("%q is not the address of an entity: %s", d.AsString(), err),
+					cause:   err,
+				})
 			}
 
 			if err := types.AppendUniqueLink(resource, fqdn.String()); err != nil {
-				return fmt.Errorf("failed to add dependency %s: %w", d, err)
+				return at(&dependsOn, problem{
+					summary: "Unable to record a dependency",
+					detail:  fmt.Sprintf("The dependency on %s could not be recorded: %s", d.AsString(), err),
+					cause:   err,
+				})
 			}
 
 			written = append(written, d.AsString())
 		}
 
 		if err := types.SetDependencies(resource, written); err != nil {
-			return fmt.Errorf("unable to set depends_on: %w", err)
+			return at(&dependsOn, problem{
+				summary: "Unable to record a dependency",
+				detail:  fmt.Sprintf("depends_on could not be recorded: %s", err),
+				cause:   err,
+			})
 		}
 	}
 
@@ -1431,7 +1366,9 @@ func (p *Parser) getUniqueResourceLinks(resource any, b *hclsyntax.Block, src []
 // the attribute's path, i.e. "location" or "network[1].name". A reference is
 // decided by the same rule as the links, so the two always agree on which
 // attributes hold one
-func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []byte) ([]string, error) {
+//
+// at places a problem within the block.
+func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []byte, at placer) ([]string, error) {
 	references := []string{}
 	written := map[string]string{}
 
@@ -1450,12 +1387,7 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 	for _, a := range attributes {
 		refs, err := referencesIn(a.Expr, p.isReferenceRoot)
 		if err != nil {
-			return nil, errors.NewParserError(
-				b.Body.SrcRange.Filename,
-				b.Body.SrcRange.Start.Line,
-				b.Body.SrcRange.Start.Column,
-				fmt.Sprintf("unable to process attribute %s: %s", a.Name, err),
-			)
+			return nil, invalidReferences(at, a, err)
 		}
 
 		references = append(references, refs...)
@@ -1482,7 +1414,7 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 		// Recursively get dependencies from nested blocks
 		fieldType := namedFieldType(entityType, block.Type)
 		prefix := nestedBlockPath("", block, blockIndex[block.Type], fieldType) + "."
-		cr, err := p.getDependentResourcesFromBlock(block, prefix, nestedBlockElement(fieldType), src, written)
+		cr, err := p.getDependentResourcesFromBlock(block, prefix, nestedBlockElement(fieldType), src, written, at)
 		if err != nil {
 			return nil, err
 		}
@@ -1523,12 +1455,10 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 						rMeta.Type == fqrn.Type &&
 						rMeta.Subtype == fqrn.Subtype &&
 						rMeta.Module == fqrn.Module {
-						return nil, errors.NewParserError(
-							b.Body.SrcRange.Filename,
-							b.Body.SrcRange.Start.Line,
-							b.Body.SrcRange.Start.Column,
-							fmt.Sprintf("'%s' depends on '%s' which creates a cyclical dependency", rMeta.ID, depMeta.ID),
-						)
+						return nil, at(nil, problem{
+							summary: "Cyclical dependency",
+							detail:  fmt.Sprintf("'%s' depends on '%s' which creates a cyclical dependency", rMeta.ID, depMeta.ID),
+						})
 					}
 				}
 			}
@@ -1543,15 +1473,15 @@ func (p *Parser) getDependentResources(resource any, b *hclsyntax.Block, src []b
 // and the text written for each attribute holding a reference is recorded in
 // written under prefix and the attribute's name. elementType is the Go type
 // the block decodes into, which decides how its own nested blocks are
-// addressed; it may be nil
-func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block, prefix string, elementType reflect.Type, src []byte, written map[string]string) ([]string, error) {
+// addressed; it may be nil. at places a problem within the entity's block
+func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block, prefix string, elementType reflect.Type, src []byte, written map[string]string, at placer) ([]string, error) {
 	references := []string{}
 
 	// Process attributes in the block
 	for _, a := range b.Body.Attributes {
 		refs, err := referencesIn(a.Expr, p.isReferenceRoot)
 		if err != nil {
-			return nil, fmt.Errorf("unable to process attribute %s: %w", a.Name, err)
+			return nil, invalidReferences(at, a, err)
 		}
 		references = append(references, refs...)
 
@@ -1570,7 +1500,7 @@ func (p *Parser) getDependentResourcesFromBlock(b *hclsyntax.Block, prefix strin
 
 		fieldType := namedFieldType(elementType, block.Type)
 		blockPrefix := nestedBlockPath(prefix, block, index, fieldType) + "."
-		cr, err := p.getDependentResourcesFromBlock(block, blockPrefix, nestedBlockElement(fieldType), src, written)
+		cr, err := p.getDependentResourcesFromBlock(block, blockPrefix, nestedBlockElement(fieldType), src, written, at)
 		if err != nil {
 			return nil, err
 		}
