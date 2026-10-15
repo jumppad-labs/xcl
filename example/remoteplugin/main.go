@@ -127,15 +127,20 @@ func eventHandler(out io.Writer) xcl.EventHandler {
 // state in stateDir. Every event xcl produces, including the plugins' log
 // messages, goes to handler, a nil handler leaves xcl silent.
 func newConfig(handler xcl.EventHandler, stateDir string) (*xcl.Config, error) {
-	releaseKey, err := fetchKey(releaseKeyURL)
+	releaseKey, err := fetchKey(source.keyURL)
 	if err != nil {
 		return nil, err
 	}
 
-	github := registry.NewGitHub(
+	options := []registry.GitHubOption{
 		registry.GitHubCacheDir("./.xcl-cache"),
 		registry.GitHubTrustedKeys(releaseKey),
-	)
+	}
+	if source.apiURL != "" {
+		options = append(options, registry.GitHubAPIURL(source.apiURL))
+	}
+
+	github := registry.NewGitHub(options...)
 
 	github.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v0.2.0")
 
@@ -155,6 +160,18 @@ func newConfig(handler xcl.EventHandler, stateDir string) (*xcl.Config, error) {
 // releaseKeyURL is where the public key that signs jumppad-labs plugin
 // releases is published
 const releaseKeyURL = "https://xcl.dev/keys/jumppad-labs-releases.asc"
+
+// pluginSource is where the Docker plugin is installed from: the GitHub API
+// its release is read from, GitHub's own when empty, and the URL of the key
+// the release is signed with
+type pluginSource struct {
+	apiURL string
+	keyURL string
+}
+
+// source is GitHub and the published jumppad-labs release key; the tests
+// point it at a release they build and serve themselves
+var source = pluginSource{keyURL: releaseKeyURL}
 
 // fetchKey downloads the ASCII-armoured public key at url, which the GitHub
 // registry checks each plugin release's signature against
