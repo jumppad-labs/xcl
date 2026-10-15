@@ -103,6 +103,43 @@ func TestEncodeSavedEntityWritesASingletonWithoutLabels(t *testing.T) {
 	require.True(t, strings.HasPrefix(string(out), "runner {\n"), "got:\n%s", out)
 }
 
+func TestEncodeWritesTheLabelOfAPlainTypeWithALabelField(t *testing.T) {
+	path := writeSingletonConfig(t, `client "web" { server = "https://maalstrom.app" }`)
+
+	store, err := state.NewFileStateStore(t.TempDir())
+	require.NoError(t, err)
+
+	c, err := NewConfig(WithRegistry(singletonRegistry()), WithStateStore(store))
+	require.NoError(t, err)
+	require.NoError(t, c.Apply(path))
+
+	out, err := c.EncodeSavedEntity(encodeSavedRecordByID(t, store.Path(), "client.web"))
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(string(out), "client \"web\" {\n"), "got:\n%s", out)
+
+	entity, err := c.FindResource("client.web")
+	require.NoError(t, err)
+
+	out, err = EncodeEntity(entity)
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(string(out), "client \"web\" {\n"), "got:\n%s", out)
+}
+
+func TestEncodeWritesTheLabelOfAPluginPlainType(t *testing.T) {
+	isolateHome(t)
+
+	store, err := state.NewFileStateStore(t.TempDir())
+	require.NoError(t, err)
+
+	c, err := NewConfig(WithRegistry(inProcessPlainRegistry()), WithStateStore(store))
+	require.NoError(t, err)
+	require.NoError(t, c.Apply(writePlainPluginConfig(t, plainPluginConfig)))
+
+	out, err := c.EncodeSavedEntity(encodeSavedRecordByID(t, store.Path(), "gadget.lamp"))
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(string(out), "gadget \"lamp\" {\n"), "got:\n%s", out)
+}
+
 func TestDependsOnASingletonOrdersAfterIt(t *testing.T) {
 	path := writeSingletonConfig(t, `
 runner {
