@@ -32,7 +32,7 @@ func fieldByName(t *testing.T, built reflect.Type, name string) reflect.StructFi
 	return field
 }
 
-func TestBuildTypeV1EmbedsResourceBaseFirst(t *testing.T) {
+func TestBuildTypeV1GivesANamedTypeAMetaField(t *testing.T) {
 	built := buildV1(t, `{
 		"schema_version": 1,
 		"type": "container",
@@ -44,11 +44,26 @@ func TestBuildTypeV1EmbedsResourceBaseFirst(t *testing.T) {
 	require.Equal(t, reflect.Struct, built.Kind())
 	require.Equal(t, 2, built.NumField())
 
+	// a plain type, named because it can read its label from its Meta field
 	first := built.Field(0)
-	require.Equal(t, "ResourceBase", first.Name)
-	require.Equal(t, reflect.TypeOf(types.ResourceBase{}), first.Type)
-	require.True(t, first.Anonymous)
-	require.Equal(t, ",remain", first.Tag.Get("xcl"))
+	require.Equal(t, "Meta", first.Name)
+	require.Equal(t, reflect.TypeOf(types.Meta{}), first.Type)
+	require.False(t, first.Anonymous)
+	require.Empty(t, first.Tag.Get("xcl"))
+}
+
+func TestBuildTypeV1GivesASingletonNoMetaField(t *testing.T) {
+	built := buildV1(t, `{
+		"schema_version": 1,
+		"type": "runner",
+		"singleton": true,
+		"fields": [
+			{"name": "server", "type": "string"}
+		]
+	}`)
+
+	require.Equal(t, 1, built.NumField())
+	require.Equal(t, "Server", built.Field(0).Name)
 }
 
 func TestBuildTypeV1ReturnsParsedSchema(t *testing.T) {
@@ -792,7 +807,7 @@ func TestBuildTypeV1CamelCasesFieldNames(t *testing.T) {
 	require.Equal(t, "max_idle_connections", maxIdle.Tag.Get("json"))
 }
 
-func TestBuildTypeV1EmptyFieldsBuildsResourceBaseOnly(t *testing.T) {
+func TestBuildTypeV1EmptyFieldsBuildsMetaOnly(t *testing.T) {
 	built := buildV1(t, `{
 		"schema_version": 1,
 		"type": "marker",
@@ -800,7 +815,7 @@ func TestBuildTypeV1EmptyFieldsBuildsResourceBaseOnly(t *testing.T) {
 	}`)
 
 	require.Equal(t, 1, built.NumField())
-	require.Equal(t, "ResourceBase", built.Field(0).Name)
+	require.Equal(t, "Meta", built.Field(0).Name)
 }
 
 func TestIsV1RecognisesVersionOne(t *testing.T) {

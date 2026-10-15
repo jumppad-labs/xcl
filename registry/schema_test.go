@@ -29,10 +29,11 @@ func TestTypeFromSchemaReturnsDeclaredType(t *testing.T) {
 	require.False(t, reflect.ValueOf(declared.Prototype).IsNil())
 	require.Equal(t, reflect.Struct, prototypeType.Elem().Kind())
 
-	base := prototypeType.Elem().Field(0)
-	require.Equal(t, "ResourceBase", base.Name)
-	require.True(t, base.Anonymous)
-	require.Equal(t, reflect.TypeOf(types.ResourceBase{}), base.Type)
+	// a plain type, named because it reads its label from its Meta field
+	meta := prototypeType.Elem().Field(0)
+	require.Equal(t, "Meta", meta.Name)
+	require.False(t, meta.Anonymous)
+	require.Equal(t, reflect.TypeOf(types.Meta{}), meta.Type)
 
 	image, ok := prototypeType.Elem().FieldByName("Image")
 	require.True(t, ok)

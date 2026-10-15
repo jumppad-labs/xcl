@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/e2e/fixtures/kube"
 )
 
@@ -16,24 +17,27 @@ func TestApplyFindsEveryDeclaredResource(t *testing.T) {
 	require.Equal(t, kubeDeclaredIDs, kubeEntityIDs(t, c.Entities()))
 }
 
-// TestApplyReturnsRegisteredGoTypes asserts each block is decoded into the Go
-// type registered for it, held as itself rather than a type generated from a
-// schema
+// TestApplyReturnsRegisteredGoTypes asserts each block converts to the Go type
+// registered for it, with its label
 func TestApplyReturnsRegisteredGoTypes(t *testing.T) {
 	c := applyKube(t, nil)
 	entities := c.Entities()
 
-	_, ok := kubeEntity(t, entities, "config_map.api").(*kube.ConfigMap)
-	require.True(t, ok)
+	configMap, err := xcl.As[kube.ConfigMap](kubeEntity(t, entities, "config_map.api"))
+	require.NoError(t, err)
+	require.Equal(t, "api", configMap.Name)
 
-	_, ok = kubeEntity(t, entities, "deployment.api").(*kube.Deployment)
-	require.True(t, ok)
+	deployment, err := xcl.As[kube.Deployment](kubeEntity(t, entities, "deployment.api"))
+	require.NoError(t, err)
+	require.Equal(t, "api", deployment.Name)
 
-	_, ok = kubeEntity(t, entities, "service.api").(*kube.Service)
-	require.True(t, ok)
+	service, err := xcl.As[kube.Service](kubeEntity(t, entities, "service.api"))
+	require.NoError(t, err)
+	require.Equal(t, "api", service.Name)
 
-	_, ok = kubeEntity(t, entities, "ingress.api").(*kube.Ingress)
-	require.True(t, ok)
+	ingress, err := xcl.As[kube.Ingress](kubeEntity(t, entities, "ingress.api"))
+	require.NoError(t, err)
+	require.Equal(t, "api", ingress.Name)
 }
 
 // TestDecodeFillsRepeatedBlocksInOrder asserts a block that appears more than

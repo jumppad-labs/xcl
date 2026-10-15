@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugins/plain/plainplugin"
@@ -13,13 +14,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// hostTypeOf describes t as a plugin does and builds the type the host
-// decodes configuration into from the description
-func hostTypeOf(t *testing.T, of reflect.Type) (reflect.Type, schema.SchemaV1) {
+// generate describes plain, a plugin's plain type, as the plugin does: from
+// the type the engine stores it as, registered without a subtype
+func generate(t *testing.T, plain reflect.Type) (*plaintype.Built, []byte) {
 	t.Helper()
 
-	data, err := schema.GenerateV1(of, "resource", "fixture", false)
+	built, err := plaintype.Build(plain, 1)
 	require.NoError(t, err)
+
+	data, err := schema.GenerateV1(built.Engine, "fixture", "", built.IsSingleton())
+	require.NoError(t, err)
+
+	return built, data
+}
+
+// hostTypeOf describes plain as a plugin does and builds the type the host
+// stores it as from the description
+func hostTypeOf(t *testing.T, plain reflect.Type) (reflect.Type, schema.SchemaV1) {
+	t.Helper()
+
+	_, data := generate(t, plain)
 
 	var doc schema.SchemaV1
 	require.NoError(t, json.Unmarshal(data, &doc))
@@ -31,14 +45,18 @@ func hostTypeOf(t *testing.T, of reflect.Type) (reflect.Type, schema.SchemaV1) {
 }
 
 // carry sends value to the host as the plugin writes it, has the host write
-// it back as it holds it, and decodes that into a new value of value's type,
+// it back as it holds it, and reads that into a new value of value's type,
 // as the plugin reads what the host sends
 func carry[T any](t *testing.T, value *T) *T {
 	t.Helper()
 
+	built, _ := generate(t, reflect.TypeFor[T]())
 	host, _ := hostTypeOf(t, reflect.TypeFor[T]())
 
-	sent, err := wire.Marshal(value)
+	stored := built.New()
+	require.NoError(t, built.FromPlain(stored, value))
+
+	sent, err := wire.Marshal(stored)
 	require.NoError(t, err)
 
 	held := reflect.New(host).Interface()
@@ -47,22 +65,22 @@ func carry[T any](t *testing.T, value *T) *T {
 	returned, err := wire.Marshal(held)
 	require.NoError(t, err)
 
-	back := new(T)
-	require.NoError(t, json.Unmarshal(returned, back))
+	received := built.New()
+	require.NoError(t, json.Unmarshal(returned, received))
 
-	return back
+	back, err := built.ToPlain(received)
+	require.NoError(t, err)
+
+	return back.(*T)
 }
 
 func TestGenerateV1CarriesAContainerThroughTheHostUnchanged(t *testing.T) {
 	container := &structs.Container{
 		ContainerBase: structs.ContainerBase{
-			ResourceBase: types.ResourceBase{
-				Meta:      types.Meta{ID: "resource.container.web", Name: "web", Type: "resource", Subtype: "container"},
-				DependsOn: []string{"resource.network.main"},
-			},
+			Meta:       types.Meta{ID: "resource.container.web", Name: "web", Type: "resource", Subtype: "container"},
 			Default:    "hello",
 			Networks:   []structs.NetworkAttachment{{ID: 1, Name: "main", Aliases: []string{"web"}, AssignedAddress: "10.0.0.2"}},
-			NetworkObj: structs.Network{ResourceBase: types.ResourceBase{Meta: types.Meta{ID: "resource.network.main", Name: "main"}}, Subnet: "10.0.0.0/16", ProviderID: "net-1"},
+			NetworkObj: structs.Network{Meta: types.Meta{ID: "resource.network.main", Name: "main"}, Subnet: "10.0.0.0/16", ProviderID: "net-1"},
 			Build:      &structs.Build{Context: "./app", Tag: "v1", ImageID: "sha256:abc"},
 			Entrypoint: []string{"/bin/sh"},
 			Env:        map[string]string{"MODE": "test"},

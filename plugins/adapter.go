@@ -97,11 +97,15 @@ func (a *TypedProviderAdapter[T]) decode(data []byte, optional bool) (T, any, er
 		return resource, nil, nil
 	}
 
+	// without data the provider is given the zero value, nil for a pointer,
+	// as it is for any T; what it returns is written into a new entity
 	stored := a.built.New()
-	if read {
-		if err := json.Unmarshal(data, stored); err != nil {
-			return resource, nil, err
-		}
+	if !read {
+		return resource, stored, nil
+	}
+
+	if err := json.Unmarshal(data, stored); err != nil {
+		return resource, nil, err
 	}
 
 	plain, err := a.built.ToPlain(stored)

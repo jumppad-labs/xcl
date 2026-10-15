@@ -64,6 +64,13 @@ type Meta struct {
 	// (see StatusCreated, StatusUpdated, StatusFailed, StatusDestroyed, StatusDestroyFailed)
 	// this is an internal property that can not be set with hcl
 	Status string `json:"status,omitempty"`
+
+	// Disabled is the disabled flag configuration set on the block, and
+	// DependsOn the dependencies it wrote in depends_on, as written. Every
+	// block takes both; xcl fills them in the copy of an entity a plain type
+	// is handed, and they are saved beside the meta rather than in it
+	Disabled  bool     `json:"-"`
+	DependsOn []string `json:"-"`
 }
 
 // AddressType returns the subtype of an entity that has one, and its type

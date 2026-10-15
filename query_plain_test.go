@@ -104,20 +104,20 @@ func TestFindResolvesAReferenceToAPlainType(t *testing.T) {
 	require.Equal(t, "make deploy port=5432", job.Command)
 }
 
-func TestFindFillsTheDependsOnMirror(t *testing.T) {
+func TestFindFillsTheDependsOnOfMeta(t *testing.T) {
 	c := setupPlainConfig(t)
 
 	job, err := Find[plain.Job](c, "job.deploy")
 	require.NoError(t, err)
-	require.Equal(t, []string{"job.build"}, job.DependsOn)
+	require.Equal(t, []string{"job.build"}, job.Meta.DependsOn)
 }
 
-func TestFindFillsTheDisabledMirror(t *testing.T) {
+func TestFindFillsTheDisabledFlagOfMeta(t *testing.T) {
 	c := setupPlainConfig(t)
 
 	job, err := Find[plain.Job](c, "job.off")
 	require.NoError(t, err)
-	require.True(t, job.Disabled)
+	require.True(t, job.Meta.Disabled)
 }
 
 func TestFindFillsAPlainTypesMetaField(t *testing.T) {
@@ -243,8 +243,11 @@ func TestAllRefusesAPlainTypeThatIsOnlyNested(t *testing.T) {
 
 	_, err := All[plain.Override](c)
 
-	var notAnEntity *xclerrors.NotAnEntityError
-	require.ErrorAs(t, err, &notAnEntity)
+	require.ErrorIs(t, err, xclerrors.ErrNotAnEntity)
+
+	var notRegistered *xclerrors.NotRegisteredError
+	require.ErrorAs(t, err, &notRegistered)
+	require.True(t, notRegistered.MayBeNested)
 }
 
 func TestDecodeFillsPlainTypes(t *testing.T) {

@@ -294,12 +294,12 @@ func TestFindOneReturnsNotUniqueWhenMoreThanOneMatches(t *testing.T) {
 	require.Equal(t, []string{"resource", "database"}, notUnique.Segments)
 }
 
-// A kind lookup hands back what the configuration holds, entity by entity, for
-// a type the configuration holds as the caller's own Go type. A plugin backed
-// type is not held that way, so it comes back as a copy, filled in from the
-// entity the plugin's schema produced.
+// A kind lookup hands back a copy of what the configuration holds, entity by
+// entity, as the caller's Go type: a declared type's copy carries its labels
+// and Meta, and a plugin backed type is filled in from the entity the
+// plugin's schema produced.
 
-func TestFindByTypeReturnsTheEntitiesTheConfigurationHolds(t *testing.T) {
+func TestFindByTypeReturnsCopiesOfTheEntitiesTheConfigurationHolds(t *testing.T) {
 	c := setupFindConfig(t)
 
 	databases, err := FindByType[registered.Database](c, "resource", "database")
@@ -310,7 +310,9 @@ func TestFindByTypeReturnsTheEntitiesTheConfigurationHolds(t *testing.T) {
 		stored, err := c.FindResource(database.Meta.ID)
 		require.NoError(t, err)
 
-		require.Same(t, stored, database)
+		want, ok := plainAs[registered.Database](stored)
+		require.True(t, ok)
+		require.Equal(t, want, database)
 	}
 }
 

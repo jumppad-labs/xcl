@@ -34,11 +34,11 @@ type subtyped struct {
 	Port   int    `xcl:"port,optional"`
 }
 
-// mirrored sees the disabled flag and dependencies every block has.
+// mirrored sees the disabled flag and dependencies every block has, in its
+// Meta.
 type mirrored struct {
-	Disabled  bool     `xcl:"disabled,optional"`
-	DependsOn []string `xcl:"depends_on,optional"`
-	Models    []string `xcl:"models,optional"`
+	Meta   types.Meta
+	Models []string `xcl:"models,optional"`
 }
 
 // timeouts is composed into composed.
@@ -179,7 +179,7 @@ func TestSetLabelsFillsTheSubtypeAndName(t *testing.T) {
 	require.Equal(t, "main", value.FieldByName("Name").String())
 }
 
-func TestBuildLeavesMirrorFieldsOutOfTheAttributes(t *testing.T) {
+func TestBuildLeavesDisabledAndDependsOnToResourceBase(t *testing.T) {
 	built := build(t, mirrored{}, 1)
 
 	field, _ := built.Engine.FieldByName("Disabled")
@@ -275,22 +275,22 @@ func TestToPlainCopiesTheMetaFieldsLinks(t *testing.T) {
 	require.Equal(t, "agent.first", base.Meta.Links[0])
 }
 
-func TestBuildRefusesADisabledMirrorThatIsNotABool(t *testing.T) {
-	type wrongDisabled struct {
-		Disabled string `xcl:"disabled,optional"`
+func TestBuildRefusesAFieldCalledDisabled(t *testing.T) {
+	type declaresDisabled struct {
+		Disabled bool `xcl:"disabled,optional"`
 	}
 
-	_, err := Build(reflect.TypeOf(wrongDisabled{}), 1)
-	require.ErrorContains(t, err, "must be a bool")
+	_, err := Build(reflect.TypeOf(declaresDisabled{}), 1)
+	require.ErrorContains(t, err, `"disabled" is held by every block and cannot be declared, the type reads it from Meta`)
 }
 
-func TestBuildRefusesADependsOnMirrorThatIsNotAStringSlice(t *testing.T) {
-	type wrongDependsOn struct {
-		DependsOn string `xcl:"depends_on,optional"`
+func TestBuildRefusesAFieldCalledDependsOn(t *testing.T) {
+	type declaresDependsOn struct {
+		DependsOn []string `xcl:"depends_on,optional"`
 	}
 
-	_, err := Build(reflect.TypeOf(wrongDependsOn{}), 1)
-	require.ErrorContains(t, err, "must be a []string")
+	_, err := Build(reflect.TypeOf(declaresDependsOn{}), 1)
+	require.ErrorContains(t, err, `"depends_on" is held by every block and cannot be declared, the type reads it from Meta`)
 }
 
 func TestBuildRefusesMoreLabelsThanTheBlockHas(t *testing.T) {
@@ -453,7 +453,7 @@ func TestToPlainFillsTheSubtypeAndNameLabels(t *testing.T) {
 	require.Equal(t, "main", plain.(*subtyped).Name)
 }
 
-func TestToPlainFillsTheMirrorFields(t *testing.T) {
+func TestToPlainFillsDisabledAndDependsOnInMeta(t *testing.T) {
 	built := build(t, mirrored{}, 1)
 	stored := entity(t, built, "", "claude")
 	base := stored.Field(0).Addr().Interface().(*types.ResourceBase)
@@ -462,8 +462,26 @@ func TestToPlainFillsTheMirrorFields(t *testing.T) {
 
 	plain, err := built.ToPlain(stored.Addr().Interface())
 	require.NoError(t, err)
-	require.True(t, plain.(*mirrored).Disabled)
-	require.Equal(t, []string{"agent.ollama"}, plain.(*mirrored).DependsOn)
+	require.True(t, plain.(*mirrored).Meta.Disabled)
+	require.Equal(t, []string{"agent.ollama"}, plain.(*mirrored).Meta.DependsOn)
+}
+
+func TestFromPlainLeavesDisabledAndDependsOnToConfiguration(t *testing.T) {
+	built := build(t, mirrored{}, 1)
+	stored := entity(t, built, "", "claude")
+	base := stored.Field(0).Addr().Interface().(*types.ResourceBase)
+	base.Disabled = true
+	base.DependsOn = []string{"agent.ollama"}
+
+	plain := &mirrored{}
+	plain.Meta.Disabled = false
+	plain.Meta.DependsOn = []string{"agent.changed"}
+
+	require.NoError(t, built.FromPlain(stored.Addr().Interface(), plain))
+	require.True(t, base.Disabled)
+	require.Equal(t, []string{"agent.ollama"}, base.DependsOn)
+	require.False(t, base.Meta.Disabled)
+	require.Nil(t, base.Meta.DependsOn)
 }
 
 func TestToPlainFillsTheFieldsOfARemainStruct(t *testing.T) {
@@ -494,7 +512,7 @@ func TestToPlainReturnsACopy(t *testing.T) {
 
 	plain, err := built.ToPlain(stored.Addr().Interface())
 	require.NoError(t, err)
-	plain.(*mirrored).DependsOn[0] = "changed"
+	plain.(*mirrored).Meta.DependsOn[0] = "changed"
 
 	require.Equal(t, "agent.ollama", base.DependsOn[0])
 }

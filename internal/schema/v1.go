@@ -138,9 +138,10 @@ func ParseV1(data []byte) (*SchemaV1, error) {
 	return s, nil
 }
 
-// BuildTypeV1 builds the Go struct type a block of the schema's type is
-// decoded into. The type embeds types.ResourceBase first and carries the
-// xcl, json and default tags the parser, decoder, change detection and
+// BuildTypeV1 builds the plain struct type a block of the schema's type is
+// declared as, laid out as a plain Go type is: a named type has a Meta field,
+// so its label is kept, and a singleton has none, so it is one. It carries
+// the xcl, json and default tags the parser, decoder, change detection and
 // computed carry-over read, so they run on it with no knowledge that it came
 // from a schema.
 //
@@ -162,37 +163,23 @@ func BuildTypeV1(data []byte) (reflect.Type, *SchemaV1, error) {
 		return nil, nil, fmt.Errorf("schema for type %s: %w", types.TypeKey(s.Type, s.Subtype), err)
 	}
 
-	if s.Singleton {
-		fields = append(fields, singletonField)
+	if !s.Singleton {
+		fields = append([]reflect.StructField{metaField}, fields...)
 	}
 
 	return reflect.StructOf(fields), s, nil
 }
 
-// SingletonField is the name of the field that marks a type built from a
-// schema as a singleton. It is a zero length array: it takes no space, has
-// no xcl tag so configuration never sees it, and is left out of JSON.
-const SingletonField = "XclSingleton"
-
-// singletonMarker is the element type of the singleton field, so only a type
-// this package built carries it
-type singletonMarker struct{}
-
-var singletonField = reflect.StructField{
-	Name: SingletonField,
-	Type: reflect.ArrayOf(0, reflect.TypeFor[singletonMarker]()),
-	Tag:  `json:"-"`,
+// metaField is the Meta field of a named type built from a schema, which
+// receives the block's metadata, its label among them
+var metaField = reflect.StructField{
+	Name: "Meta",
+	Type: reflect.TypeOf(types.Meta{}),
 }
 
-// IsSingleton reports whether t, a struct type built from a schema, was
-// built from one marked as a singleton
-func IsSingleton(t reflect.Type) bool {
-	field, ok := t.FieldByName(SingletonField)
-	return ok && field.Type == singletonField.Type
-}
-
-// resourceBaseField is the anonymous types.ResourceBase every built block
-// type starts with, tagged as a hand-written type tags it.
+// resourceBaseField is the anonymous types.ResourceBase an entity held as a
+// value starts with, as a reference to a block gives it, tagged as a
+// hand-written type tags it.
 var resourceBaseField = reflect.StructField{
 	Name:      "ResourceBase",
 	Type:      reflect.TypeOf(types.ResourceBase{}),
@@ -200,8 +187,9 @@ var resourceBaseField = reflect.StructField{
 	Tag:       `xcl:",remain"`,
 }
 
-// reservedFieldNames are the names ResourceBase already gives every block
-// type, which a schema may not redeclare.
+// reservedFieldNames are the names every block has, which a schema may not
+// redeclare: meta, and the disabled flag and dependencies configuration may
+// set on any block.
 var reservedFieldNames = map[string]bool{
 	"depends_on": true,
 	"disabled":   true,
@@ -209,13 +197,10 @@ var reservedFieldNames = map[string]bool{
 }
 
 // buildFieldsV1 builds the struct fields for one object. path names the
-// enclosing field in errors, empty at the top level. top adds ResourceBase,
-// and refuses the names it reserves.
+// enclosing field in errors, empty at the top level. top refuses the names
+// every block has, for a block type and an entity.
 func buildFieldsV1(fields []FieldV1, path string, top bool) ([]reflect.StructField, error) {
 	built := []reflect.StructField{}
-	if top {
-		built = append(built, resourceBaseField)
-	}
 
 	seen := map[string]bool{}
 
@@ -578,7 +563,7 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 			return nil, err
 		}
 
-		return reflect.StructOf(fields), nil
+		return reflect.StructOf(append([]reflect.StructField{resourceBaseField}, fields...)), nil
 	case len(typed.List) > 0:
 		element, err := valueTypeV1(typed.List, format, where)
 		if err != nil {

@@ -161,10 +161,11 @@ See [Parser & Entity Lifecycle](parser-lifecycle.md#destroy) and
 Every entity the engine holds — builtin (`resources.Module`,
 `resources.Output`, ...), plugin-defined, or declared by the application —
 embeds [`types.ResourceBase`](../types/resource.go#L58), which in turn embeds
-[`types.Meta`](../types/resource.go#L5). A declared type may be a plain struct
-that embeds neither: it is stored as a type built from it that embeds
+[`types.Meta`](../types/resource.go#L5). A declared or plugin type is a plain
+struct that embeds neither: it is stored as a type built from it that embeds
 `types.ResourceBase` (`internal/plaintype`), and turned back into the plain
-struct, its `Meta` field if it has one filled, when it is read:
+struct, its `Meta` field if it has one filled, `Meta.Disabled` and
+`Meta.DependsOn` included, when it is read:
 
 ```go
 type ResourceBase struct {

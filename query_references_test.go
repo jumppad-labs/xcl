@@ -14,7 +14,7 @@ import (
 // cacheClient is registered bare as "cache_client"; its nested blocks
 // reference a registered cache as a whole
 type cacheClient struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Primary *cacheLink `xcl:"primary,block" json:"primary,omitempty"`
 	Mirror  *cacheCopy `xcl:"mirror,block" json:"mirror,omitempty"`

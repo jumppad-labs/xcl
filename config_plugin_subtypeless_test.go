@@ -26,7 +26,7 @@ import (
 // subtypelessWidget matches the fixture plugin's Widget, it is the in-process
 // plugin's type and the type an external widget is read back into
 type subtypelessWidget struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Size  int               `xcl:"size,optional" json:"size,omitempty"`
 	Parts []subtypelessPart `xcl:"part,block" json:"part,omitempty"`

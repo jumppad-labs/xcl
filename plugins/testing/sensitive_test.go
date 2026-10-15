@@ -10,7 +10,7 @@ import (
 )
 
 type credentialFixture struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Username string                  `xcl:"username,optional" json:"username,omitempty"`
 	Password types.Sensitive[string] `xcl:"password" json:"password"`

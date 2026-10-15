@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/xcl"
@@ -34,10 +36,37 @@ func findResource[T any](t *testing.T, entities []any, path string) *T {
 	require.NoError(t, err)
 
 	result := new(T)
-	err = schema.UnmarshalUntyped(r, result)
+
+	// a type of xcl's own embeds types.ResourceBase and is copied as it is
+	if _, err := types.GetMeta(result); err == nil {
+		err = schema.UnmarshalUntyped(r, result)
+		require.NoError(t, err)
+
+		return result
+	}
+
+	// a plain type is copied through the type built from it, as the engine
+	// hands one to a program, so its Meta holds the disabled flag and
+	// dependencies as well
+	meta, err := types.GetMeta(r)
 	require.NoError(t, err)
 
-	return result
+	labels := 1
+	if meta.Subtype != "" {
+		labels = 2
+	}
+
+	built, err := plaintype.Build(reflect.TypeFor[T](), labels)
+	require.NoError(t, err)
+
+	stored := built.New()
+	err = schema.UnmarshalUntyped(r, stored)
+	require.NoError(t, err)
+
+	plain, err := built.ToPlain(stored)
+	require.NoError(t, err)
+
+	return plain.(*T)
 }
 
 // testOptions returns DefaultOptions with a test logger and the module cache
@@ -474,7 +503,7 @@ func TestModuleDisabledCanBeOverriden(t *testing.T) {
 	cont := findResource[structs.Container](t, c.GetResources(), "module.consul_2.resource.container.sidecar")
 
 	// check disabled has been interpolated
-	require.False(t, cont.Disabled)
+	require.False(t, cont.Meta.Disabled)
 
 	// check that the module resources callbacks are called
 	// TODO: re-enable when lifecycle is implemented
@@ -484,7 +513,7 @@ func TestModuleDisabledCanBeOverriden(t *testing.T) {
 	cont = findResource[structs.Container](t, c.GetResources(), "module.consul_1.resource.container.sidecar")
 
 	// check disabled has been interpolated
-	require.True(t, cont.Disabled)
+	require.True(t, cont.Meta.Disabled)
 
 	// check that the module resources callbacks are called
 	// TODO: re-enable when lifecycle is implemented

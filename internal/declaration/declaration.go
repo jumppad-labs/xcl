@@ -13,11 +13,10 @@ import (
 
 // Validate checks the shape of a type declaration on its own, without any
 // other declaration: the type must be named, take at most one subtype that
-// is not empty, and prototype must be a non-nil pointer to a struct. A struct
-// that embeds types.ResourceBase is used as it is; any other is a plain type,
-// and must be one plaintype.Build can build. The checks that need every
-// declaration, such as duplicates, are made when the type is registered in a
-// catalog.
+// is not empty, and prototype must be a non-nil pointer to a plain struct,
+// one plaintype.Build can build, which does not embed types.ResourceBase.
+// The checks that need every declaration, such as duplicates, are made when
+// the type is registered in a catalog.
 func Validate(prototype any, name ...string) error {
 	if len(name) == 0 || name[0] == "" {
 		return fmt.Errorf("an entity type must be named")
@@ -44,14 +43,20 @@ func Validate(prototype any, name ...string) error {
 		return fmt.Errorf("type %q must be a pointer to a struct", key)
 	}
 
-	if IsPlain(prototype) {
-		if _, err := plaintype.Build(value.Elem().Type(), len(name)); err != nil {
-			return fmt.Errorf("type %q: %w", key, err)
-		}
+	if !IsPlain(prototype) {
+		return fmt.Errorf("type %q: %w", key, ErrEmbedsResourceBase)
+	}
+
+	if _, err := plaintype.Build(value.Elem().Type(), len(name)); err != nil {
+		return fmt.Errorf("type %q: %w", key, err)
 	}
 
 	return nil
 }
+
+// ErrEmbedsResourceBase is the error with a type that embeds
+// types.ResourceBase, which xcl adds to the type it builds from a plain one
+var ErrEmbedsResourceBase = fmt.Errorf("a block type does not embed types.ResourceBase: give it a field tagged as a label for each of its labels, or a Meta field of type types.Meta to read its metadata, or neither for a singleton")
 
 // IsPlain reports whether prototype, a pointer to a struct, is a plain type:
 // one that does not embed types.ResourceBase, which is built into one that

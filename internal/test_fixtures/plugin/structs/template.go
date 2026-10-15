@@ -10,7 +10,7 @@ const TypeTemplate = "template"
 
 // Template allows the process of user defined templates
 type Template struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Source     string    `xcl:"source" json:"source"`                // Source template to be processed as string
 	Destination string    `xcl:"destination" json:"destination"`      // Destination filename to write

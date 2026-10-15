@@ -56,11 +56,10 @@ func TestEveryLookupIsAvailableAsAFunctionAndAsAMethod(t *testing.T) {
 	require.Len(t, allMethod, 2)
 }
 
-// Where the lookup succeeds, both spellings hand back the entity the
-// configuration holds, so what the caller has is the same value and not two
-// copies of it that could be changed independently.
+// Where the lookup succeeds, both spellings hand back equal copies of the
+// entity the configuration holds.
 
-func TestFindReturnsTheSameEntityFromBothSpellings(t *testing.T) {
+func TestFindReturnsAnEqualEntityFromBothSpellings(t *testing.T) {
 	c := setupFindConfig(t)
 
 	function, err := Find[registered.Database](c, "resource.database.main")
@@ -69,10 +68,10 @@ func TestFindReturnsTheSameEntityFromBothSpellings(t *testing.T) {
 	method, err := c.Find[registered.Database]("resource.database.main")
 	require.NoError(t, err)
 
-	require.Same(t, function, method)
+	require.Equal(t, function, method)
 }
 
-func TestFindByTypeReturnsTheSameEntitiesFromBothSpellings(t *testing.T) {
+func TestFindByTypeReturnsEqualEntitiesFromBothSpellings(t *testing.T) {
 	c := setupFindConfig(t)
 
 	function, err := FindByType[registered.Database](c, "resource", "database")
@@ -85,11 +84,11 @@ func TestFindByTypeReturnsTheSameEntitiesFromBothSpellings(t *testing.T) {
 	require.Len(t, function, 2)
 
 	for i := range function {
-		require.Same(t, function[i], method[i])
+		require.Equal(t, function[i], method[i])
 	}
 }
 
-func TestFindOneReturnsTheSameEntityFromBothSpellings(t *testing.T) {
+func TestFindOneReturnsAnEqualEntityFromBothSpellings(t *testing.T) {
 	c := setupFindConfig(t)
 
 	function, err := FindOne[registered.App](c, "resource", "app")
@@ -98,10 +97,10 @@ func TestFindOneReturnsTheSameEntityFromBothSpellings(t *testing.T) {
 	method, err := c.FindOne[registered.App]("resource", "app")
 	require.NoError(t, err)
 
-	require.Same(t, function, method)
+	require.Equal(t, function, method)
 }
 
-func TestAllReturnsTheSameEntitiesFromBothSpellings(t *testing.T) {
+func TestAllReturnsEqualEntitiesFromBothSpellings(t *testing.T) {
 	c := setupFindConfig(t)
 
 	function, err := All[registered.Database](c)
@@ -114,7 +113,7 @@ func TestAllReturnsTheSameEntitiesFromBothSpellings(t *testing.T) {
 	require.Len(t, function, 2)
 
 	for i := range function {
-		require.Same(t, function[i], method[i])
+		require.Equal(t, function[i], method[i])
 	}
 }
 

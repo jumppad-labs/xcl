@@ -12,12 +12,11 @@ import (
 	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
-	"github.com/jumppad-labs/xcl/types"
 )
 
 // Widget is the block type widget, which has no subtype
 type Widget struct {
-	types.ResourceBase `xcl:",remain"`
+	Name string `xcl:"name,label" json:"name"`
 
 	Size  int    `xcl:"size,optional" json:"size,omitempty"`
 	Parts []Part `xcl:"part,block" json:"part,omitempty"`

@@ -107,11 +107,13 @@ err = c.Decode(&cfg)
 ```
 
 A field tagged as a label is filled from the block's labels and can be read
-in expressions like an attribute (`database.postgres.main.name`); fields
-tagged `disabled` or `depends_on` receive the values every block has; and a
-field called `Meta`, a `types.Meta`, receives the block's metadata. A plugin's
-types are written the same way. A type may instead embed `types.ResourceBase`.
-On Go 1.27 the
+in expressions like an attribute (`database.postgres.main.name`), and a field
+called `Meta`, a `types.Meta`, receives the block's metadata, its disabled
+flag and dependencies among it (`Meta.Disabled`, `Meta.DependsOn`).
+Configuration sets `disabled` and `depends_on` on any block; a type declares
+no fields by those names. A plugin's types are written the same way. A type
+does not embed `types.ResourceBase`: xcl stores each type as one built from
+it that does. On Go 1.27 the
 declaration is also a method, `local.Register[PostgreSQL]("database", "postgres")`,
 and `RegisterType(&PostgreSQL{}, ...)` remains for a type only known at run
 time.

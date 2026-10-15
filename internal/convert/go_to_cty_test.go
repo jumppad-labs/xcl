@@ -11,8 +11,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// storedContainer is laid out as xcl stores an entity, embedding
+// types.ResourceBase, which is what GoToCtyValue is given
+type storedContainer struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Command []string `xcl:"command,optional" json:"command,omitempty"`
+}
+
+// storedSidecar embeds storedContainer, so its ResourceBase is promoted
+// through an embedded struct
+type storedSidecar struct {
+	storedContainer `xcl:",remain"`
+
+	SidecarID string `xcl:"sidecar_id,optional" json:"sidecar_id,omitempty"`
+}
+
 func TestGoStructToCtyValue(t *testing.T) {
-	cont1 := structs.ContainerBase{
+	cont1 := storedContainer{
 		ResourceBase: types.ResourceBase{
 			Meta: types.Meta{
 				ID: "test_container",
@@ -31,8 +47,8 @@ func TestGoStructToCtyValue(t *testing.T) {
 }
 
 func TestGoStructToCtyValueWithEmbeddedStruct(t *testing.T) {
-	cont2 := structs.Container{
-		ContainerBase: structs.ContainerBase{
+	cont2 := storedSidecar{
+		storedContainer: storedContainer{
 			ResourceBase: types.ResourceBase{
 				Meta: types.Meta{
 					ID: "test_container",

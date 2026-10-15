@@ -20,12 +20,10 @@ import (
 
 func testContainer() *entities.Container {
 	return &entities.Container{
-		ResourceBase: types.ResourceBase{
-			Meta: types.Meta{
-				ID:   "docker.container.web",
-				Name: "web",
-				Type: "docker",
-			},
+		Meta: types.Meta{
+			ID:   "docker.container.web",
+			Name: "web",
+			Type: "docker",
 		},
 		Image: "nginx:1.27",
 		Networks: []entities.NetworkAttachment{

@@ -13,6 +13,20 @@ import (
 	"github.com/jumppad-labs/xcl/logger"
 )
 
+// newTestAdapter wraps provider as RegisterResourceProvider does, converting
+// the stored entity to and from the plain testResource around every call
+func newTestAdapter(t *testing.T, provider ResourceProvider[*testResource]) *TypedProviderAdapter[*testResource] {
+	t.Helper()
+
+	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+
+	built, err := plainShape(&testResource{}, "")
+	require.NoError(t, err)
+	adapter.built = built
+
+	return adapter
+}
+
 // readRecordingProvider is a fake provider that records the resources passed
 // to Read and returns the configured result and error.
 type readRecordingProvider struct {
@@ -83,7 +97,7 @@ func TestTypedProviderAdapterReadPassesOldAndNewToProvider(t *testing.T) {
 	provider := &readRecordingProvider{
 		readResult: &testResource{Name: "web", Count: 5},
 	}
-	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+	adapter := newTestAdapter(t, provider)
 
 	oldData := []byte(`{"name":"web","count":1}`)
 	newData := []byte(`{"name":"web","count":2}`)
@@ -104,7 +118,7 @@ func TestTypedProviderAdapterReadReturnsProviderResultAsJSON(t *testing.T) {
 	provider := &readRecordingProvider{
 		readResult: &testResource{Name: "web", Count: 5},
 	}
-	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+	adapter := newTestAdapter(t, provider)
 
 	oldData := []byte(`{"name":"web","count":1}`)
 	newData := []byte(`{"name":"web","count":2}`)
@@ -124,7 +138,7 @@ func TestTypedProviderAdapterReadPassesZeroValueForNilData(t *testing.T) {
 	provider := &readRecordingProvider{
 		readResult: &testResource{Name: "web"},
 	}
-	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+	adapter := newTestAdapter(t, provider)
 
 	_, err := adapter.Read(context.Background(), nil, nil)
 	require.NoError(t, err)
@@ -138,7 +152,7 @@ func TestTypedProviderAdapterReadReturnsErrNotFoundFromProvider(t *testing.T) {
 	provider := &readRecordingProvider{
 		readError: ErrNotFound,
 	}
-	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+	adapter := newTestAdapter(t, provider)
 
 	oldData := []byte(`{"name":"web","count":1}`)
 	newData := []byte(`{"name":"web","count":1}`)
@@ -152,7 +166,7 @@ func TestTypedProviderAdapterReadReturnsWrappedErrNotFoundFromProvider(t *testin
 	provider := &readRecordingProvider{
 		readError: fmt.Errorf("container web is gone: %w", ErrNotFound),
 	}
-	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+	adapter := newTestAdapter(t, provider)
 
 	oldData := []byte(`{"name":"web","count":1}`)
 	newData := []byte(`{"name":"web","count":1}`)
@@ -207,7 +221,7 @@ func TestDirectPluginHostReadReturnsErrNotFoundFromProvider(t *testing.T) {
 func TestTypedProviderAdapterCreateEmitsNoLogEventsOfItsOwn(t *testing.T) {
 	recorder := &testutil.EventRecorder{}
 	provider := &readRecordingProvider{}
-	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+	adapter := newTestAdapter(t, provider)
 
 	ctx := WithLogger(context.Background(), logger.New(recorder.Record, events.Event{Source: "core", ResourceID: "resource.test.web"}))
 
@@ -285,7 +299,7 @@ func (p *changedTestPlugin) Init(log logger.Logger, state State) error {
 
 func TestTypedProviderAdapterChangedPassesDependenciesToProvider(t *testing.T) {
 	provider := &changedRecordingProvider{changedResult: entity.Update}
-	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+	adapter := newTestAdapter(t, provider)
 
 	dependencies := []entity.DependencyChange{
 		{Address: "resource.network.main", Change: entity.Replace},
@@ -333,7 +347,7 @@ func TestDirectPluginHostChangedReturnsProviderAnswer(t *testing.T) {
 
 func TestTypedProviderAdapterChangedPassesChangesToProvider(t *testing.T) {
 	provider := &changedRecordingProvider{changedResult: entity.Update}
-	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+	adapter := newTestAdapter(t, provider)
 
 	changes := []entity.PropertyChange{
 		{Path: entity.Path{}.Attribute("count"), Before: float64(1), After: float64(2)},
@@ -356,7 +370,7 @@ func TestTypedProviderAdapterChangedPassesChangesToProvider(t *testing.T) {
 
 func TestTypedProviderAdapterUpdatePassesChangesAndDependenciesToProvider(t *testing.T) {
 	provider := &changedRecordingProvider{}
-	adapter := NewTypedProviderAdapter[*testResource](provider, &testResource{})
+	adapter := newTestAdapter(t, provider)
 
 	changes := []entity.PropertyChange{
 		{Path: entity.Path{}.Attribute("count"), Before: float64(1), After: float64(2)},

@@ -257,22 +257,17 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 
 	key := types.TypeKey(t.Type, t.Subtype)
 
-	// a plain struct is stored as the type built from it, which embeds
+	// the plain struct is stored as the type built from it, which embeds
 	// types.ResourceBase as everything that handles entities expects; the
 	// application's type is recovered from it when entities are read back.
-	// One that cannot read a name is a singleton, as is a type built from a
-	// schema marked as one
-	stored := t.Prototype
-	singleton := schema.IsSingleton(reflect.TypeOf(t.Prototype).Elem())
-	if declaration.IsPlain(t.Prototype) {
-		built, err := plaintype.Build(reflect.TypeOf(t.Prototype).Elem(), len(name))
-		if err != nil {
-			return fmt.Errorf("type %q: %w", key, err)
-		}
-
-		stored = built.New()
-		singleton = built.IsSingleton()
+	// One that cannot read a name is a singleton
+	built, err := plaintype.Build(reflect.TypeOf(t.Prototype).Elem(), len(name))
+	if err != nil {
+		return fmt.Errorf("type %q: %w", key, err)
 	}
+
+	stored := built.New()
+	singleton := built.IsSingleton()
 
 	// a field configuration cannot be decoded into is reported here, where
 	// the type is declared, rather than while configuration is read
@@ -601,6 +596,12 @@ func (c *Catalog) checkLoaded(entityType, subtype string) *xclerrors.TypeNameCla
 // describeGoType names a declared type by its Go type, i.e.
 // "type *main.Server", as a TypeNameClashError describes it
 func describeGoType(prototype any) string {
+	// a stored type is named by the plain type it was built from, the one the
+	// application declared
+	if plain, ok := plaintype.PlainOf(reflect.TypeOf(prototype)); ok {
+		return fmt.Sprintf("type *%s", plain.String())
+	}
+
 	return fmt.Sprintf("type %s", reflect.TypeOf(prototype).String())
 }
 

@@ -8,10 +8,12 @@ package state_test
 
 import (
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/internal/catalog"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/internal/testutil"
@@ -203,8 +205,13 @@ func TestLoadRestoresResourceValues(t *testing.T) {
 	r, err := testutil.EntityByID(s, "resource.database.main")
 	require.NoError(t, err)
 
-	database, ok := r.(*registered.Database)
+	built, ok := plaintype.LookupPlain(reflect.TypeFor[registered.Database]())
 	require.True(t, ok)
+
+	plain, err := built.ToPlain(r)
+	require.NoError(t, err)
+
+	database := plain.(*registered.Database)
 
 	require.Equal(t, "us-east", database.Location)
 	require.Equal(t, 5432, database.Port)

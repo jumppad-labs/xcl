@@ -1,5 +1,7 @@
 // Package registered holds plain Go types that tests register with
-// PluginRegistry.RegisterType, they have no plugin and no provider.
+// PluginRegistry.RegisterType, they have no plugin and no provider. Each has
+// a Meta field rather than label fields, as tests register the same type with
+// and without a subtype, so with one label and with two.
 package registered
 
 import "github.com/jumppad-labs/xcl/types"
@@ -26,7 +28,7 @@ const SubtypeBig = "big"
 
 // Database is a registered type with a nested block and a computed field
 type Database struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Location string `xcl:"location" json:"location"`
 	Port     int    `xcl:"port" json:"port"`
@@ -45,7 +47,7 @@ type Timeouts struct {
 
 // App reads a variable, fields of a Database and a module output
 type App struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Environment      string `xcl:"environment" json:"environment"`
 	DatabaseLocation string `xcl:"database_location" json:"database_location"`
@@ -55,7 +57,7 @@ type App struct {
 
 // Consumer reads a field of an App
 type Consumer struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	AppEnvironment string `xcl:"app_environment" json:"app_environment"`
 }
@@ -63,7 +65,7 @@ type Consumer struct {
 // Cache is registered as the type "cache" without a subtype, it is declared
 // with a single label and is addressed cache.<name>
 type Cache struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Location string `xcl:"location" json:"location"`
 }
@@ -72,7 +74,7 @@ type Cache struct {
 // other than resource that takes a subtype. It is declared
 // server "big" "<name>" {} and addressed server.big.<name>
 type Server struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Location string `xcl:"location" json:"location"`
 	Size     int    `xcl:"size,optional" json:"size,omitempty"`
@@ -86,7 +88,7 @@ const TypeSecretConsumer = "secret_consumer"
 
 // Secret holds a sensitive password beside a plain username
 type Secret struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Username string                  `xcl:"username,optional" json:"username,omitempty"`
 	Password types.Sensitive[string] `xcl:"password" json:"password"`
@@ -95,7 +97,7 @@ type Secret struct {
 // SecretConsumer reads values that may be sensitive into a sensitive field
 // and a plain field
 type SecretConsumer struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Password types.Sensitive[string] `xcl:"password,optional" json:"password"`
 	Note     string                  `xcl:"note,optional" json:"note,omitempty"`
@@ -106,7 +108,7 @@ const TypeSecretShapes = "secret_shape"
 
 // SecretShape has plain and sensitive fields of object and list shapes
 type SecretShape struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Tags    map[string]string                  `xcl:"tags,optional" json:"tags,omitempty"`
 	Items   []string                           `xcl:"items,optional" json:"items,omitempty"`
@@ -132,7 +134,7 @@ const TypeGateway = "gateway"
 // expression, an index expression or a parenthesised expression in another
 // entity can reach into it
 type Service struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Host      string     `xcl:"host" json:"host"`
 	Listeners []Listener `xcl:"listener,block" json:"listeners,omitempty"`
@@ -149,7 +151,7 @@ type Listener struct {
 // the service's listeners, and its single port and address with index and
 // parenthesised expressions
 type Gateway struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Ports   map[string]int `xcl:"ports,optional" json:"ports,omitempty"`
 	Port    int            `xcl:"port,optional" json:"port,omitempty"`
@@ -164,7 +166,7 @@ const TypeProxy = "proxy"
 // objects, rather than as blocks. Endpoint marks tls optional, so a value may
 // leave it out
 type Proxy struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Default   Endpoint            `xcl:"default_endpoint,optional" json:"default_endpoint,omitempty"`
 	Listeners map[string]Endpoint `xcl:"listeners,optional" json:"listeners,omitempty"`
@@ -184,7 +186,7 @@ const TypeWebApp = "app"
 // another entity can reach a listener as app.web.listener.https.port and
 // iterate them with a for expression
 type WebApp struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Image     string              `xcl:"image" json:"image"`
 	Host      string              `xcl:"host" json:"host"`
