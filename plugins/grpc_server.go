@@ -52,10 +52,9 @@ func (s *GRPCServer) GetTypes(ctx context.Context, req *proto.GetTypesRequest) (
 
 	for i, t := range types {
 		protoTypes[i] = &proto.RegisteredType{
-			Type:      t.Type,
-			SubType:   t.SubType,
-			Schema:    t.Schema,
-			Singleton: t.Singleton,
+			Type:    t.Type,
+			SubType: t.SubType,
+			Schema:  t.Schema,
 		}
 	}
 
