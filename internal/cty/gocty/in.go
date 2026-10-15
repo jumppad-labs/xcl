@@ -535,24 +535,74 @@ func toCtyCapsule(val reflect.Value, capsuleType cty.Type, path cty.Path) (cty.V
 }
 
 func toCtyDynamic(val reflect.Value, path cty.Path) (cty.Value, error) {
-	if val = toCtyUnwrapPointer(val); !val.IsValid() {
+	// a value held in an interface is converted as what it holds
+	for val.IsValid() && (val.Kind() == reflect.Interface || val.Kind() == reflect.Ptr) {
+		if val.IsNil() {
+			return cty.NullVal(cty.DynamicPseudoType), nil
+		}
+
+		val = val.Elem()
+	}
+
+	if !val.IsValid() {
 		return cty.NullVal(cty.DynamicPseudoType), nil
 	}
 
 	switch val.Kind() {
 
 	case reflect.Struct:
-		if !val.Type().AssignableTo(valueType) {
-			return cty.NilVal, path.NewErrorf("can't convert Go %s dynamically; only cty.Value allowed", val.Type())
+		if val.Type().AssignableTo(valueType) {
+			return val.Interface().(cty.Value), nil
 		}
 
-		return val.Interface().(cty.Value), nil
+	case reflect.Slice, reflect.Array:
+		// the elements may differ in type, so they make a tuple
+		if val.Len() == 0 {
+			return cty.EmptyTupleVal, nil
+		}
 
-	default:
-		return cty.NilVal, path.NewErrorf("can't convert Go %s dynamically; only cty.Value allowed", val.Kind())
+		elems := make([]cty.Value, val.Len())
+		for i := range val.Len() {
+			elem, err := toCtyDynamic(val.Index(i), append(path, cty.IndexStep{Key: cty.NumberIntVal(int64(i))}))
+			if err != nil {
+				return cty.NilVal, err
+			}
 
+			elems[i] = elem
+		}
+
+		return cty.TupleVal(elems), nil
+
+	case reflect.Map:
+		// the values may differ in type, so they make an object
+		if val.Type().Key().Kind() != reflect.String {
+			return cty.NilVal, path.NewErrorf("can't convert Go %s dynamically; a map must have string keys", val.Type())
+		}
+
+		if val.Len() == 0 {
+			return cty.EmptyObjectVal, nil
+		}
+
+		attrs := make(map[string]cty.Value, val.Len())
+		for _, key := range val.MapKeys() {
+			attr, err := toCtyDynamic(val.MapIndex(key), append(path, cty.GetAttrStep{Name: key.String()}))
+			if err != nil {
+				return cty.NilVal, err
+			}
+
+			attrs[key.String()] = attr
+		}
+
+		return cty.ObjectVal(attrs), nil
 	}
 
+	// anything else has a type of its own to convert by
+	ty, err := impliedType(val.Type(), path, false)
+	if err != nil {
+		return cty.NilVal, path.NewErrorf("can't convert Go %s dynamically: %s", val.Type(), err)
+	}
+
+	return toCtyValue(val, ty, path)
 }
 
 func toCtyPassthrough(wrappedVal reflect.Value, wantTy cty.Type, path cty.Path) (cty.Value, error) {

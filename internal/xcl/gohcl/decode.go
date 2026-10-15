@@ -5,10 +5,12 @@
 package gohcl
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
 	"github.com/jumppad-labs/xcl/internal/cty"
+	ctyjson "github.com/jumppad-labs/xcl/internal/cty/json"
 
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/cty/gocty"
@@ -149,6 +151,8 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 		}
 
 		switch {
+		case field.Type.Kind() == reflect.Interface && field.Type.NumMethod() == 0:
+			diags = append(diags, nameAttributeInDiagnostics(name, decodeAny(attr.Expr, ctx, fieldV))...)
 		case attrType.AssignableTo(field.Type):
 			fieldV.Set(reflect.ValueOf(attr))
 		case exprType.AssignableTo(field.Type):
@@ -497,6 +501,38 @@ func DecodeExpression(expr hcl.Expression, ctx *hcl.EvalContext, val interface{}
 	}
 
 	return diags
+}
+
+// decodeAny sets fieldV, an empty interface, to the expression's value as
+// plain Go data, the forms encoding/json decodes into: map[string]any, []any,
+// float64, string and bool. A value not yet known, or null, leaves it nil.
+func decodeAny(expr hcl.Expression, ctx *hcl.EvalContext, fieldV reflect.Value) hcl.Diagnostics {
+	val, diags := expr.Value(ctx)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	val, _ = val.UnmarkDeep()
+	if val.IsNull() || !val.IsWhollyKnown() {
+		fieldV.Set(reflect.Zero(fieldV.Type()))
+		return diags
+	}
+
+	data, err := ctyjson.Marshal(val, val.Type())
+	if err == nil {
+		var plain any
+		if err = json.Unmarshal(data, &plain); err == nil {
+			fieldV.Set(reflect.ValueOf(&plain).Elem())
+			return diags
+		}
+	}
+
+	return append(diags, &hcl.Diagnostic{
+		Severity: hcl.DiagError,
+		Summary:  "Unsuitable value type",
+		Detail:   fmt.Sprintf("Unsuitable value: %s", err),
+		Subject:  expr.Range().Ptr(),
+	})
 }
 
 // nameAttributeInDiagnostics prefixes the detail of each error diagnostic
