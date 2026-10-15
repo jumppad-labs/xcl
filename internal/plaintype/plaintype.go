@@ -242,7 +242,7 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 		return nil, fmt.Errorf("%s has %d label fields, a block of its type has %d labels", plain, len(b.labels), labels)
 	}
 
-	if b.Singleton() && labels == 2 {
+	if b.IsSingleton() && labels == 2 {
 		return nil, fmt.Errorf("%s has no label fields and no Meta field, so its block is written without labels, and its type takes no subtype", plain)
 	}
 
@@ -259,10 +259,10 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 	return b, nil
 }
 
-// Singleton reports whether the plain type is a singleton: one with neither
+// IsSingleton reports whether the plain type is a singleton: one with neither
 // label fields nor a Meta field, which cannot read a name, so its block is
 // written without labels, i.e. runner {}, and a module holds one of it.
-func (b *Built) Singleton() bool {
+func (b *Built) IsSingleton() bool {
 	return len(b.labels) == 0 && b.meta == nil
 }
 

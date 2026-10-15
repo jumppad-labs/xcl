@@ -271,7 +271,7 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 		}
 
 		stored = built.New()
-		singleton = built.Singleton()
+		singleton = built.IsSingleton()
 	}
 
 	// a field configuration cannot be decoded into is reported here, where
@@ -379,9 +379,9 @@ func (c *Catalog) takesSubtype(entityType string) (bool, bool) {
 	return false, false
 }
 
-// Singleton reports whether the type keyword entityType is a singleton, whose
-// block has no labels: a declared type, or one a loaded plugin provides.
-func (c *Catalog) Singleton(entityType string) bool {
+// IsSingleton reports whether the type keyword entityType is a singleton,
+// whose block has no labels: a declared type, or one a loaded plugin provides.
+func (c *Catalog) IsSingleton(entityType string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

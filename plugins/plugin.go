@@ -173,7 +173,7 @@ func (p *PluginBase) RegisterType(typeName, subTypeName string, t any, prov Prov
 	singleton := false
 	if built != nil {
 		instance = built.New()
-		singleton = built.Singleton()
+		singleton = built.IsSingleton()
 	}
 
 	entitySchema, err := schema.GenerateSchemaFromInstance(instance, 10)

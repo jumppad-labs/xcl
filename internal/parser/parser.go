@@ -960,7 +960,7 @@ func (p *Parser) takesSubtype(entityType string) (bool, bool) {
 // isSingleton reports whether the type keyword entityType is a singleton,
 // whose block has no labels
 func (p *Parser) isSingleton(entityType string) bool {
-	return p.catalog != nil && p.catalog.Singleton(entityType)
+	return p.catalog != nil && p.catalog.IsSingleton(entityType)
 }
 
 // isReferenceRoot reports whether name, the first segment of a traversal in an
