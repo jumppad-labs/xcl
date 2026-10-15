@@ -65,7 +65,7 @@ type Container struct {
 	types.ResourceBase `xcl:",remain"`
 
 	Command  []string            `xcl:"command,optional" json:"command,omitempty"`
-	Networks []NetworkAttachment `xcl:"network,block" json:"networks,omitempty"`
+	Networks []NetworkAttachment `xcl:"network,block" json:"network,omitempty"`
 }
 
 // NetworkAttachment is one repeated network block of a Container, the
