@@ -120,6 +120,37 @@ func entity(t *testing.T, entities any, id string) map[string]any {
 	return nil
 }
 
+// encodedText returns the text the encode stage recorded for an entity id,
+// for the held entity or saved record (kind), under the named combination
+func encodedText(t *testing.T, record map[string]any, id, kind, combination string) string {
+	t.Helper()
+
+	stage, ok := record["encode"].(map[string]any)
+	require.True(t, ok, "encode stage is %T, not a map", record["encode"])
+
+	encoded, ok := stage[id].(map[string]any)
+	require.True(t, ok, "no encode entry for %q in %v", id, keysOf(stage))
+
+	texts, ok := encoded[kind].(map[string]any)
+	require.True(t, ok, "no %q texts for %q", kind, id)
+
+	text, ok := texts[combination].(string)
+	require.True(t, ok, "%s %s %s is %v, not text", id, kind, combination, texts[combination])
+
+	return text
+}
+
+// encodedCombinations returns the combination names the encode stage
+// recorded for an entity id, for the held entity or saved record (kind)
+func encodedCombinations(t *testing.T, record map[string]any, id, kind string) []string {
+	t.Helper()
+
+	stage := record["encode"].(map[string]any)
+	encoded := stage[id].(map[string]any)
+
+	return keysOf(encoded[kind].(map[string]any))
+}
+
 func keysOf(m map[string]any) []string {
 	keys := []string{}
 	for k := range m {
@@ -153,6 +184,7 @@ func TestParityRecordCoversEveryStage(t *testing.T) {
 		"entities",
 		"outputs",
 		"state",
+		"encode",
 		"diff_changed",
 		"load",
 		"destroy",
@@ -219,6 +251,7 @@ func TestParityInvalidFixtureReportsEveryProblem(t *testing.T) {
 		"entities",
 		"outputs",
 		"state",
+		"encode",
 	}, keysOf(record))
 
 	validate := record["validate"].(map[string]any)
@@ -254,6 +287,9 @@ func TestParityInvalidFixtureReportsEveryProblem(t *testing.T) {
 	require.Equal(t, false, record["apply"].(map[string]any)["ok"])
 	require.Empty(t, record["entities"])
 	require.Empty(t, record["state"])
+
+	// nothing was applied, so there is nothing to encode
+	require.Empty(t, record["encode"])
 }
 
 func TestParityPluginEntitiesDiffReportsUpdate(t *testing.T) {
@@ -330,4 +366,200 @@ func TestParityMissingFixtureFails(t *testing.T) {
 	require.ErrorAs(t, err, &exitErr)
 	require.NotEqual(t, 0, exitErr.ExitCode())
 	require.Contains(t, stderr.String(), "main.xcl")
+}
+
+func TestParityEncodeStageSkipsBuiltins(t *testing.T) {
+	record := runParity(t, "encode")
+
+	stage := record["encode"].(map[string]any)
+	require.ElementsMatch(t, []string{"store.main", "service.api"}, keysOf(stage))
+
+	require.NotContains(t, stage, "variable.suffix")
+	require.NotContains(t, stage, "output.endpoint")
+}
+
+func TestParityEncodeStageRecordsEveryCombination(t *testing.T) {
+	record := runParity(t, "encode")
+
+	combinations := []string{
+		"default",
+		"computed",
+		"empty",
+		"reveal",
+		"references",
+		"computed+empty",
+		"computed+reveal",
+		"computed+references",
+		"empty+reveal",
+		"empty+references",
+		"reveal+references",
+		"computed+empty+reveal",
+		"computed+empty+references",
+		"computed+reveal+references",
+		"empty+reveal+references",
+		"computed+empty+reveal+references",
+	}
+
+	stage := record["encode"].(map[string]any)
+	require.ElementsMatch(t, []string{"entity", "saved"}, keysOf(stage["store.main"].(map[string]any)))
+	require.ElementsMatch(t, []string{"entity", "saved"}, keysOf(stage["service.api"].(map[string]any)))
+
+	require.ElementsMatch(t, combinations, encodedCombinations(t, record, "store.main", "entity"))
+	require.ElementsMatch(t, combinations, encodedCombinations(t, record, "store.main", "saved"))
+	require.ElementsMatch(t, combinations, encodedCombinations(t, record, "service.api", "entity"))
+	require.ElementsMatch(t, combinations, encodedCombinations(t, record, "service.api", "saved"))
+}
+
+func TestParityEncodeFixtureResolvesReferencesByDefault(t *testing.T) {
+	record := runParity(t, "encode")
+
+	expected := `service "api" {
+  endpoint = "10.0.0.1"
+  secret   = "(sensitive)"
+  label    = "10.0.0.1-svc"
+}
+`
+
+	require.Equal(t, expected, encodedText(t, record, "service.api", "entity", "default"))
+	require.Equal(t, expected, encodedText(t, record, "service.api", "saved", "default"))
+}
+
+func TestParityEncodeFixtureShowsReferencesWhenAsked(t *testing.T) {
+	record := runParity(t, "encode")
+
+	expected := `service "api" {
+  endpoint = store.main.address
+  secret   = store.main.password
+  label    = "${store.main.address}-${variable.suffix}"
+}
+`
+
+	require.Equal(t, expected, encodedText(t, record, "service.api", "entity", "references"))
+	require.Equal(t, expected, encodedText(t, record, "service.api", "saved", "references"))
+}
+
+func TestParityEncodeFixtureMasksSensitiveByDefault(t *testing.T) {
+	record := runParity(t, "encode")
+
+	expected := `store "main" {
+  address  = "10.0.0.1"
+  password = "(sensitive)"
+
+  listener {
+    port = 5432
+  }
+}
+`
+
+	require.Equal(t, expected, encodedText(t, record, "store.main", "entity", "default"))
+	require.Equal(t, expected, encodedText(t, record, "store.main", "saved", "default"))
+}
+
+func TestParityEncodeFixtureRevealsSavedSensitiveWhenAsked(t *testing.T) {
+	record := runParity(t, "encode")
+
+	require.Equal(t, `store "main" {
+  address  = "10.0.0.1"
+  password = "s3cret"
+
+  listener {
+    port = 5432
+  }
+}
+`, encodedText(t, record, "store.main", "saved", "reveal"))
+
+	require.Equal(t, `service "api" {
+  endpoint = "10.0.0.1"
+  secret   = "s3cret"
+  label    = "10.0.0.1-svc"
+}
+`, encodedText(t, record, "service.api", "saved", "reveal"))
+}
+
+func TestParityEncodeFixtureKeepsHeldSensitiveMaskedWhenRevealed(t *testing.T) {
+	record := runParity(t, "encode")
+
+	require.Equal(t, `store "main" {
+  address  = "10.0.0.1"
+  password = "(sensitive)"
+
+  listener {
+    port = 5432
+  }
+}
+`, encodedText(t, record, "store.main", "entity", "reveal"))
+
+	require.Equal(t, `service "api" {
+  endpoint = "10.0.0.1"
+  secret   = "(sensitive)"
+  label    = "10.0.0.1-svc"
+}
+`, encodedText(t, record, "service.api", "entity", "reveal"))
+}
+
+func TestParityEncodeFixtureIncludesEmptyWhenAsked(t *testing.T) {
+	record := runParity(t, "encode")
+
+	expectedService := `service "api" {
+  endpoint = "10.0.0.1"
+  secret   = "(sensitive)"
+  label    = "10.0.0.1-svc"
+  tags     = []
+}
+`
+
+	require.Equal(t, expectedService, encodedText(t, record, "service.api", "entity", "empty"))
+	require.Equal(t, expectedService, encodedText(t, record, "service.api", "saved", "empty"))
+
+	expectedStore := `store "main" {
+  address  = "10.0.0.1"
+  password = "(sensitive)"
+  note     = ""
+
+  listener {
+    port = 5432
+  }
+}
+`
+
+	require.Equal(t, expectedStore, encodedText(t, record, "store.main", "entity", "empty"))
+	require.Equal(t, expectedStore, encodedText(t, record, "store.main", "saved", "empty"))
+}
+
+func TestParityEncodeFixtureLeavesEmptyOutByDefault(t *testing.T) {
+	record := runParity(t, "encode")
+
+	require.NotContains(t, encodedText(t, record, "service.api", "entity", "default"), "tags")
+	require.NotContains(t, encodedText(t, record, "service.api", "saved", "default"), "tags")
+	require.NotContains(t, encodedText(t, record, "store.main", "entity", "default"), "note")
+	require.NotContains(t, encodedText(t, record, "store.main", "saved", "default"), "note")
+}
+
+func TestParityPluginEntitiesEncodeIncludesComputedWhenAsked(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	expected := `resource "recording" "second" {
+  log    = "<tmp>/recording.log"
+  value  = "two"
+  input  = "first-one"
+  output = "second-two" # set by the provider
+}
+`
+
+	require.Equal(t, expected, encodedText(t, record, "resource.recording.second", "entity", "computed"))
+	require.Equal(t, expected, encodedText(t, record, "resource.recording.second", "saved", "computed"))
+}
+
+func TestParityPluginEntitiesEncodeLeavesComputedOutByDefault(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	expected := `resource "recording" "second" {
+  log   = "<tmp>/recording.log"
+  value = "two"
+  input = "first-one"
+}
+`
+
+	require.Equal(t, expected, encodedText(t, record, "resource.recording.second", "entity", "default"))
+	require.Equal(t, expected, encodedText(t, record, "resource.recording.second", "saved", "default"))
 }

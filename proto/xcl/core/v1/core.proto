@@ -43,6 +43,10 @@ service CoreService {
   rpc FindByType(FindByTypeRequest) returns (EntitiesResponse);
   rpc FindOne(FindByTypeRequest) returns (EntityResponse);
   rpc Outputs(OutputsRequest) returns (OutputsResponse);
+
+  // EncodeSavedEntity is Config.EncodeSavedEntity: it renders any entity
+  // record as configuration text, a saved record or one the host built from
+  // its own values, which is how a host encodes an entity by value.
   rpc EncodeSavedEntity(EncodeSavedEntityRequest) returns (EncodeSavedEntityResponse);
 }
 
@@ -289,9 +293,19 @@ message OutputsResponse {
   bytes outputs_json = 1;                    // {"output.name": value, ...}
 }
 
+// EncodeOptions are the four choices of Go's encoder. Every field defaults to
+// false, which is Go's default output.
+message EncodeOptions {
+  bool include_computed = 1;                 // xcl.IncludeComputed()
+  bool include_empty = 2;                    // xcl.IncludeEmpty()
+  bool reveal_sensitive = 3;                 // xcl.RevealSensitive()
+  bool show_references = 4;                  // xcl.ShowReferences()
+}
+
 message EncodeSavedEntityRequest {
   bytes entity = 1;
   bool highlight = 2;
+  EncodeOptions options = 3;                 // absent renders with Go's defaults
 }
 
 message EncodeSavedEntityResponse {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 20261015072147-b41720ce-python-encoder
+
+The engine renders any entity record with the four choices of Go's encoder. The core service's `EncodeSavedEntity` request gains `options`, an `EncodeOptions` message with `include_computed`, `include_empty`, `reveal_sensitive` and `show_references`, which the engine passes to `Config.EncodeSavedEntity` as `IncludeComputed`, `IncludeEmpty`, `RevealSensitive` and `ShowReferences`. The record need not come from state: a host can build one from its own values, its fields plus a `meta` naming the type, subtype and name, and the engine creates the registered or plugin type from it and renders it, which is how a binding encodes an entity by value without the engine looking anything up. A sensitive value the record holds as the marker stays the marker under `reveal_sensitive`, and a value masked when it was stored stays masked, as before. A request without `options` renders exactly as it did, so existing hosts, xcl-python 0.9.0 included, are unaffected. The change is additive: a new message and a new field number, no call added and none renamed, and Go's public API is unchanged.
+
+The parity program records a new `encode` stage: for every entity that is not a builtin, the text Go's `EncodeEntity` gives for the entity as a host holds it, and for every saved record the text `EncodeSavedEntity` gives, under all sixteen combinations of the four choices. A new `encode` fixture covers sensitive and unset optional attributes, a nested block, and attributes set from references, and `plugin_entities` covers a plugin entity with a field the provider fills in, so a binding's encoder can be compared with Go's byte for byte.
+
+**Breaking:**
+
+None.
+
 ## 20261011232013-da18c586-python-release-hardening
 
 A plugin release signed by a key that is not trusted now says which key signed it. The GitHub registry still refuses it with `ErrPluginVerification` and the same "signature `<name>_<version>_checksums.txt.sig` does not verify against any trusted key" wording, and now ends the message with "signed by key `<long key ID>`, which is not trusted", the 16-hex-digit ID read from the signature's issuer, so whoever installs the plugin can see which key they would need to trust. Every binding reports the engine's message as it is, so Python's `PluginVerificationError` carries it too. A tampered, unsigned or correctly signed release is handled exactly as before, and a signature that cannot be read for its issuer keeps the previous message. The shared test helper `internal/testutil.FakeGitHubRelease` gains `OtherKeyID`, the long ID of the key `SignedByOtherKey` signs with.

@@ -2410,17 +2410,88 @@ func (x *OutputsResponse) GetOutputsJson() []byte {
 	return nil
 }
 
+// EncodeOptions are the four choices of Go's encoder. Every field defaults to
+// false, which is Go's default output.
+type EncodeOptions struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	IncludeComputed bool                   `protobuf:"varint,1,opt,name=include_computed,json=includeComputed,proto3" json:"include_computed,omitempty"` // xcl.IncludeComputed()
+	IncludeEmpty    bool                   `protobuf:"varint,2,opt,name=include_empty,json=includeEmpty,proto3" json:"include_empty,omitempty"`          // xcl.IncludeEmpty()
+	RevealSensitive bool                   `protobuf:"varint,3,opt,name=reveal_sensitive,json=revealSensitive,proto3" json:"reveal_sensitive,omitempty"` // xcl.RevealSensitive()
+	ShowReferences  bool                   `protobuf:"varint,4,opt,name=show_references,json=showReferences,proto3" json:"show_references,omitempty"`    // xcl.ShowReferences()
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *EncodeOptions) Reset() {
+	*x = EncodeOptions{}
+	mi := &file_xcl_core_v1_core_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EncodeOptions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EncodeOptions) ProtoMessage() {}
+
+func (x *EncodeOptions) ProtoReflect() protoreflect.Message {
+	mi := &file_xcl_core_v1_core_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EncodeOptions.ProtoReflect.Descriptor instead.
+func (*EncodeOptions) Descriptor() ([]byte, []int) {
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *EncodeOptions) GetIncludeComputed() bool {
+	if x != nil {
+		return x.IncludeComputed
+	}
+	return false
+}
+
+func (x *EncodeOptions) GetIncludeEmpty() bool {
+	if x != nil {
+		return x.IncludeEmpty
+	}
+	return false
+}
+
+func (x *EncodeOptions) GetRevealSensitive() bool {
+	if x != nil {
+		return x.RevealSensitive
+	}
+	return false
+}
+
+func (x *EncodeOptions) GetShowReferences() bool {
+	if x != nil {
+		return x.ShowReferences
+	}
+	return false
+}
+
 type EncodeSavedEntityRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Entity        []byte                 `protobuf:"bytes,1,opt,name=entity,proto3" json:"entity,omitempty"`
 	Highlight     bool                   `protobuf:"varint,2,opt,name=highlight,proto3" json:"highlight,omitempty"`
+	Options       *EncodeOptions         `protobuf:"bytes,3,opt,name=options,proto3" json:"options,omitempty"` // absent renders with Go's defaults
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EncodeSavedEntityRequest) Reset() {
 	*x = EncodeSavedEntityRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[38]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2432,7 +2503,7 @@ func (x *EncodeSavedEntityRequest) String() string {
 func (*EncodeSavedEntityRequest) ProtoMessage() {}
 
 func (x *EncodeSavedEntityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[38]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2445,7 +2516,7 @@ func (x *EncodeSavedEntityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncodeSavedEntityRequest.ProtoReflect.Descriptor instead.
 func (*EncodeSavedEntityRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{38}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *EncodeSavedEntityRequest) GetEntity() []byte {
@@ -2462,6 +2533,13 @@ func (x *EncodeSavedEntityRequest) GetHighlight() bool {
 	return false
 }
 
+func (x *EncodeSavedEntityRequest) GetOptions() *EncodeOptions {
+	if x != nil {
+		return x.Options
+	}
+	return nil
+}
+
 type EncodeSavedEntityResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Text          []byte                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
@@ -2471,7 +2549,7 @@ type EncodeSavedEntityResponse struct {
 
 func (x *EncodeSavedEntityResponse) Reset() {
 	*x = EncodeSavedEntityResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[39]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2483,7 +2561,7 @@ func (x *EncodeSavedEntityResponse) String() string {
 func (*EncodeSavedEntityResponse) ProtoMessage() {}
 
 func (x *EncodeSavedEntityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[39]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2496,7 +2574,7 @@ func (x *EncodeSavedEntityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncodeSavedEntityResponse.ProtoReflect.Descriptor instead.
 func (*EncodeSavedEntityResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{39}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *EncodeSavedEntityResponse) GetText() []byte {
@@ -2662,10 +2740,16 @@ const file_xcl_core_v1_core_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x03(\tR\x04path\"\x10\n" +
 	"\x0eOutputsRequest\"4\n" +
 	"\x0fOutputsResponse\x12!\n" +
-	"\foutputs_json\x18\x01 \x01(\fR\voutputsJson\"P\n" +
+	"\foutputs_json\x18\x01 \x01(\fR\voutputsJson\"\xb3\x01\n" +
+	"\rEncodeOptions\x12)\n" +
+	"\x10include_computed\x18\x01 \x01(\bR\x0fincludeComputed\x12#\n" +
+	"\rinclude_empty\x18\x02 \x01(\bR\fincludeEmpty\x12)\n" +
+	"\x10reveal_sensitive\x18\x03 \x01(\bR\x0frevealSensitive\x12'\n" +
+	"\x0fshow_references\x18\x04 \x01(\bR\x0eshowReferences\"\x86\x01\n" +
 	"\x18EncodeSavedEntityRequest\x12\x16\n" +
 	"\x06entity\x18\x01 \x01(\fR\x06entity\x12\x1c\n" +
-	"\thighlight\x18\x02 \x01(\bR\thighlight\"/\n" +
+	"\thighlight\x18\x02 \x01(\bR\thighlight\x124\n" +
+	"\aoptions\x18\x03 \x01(\v2\x1a.xcl.core.v1.EncodeOptionsR\aoptions\"/\n" +
 	"\x19EncodeSavedEntityResponse\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\fR\x04text*S\n" +
 	"\x0eEventDataLevel\x12\x13\n" +
@@ -2706,7 +2790,7 @@ func file_xcl_core_v1_core_proto_rawDescGZIP() []byte {
 }
 
 var file_xcl_core_v1_core_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_xcl_core_v1_core_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
+var file_xcl_core_v1_core_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_xcl_core_v1_core_proto_goTypes = []any{
 	(EventDataLevel)(0),               // 0: xcl.core.v1.EventDataLevel
 	(StateTask_Kind)(0),               // 1: xcl.core.v1.StateTask.Kind
@@ -2748,12 +2832,13 @@ var file_xcl_core_v1_core_proto_goTypes = []any{
 	(*FindByTypeRequest)(nil),         // 37: xcl.core.v1.FindByTypeRequest
 	(*OutputsRequest)(nil),            // 38: xcl.core.v1.OutputsRequest
 	(*OutputsResponse)(nil),           // 39: xcl.core.v1.OutputsResponse
-	(*EncodeSavedEntityRequest)(nil),  // 40: xcl.core.v1.EncodeSavedEntityRequest
-	(*EncodeSavedEntityResponse)(nil), // 41: xcl.core.v1.EncodeSavedEntityResponse
-	nil,                               // 42: xcl.core.v1.Error.DetailsEntry
+	(*EncodeOptions)(nil),             // 40: xcl.core.v1.EncodeOptions
+	(*EncodeSavedEntityRequest)(nil),  // 41: xcl.core.v1.EncodeSavedEntityRequest
+	(*EncodeSavedEntityResponse)(nil), // 42: xcl.core.v1.EncodeSavedEntityResponse
+	nil,                               // 43: xcl.core.v1.Error.DetailsEntry
 }
 var file_xcl_core_v1_core_proto_depIdxs = []int32{
-	42, // 0: xcl.core.v1.Error.details:type_name -> xcl.core.v1.Error.DetailsEntry
+	43, // 0: xcl.core.v1.Error.details:type_name -> xcl.core.v1.Error.DetailsEntry
 	2,  // 1: xcl.core.v1.Error.causes:type_name -> xcl.core.v1.Error
 	7,  // 2: xcl.core.v1.CreateConfigRequest.registries:type_name -> xcl.core.v1.Registry
 	13, // 3: xcl.core.v1.CreateConfigRequest.state_store:type_name -> xcl.core.v1.StateStore
@@ -2777,43 +2862,44 @@ var file_xcl_core_v1_core_proto_depIdxs = []int32{
 	32, // 21: xcl.core.v1.CompleteRequest.function:type_name -> xcl.core.v1.FunctionResult
 	2,  // 22: xcl.core.v1.StateResult.error:type_name -> xcl.core.v1.Error
 	2,  // 23: xcl.core.v1.FunctionResult.error:type_name -> xcl.core.v1.Error
-	3,  // 24: xcl.core.v1.CoreService.GetVersion:input_type -> xcl.core.v1.GetVersionRequest
-	5,  // 25: xcl.core.v1.CoreService.CreateConfig:input_type -> xcl.core.v1.CreateConfigRequest
-	15, // 26: xcl.core.v1.CoreService.StartValidate:input_type -> xcl.core.v1.StartValidateRequest
-	16, // 27: xcl.core.v1.CoreService.StartApply:input_type -> xcl.core.v1.StartApplyRequest
-	17, // 28: xcl.core.v1.CoreService.StartDiff:input_type -> xcl.core.v1.StartDiffRequest
-	18, // 29: xcl.core.v1.CoreService.StartDestroy:input_type -> xcl.core.v1.StartDestroyRequest
-	19, // 30: xcl.core.v1.CoreService.StartLoad:input_type -> xcl.core.v1.StartLoadRequest
-	21, // 31: xcl.core.v1.CoreService.Cancel:input_type -> xcl.core.v1.CancelRequest
-	23, // 32: xcl.core.v1.CoreService.Poll:input_type -> xcl.core.v1.PollRequest
-	29, // 33: xcl.core.v1.CoreService.Complete:input_type -> xcl.core.v1.CompleteRequest
-	33, // 34: xcl.core.v1.CoreService.Entities:input_type -> xcl.core.v1.EntitiesRequest
-	35, // 35: xcl.core.v1.CoreService.Find:input_type -> xcl.core.v1.FindRequest
-	37, // 36: xcl.core.v1.CoreService.FindByType:input_type -> xcl.core.v1.FindByTypeRequest
-	37, // 37: xcl.core.v1.CoreService.FindOne:input_type -> xcl.core.v1.FindByTypeRequest
-	38, // 38: xcl.core.v1.CoreService.Outputs:input_type -> xcl.core.v1.OutputsRequest
-	40, // 39: xcl.core.v1.CoreService.EncodeSavedEntity:input_type -> xcl.core.v1.EncodeSavedEntityRequest
-	4,  // 40: xcl.core.v1.CoreService.GetVersion:output_type -> xcl.core.v1.GetVersionResponse
-	6,  // 41: xcl.core.v1.CoreService.CreateConfig:output_type -> xcl.core.v1.CreateConfigResponse
-	20, // 42: xcl.core.v1.CoreService.StartValidate:output_type -> xcl.core.v1.StartOperationResponse
-	20, // 43: xcl.core.v1.CoreService.StartApply:output_type -> xcl.core.v1.StartOperationResponse
-	20, // 44: xcl.core.v1.CoreService.StartDiff:output_type -> xcl.core.v1.StartOperationResponse
-	20, // 45: xcl.core.v1.CoreService.StartDestroy:output_type -> xcl.core.v1.StartOperationResponse
-	20, // 46: xcl.core.v1.CoreService.StartLoad:output_type -> xcl.core.v1.StartOperationResponse
-	22, // 47: xcl.core.v1.CoreService.Cancel:output_type -> xcl.core.v1.CancelResponse
-	24, // 48: xcl.core.v1.CoreService.Poll:output_type -> xcl.core.v1.PollResponse
-	30, // 49: xcl.core.v1.CoreService.Complete:output_type -> xcl.core.v1.CompleteResponse
-	34, // 50: xcl.core.v1.CoreService.Entities:output_type -> xcl.core.v1.EntitiesResponse
-	36, // 51: xcl.core.v1.CoreService.Find:output_type -> xcl.core.v1.EntityResponse
-	34, // 52: xcl.core.v1.CoreService.FindByType:output_type -> xcl.core.v1.EntitiesResponse
-	36, // 53: xcl.core.v1.CoreService.FindOne:output_type -> xcl.core.v1.EntityResponse
-	39, // 54: xcl.core.v1.CoreService.Outputs:output_type -> xcl.core.v1.OutputsResponse
-	41, // 55: xcl.core.v1.CoreService.EncodeSavedEntity:output_type -> xcl.core.v1.EncodeSavedEntityResponse
-	40, // [40:56] is the sub-list for method output_type
-	24, // [24:40] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	40, // 24: xcl.core.v1.EncodeSavedEntityRequest.options:type_name -> xcl.core.v1.EncodeOptions
+	3,  // 25: xcl.core.v1.CoreService.GetVersion:input_type -> xcl.core.v1.GetVersionRequest
+	5,  // 26: xcl.core.v1.CoreService.CreateConfig:input_type -> xcl.core.v1.CreateConfigRequest
+	15, // 27: xcl.core.v1.CoreService.StartValidate:input_type -> xcl.core.v1.StartValidateRequest
+	16, // 28: xcl.core.v1.CoreService.StartApply:input_type -> xcl.core.v1.StartApplyRequest
+	17, // 29: xcl.core.v1.CoreService.StartDiff:input_type -> xcl.core.v1.StartDiffRequest
+	18, // 30: xcl.core.v1.CoreService.StartDestroy:input_type -> xcl.core.v1.StartDestroyRequest
+	19, // 31: xcl.core.v1.CoreService.StartLoad:input_type -> xcl.core.v1.StartLoadRequest
+	21, // 32: xcl.core.v1.CoreService.Cancel:input_type -> xcl.core.v1.CancelRequest
+	23, // 33: xcl.core.v1.CoreService.Poll:input_type -> xcl.core.v1.PollRequest
+	29, // 34: xcl.core.v1.CoreService.Complete:input_type -> xcl.core.v1.CompleteRequest
+	33, // 35: xcl.core.v1.CoreService.Entities:input_type -> xcl.core.v1.EntitiesRequest
+	35, // 36: xcl.core.v1.CoreService.Find:input_type -> xcl.core.v1.FindRequest
+	37, // 37: xcl.core.v1.CoreService.FindByType:input_type -> xcl.core.v1.FindByTypeRequest
+	37, // 38: xcl.core.v1.CoreService.FindOne:input_type -> xcl.core.v1.FindByTypeRequest
+	38, // 39: xcl.core.v1.CoreService.Outputs:input_type -> xcl.core.v1.OutputsRequest
+	41, // 40: xcl.core.v1.CoreService.EncodeSavedEntity:input_type -> xcl.core.v1.EncodeSavedEntityRequest
+	4,  // 41: xcl.core.v1.CoreService.GetVersion:output_type -> xcl.core.v1.GetVersionResponse
+	6,  // 42: xcl.core.v1.CoreService.CreateConfig:output_type -> xcl.core.v1.CreateConfigResponse
+	20, // 43: xcl.core.v1.CoreService.StartValidate:output_type -> xcl.core.v1.StartOperationResponse
+	20, // 44: xcl.core.v1.CoreService.StartApply:output_type -> xcl.core.v1.StartOperationResponse
+	20, // 45: xcl.core.v1.CoreService.StartDiff:output_type -> xcl.core.v1.StartOperationResponse
+	20, // 46: xcl.core.v1.CoreService.StartDestroy:output_type -> xcl.core.v1.StartOperationResponse
+	20, // 47: xcl.core.v1.CoreService.StartLoad:output_type -> xcl.core.v1.StartOperationResponse
+	22, // 48: xcl.core.v1.CoreService.Cancel:output_type -> xcl.core.v1.CancelResponse
+	24, // 49: xcl.core.v1.CoreService.Poll:output_type -> xcl.core.v1.PollResponse
+	30, // 50: xcl.core.v1.CoreService.Complete:output_type -> xcl.core.v1.CompleteResponse
+	34, // 51: xcl.core.v1.CoreService.Entities:output_type -> xcl.core.v1.EntitiesResponse
+	36, // 52: xcl.core.v1.CoreService.Find:output_type -> xcl.core.v1.EntityResponse
+	34, // 53: xcl.core.v1.CoreService.FindByType:output_type -> xcl.core.v1.EntitiesResponse
+	36, // 54: xcl.core.v1.CoreService.FindOne:output_type -> xcl.core.v1.EntityResponse
+	39, // 55: xcl.core.v1.CoreService.Outputs:output_type -> xcl.core.v1.OutputsResponse
+	42, // 56: xcl.core.v1.CoreService.EncodeSavedEntity:output_type -> xcl.core.v1.EncodeSavedEntityResponse
+	41, // [41:57] is the sub-list for method output_type
+	25, // [25:41] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_xcl_core_v1_core_proto_init() }
@@ -2851,7 +2937,7 @@ func file_xcl_core_v1_core_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_xcl_core_v1_core_proto_rawDesc), len(file_xcl_core_v1_core_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   41,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

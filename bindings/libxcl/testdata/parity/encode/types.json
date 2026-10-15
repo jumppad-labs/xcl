@@ -1,0 +1,16 @@
+[
+  {"schema_version": 1, "type": "store", "fields": [
+    {"name": "address", "type": "string"},
+    {"name": "password", "type": "string", "sensitive": true},
+    {"name": "note", "type": "string", "optional": true},
+    {"name": "listener", "kind": "block", "optional": true, "type": {"object": [
+      {"name": "port", "type": "number", "format": "int"}
+    ]}}
+  ]},
+  {"schema_version": 1, "type": "service", "fields": [
+    {"name": "endpoint", "type": "string"},
+    {"name": "secret", "type": "string", "optional": true, "sensitive": true},
+    {"name": "label", "type": "string", "optional": true},
+    {"name": "tags", "type": {"list": "string"}, "optional": true}
+  ]}
+]

@@ -3,6 +3,7 @@ package coreservice
 import (
 	"encoding/json"
 
+	"github.com/jumppad-labs/xcl"
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
 	"github.com/jumppad-labs/xcl/highlight"
 )
@@ -117,8 +118,10 @@ func (s *Service) outputs(conf *configuration, _ *corepb.OutputsRequest) (*corep
 	return &corepb.OutputsResponse{OutputsJson: data}, nil
 }
 
-// encodeSavedEntity is EncodeSavedEntity, a saved record rendered as
-// configuration text, coloured for a terminal when asked.
+// encodeSavedEntity is EncodeSavedEntity, an entity record rendered as
+// configuration text with the requested choices, coloured for a terminal
+// when asked. The record is a saved one or one a host built from its own
+// values; either way the engine builds its type and never looks it up.
 func (s *Service) encodeSavedEntity(conf *configuration, req *corepb.EncodeSavedEntityRequest) (*corepb.EncodeSavedEntityResponse, error) {
 	if err := conf.lookupAllowed("EncodeSavedEntity"); err != nil {
 		return nil, err
@@ -128,7 +131,7 @@ func (s *Service) encodeSavedEntity(conf *configuration, req *corepb.EncodeSaved
 		return nil, invalidArgument("an entity is required", "argument", "entity")
 	}
 
-	text, err := conf.cfg.EncodeSavedEntity(req.GetEntity())
+	text, err := conf.cfg.EncodeSavedEntity(req.GetEntity(), encodeOptions(req.GetOptions())...)
 	if err != nil {
 		return nil, err
 	}
@@ -138,4 +141,28 @@ func (s *Service) encodeSavedEntity(conf *configuration, req *corepb.EncodeSaved
 	}
 
 	return &corepb.EncodeSavedEntityResponse{Text: text}, nil
+}
+
+// encodeOptions converts the protocol's choices to Go's encode options. No
+// choices, or none set, is Go's default output.
+func encodeOptions(options *corepb.EncodeOptions) []xcl.EncodeOption {
+	var converted []xcl.EncodeOption
+
+	if options.GetIncludeComputed() {
+		converted = append(converted, xcl.IncludeComputed())
+	}
+
+	if options.GetIncludeEmpty() {
+		converted = append(converted, xcl.IncludeEmpty())
+	}
+
+	if options.GetRevealSensitive() {
+		converted = append(converted, xcl.RevealSensitive())
+	}
+
+	if options.GetShowReferences() {
+		converted = append(converted, xcl.ShowReferences())
+	}
+
+	return converted
 }

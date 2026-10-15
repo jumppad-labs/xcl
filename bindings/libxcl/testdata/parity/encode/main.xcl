@@ -1,0 +1,22 @@
+variable "suffix" {
+  default = "svc"
+}
+
+store "main" {
+  address  = "10.0.0.1"
+  password = "s3cret"
+
+  listener {
+    port = 5432
+  }
+}
+
+service "api" {
+  endpoint = store.main.address
+  secret   = store.main.password
+  label    = "${store.main.address}-${variable.suffix}"
+}
+
+output "endpoint" {
+  value = service.api.endpoint
+}

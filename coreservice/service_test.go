@@ -313,6 +313,79 @@ func TestEveryHandlerIsAServiceMethod(t *testing.T) {
 	}
 }
 
+func TestEncodeOptionsDeclaresIncludeComputed(t *testing.T) {
+	message := corepb.File_xcl_core_v1_core_proto.Messages().ByName("EncodeOptions")
+	require.NotNil(t, message)
+
+	field := message.Fields().ByNumber(1)
+	require.NotNil(t, field)
+	require.Equal(t, "include_computed", string(field.Name()))
+	require.Equal(t, "bool", field.Kind().String())
+}
+
+func TestEncodeOptionsDeclaresIncludeEmpty(t *testing.T) {
+	message := corepb.File_xcl_core_v1_core_proto.Messages().ByName("EncodeOptions")
+	require.NotNil(t, message)
+
+	field := message.Fields().ByNumber(2)
+	require.NotNil(t, field)
+	require.Equal(t, "include_empty", string(field.Name()))
+	require.Equal(t, "bool", field.Kind().String())
+}
+
+func TestEncodeOptionsDeclaresRevealSensitive(t *testing.T) {
+	message := corepb.File_xcl_core_v1_core_proto.Messages().ByName("EncodeOptions")
+	require.NotNil(t, message)
+
+	field := message.Fields().ByNumber(3)
+	require.NotNil(t, field)
+	require.Equal(t, "reveal_sensitive", string(field.Name()))
+	require.Equal(t, "bool", field.Kind().String())
+}
+
+func TestEncodeOptionsDeclaresShowReferences(t *testing.T) {
+	message := corepb.File_xcl_core_v1_core_proto.Messages().ByName("EncodeOptions")
+	require.NotNil(t, message)
+
+	field := message.Fields().ByNumber(4)
+	require.NotNil(t, field)
+	require.Equal(t, "show_references", string(field.Name()))
+	require.Equal(t, "bool", field.Kind().String())
+}
+
+func TestEncodeOptionsDeclaresOnlyFourFields(t *testing.T) {
+	message := corepb.File_xcl_core_v1_core_proto.Messages().ByName("EncodeOptions")
+	require.NotNil(t, message)
+
+	require.Equal(t, 4, message.Fields().Len())
+}
+
+func TestEncodeSavedEntityRequestKeepsEntityAndHighlight(t *testing.T) {
+	message := corepb.File_xcl_core_v1_core_proto.Messages().ByName("EncodeSavedEntityRequest")
+	require.NotNil(t, message)
+
+	entity := message.Fields().ByNumber(1)
+	require.NotNil(t, entity)
+	require.Equal(t, "entity", string(entity.Name()))
+	require.Equal(t, "bytes", entity.Kind().String())
+
+	highlight := message.Fields().ByNumber(2)
+	require.NotNil(t, highlight)
+	require.Equal(t, "highlight", string(highlight.Name()))
+	require.Equal(t, "bool", highlight.Kind().String())
+}
+
+func TestEncodeSavedEntityRequestDeclaresOptions(t *testing.T) {
+	message := corepb.File_xcl_core_v1_core_proto.Messages().ByName("EncodeSavedEntityRequest")
+	require.NotNil(t, message)
+
+	options := message.Fields().ByNumber(3)
+	require.NotNil(t, options)
+	require.Equal(t, "options", string(options.Name()))
+	require.Equal(t, "message", options.Kind().String())
+	require.Equal(t, "xcl.core.v1.EncodeOptions", string(options.Message().FullName()))
+}
+
 func TestUnknownMethodReturnsStatus(t *testing.T) {
 	s := New()
 
