@@ -183,6 +183,7 @@ func (g *generatorV1) attribute(sf reflect.StructField, parsed tags.Field, where
 	field := FieldV1{
 		Name:     parsed.Name,
 		Optional: (parsed.Kind == tags.KindOptional || pointer) && !parsed.Computed,
+		Nullable: pointer,
 		Computed: parsed.Computed,
 		Key:      parsed.Key,
 	}
