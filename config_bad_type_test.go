@@ -131,13 +131,12 @@ func TestFirstOperationReturnsErrorForPluginTypeWithBadBlockField(t *testing.T) 
 	})
 	require.Error(t, err)
 
-	var invalid *InvalidTypeError
-	require.True(t, errors.As(err, &invalid), "error chain was: %v", err)
-	require.Equal(t, "resource.bad", invalid.Type)
-	require.Equal(t, badBlockPluginName, invalid.Provider)
-	require.Equal(t, "local", invalid.Registry)
-	require.ErrorContains(t, invalid.Err, "Listener")
-	require.ErrorContains(t, invalid.Err, "cannot hold blocks")
+	// the plugin cannot describe the type, so it fails to load
+	var load *PluginLoadError
+	require.True(t, errors.As(err, &load), "error chain was: %v", err)
+	require.ErrorContains(t, err, "resource.bad")
+	require.ErrorContains(t, err, "Listener")
+	require.ErrorContains(t, err, "a block must hold a struct")
 }
 
 func TestFirstOperationErrorForPluginTypeNamesThePluginTypeAndField(t *testing.T) {
@@ -153,6 +152,6 @@ func TestFirstOperationErrorForPluginTypeNamesThePluginTypeAndField(t *testing.T
 	require.Error(t, err)
 
 	require.Contains(t, err.Error(), badBlockPluginName)
-	require.Contains(t, err.Error(), `"resource.bad"`)
+	require.Contains(t, err.Error(), "resource.bad")
 	require.Contains(t, err.Error(), "Listener")
 }

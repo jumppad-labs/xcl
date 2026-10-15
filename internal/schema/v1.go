@@ -38,7 +38,9 @@ type FieldV1 struct {
 	Name string `json:"name"`
 
 	// Type is the value's type: "string", "number", "bool", "any",
-	// {"list": T}, {"map": T} or {"object": [fields]}
+	// {"list": T}, {"map": T}, {"object": [fields]}, or {"entity": [fields]}
+	// for a value holding a block, as a reference to one gives it, which
+	// carries meta, disabled and depends_on beside its fields
 	Type json.RawMessage `json:"type"`
 
 	// Kind is "attribute", the default, or "block"
@@ -68,6 +70,11 @@ type FieldV1 struct {
 	// name: optional on a list of blocks, and filled from the key in a map
 	// of blocks
 	Label string `json:"label,omitempty"`
+
+	// Key marks an attribute that identifies an element in a list of blocks:
+	// the saved and configured elements are paired by it when computed values
+	// are carried over, rather than by position
+	Key bool `json:"key,omitempty"`
 }
 
 // Field kinds.
@@ -268,6 +275,9 @@ func buildAttributeV1(f FieldV1, where, goName string) (reflect.StructField, err
 	if f.Computed {
 		options = append(options, "computed")
 	}
+	if f.Key {
+		options = append(options, "key")
+	}
 
 	tag := fmt.Sprintf(`xcl:%q json:%q`, strings.Join(options, ","), jsonTagV1(f.Name, optional))
 
@@ -304,6 +314,10 @@ func buildBlockV1(f FieldV1, where, goName string) (reflect.StructField, error) 
 
 	if len(f.Default) > 0 {
 		return reflect.StructField{}, fmt.Errorf("field %s: a block has no default", where)
+	}
+
+	if f.Key {
+		return reflect.StructField{}, fmt.Errorf("field %s: a block cannot be a key, mark the attribute that identifies it", where)
 	}
 
 	objectFields, named, err := blockElementV1(f.Type, where)
@@ -430,7 +444,7 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 				return nil, fmt.Errorf("field %s: unknown number format %q, expected %q or %q", where, format, NumberFormatInt, NumberFormatFloat)
 			}
 		default:
-			return nil, fmt.Errorf("field %s: unknown type %q, expected string, number, bool, any, {\"list\": T}, {\"map\": T} or {\"object\": [fields]}", where, name)
+			return nil, fmt.Errorf("field %s: unknown type %q, expected string, number, bool, any, {\"list\": T}, {\"map\": T}, {\"object\": [fields]} or {\"entity\": [fields]}", where, name)
 		}
 	}
 
@@ -442,6 +456,7 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 		List   json.RawMessage `json:"list"`
 		Map    json.RawMessage `json:"map"`
 		Object []FieldV1       `json:"object"`
+		Entity []FieldV1       `json:"entity"`
 	}
 
 	if err := json.Unmarshal(raw, &typed); err != nil {
@@ -449,6 +464,15 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 	}
 
 	switch {
+	case typed.Entity != nil:
+		// an entity, as a reference to a block gives it, carries the meta,
+		// disabled and depends_on every block has beside its own fields
+		fields, err := buildFieldsV1(typed.Entity, where, true)
+		if err != nil {
+			return nil, err
+		}
+
+		return reflect.StructOf(fields), nil
 	case len(typed.List) > 0:
 		element, err := valueTypeV1(typed.List, format, where)
 		if err != nil {
@@ -471,7 +495,7 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 
 		return reflect.StructOf(fields), nil
 	default:
-		return nil, fmt.Errorf("field %s: unknown type %s, expected string, number, bool, any, {\"list\": T}, {\"map\": T} or {\"object\": [fields]}", where, string(raw))
+		return nil, fmt.Errorf("field %s: unknown type %s, expected string, number, bool, any, {\"list\": T}, {\"map\": T}, {\"object\": [fields]} or {\"entity\": [fields]}", where, string(raw))
 	}
 }
 

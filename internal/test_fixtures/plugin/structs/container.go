@@ -15,14 +15,14 @@ type ContainerBase struct {
 
 	Default string `xcl:"default,optional" json:"default,omitempty" default:"hello world"` // A default value
 
-	Networks   []NetworkAttachment `xcl:"network,block" json:"networks,omitempty"`         // Attach to the correct network // only when Image is specified
+	Networks   []NetworkAttachment `xcl:"network,block" json:"network,omitempty"`          // Attach to the correct network // only when Image is specified
 	NetworkObj Network             `xcl:"networkobj,optional" json:"networkobj,omitempty"` // Reference to an object
 
 	Build      *Build            `xcl:"build,block" json:"build"`                        // Enables containers to be built on the fly
 	Entrypoint []string          `xcl:"entrypoint,optional" json:"entrypoint,omitempty"` // entrypoint to use when starting the container
 	Command    []string          `xcl:"command,optional" json:"command,omitempty"`       // command to use when starting the container
 	Env        map[string]string `xcl:"env,optional" json:"env,omitempty"`               // environment variables to set when starting the container
-	Volumes    []Volume          `xcl:"volume,block" json:"volumes,omitempty"`           // volumes to attach to the container
+	Volumes    []Volume          `xcl:"volume,block" json:"volume,omitempty"`            // volumes to attach to the container
 	Ports      []Port            `xcl:"port,block" json:"port,omitempty"`
 	DNS        []string          `xcl:"dns,optional" json:"dns,omitempty"` // Add custom DNS servers to the container
 
@@ -37,8 +37,8 @@ type ContainerBase struct {
 	RunAs *User `xcl:"run_as,block" json:"run_as,omitempty"`
 
 	// output
-	CreatedNetworks    []NetworkAttachment `xcl:"created_network,optional" json:"created_networks,omitempty"`         // Attach to the correct network // only when Image is specified
-	CreatedNetworksMap map[string]Network  `xcl:"created_network_map,optional" json:"created_networks_map,omitempty"` // Attach to the correct network // only when Image is specified
+	CreatedNetworks    []NetworkAttachment `xcl:"created_network,optional" json:"created_network,omitempty"`         // Attach to the correct network // only when Image is specified
+	CreatedNetworksMap map[string]Network  `xcl:"created_network_map,optional" json:"created_network_map,omitempty"` // Attach to the correct network // only when Image is specified
 }
 
 type User struct {

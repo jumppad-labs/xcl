@@ -43,10 +43,11 @@ type RegisteredType struct {
 	Type string
 	// the optional sub type, i.e. k8s_config
 	SubType string
-	// The json schema for the type
+	// The schema v1 document describing the type
 	Schema []byte
 	// Singleton is true for a type whose block is written without labels,
-	// i.e. runner {}: a plain type with neither label fields nor a Meta field
+	// i.e. runner {}: a plain type with neither label fields nor a Meta field.
+	// It is what Schema says, read once so the host need not parse it again
 	Singleton bool
 	// The provider adapter that handles this type
 	Adapter ProviderAdapter
@@ -169,14 +170,14 @@ func (p *PluginBase) RegisterType(typeName, subTypeName string, t any, prov Prov
 
 	// a plain type is described to the host as the type the engine stores,
 	// which embeds types.ResourceBase as every block type does
-	instance := t
+	engine := reflect.TypeOf(t)
 	singleton := false
 	if built != nil {
-		instance = built.New()
+		engine = built.Engine
 		singleton = built.IsSingleton()
 	}
 
-	entitySchema, err := schema.GenerateSchemaFromInstance(instance, 10)
+	entitySchema, err := schema.GenerateV1(engine, typeName, subTypeName, singleton)
 	if err != nil {
 		return err
 	}
