@@ -4,7 +4,7 @@
     {"name": "replicas", "type": "number", "format": "int", "optional": true, "default": 2},
     {"name": "region", "type": "string", "optional": true, "default": "eu"},
     {"name": "password", "type": "string", "optional": true, "sensitive": true},
-    {"name": "endpoint", "type": "string", "computed": true},
+    {"name": "endpoint", "type": "string", "computed": true, "nullable": true},
     {"name": "health", "kind": "block", "optional": true, "type": {"object": [
       {"name": "path", "type": "string"}
     ]}},

@@ -97,6 +97,56 @@ func TestGenerateV1CarriesAContainerThroughTheHostUnchanged(t *testing.T) {
 	require.Equal(t, container, carry(t, container))
 }
 
+type endpoint struct {
+	Location string `xcl:"location"`
+}
+
+type service struct {
+	Meta types.Meta
+
+	Database *endpoint `xcl:"database,optional"`
+	Settings endpoint  `xcl:"settings,optional"`
+	Region   *string   `xcl:"region,optional"`
+}
+
+func TestGenerateV1MarksPointerAttributesNullable(t *testing.T) {
+	_, doc := hostTypeOf(t, reflect.TypeFor[service]())
+
+	nullable := map[string]bool{}
+	for _, f := range doc.Fields {
+		nullable[f.Name] = f.Nullable
+	}
+
+	require.Equal(t, map[string]bool{"database": true, "settings": false, "region": true}, nullable)
+}
+
+type vault struct {
+	Meta types.Meta
+
+	Token *types.Sensitive[string] `xcl:"token,optional"`
+}
+
+func TestGenerateV1NeverMarksASensitiveValueNullable(t *testing.T) {
+	_, doc := hostTypeOf(t, reflect.TypeFor[vault]())
+
+	require.True(t, doc.Fields[0].Sensitive)
+	require.False(t, doc.Fields[0].Nullable)
+}
+
+func TestGenerateV1CarriesAbsentAndZeroAttributesThroughTheHostUnchanged(t *testing.T) {
+	left := &service{Meta: types.Meta{ID: "service.web", Name: "web", Type: "service"}}
+	require.Equal(t, left, carry(t, left))
+
+	region := "eu"
+	set := &service{
+		Meta:     types.Meta{ID: "service.web", Name: "web", Type: "service"},
+		Database: &endpoint{Location: "db:5432"},
+		Settings: endpoint{Location: "/etc"},
+		Region:   &region,
+	}
+	require.Equal(t, set, carry(t, set))
+}
+
 func TestGenerateV1DescribesAKeyAComputedFieldAndADefault(t *testing.T) {
 	_, doc := hostTypeOf(t, reflect.TypeFor[structs.Container]())
 

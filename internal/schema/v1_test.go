@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -509,6 +510,119 @@ func TestBuildTypeV1ObjectAttributeIsNestedStruct(t *testing.T) {
 	require.Equal(t, "Memory", memory.Name)
 	require.Equal(t, reflect.TypeOf(""), memory.Type)
 	require.Equal(t, "memory,optional", memory.Tag.Get("xcl"))
+}
+
+func TestBuildTypeV1NullableObjectAttributeIsPointerLeftOutOfJSON(t *testing.T) {
+	built := buildV1(t, `{
+		"schema_version": 1,
+		"type": "service",
+		"fields": [
+			{
+				"name": "database",
+				"optional": true,
+				"nullable": true,
+				"type": {"object": [
+					{"name": "location", "type": "string"}
+				]}
+			}
+		]
+	}`)
+
+	field := fieldByName(t, built, "Database")
+	require.Equal(t, reflect.Pointer, field.Type.Kind())
+	require.Equal(t, reflect.Struct, field.Type.Elem().Kind())
+	require.Equal(t, "database,optional", field.Tag.Get("xcl"))
+	require.Equal(t, "database,omitempty", field.Tag.Get("json"))
+
+	encoded, err := json.Marshal(reflect.New(built).Interface())
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), `"database"`)
+}
+
+func TestBuildTypeV1OptionalObjectAttributeNotNullableIsStruct(t *testing.T) {
+	built := buildV1(t, `{
+		"schema_version": 1,
+		"type": "service",
+		"fields": [
+			{
+				"name": "database",
+				"optional": true,
+				"type": {"object": [
+					{"name": "location", "type": "string"}
+				]}
+			}
+		]
+	}`)
+
+	field := fieldByName(t, built, "Database")
+	require.Equal(t, reflect.Struct, field.Type.Kind())
+}
+
+func TestBuildTypeV1NullableStringIsPointer(t *testing.T) {
+	built := buildV1(t, `{
+		"schema_version": 1,
+		"type": "service",
+		"fields": [
+			{"name": "region", "type": "string", "optional": true, "nullable": true}
+		]
+	}`)
+
+	field := fieldByName(t, built, "Region")
+	require.Equal(t, reflect.TypeOf((*string)(nil)), field.Type)
+}
+
+func TestBuildTypeV1RefusesNullableSensitiveValue(t *testing.T) {
+	_, _, err := BuildTypeV1([]byte(`{
+		"schema_version": 1,
+		"type": "vault",
+		"fields": [
+			{"name": "token", "type": "string", "optional": true, "sensitive": true, "nullable": true}
+		]
+	}`))
+
+	require.ErrorContains(t, err, "a sensitive value is never nullable")
+}
+
+func TestBuildTypeV1RefusesNullableBlock(t *testing.T) {
+	_, _, err := BuildTypeV1([]byte(`{
+		"schema_version": 1,
+		"type": "service",
+		"fields": [
+			{
+				"name": "health",
+				"kind": "block",
+				"optional": true,
+				"nullable": true,
+				"type": {"object": [
+					{"name": "path", "type": "string"}
+				]}
+			}
+		]
+	}`))
+
+	require.ErrorContains(t, err, "only an attribute is marked nullable")
+}
+
+func TestBuildTypeV1NullableObjectAttributeKeepsItsDefault(t *testing.T) {
+	built := buildV1(t, `{
+		"schema_version": 1,
+		"type": "service",
+		"fields": [
+			{
+				"name": "database",
+				"optional": true,
+				"nullable": true,
+				"default": {"location": "db:5432"},
+				"type": {"object": [
+					{"name": "location", "type": "string"}
+				]}
+			}
+		]
+	}`)
+
+	field := fieldByName(t, built, "Database")
+	require.Equal(t, reflect.Pointer, field.Type.Kind())
+	require.JSONEq(t, `{"location": "db:5432"}`, field.Tag.Get("default"))
 }
 
 func TestBuildTypeV1AnyType(t *testing.T) {

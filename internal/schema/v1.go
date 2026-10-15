@@ -66,6 +66,12 @@ type FieldV1 struct {
 	// Optional marks a field that may be left out
 	Optional bool `json:"optional,omitempty"`
 
+	// Nullable marks an attribute the type holds as a value that may be
+	// absent, a Go pointer or a Python T | None: left out, it is null rather
+	// than its type's zero value. An optional block is always nullable, and a
+	// sensitive value never is: left out, it is empty
+	Nullable bool `json:"nullable,omitempty"`
+
 	// Sensitive marks a value that is a secret
 	Sensitive bool `json:"sensitive,omitempty"`
 
@@ -271,6 +277,16 @@ func buildAttributeV1(f FieldV1, where, goName string) (reflect.StructField, err
 
 	optional := f.Optional || f.Computed
 
+	if f.Nullable {
+		if f.Sensitive {
+			return reflect.StructField{}, fmt.Errorf("field %s: a sensitive value is never nullable, left out it is empty", where)
+		}
+
+		// the type the schema describes holds a pointer, so a value left out
+		// stays null on both sides rather than becoming its zero value here
+		goType = reflect.PointerTo(goType)
+	}
+
 	options := []string{f.Name}
 	if optional {
 		options = append(options, "optional")
@@ -321,6 +337,10 @@ func buildBlockV1(f FieldV1, where, goName string) (reflect.StructField, error) 
 
 	if f.Key {
 		return reflect.StructField{}, fmt.Errorf("field %s: a block cannot be a key, mark the attribute that identifies it", where)
+	}
+
+	if f.Nullable {
+		return reflect.StructField{}, fmt.Errorf("field %s: only an attribute is marked nullable, an optional block is always left out as null", where)
 	}
 
 	objectFields, named, err := blockElementV1(f.Type, where)
