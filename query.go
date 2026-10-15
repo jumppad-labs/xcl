@@ -53,10 +53,11 @@ func find[T any](c *Config, address string) (*T, error) {
 // As converts an entity, typically one taken from an untyped enumeration, into
 // a caller's Go type.
 //
-// An entity that already is a *T is returned as it stands, so the caller holds
-// the value in the configuration rather than a copy of it. Anything else is
-// copied into a new T, which is how a plugin provided entity built from a
-// schema is reached.
+// An entity of a declared or plugin type is handed back as a copy of its
+// plain struct, labels and Meta filled; changing the copy leaves the
+// configuration as it is, as only configuration and a provider's results set
+// an entity. An entity that already is a *T, such as a builtin types.Output,
+// is returned as it stands.
 //
 // Where the entity's own Go type says it cannot be a T, the conversion is
 // refused. The copy underneath is a JSON round trip that drops unknown fields
