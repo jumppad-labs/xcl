@@ -17,12 +17,10 @@ import (
 
 func networkTestNetwork() *entities.Network {
 	return &entities.Network{
-		ResourceBase: types.ResourceBase{
-			Meta: types.Meta{
-				ID:   "docker.network.app",
-				Name: "app",
-				Type: "docker",
-			},
+		Meta: types.Meta{
+			ID:   "docker.network.app",
+			Name: "app",
+			Type: "docker",
 		},
 	}
 }
@@ -377,7 +375,7 @@ func TestNetworkChangedUpdatesWhenANonReplaceSettingChanges(t *testing.T) {
 
 	old := networkTestNetwork()
 	new := networkTestNetwork()
-	new.DependsOn = []string{"docker.network.other"}
+	new.Meta.DependsOn = []string{"docker.network.other"}
 
 	changes := []entity.PropertyChange{
 		{Path: entity.Path{}.Attribute("depends_on"), Before: nil, After: []any{"docker.network.other"}},

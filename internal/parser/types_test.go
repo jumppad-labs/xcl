@@ -5,6 +5,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/plaintype"
+	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
@@ -15,6 +17,42 @@ import (
 	// configuration is applied.
 	"github.com/jumppad-labs/xcl/internal/cty/gocty"
 )
+
+// storedPluginType is the type the host stores plain, one of a plugin's types
+// registered as resource "<subtype>", as: the type built from the schema v1
+// document the plugin describes it with
+func storedPluginType(plain any, subtype string) reflect.Type {
+	built, err := plaintype.Build(reflect.TypeOf(plain), 2)
+	if err != nil {
+		panic(err)
+	}
+
+	doc, err := schema.GenerateV1(built.Engine, types.TypeResource, subtype, built.IsSingleton())
+	if err != nil {
+		panic(err)
+	}
+
+	instance, err := schema.CreateInstanceFromSchema(doc)
+	if err != nil {
+		panic(err)
+	}
+
+	return reflect.TypeOf(instance).Elem()
+}
+
+// storedPluginEntity is a new entity of the type the host stores plain, a
+// plugin type registered as resource "<subtype>", as, whose id is id
+func storedPluginEntity(plain any, subtype, id string) any {
+	entity := reflect.New(storedPluginType(plain, subtype)).Interface()
+
+	meta, err := types.GetMeta(entity)
+	if err != nil {
+		panic(err)
+	}
+	meta.ID = id
+
+	return entity
+}
 
 // sortedNames returns the keys of a property set in a stable order so a failure
 // message reads the same way every run.
@@ -208,15 +246,15 @@ func TestPropertyNamesForResourceBase(t *testing.T) {
 }
 
 func TestPropertyNamesForNetwork(t *testing.T) {
-	properties := propertyNames(reflect.TypeOf(structs.Network{}))
+	properties := propertyNames(storedPluginType(structs.Network{}, structs.TypeNetwork))
 
 	require.Equal(t, []string{"depends_on", "disabled", "meta", "observed", "provider_id", "subnet"}, sortedNames(properties))
 }
 
 func TestPropertyNamesForNetworkFlattensResourceBaseWithoutNamingIt(t *testing.T) {
-	properties := propertyNames(reflect.TypeOf(structs.Network{}))
+	properties := propertyNames(storedPluginType(structs.Network{}, structs.TypeNetwork))
 
-	// structs.Network embeds types.ResourceBase as `xcl:",remain"`, so its
+	// the stored network embeds types.ResourceBase as `xcl:",remain"`, so its
 	// properties flatten in but the embed itself contributes no name.
 	require.Contains(t, properties, "depends_on")
 	require.Contains(t, properties, "disabled")
@@ -226,7 +264,7 @@ func TestPropertyNamesForNetworkFlattensResourceBaseWithoutNamingIt(t *testing.T
 }
 
 func TestPropertyNamesForTemplate(t *testing.T) {
-	properties := propertyNames(reflect.TypeOf(structs.Template{}))
+	properties := propertyNames(storedPluginType(structs.Template{}, structs.TypeTemplate))
 
 	require.Equal(t,
 		[]string{"append_file", "depends_on", "destination", "disabled", "inner", "meta", "source", "vars"},
@@ -235,7 +273,7 @@ func TestPropertyNamesForTemplate(t *testing.T) {
 }
 
 func TestPropertyNamesForContainer(t *testing.T) {
-	properties := propertyNames(reflect.TypeOf(structs.Container{}))
+	properties := propertyNames(storedPluginType(structs.Container{}, structs.TypeContainer))
 
 	require.Equal(t,
 		[]string{
@@ -257,7 +295,6 @@ func TestPropertyNamesForContainer(t *testing.T) {
 			"port",
 			"privileged",
 			"resources",
-			"rm",
 			"run_as",
 			"volume",
 		},
@@ -265,13 +302,12 @@ func TestPropertyNamesForContainer(t *testing.T) {
 	)
 }
 
-func TestPropertyNamesForContainerReachesNamedEmbedBothWays(t *testing.T) {
-	properties := propertyNames(reflect.TypeOf(structs.Container{}))
+func TestPropertyNamesForANamedEmbedReachesItBothWays(t *testing.T) {
+	properties := propertyNames(reflect.TypeOf(namedRemainEquivalent{}))
 
-	// structs.ContainerBase embeds types.ResourceBase as `xcl:"rm,remain"`, so
+	// namedRemainEquivalent embeds types.ResourceBase as `xcl:"rm,remain"`, so
 	// the same embed is reachable under its own name and through its flattened
-	// properties. Container reaches both through a second, unnamed embed of
-	// ContainerBase.
+	// properties.
 	require.Contains(t, properties, "rm")
 	require.Equal(t, reflect.TypeOf(types.ResourceBase{}), properties["rm"])
 

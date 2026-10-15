@@ -18,7 +18,7 @@ import (
 
 // Thing is a plain Go resource type provided by thingPlugin
 type Thing struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Size int `xcl:"size" json:"size"`
 }
@@ -189,7 +189,7 @@ func TestLocalRegisterNilPluginPanics(t *testing.T) {
 
 // Gadget is a second plain Go resource type, declared alongside Thing
 type Gadget struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Colour string `xcl:"colour" json:"colour"`
 }

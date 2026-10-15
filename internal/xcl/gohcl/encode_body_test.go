@@ -377,15 +377,15 @@ network {
 	require.Equal(t, expected, string(f.Bytes()))
 }
 
-func TestEncodeBodyReturnsErrorForUntypedMap(t *testing.T) {
+func TestEncodeBodyWritesAnUntypedMapAsAnObject(t *testing.T) {
 	untyped := encodeUntypedMap{
-		M: map[string]any{"a": 1},
+		M: map[string]any{"a": 1, "b": "two"},
 	}
 
 	f := hclwrite.NewEmptyFile()
 	err := EncodeBody(&untyped, f.Body(), EncodeOptions{})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "m: cannot encode")
+	require.NoError(t, err)
+	require.Equal(t, "m = {\n  a = 1\n  b = \"two\"\n}\n", string(f.Bytes()))
 }
 
 func TestEncodeBodyReturnsErrorForTime(t *testing.T) {

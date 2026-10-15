@@ -106,9 +106,17 @@ func (e *NotTypeableError) Unwrap() error { return ErrNotTypeable }
 type NotRegisteredError struct {
 	Type reflect.Type
 	Use  string
+
+	// MayBeNested is set for a plain struct, which is as likely a nested
+	// block of another type as a plugin's type, so both are named
+	MayBeNested bool
 }
 
 func (e *NotRegisteredError) Error() string {
+	if e.MayBeNested {
+		return fmt.Sprintf("type %s is not registered as a block type: if a plugin provides it, use %s; if it is a nested block, reach it through the declaration that contains it", typeName(e.Type), e.Use)
+	}
+
 	msg := fmt.Sprintf("type %s is not registered", typeName(e.Type))
 	if e.Use != "" {
 		msg = fmt.Sprintf("%s, use %s instead", msg, e.Use)
@@ -117,7 +125,15 @@ func (e *NotRegisteredError) Error() string {
 	return msg
 }
 
-func (e *NotRegisteredError) Unwrap() error { return ErrNotRegistered }
+// Unwrap is ErrNotRegistered, and ErrNotAnEntity as well for a type that may
+// be a nested block
+func (e *NotRegisteredError) Unwrap() []error {
+	if e.MayBeNested {
+		return []error{ErrNotRegistered, ErrNotAnEntity}
+	}
+
+	return []error{ErrNotRegistered}
+}
 
 // TypeMismatchError reports the entity asked for, the Go type requested, and
 // the type the entity actually is.

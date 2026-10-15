@@ -31,11 +31,11 @@ func TestFindEntitiesByTypeMatchesFindByType(t *testing.T) {
 		expected = append(expected, database.Meta.ID)
 	}
 
-	// each entity comes back exactly as the configuration stores it, which for
-	// a registered type is the registered Go type itself
+	// each entity comes back as the configuration stores it, in the type built
+	// from the registered Go type, whose plain copy is that type
 	found := []string{}
 	for _, entity := range untyped {
-		database, ok := entity.(*registered.Database)
+		database, ok := plainAs[registered.Database](entity)
 		require.True(t, ok, "expected *registered.Database, got %T", entity)
 
 		found = append(found, database.Meta.ID)
@@ -114,7 +114,7 @@ func TestFindOneEntityReturnsTheEntity(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, entity)
 
-	app, ok := entity.(*registered.App)
+	app, ok := plainAs[registered.App](entity)
 	require.True(t, ok, "expected *registered.App, got %T", entity)
 
 	require.Equal(t, "resource.app.web", app.Meta.ID)

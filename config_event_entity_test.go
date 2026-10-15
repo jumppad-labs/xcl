@@ -18,7 +18,7 @@ func TestEventEntityReturnsRegisteredGoType(t *testing.T) {
 	entity, err := succeeded.Entity()
 	require.NoError(t, err)
 
-	secret, ok := entity.(*registered.Secret)
+	secret, ok := plainAs[registered.Secret](entity)
 	require.True(t, ok, "expected *registered.Secret, got %T", entity)
 	require.Equal(t, "admin", secret.Username)
 }
@@ -31,7 +31,7 @@ func TestEventEntityShowsSensitiveValuesMasked(t *testing.T) {
 	entity, err := succeeded.Entity()
 	require.NoError(t, err)
 
-	secret, ok := entity.(*registered.Secret)
+	secret, ok := plainAs[registered.Secret](entity)
 	require.True(t, ok, "expected *registered.Secret, got %T", entity)
 	require.Equal(t, types.SensitiveMarker, fmt.Sprint(secret.Password))
 }
@@ -44,7 +44,7 @@ func TestEventEntityHoldsNoRealSensitiveValue(t *testing.T) {
 	entity, err := succeeded.Entity()
 	require.NoError(t, err)
 
-	secret, ok := entity.(*registered.Secret)
+	secret, ok := plainAs[registered.Secret](entity)
 	require.True(t, ok, "expected *registered.Secret, got %T", entity)
 	require.Equal(t, "", secret.Password.Reveal())
 }
@@ -69,7 +69,7 @@ func TestEventEntityFromRawDataReturnsRegisteredGoType(t *testing.T) {
 	entity, err := succeeded.Entity()
 	require.NoError(t, err)
 
-	secret, ok := entity.(*registered.Secret)
+	secret, ok := plainAs[registered.Secret](entity)
 	require.True(t, ok, "expected *registered.Secret, got %T", entity)
 	require.Equal(t, "admin", secret.Username)
 	require.Equal(t, types.SensitiveMarker, fmt.Sprint(secret.Password))

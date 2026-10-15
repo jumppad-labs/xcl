@@ -32,7 +32,7 @@ func fieldByName(t *testing.T, built reflect.Type, name string) reflect.StructFi
 	return field
 }
 
-func TestBuildTypeV1EmbedsResourceBaseFirst(t *testing.T) {
+func TestBuildTypeV1GivesANamedTypeAMetaField(t *testing.T) {
 	built := buildV1(t, `{
 		"schema_version": 1,
 		"type": "container",
@@ -44,11 +44,26 @@ func TestBuildTypeV1EmbedsResourceBaseFirst(t *testing.T) {
 	require.Equal(t, reflect.Struct, built.Kind())
 	require.Equal(t, 2, built.NumField())
 
+	// a plain type, named because it can read its label from its Meta field
 	first := built.Field(0)
-	require.Equal(t, "ResourceBase", first.Name)
-	require.Equal(t, reflect.TypeOf(types.ResourceBase{}), first.Type)
-	require.True(t, first.Anonymous)
-	require.Equal(t, ",remain", first.Tag.Get("xcl"))
+	require.Equal(t, "Meta", first.Name)
+	require.Equal(t, reflect.TypeOf(types.Meta{}), first.Type)
+	require.False(t, first.Anonymous)
+	require.Empty(t, first.Tag.Get("xcl"))
+}
+
+func TestBuildTypeV1GivesASingletonNoMetaField(t *testing.T) {
+	built := buildV1(t, `{
+		"schema_version": 1,
+		"type": "runner",
+		"singleton": true,
+		"fields": [
+			{"name": "server", "type": "string"}
+		]
+	}`)
+
+	require.Equal(t, 1, built.NumField())
+	require.Equal(t, "Server", built.Field(0).Name)
 }
 
 func TestBuildTypeV1ReturnsParsedSchema(t *testing.T) {
@@ -792,7 +807,7 @@ func TestBuildTypeV1CamelCasesFieldNames(t *testing.T) {
 	require.Equal(t, "max_idle_connections", maxIdle.Tag.Get("json"))
 }
 
-func TestBuildTypeV1EmptyFieldsBuildsResourceBaseOnly(t *testing.T) {
+func TestBuildTypeV1EmptyFieldsBuildsMetaOnly(t *testing.T) {
 	built := buildV1(t, `{
 		"schema_version": 1,
 		"type": "marker",
@@ -800,24 +815,22 @@ func TestBuildTypeV1EmptyFieldsBuildsResourceBaseOnly(t *testing.T) {
 	}`)
 
 	require.Equal(t, 1, built.NumField())
-	require.Equal(t, "ResourceBase", built.Field(0).Name)
+	require.Equal(t, "Meta", built.Field(0).Name)
 }
 
 func TestIsV1RecognisesVersionOne(t *testing.T) {
 	require.True(t, IsV1([]byte(`{"schema_version": 1, "type": "container", "fields": []}`)))
 }
 
-func TestIsV1RejectsLegacySchema(t *testing.T) {
-	type holder struct {
-		types.ResourceBase `xcl:",remain"`
+func TestIsV1RejectsADocumentWithoutAVersion(t *testing.T) {
+	require.False(t, IsV1([]byte(`{"type": "container", "properties": [{"name": "Image", "type": "string"}]}`)))
+}
 
-		Image string `xcl:"image"`
-	}
+func TestCreateInstanceFromSchemaRefusesADocumentWithoutAVersion(t *testing.T) {
+	_, err := CreateInstanceFromSchema([]byte(`{"type": "container", "properties": []}`))
 
-	data, err := GenerateSchemaFromInstance(holder{}, 10)
-	require.NoError(t, err)
-
-	require.False(t, IsV1(data))
+	require.Error(t, err)
+	require.ErrorContains(t, err, "not a schema v1 document")
 }
 
 func TestIsV1RejectsOtherVersion(t *testing.T) {
@@ -862,7 +875,7 @@ func TestCreateInstanceFromSchemaRoutesV1(t *testing.T) {
 		"fields": [
 			{"name": "image", "type": "string"}
 		]
-	}`), KnownTypes())
+	}`))
 	require.NoError(t, err)
 	require.NotNil(t, instance)
 
@@ -891,34 +904,8 @@ func TestCreateInstanceFromSchemaV1InvalidFails(t *testing.T) {
 		"fields": [
 			{"name": "image", "type": "text"}
 		]
-	}`), KnownTypes())
+	}`))
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "image")
-}
-
-func TestCreateInstanceFromSchemaKeepsLegacy(t *testing.T) {
-	type holder struct {
-		types.ResourceBase `xcl:",remain"`
-
-		Image string `xcl:"image" json:"image"`
-	}
-
-	data, err := GenerateSchemaFromInstance(holder{}, 10)
-	require.NoError(t, err)
-
-	rebuilt, err := CreateInstanceFromSchema(data, KnownTypes())
-	require.NoError(t, err)
-
-	rebuiltType := reflect.TypeOf(rebuilt)
-	require.Equal(t, reflect.Pointer, rebuiltType.Kind())
-	require.Equal(t, reflect.Struct, rebuiltType.Elem().Kind())
-
-	first := rebuiltType.Elem().Field(0)
-	require.Equal(t, "ResourceBase", first.Name)
-	require.True(t, first.Anonymous)
-
-	image := fieldByName(t, rebuiltType.Elem(), "Image")
-	require.Equal(t, reflect.TypeOf(""), image.Type)
-	require.Equal(t, "image", image.Tag.Get("xcl"))
 }

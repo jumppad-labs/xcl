@@ -31,9 +31,8 @@ func TestAllReturnsWhatTheEquivalentKindLookupReturns(t *testing.T) {
 	require.Len(t, byGoType, len(byKind))
 	require.Len(t, byGoType, 2)
 
-	// the same entities, not merely equal copies of them
 	for i := range byKind {
-		require.Same(t, byKind[i], byGoType[i])
+		require.Equal(t, byKind[i], byGoType[i])
 	}
 }
 
@@ -68,7 +67,7 @@ func TestAllDerivesTheBareFormAddressingForABareRegisteredType(t *testing.T) {
 
 	require.Len(t, byGoType, len(byKind))
 	require.Len(t, byGoType, 1)
-	require.Same(t, byKind[0], byGoType[0])
+	require.Equal(t, byKind[0], byGoType[0])
 	require.Equal(t, "cache.main", byGoType[0].Meta.ID)
 }
 
@@ -101,23 +100,26 @@ func TestFindByTypeStillReachesThePluginProvidedTypeAllRefuses(t *testing.T) {
 }
 
 // A block that only ever exists nested inside another declaration has no
-// address of its own, so it is refused before any addressing is derived, and
-// with the same condition the kind lookup reports for it.
+// address of its own, so it is refused before any addressing is derived. All
+// has no path to tell a nested block from a plugin's type, both being plain
+// structs nothing registered, so it names both, and is the condition of each.
 
 func TestAllRejectsATypeThatIsOnlyANestedBlock(t *testing.T) {
 	c := setupFindConfig(t)
 
-	// Timeouts is the timeouts block of a Database, it embeds no ResourceBase
+	// Timeouts is the timeouts block of a Database
 	timeouts, err := All[registered.Timeouts](c)
 	require.ErrorIs(t, err, ErrNotAnEntity)
+	require.ErrorIs(t, err, ErrNotRegistered)
 	require.Nil(t, timeouts)
 
-	var notAnEntity *NotAnEntityError
-	require.True(t, errors.As(err, &notAnEntity))
-	require.Equal(t, "declaration", notAnEntity.ReachedThrough)
+	var notRegistered *NotRegisteredError
+	require.True(t, errors.As(err, &notRegistered))
+	require.True(t, notRegistered.MayBeNested)
+	require.Equal(t, "type registered.Timeouts is not registered as a block type: if a plugin provides it, use FindByType with the type and subtype; if it is a nested block, reach it through the declaration that contains it", err.Error())
 }
 
-func TestAllRejectsANestedBlockWithTheSameConditionAsTheKindLookup(t *testing.T) {
+func TestAllRejectsANestedBlockWithTheConditionOfTheKindLookup(t *testing.T) {
 	c := setupFindConfig(t)
 
 	_, byGoType := All[registered.Timeouts](c)
@@ -126,7 +128,8 @@ func TestAllRejectsANestedBlockWithTheSameConditionAsTheKindLookup(t *testing.T)
 	_, byKind := FindByType[registered.Timeouts](c, "resource", "database")
 	require.Error(t, byKind)
 
-	require.Equal(t, byKind.Error(), byGoType.Error())
+	require.ErrorIs(t, byKind, ErrNotAnEntity)
+	require.ErrorIs(t, byGoType, ErrNotAnEntity)
 }
 
 // Enumerating the configuration yields every declaration, whatever kind it is.

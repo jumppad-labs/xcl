@@ -29,3 +29,11 @@ func TestBlockHeaderSetsAsideNestedModulePrefixes(t *testing.T) {
 func TestBlockHeaderSetsAsideModulePrefixOfNonResourceBlock(t *testing.T) {
 	require.Equal(t, `server "web"`, blockHeader("module.app.server.web"))
 }
+
+func TestBlockHeaderWritesASingletonWithoutLabels(t *testing.T) {
+	require.Equal(t, `runner`, blockHeader("runner"))
+}
+
+func TestBlockHeaderSetsAsideModulePrefixOfASingleton(t *testing.T) {
+	require.Equal(t, `runner`, blockHeader("module.app.runner"))
+}

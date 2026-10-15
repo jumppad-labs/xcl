@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/xcl"
@@ -34,10 +36,37 @@ func findResource[T any](t *testing.T, entities []any, path string) *T {
 	require.NoError(t, err)
 
 	result := new(T)
-	err = schema.UnmarshalUntyped(r, result)
+
+	// a type of xcl's own embeds types.ResourceBase and is copied as it is
+	if _, err := types.GetMeta(result); err == nil {
+		err = schema.UnmarshalUntyped(r, result)
+		require.NoError(t, err)
+
+		return result
+	}
+
+	// a plain type is copied through the type built from it, as the engine
+	// hands one to a program, so its Meta holds the disabled flag and
+	// dependencies as well
+	meta, err := types.GetMeta(r)
 	require.NoError(t, err)
 
-	return result
+	labels := 1
+	if meta.Subtype != "" {
+		labels = 2
+	}
+
+	built, err := plaintype.Build(reflect.TypeFor[T](), labels)
+	require.NoError(t, err)
+
+	stored := built.New()
+	err = schema.UnmarshalUntyped(r, stored)
+	require.NoError(t, err)
+
+	plain, err := built.ToPlain(stored)
+	require.NoError(t, err)
+
+	return plain.(*T)
 }
 
 // testOptions returns DefaultOptions with a test logger and the module cache
@@ -474,7 +503,7 @@ func TestModuleDisabledCanBeOverriden(t *testing.T) {
 	cont := findResource[structs.Container](t, c.GetResources(), "module.consul_2.resource.container.sidecar")
 
 	// check disabled has been interpolated
-	require.False(t, cont.Disabled)
+	require.False(t, cont.Meta.Disabled)
 
 	// check that the module resources callbacks are called
 	// TODO: re-enable when lifecycle is implemented
@@ -484,7 +513,7 @@ func TestModuleDisabledCanBeOverriden(t *testing.T) {
 	cont = findResource[structs.Container](t, c.GetResources(), "module.consul_1.resource.container.sidecar")
 
 	// check disabled has been interpolated
-	require.True(t, cont.Disabled)
+	require.True(t, cont.Meta.Disabled)
 
 	// check that the module resources callbacks are called
 	// TODO: re-enable when lifecycle is implemented
@@ -1008,7 +1037,7 @@ func TestParseFileReturnsConfigErrorWhenFunctionError(t *testing.T) {
 	d, ok := ce.Errors[0].(*errors.Diagnostic)
 	require.True(t, ok, "the problem is a %T", ce.Errors[0])
 	require.Equal(t, "Error in function call", d.Summary)
-	require.Equal(t, "resource.container.consul", d.Entity)
+	require.Equal(t, "resource.container.function", d.Entity)
 	require.Equal(t, "network[0].name", d.Field)
 }
 
@@ -1349,15 +1378,15 @@ func TestParseFileReportsEveryMalformedBlockInFile(t *testing.T) {
 	require.Equal(t, f, first.Subject.Filename)
 	require.Equal(t, 3, first.Subject.Start.Line)
 	require.Equal(t, 1, first.Subject.Start.Column)
-	require.Equal(t, "Missing name", first.Summary)
-	require.Contains(t, first.Detail, "has no name")
+	require.Equal(t, "Missing labels", first.Summary)
+	require.Equal(t, `resource takes a subtype and a label: write it as resource "<subtype>" "<label>" { … }.`, first.Detail)
 	require.NotNil(t, first.Source)
 
 	second := ce.Errors[1].(*errors.Diagnostic)
 	require.Equal(t, f, second.Subject.Filename)
 	require.Equal(t, 7, second.Subject.Start.Line)
 	require.Equal(t, 1, second.Subject.Start.Column)
-	require.Contains(t, second.Detail, "has no name")
+	require.Equal(t, "Missing labels", second.Summary)
 }
 
 func TestParseFileReportsEveryDiagnosticForSingleMalformation(t *testing.T) {

@@ -3,6 +3,8 @@ package parser
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/xcl"
@@ -87,6 +89,105 @@ func unreadable(extension string, err error) *errors.Diagnostic {
 // invalidName is the problem with a block whose name is not valid
 func invalidName(err error) problem {
 	return problem{summary: "Invalid name", detail: err.Error(), cause: err}
+}
+
+// unexpectedLabels is the problem with a singleton's block written with
+// labels, i.e. runner "nas" {}: there is one of it, and it takes none
+func unexpectedLabels(b *hclsyntax.Block) problem {
+	written := make([]string, len(b.Labels))
+	for i, label := range b.Labels {
+		written[i] = strconv.Quote(label)
+	}
+
+	summary := "Unexpected label"
+	if len(b.Labels) > 1 {
+		summary = "Unexpected labels"
+	}
+
+	return problem{
+		summary: summary,
+		detail:  fmt.Sprintf("%s takes no labels, there is one of it: write it as %s { … }, without %s.", b.Type, b.Type, strings.Join(written, " ")),
+	}
+}
+
+// missingLabels is the problem with a block of entityType written without
+// labels, when the type takes them: a label, and a subtype before it when
+// takesSubtype
+func missingLabels(entityType string, takesSubtype bool) problem {
+	summary := "Missing label"
+	if takesSubtype {
+		summary = "Missing labels"
+	}
+
+	return problem{summary: summary, detail: labelsTaken(entityType, takesSubtype)}
+}
+
+// wrongLabels is the problem with a block of entityType written with labels,
+// but not as many as the type takes
+func wrongLabels(entityType string, takesSubtype bool) problem {
+	return problem{summary: "Invalid block labels", detail: labelsTaken(entityType, takesSubtype)}
+}
+
+// labelsTaken says which labels a block of entityType takes, and how to
+// write them
+func labelsTaken(entityType string, takesSubtype bool) string {
+	if takesSubtype {
+		return fmt.Sprintf(`%s takes a subtype and a label: write it as %s "<subtype>" "<label>" { … }.`, entityType, entityType)
+	}
+
+	return fmt.Sprintf(`%s takes a label: write it as %s "<label>" { … }.`, entityType, entityType)
+}
+
+// labelsRange is the range of a block's labels, from the first to the last
+func labelsRange(b *hclsyntax.Block) *hcl.Range {
+	r := hcl.RangeBetween(b.LabelRanges[0], b.LabelRanges[len(b.LabelRanges)-1])
+	return &r
+}
+
+// duplicateBlock is the problem with a block declaring the entity id, which a
+// block at earlier already declares
+func duplicateBlock(id string, singleton bool, earlier hcl.Range) problem {
+	if singleton {
+		return problem{
+			summary: "Duplicate block",
+			detail:  fmt.Sprintf("%s is declared once, it is already declared at %s", id, earlier),
+		}
+	}
+
+	return problem{
+		summary: "Duplicate block",
+		detail:  fmt.Sprintf("%s is already declared at %s, each entity is declared once", id, earlier),
+	}
+}
+
+// nestedTooDeep returns the first block within b nested deeper than limit,
+// its own blocks being at depth one, and its depth, or nil when none is
+func nestedTooDeep(b *hclsyntax.Block, limit int) (*hclsyntax.Block, int) {
+	var walk func(body *hclsyntax.Body, depth int) (*hclsyntax.Block, int)
+	walk = func(body *hclsyntax.Body, depth int) (*hclsyntax.Block, int) {
+		for _, nested := range body.Blocks {
+			if depth > limit {
+				return nested, depth
+			}
+
+			if deep, at := walk(nested.Body, depth+1); deep != nil {
+				return deep, at
+			}
+		}
+
+		return nil, 0
+	}
+
+	return walk(b.Body, 1)
+}
+
+// tooDeep is the problem with a block nested depth blocks deep, deeper than
+// configuration nests them
+func tooDeep(block string, depth, limit int) problem {
+	return problem{
+		summary: "Blocks nested too deep",
+		detail:  fmt.Sprintf("%s is nested %d blocks deep, and blocks nest at most %d deep", block, depth, limit),
+	}
 }
 
 // missingMeta is the problem with an entity xcl made but can not read the

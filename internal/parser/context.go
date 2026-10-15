@@ -111,12 +111,17 @@ func buildContextForResource(res *parsed, r any, addresses *resources.AddressPar
 
 			// an entity of a type other than "resource" and the builtins is
 			// reached under its own type keyword, by its subtype where it has
-			// one and its name, i.e. server.big.web or cache.main
+			// one and its name, i.e. server.big.web or cache.main, and a
+			// singleton, which has neither, by its type alone, i.e. runner
 			typedPath := []string{}
 			if resourceMeta.Type != types.TypeResource && resourceMeta.Type != resources.TypeOutput {
-				typedPath = append([]string{resourceMeta.Type}, resourceMeta.Subtype, resourceMeta.Name)
-				if resourceMeta.Subtype == "" {
+				switch {
+				case resourceMeta.Name == "":
+					typedPath = []string{resourceMeta.Type}
+				case resourceMeta.Subtype == "":
 					typedPath = []string{resourceMeta.Type, resourceMeta.Name}
+				default:
+					typedPath = []string{resourceMeta.Type, resourceMeta.Subtype, resourceMeta.Name}
 				}
 			}
 

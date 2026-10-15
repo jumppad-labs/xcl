@@ -1,0 +1,8 @@
+agent "claude" {
+  model               = "claude/opus"
+  max_concurrent_runs = 2
+}
+
+agent "local" {
+  model = "ollama/qwen3:32b"
+}

@@ -13,12 +13,11 @@ import (
 	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
-	"github.com/jumppad-labs/xcl/types"
 )
 
 // Greeting is the block type greeting, which has no subtype
 type Greeting struct {
-	types.ResourceBase `xcl:",remain"`
+	Name string `xcl:"name,label" json:"name"`
 
 	// Target is the value to greet, configuration usually sets it from
 	// greet(...)

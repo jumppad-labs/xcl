@@ -334,8 +334,10 @@ func TestReadReceivesSavedAndConfiguredCopies(t *testing.T) {
 	require.Equal(t, "id-one", saved["provider_id"])
 	require.Equal(t, "10.0.0.0/16", saved["subnet"])
 
-	savedMeta, ok := saved["meta"].(map[string]any)
-	require.True(t, ok, "saved copy has no meta: %s", string(readCalls[0].Old))
+	// the provider's copy is the plain structs.Network, whose Meta field has
+	// no json tag
+	savedMeta, ok := saved["Meta"].(map[string]any)
+	require.True(t, ok, "saved copy has no Meta: %s", string(readCalls[0].Old))
 	require.Equal(t, types.StatusCreated, savedMeta["status"])
 
 	// the configured copy holds the configured subnet, and the computed
@@ -1487,10 +1489,20 @@ func TestRefreshReadErrorReturnsErrorAndLeavesStatusAlone(t *testing.T) {
 	require.Empty(t, h.plugin.GetUpdatedResources())
 }
 
+// storedNetwork is a network as xcl stores the entity, embedding
+// types.ResourceBase, with the fields of structs.Network
+type storedNetwork struct {
+	types.ResourceBase `xcl:",remain"`
+
+	Subnet     string `xcl:"subnet" json:"subnet"`
+	ProviderID string `xcl:"provider_id,optional,computed" json:"provider_id,omitempty"`
+	Observed   string `xcl:"observed,optional,computed" json:"observed,omitempty"`
+}
+
 // networkWithMeta returns a network whose meta is set, as a parsed resource's
 // is when the provider is called
-func networkWithMeta() *structs.Network {
-	n := &structs.Network{Subnet: "10.0.0.0/16", ProviderID: "p-1"}
+func networkWithMeta() *storedNetwork {
+	n := &storedNetwork{Subnet: "10.0.0.0/16", ProviderID: "p-1"}
 	n.Meta = types.Meta{
 		ID:         "resource.network.main",
 		Name:       "main",

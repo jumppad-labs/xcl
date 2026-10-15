@@ -3,6 +3,7 @@ package parser
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -563,6 +564,22 @@ type TestResourceProvider[T any] struct {
 	plugin    *TestPlugin // Reference to parent plugin for tracking
 }
 
+// plainMeta returns the Meta field of resource, a pointer to one of the
+// fixture plugin's plain types, as a provider reads it
+func plainMeta(resource any) (*types.Meta, error) {
+	value := reflect.ValueOf(resource)
+	if value.Kind() != reflect.Pointer || value.IsNil() || value.Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("%T is not a pointer to a struct", resource)
+	}
+
+	meta := value.Elem().FieldByName("Meta")
+	if !meta.IsValid() || meta.Type() != reflect.TypeFor[types.Meta]() {
+		return nil, fmt.Errorf("%T has no Meta field", resource)
+	}
+
+	return meta.Addr().Interface().(*types.Meta), nil
+}
+
 // Init initializes the test provider
 func (p *TestResourceProvider[T]) Init(state plugins.State, functions plugins.ProviderFunctions, logger logger.Logger) error {
 	p.state = state
@@ -575,7 +592,7 @@ func (p *TestResourceProvider[T]) Init(state plugins.State, functions plugins.Pr
 func (p *TestResourceProvider[T]) Create(ctx context.Context, resource T) (result T, err error) {
 	started := time.Now()
 
-	meta, err := types.GetMeta(resource)
+	meta, err := plainMeta(resource)
 	if err != nil {
 		return resource, err
 	}
@@ -622,7 +639,7 @@ func (p *TestResourceProvider[T]) Create(ctx context.Context, resource T) (resul
 func (p *TestResourceProvider[T]) Destroy(ctx context.Context, resource T, force bool) (err error) {
 	started := time.Now()
 
-	meta, err := types.GetMeta(resource)
+	meta, err := plainMeta(resource)
 	if err != nil {
 		return err
 	}
@@ -647,7 +664,7 @@ func (p *TestResourceProvider[T]) Destroy(ctx context.Context, resource T, force
 func (p *TestResourceProvider[T]) Read(ctx context.Context, old T, resource T) (result T, err error) {
 	started := time.Now()
 
-	meta, err := types.GetMeta(resource)
+	meta, err := plainMeta(resource)
 	if err != nil {
 		return resource, err
 	}
@@ -699,7 +716,7 @@ func (p *TestResourceProvider[T]) Read(ctx context.Context, old T, resource T) (
 func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (result T, err error) {
 	started := time.Now()
 
-	meta, err := types.GetMeta(resource)
+	meta, err := plainMeta(resource)
 	if err != nil {
 		return resource, err
 	}
@@ -731,12 +748,12 @@ func (p *TestResourceProvider[T]) Update(ctx context.Context, resource T, change
 // Changed tracks the comparison, returns a configured error or result, and
 // otherwise uses the default change detection
 func (p *TestResourceProvider[T]) Changed(ctx context.Context, old T, new T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
-	oldMeta, err := types.GetMeta(old)
+	oldMeta, err := plainMeta(old)
 	if err != nil {
 		return entity.NoChange, err
 	}
 
-	newMeta, err := types.GetMeta(new)
+	newMeta, err := plainMeta(new)
 	if err != nil {
 		return entity.NoChange, err
 	}

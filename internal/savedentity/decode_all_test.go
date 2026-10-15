@@ -307,7 +307,7 @@ func TestDecodeAllTypesWhatAFileStoreLoaded(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, decoded, 2)
 
-	loadedDatabase, ok := testEntityByID(t, decoded, "resource.database.main").(*registered.Database)
+	loadedDatabase, ok := plainAs[registered.Database](testEntityByID(t, decoded, "resource.database.main"))
 	require.True(t, ok)
 	require.Equal(t, types.TypeResource, loadedDatabase.Meta.Type)
 	require.Equal(t, registered.TypeDatabase, loadedDatabase.Meta.Subtype)
@@ -391,7 +391,7 @@ func TestDecodeAllTypesABareTypeWhatAFileStoreLoaded(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, decoded, 1)
 
-	loadedDatabase, ok := decoded[0].(*registered.Database)
+	loadedDatabase, ok := plainAs[registered.Database](decoded[0])
 	require.True(t, ok)
 	require.Equal(t, registered.TypeDatabase, loadedDatabase.Meta.Type)
 	require.Empty(t, loadedDatabase.Meta.Subtype)
@@ -435,7 +435,7 @@ func TestDecodeAllOpensMaskedRecordWithTheMasker(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, decoded, 1)
 
-	loaded, ok := testEntityByID(t, decoded, testSecretID).(*registered.Secret)
+	loaded, ok := plainAs[registered.Secret](testEntityByID(t, decoded, testSecretID))
 	require.True(t, ok)
 	require.Equal(t, "admin", loaded.Username)
 	require.Equal(t, "hunter2", loaded.Password.Reveal())

@@ -5,7 +5,7 @@ import "github.com/jumppad-labs/xcl/types"
 // Container defines the block type docker "container", a Docker container
 // named after the block
 type Container struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	// Image is the image the container runs, it is pulled when Docker does
 	// not have it

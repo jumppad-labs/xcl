@@ -134,8 +134,8 @@ func TestEnvFunctionReadsSensitiveValue(t *testing.T) {
 	entity, err := testutil.EntityByID(c.Entities(), "secret.db")
 	require.NoError(t, err)
 
-	secret, ok := entity.(*kube.Secret)
-	require.True(t, ok)
+	secret, err := xcl.As[kube.Secret](entity)
+	require.NoError(t, err)
 
 	require.Equal(t, testPassword, secret.Data.Reveal()["password"])
 }
@@ -152,8 +152,8 @@ func TestNestedBlockReferencesSecretByNameAndKey(t *testing.T) {
 	entity, err := testutil.EntityByID(c.Entities(), "deployment.api")
 	require.NoError(t, err)
 
-	d, ok := entity.(*kube.Deployment)
-	require.True(t, ok)
+	d, err := xcl.As[kube.Deployment](entity)
+	require.NoError(t, err)
 
 	env := d.Containers[0].Env[2]
 	require.Equal(t, "DB_PASSWORD", env.Name)

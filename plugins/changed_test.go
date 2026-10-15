@@ -14,7 +14,7 @@ import (
 // testResource is a resource shaped like a real provider resource, it embeds
 // types.ResourceBase with the remain tag and has a couple of plain fields.
 type testResource struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Name  string `xcl:"name" json:"name"`
 	Count int    `xcl:"count,optional" json:"count,omitempty"`
@@ -90,12 +90,12 @@ func TestDefaultChangedIgnoresMetaDifferences(t *testing.T) {
 
 func TestDefaultChangedIgnoresDependsOnAndDisabled(t *testing.T) {
 	old := &testResource{Name: "web", Count: 2}
-	old.DependsOn = []string{"resource.network.main"}
-	old.Disabled = false
+	old.Meta.DependsOn = []string{"resource.network.main"}
+	old.Meta.Disabled = false
 
 	new := &testResource{Name: "web", Count: 2}
-	new.DependsOn = []string{"resource.network.other", "resource.volume.data"}
-	new.Disabled = true
+	new.Meta.DependsOn = []string{"resource.network.other", "resource.volume.data"}
+	new.Meta.Disabled = true
 
 	change, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new, nil, nil)
 	require.NoError(t, err)

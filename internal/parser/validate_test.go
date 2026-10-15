@@ -638,7 +638,7 @@ func TestValidateAcceptsUnsetComputedField(t *testing.T) {
 // badComputed is a resource type whose computed field is not optional, which no
 // configuration could satisfy since users can not set a computed field
 type badComputed struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Secret string `xcl:"secret,computed" json:"secret"`
 }
@@ -711,19 +711,13 @@ func TestValidateRejectsNonOptionalComputedField(t *testing.T) {
 	p, _ := setupParser(t, o)
 
 	err := p.Validate(context.Background(), f)
-	require.IsType(t, &errors.ConfigError{}, err)
 
-	ce := err.(*errors.ConfigError)
-	require.Len(t, ce.Errors, 1)
-
-	// the problem is with the type rather than the configuration, so it is
-	// reported at the resource block
-	pe := ce.Errors[0].(*errors.Diagnostic)
-	require.Equal(t, f, pe.Subject.Filename)
-	require.Equal(t, 1, pe.Subject.Start.Line)
-	require.Contains(t, pe.Detail, "is computed and must be optional")
-	require.Contains(t, pe.Detail, "secret")
-	require.Equal(t, "resource 'resource.bad_computed.x' field 'secret' is computed and must be optional", pe.Detail)
+	// the problem is with the plugin's type rather than the configuration, so
+	// the plugin fails to load
+	require.IsType(t, &errors.PluginLoadError{}, err)
+	require.ErrorContains(t, err, "resource.bad_computed")
+	require.ErrorContains(t, err, "a computed field must also be optional")
+	require.ErrorContains(t, err, "secret")
 }
 
 func TestValidateRejectsUnknownAttributeOnRegisteredType(t *testing.T) {

@@ -45,6 +45,65 @@ the lifecycle methods; log from those through the call's context (see
 nil when it offers none; see [Offering a function](#offering-a-function).
 The rest of this guide is about the lifecycle methods.
 
+## The entity type
+
+`T` is a plain struct of your own, laid out as a Go application lays out the
+types it declares:
+
+```go
+type Container struct {
+    Name  string `xcl:"name,label" json:"name"`
+    Image string `xcl:"image" json:"image"`
+    Meta  types.Meta
+}
+
+plugins.RegisterResourceProvider(&p.PluginBase, log, state, "container", "", &Container{}, &ContainerProvider{})
+```
+
+- A field tagged as a label is filled from the block's label: `container "web"
+  {}` gives `Name` the value `web`. A type registered with a subtype takes
+  two label fields, the subtype and the label. Configuration cannot set them.
+- A field called `Meta`, a `types.Meta` with no tag, receives the entity's
+  metadata, such as `Meta.ID`, and the `disabled` flag and `depends_on`
+  list configuration set on the block, as `Meta.Disabled` and
+  `Meta.DependsOn`. Changes the provider makes to `Meta.Properties` are
+  kept; the disabled flag and dependencies are configuration's, and changes
+  to them are not.
+- A type with neither label fields nor a `Meta` field cannot read a label,
+  so it is a singleton: its block is written without labels, `hub { … }`, a
+  module holds one of it, and it is addressed by its type alone, `hub.address`.
+  A singleton takes no subtype.
+
+Every block takes `disabled` and `depends_on` in configuration, so a type
+declares no fields by those names, nor `meta`. xcl stores the entity as a
+type built from yours, which embeds `types.ResourceBase`, and converts it to
+and from your struct around every provider call, so the provider only ever
+sees `T`. A type of your own that embeds `types.ResourceBase` is refused when
+it is registered.
+
+### How the host sees the type
+
+The host does not have your Go type compiled in. When the plugin registers a
+type, xcl describes it from its tags as a schema v1 document, and the host
+builds its own copy of the type from that. So a type's fields follow a few
+rules, and one that breaks them fails the plugin's registration, naming the
+type and the field:
+
+- Every field carries an `xcl` tag. A field the provider sets and the user
+  does not is tagged as computed, `xcl:"address,optional,computed"`; one
+  without a tag would be dropped by the host.
+- A field's `json` name is its `xcl` name, `xcl:"network,block"
+  json:"network"`, as state holds it under that name.
+- A computed field is also optional.
+- An embedded struct's fields are the type's own.
+- A field holding another entity, as a reference to a block gives it, keeps
+  that entity's `Meta`.
+- A block may hold itself, directly or through other blocks, such as a
+  column holding rows holding columns: write the types as they are, and the
+  schema describes each once. Configuration nests blocks at most ten deep, in
+  every block, and a block deeper than that is reported where it is written.
+  A value that is not a block cannot hold itself.
+
 ## The two copies of an entity
 
 Every call on an entity that already exists works with two copies of it:
@@ -87,8 +146,7 @@ A field holding a password, token or other secret is declared with the type
 
 ```go
 type Database struct {
-    types.ResourceBase `xcl:",remain"`
-
+    Name     string                  `xcl:"name,label" json:"name"`
     Username string                  `xcl:"username" json:"username"`
     Password types.Sensitive[string] `xcl:"password" json:"password"`
 }
@@ -103,9 +161,7 @@ A plugin type is rebuilt on the host from its schema, and Go cannot build a
 generic type at run time, so a plugin type may use only these instantiations:
 `types.Sensitive[string]`, `[int]`, `[int64]`, `[float64]`, `[bool]`,
 `[[]string]` and `[map[string]string]`. A plugin type with any other fails to
-load, with an error naming the type and the field. Rebuild an external plugin
-against the version of xcl it is loaded by, so its type names match the
-host's.
+register, with an error naming the type and the field.
 
 Read the real value with `Reveal()`, only where it is needed, such as when
 connecting to the service the provider manages:
@@ -702,8 +758,7 @@ by the network:
 
 ```go
 type Container struct {
-    types.ResourceBase `xcl:",remain"`
-
+    Name  string `xcl:"name,label" json:"name"`
     Image string `xcl:"image" json:"image"`
 
     // set by the provider in Create

@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"github.com/jumppad-labs/xcl/entity"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/wire"
 )
 
@@ -49,8 +50,19 @@ func (DefaultChanged[T]) Changed(ctx context.Context, old T, new T, changes []en
 }
 
 // comparableJSON returns the JSON form of a resource with xcl's metadata removed.
-// A nil resource returns nil.
+// A nil resource returns nil. A plain resource is compared in the form the
+// engine stores it in, so its Meta and mirror fields are removed as
+// ResourceBase's are, whatever its tags call them.
 func comparableJSON(resource any) (any, error) {
+	if b, ok := plaintype.LookupPlain(reflect.TypeOf(resource)); ok && !isNil(resource) {
+		stored := b.New()
+		if err := b.FromPlain(stored, resource); err != nil {
+			return nil, err
+		}
+
+		resource = stored
+	}
+
 	data, err := wire.Marshal(resource)
 	if err != nil {
 		return nil, err
@@ -68,4 +80,14 @@ func comparableJSON(resource any) (any, error) {
 	}
 
 	return value, nil
+}
+
+// isNil reports whether resource is nil or a nil pointer
+func isNil(resource any) bool {
+	if resource == nil {
+		return true
+	}
+
+	value := reflect.ValueOf(resource)
+	return value.Kind() == reflect.Pointer && value.IsNil()
 }

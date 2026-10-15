@@ -21,11 +21,27 @@ const SchemaVersion1 = 1
 // ResourceBase (depends_on, disabled, meta) is never listed. Every block type
 // has it and BuildTypeV1 adds it.
 type SchemaV1 struct {
-	SchemaVersion int       `json:"schema_version"`
-	Type          string    `json:"type"`
-	Subtype       string    `json:"subtype,omitempty"`
-	Fields        []FieldV1 `json:"fields"`
+	SchemaVersion int    `json:"schema_version"`
+	Type          string `json:"type"`
+	Subtype       string `json:"subtype,omitempty"`
+
+	// Singleton marks a type whose block is written without labels, i.e.
+	// runner {}, of which a module holds one. A singleton has no subtype
+	Singleton bool `json:"singleton,omitempty"`
+
+	Fields []FieldV1 `json:"fields"`
+
+	// Definitions are block element types named so a block can refer to one,
+	// {"ref": "column"}, wherever it is used, including from within itself:
+	// a column holding rows that hold columns is described once, and
+	// configuration nests it as deep as MaxNestingDepth allows
+	Definitions map[string][]FieldV1 `json:"definitions,omitempty"`
 }
+
+// MaxNestingDepth is how deep configuration nests blocks within a block:
+// a block's own blocks are at depth one. A block type that holds itself is
+// built this deep and no deeper.
+const MaxNestingDepth = 10
 
 // FieldV1 is one field of a SchemaV1 block type.
 type FieldV1 struct {
@@ -33,7 +49,11 @@ type FieldV1 struct {
 	Name string `json:"name"`
 
 	// Type is the value's type: "string", "number", "bool", "any",
-	// {"list": T}, {"map": T} or {"object": [fields]}
+	// {"list": T}, {"map": T}, {"object": [fields]}, or {"entity": [fields]}
+	// for a value holding a block, as a reference to one gives it, which
+	// carries meta, disabled and depends_on beside its fields. A block's
+	// element is {"object": [fields]}, or {"ref": "name"} for one of the
+	// schema's Definitions, and either within {"map": …} for named blocks
 	Type json.RawMessage `json:"type"`
 
 	// Kind is "attribute", the default, or "block"
@@ -63,6 +83,11 @@ type FieldV1 struct {
 	// name: optional on a list of blocks, and filled from the key in a map
 	// of blocks
 	Label string `json:"label,omitempty"`
+
+	// Key marks an attribute that identifies an element in a list of blocks:
+	// the saved and configured elements are paired by it when computed values
+	// are carried over, rather than by position
+	Key bool `json:"key,omitempty"`
 }
 
 // Field kinds.
@@ -106,16 +131,21 @@ func ParseV1(data []byte) (*SchemaV1, error) {
 		return nil, fmt.Errorf("schema names no type")
 	}
 
+	if s.Singleton && s.Subtype != "" {
+		return nil, fmt.Errorf("schema for type %s: a singleton takes no subtype", types.TypeKey(s.Type, s.Subtype))
+	}
+
 	return s, nil
 }
 
-// BuildTypeV1 builds the Go struct type a block of the schema's type is
-// decoded into. The type embeds types.ResourceBase first and carries the
-// xcl, json and default tags the parser, decoder, change detection and
+// BuildTypeV1 builds the plain struct type a block of the schema's type is
+// declared as, laid out as a plain Go type is: a named type has a Meta field,
+// so its label is kept, and a singleton has none, so it is one. It carries
+// the xcl, json and default tags the parser, decoder, change detection and
 // computed carry-over read, so they run on it with no knowledge that it came
 // from a schema.
 //
-// A sensitive field is limited to the instantiations in KnownTypes; any other
+// A sensitive field is limited to the instantiations in sensitiveTypes; any other
 // shape, and an unknown type, kind or format, is an error naming the field.
 func BuildTypeV1(data []byte) (reflect.Type, *SchemaV1, error) {
 	s, err := ParseV1(data)
@@ -123,16 +153,33 @@ func BuildTypeV1(data []byte) (reflect.Type, *SchemaV1, error) {
 		return nil, nil, err
 	}
 
-	fields, err := buildFieldsV1(s.Fields, "", true)
+	expanded, err := expandRefsV1(s.Fields, s.Definitions, "", 0)
 	if err != nil {
 		return nil, nil, fmt.Errorf("schema for type %s: %w", types.TypeKey(s.Type, s.Subtype), err)
+	}
+
+	fields, err := buildFieldsV1(expanded, "", true)
+	if err != nil {
+		return nil, nil, fmt.Errorf("schema for type %s: %w", types.TypeKey(s.Type, s.Subtype), err)
+	}
+
+	if !s.Singleton {
+		fields = append([]reflect.StructField{metaField}, fields...)
 	}
 
 	return reflect.StructOf(fields), s, nil
 }
 
-// resourceBaseField is the anonymous types.ResourceBase every built block
-// type starts with, tagged as a hand-written type tags it.
+// metaField is the Meta field of a named type built from a schema, which
+// receives the block's metadata, its label among them
+var metaField = reflect.StructField{
+	Name: "Meta",
+	Type: reflect.TypeOf(types.Meta{}),
+}
+
+// resourceBaseField is the anonymous types.ResourceBase an entity held as a
+// value starts with, as a reference to a block gives it, tagged as a
+// hand-written type tags it.
 var resourceBaseField = reflect.StructField{
 	Name:      "ResourceBase",
 	Type:      reflect.TypeOf(types.ResourceBase{}),
@@ -140,8 +187,9 @@ var resourceBaseField = reflect.StructField{
 	Tag:       `xcl:",remain"`,
 }
 
-// reservedFieldNames are the names ResourceBase already gives every block
-// type, which a schema may not redeclare.
+// reservedFieldNames are the names every block has, which a schema may not
+// redeclare: meta, and the disabled flag and dependencies configuration may
+// set on any block.
 var reservedFieldNames = map[string]bool{
 	"depends_on": true,
 	"disabled":   true,
@@ -149,13 +197,10 @@ var reservedFieldNames = map[string]bool{
 }
 
 // buildFieldsV1 builds the struct fields for one object. path names the
-// enclosing field in errors, empty at the top level. top adds ResourceBase,
-// and refuses the names it reserves.
+// enclosing field in errors, empty at the top level. top refuses the names
+// every block has, for a block type and an entity.
 func buildFieldsV1(fields []FieldV1, path string, top bool) ([]reflect.StructField, error) {
 	built := []reflect.StructField{}
-	if top {
-		built = append(built, resourceBaseField)
-	}
 
 	seen := map[string]bool{}
 
@@ -233,6 +278,9 @@ func buildAttributeV1(f FieldV1, where, goName string) (reflect.StructField, err
 	if f.Computed {
 		options = append(options, "computed")
 	}
+	if f.Key {
+		options = append(options, "key")
+	}
 
 	tag := fmt.Sprintf(`xcl:%q json:%q`, strings.Join(options, ","), jsonTagV1(f.Name, optional))
 
@@ -269,6 +317,10 @@ func buildBlockV1(f FieldV1, where, goName string) (reflect.StructField, error) 
 
 	if len(f.Default) > 0 {
 		return reflect.StructField{}, fmt.Errorf("field %s: a block has no default", where)
+	}
+
+	if f.Key {
+		return reflect.StructField{}, fmt.Errorf("field %s: a block cannot be a key, mark the attribute that identifies it", where)
 	}
 
 	objectFields, named, err := blockElementV1(f.Type, where)
@@ -323,6 +375,94 @@ func buildBlockV1(f FieldV1, where, goName string) (reflect.StructField, error) 
 	tag := fmt.Sprintf(`xcl:%q json:%q`, f.Name+",block", jsonTagV1(f.Name, true))
 
 	return reflect.StructField{Name: goName, Type: goType, Tag: reflect.StructTag(tag)}, nil
+}
+
+// expandRefsV1 replaces every block that refers to a definition with the
+// definition's fields, so the builders see only objects. depth is how deep
+// fields are nested within the block type, zero at its top level: a block
+// whose elements would sit deeper than MaxNestingDepth is left out, which is
+// where a block type that holds itself stops.
+func expandRefsV1(fields []FieldV1, definitions map[string][]FieldV1, path string, depth int) ([]FieldV1, error) {
+	expanded := make([]FieldV1, 0, len(fields))
+
+	for _, f := range fields {
+		if f.Kind != FieldKindBlock {
+			expanded = append(expanded, f)
+			continue
+		}
+
+		where := f.Name
+		if path != "" {
+			where = path + "." + f.Name
+		}
+
+		element, ref, named, err := blockShapeV1(f.Type, where)
+		if err != nil {
+			return nil, err
+		}
+
+		if ref != "" {
+			definition, ok := definitions[ref]
+			if !ok {
+				return nil, fmt.Errorf("field %s: refers to %q, which the schema does not define", where, ref)
+			}
+
+			if depth+1 > MaxNestingDepth {
+				continue
+			}
+
+			element = definition
+		}
+
+		children, err := expandRefsV1(element, definitions, where, depth+1)
+		if err != nil {
+			return nil, err
+		}
+
+		object, err := json.Marshal(map[string][]FieldV1{"object": children})
+		if err != nil {
+			return nil, err
+		}
+
+		if named {
+			object, err = json.Marshal(map[string]json.RawMessage{"map": object})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		f.Type = object
+		expanded = append(expanded, f)
+	}
+
+	return expanded, nil
+}
+
+// blockShapeV1 reads a block's type as written: its element's fields, or the
+// name of the definition it refers to, {"ref": "column"}, and whether it is a
+// map of named blocks, {"map": {"ref": "column"}}.
+func blockShapeV1(raw json.RawMessage, where string) ([]FieldV1, string, bool, error) {
+	var typed struct {
+		Ref string          `json:"ref"`
+		Map json.RawMessage `json:"map"`
+	}
+
+	if len(raw) > 0 && raw[0] == '{' && json.Unmarshal(raw, &typed) == nil {
+		if typed.Ref != "" {
+			return nil, typed.Ref, false, nil
+		}
+
+		var inner struct {
+			Ref string `json:"ref"`
+		}
+
+		if len(typed.Map) > 0 && typed.Map[0] == '{' && json.Unmarshal(typed.Map, &inner) == nil && inner.Ref != "" {
+			return nil, inner.Ref, true, nil
+		}
+	}
+
+	fields, named, err := blockElementV1(raw, where)
+	return fields, "", named, err
 }
 
 // blockElementV1 reads a block's type, which is {"object": [fields]} for a
@@ -395,7 +535,7 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 				return nil, fmt.Errorf("field %s: unknown number format %q, expected %q or %q", where, format, NumberFormatInt, NumberFormatFloat)
 			}
 		default:
-			return nil, fmt.Errorf("field %s: unknown type %q, expected string, number, bool, any, {\"list\": T}, {\"map\": T} or {\"object\": [fields]}", where, name)
+			return nil, fmt.Errorf("field %s: unknown type %q, expected string, number, bool, any, {\"list\": T}, {\"map\": T}, {\"object\": [fields]} or {\"entity\": [fields]}", where, name)
 		}
 	}
 
@@ -407,6 +547,7 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 		List   json.RawMessage `json:"list"`
 		Map    json.RawMessage `json:"map"`
 		Object []FieldV1       `json:"object"`
+		Entity []FieldV1       `json:"entity"`
 	}
 
 	if err := json.Unmarshal(raw, &typed); err != nil {
@@ -414,6 +555,15 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 	}
 
 	switch {
+	case typed.Entity != nil:
+		// an entity, as a reference to a block gives it, carries the meta,
+		// disabled and depends_on every block has beside its own fields
+		fields, err := buildFieldsV1(typed.Entity, where, true)
+		if err != nil {
+			return nil, err
+		}
+
+		return reflect.StructOf(append([]reflect.StructField{resourceBaseField}, fields...)), nil
 	case len(typed.List) > 0:
 		element, err := valueTypeV1(typed.List, format, where)
 		if err != nil {
@@ -436,17 +586,17 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 
 		return reflect.StructOf(fields), nil
 	default:
-		return nil, fmt.Errorf("field %s: unknown type %s, expected string, number, bool, any, {\"list\": T}, {\"map\": T} or {\"object\": [fields]}", where, string(raw))
+		return nil, fmt.Errorf("field %s: unknown type %s, expected string, number, bool, any, {\"list\": T}, {\"map\": T}, {\"object\": [fields]} or {\"entity\": [fields]}", where, string(raw))
 	}
 }
 
 // sensitiveTypeV1 wraps a value type in the matching types.Sensitive
 // instantiation. Go cannot instantiate a generic at run time, so only the
-// shapes in KnownTypes are available.
+// shapes in sensitiveTypes are available.
 func sensitiveTypeV1(inner reflect.Type, where string) (reflect.Type, error) {
 	key := sensitiveTypePrefix + inner.String() + "]"
 
-	wrapped, ok := KnownTypes()[key]
+	wrapped, ok := sensitiveTypes[key]
 	if !ok {
 		return nil, fmt.Errorf("field %s: a sensitive value of type %s cannot be held, sensitive values may be string, number, bool, {\"list\": \"string\"} or {\"map\": \"string\"}", where, inner)
 	}

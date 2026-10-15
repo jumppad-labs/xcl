@@ -16,10 +16,11 @@
 //   - fields tagged as labels are filled from the block's labels, in order,
 //     when an entity is made, rather than decoded: configuration cannot set
 //     one, and an expression reads it like any attribute;
-//   - fields tagged `disabled` or `depends_on` mirror the values every block
-//     has, filled from types.ResourceBase rather than decoded twice;
 //   - a field called Meta, which must be a types.Meta with no tag, is filled
-//     with the block's metadata, as a type embedding types.ResourceBase has it.
+//     with the block's metadata, its disabled flag and dependencies among it.
+//
+// disabled, depends_on and meta are every block's, so a plain type declares
+// no field by those names.
 package plaintype
 
 import (
@@ -82,11 +83,6 @@ type Built struct {
 	labels      [][]int
 	labelFields []int
 
-	// disabled and dependsOn are the index paths of Plain's mirror fields,
-	// nil when it has none
-	disabled  []int
-	dependsOn []int
-
 	// meta is the index path of Plain's Meta field, nil when it has none
 	meta []int
 }
@@ -97,13 +93,15 @@ type copiedField struct {
 }
 
 // Build makes the engine type for plain, a struct type that does not embed
-// types.ResourceBase. labels is how many labels a block of the type has: one
-// for a type declared without a subtype, two for one declared with one.
+// types.ResourceBase. labels is how many labels a block of the type has when
+// it is named: one for a type declared without a subtype, two for one
+// declared with one. A type with neither label fields nor a Meta field cannot
+// read a name, so it is a singleton, see Singleton, and takes no subtype.
 //
 // The error names the field at fault: a reserved name, a label count that does
-// not match, a mirror field of the wrong type, an embedded field that is not a
-// remain struct, or a second field with the same Go name once embedded fields
-// are lifted.
+// not match, a subtype for a singleton, an embedded field that is not a remain
+// struct, or a second field with the same Go name once embedded fields are
+// lifted.
 func Build(plain reflect.Type, labels int) (*Built, error) {
 	if plain.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("%s is not a struct", plain)
@@ -195,24 +193,8 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 				case parsed.Kind == tags.KindRemain || parsed.Kind == tags.KindBody:
 					return fmt.Errorf("field %s of %s: a block type's remain and body are xcl's, a plain type cannot take them", field.Name, plain)
 
-				case parsed.Name == metaName:
-					return fmt.Errorf("field %s of %s: %q is held by every block and cannot be declared", field.Name, plain, metaName)
-
-				case parsed.Name == disabledName:
-					if field.Type.Kind() != reflect.Bool {
-						return fmt.Errorf("field %s of %s: %q mirrors every block's disabled flag and must be a bool, not %s", field.Name, plain, disabledName, field.Type)
-					}
-
-					b.disabled = index
-					continue
-
-				case parsed.Name == dependsOnName:
-					if field.Type != reflect.TypeOf([]string{}) {
-						return fmt.Errorf("field %s of %s: %q mirrors every block's dependencies and must be a []string, not %s", field.Name, plain, dependsOnName, field.Type)
-					}
-
-					b.dependsOn = index
-					continue
+				case parsed.Name == metaName || parsed.Name == disabledName || parsed.Name == dependsOnName:
+					return fmt.Errorf("field %s of %s: %q is held by every block and cannot be declared, the type reads it from Meta", field.Name, plain, parsed.Name)
 				}
 			}
 
@@ -240,6 +222,10 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 		return nil, fmt.Errorf("%s has %d label fields, a block of its type has %d labels", plain, len(b.labels), labels)
 	}
 
+	if b.IsSingleton() && labels == 2 {
+		return nil, fmt.Errorf("%s has no label fields and no Meta field, so its block is written without labels, and its type takes no subtype", plain)
+	}
+
 	fields = append(fields, reflect.StructField{
 		Name: MarkerField,
 		Type: reflect.ArrayOf(0, plain),
@@ -248,14 +234,37 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 
 	b.Engine = reflect.StructOf(fields)
 	built.Store(b.Engine, b)
-	plains.Store(plain, true)
+	plains.Store(plain, b)
 
 	return b, nil
 }
 
-// plains holds every plain type Build has built, so a value of one can be
-// recognised for what it is where the engine type is not to hand.
+// IsSingleton reports whether the plain type is a singleton: one with neither
+// label fields nor a Meta field, which cannot read a name, so its block is
+// written without labels, i.e. runner {}, and a module holds one of it.
+func (b *Built) IsSingleton() bool {
+	return len(b.labels) == 0 && b.meta == nil
+}
+
+// plains holds every plain type Build has built, with how it was built, so a
+// value of one can be recognised for what it is where the engine type is not
+// to hand.
 var plains sync.Map
+
+// LookupPlain returns how plain, or the type a pointer to it points at, was
+// built, and false for a type Build has not built.
+func LookupPlain(plain reflect.Type) (*Built, bool) {
+	for plain.Kind() == reflect.Pointer {
+		plain = plain.Elem()
+	}
+
+	b, ok := plains.Load(plain)
+	if !ok {
+		return nil, false
+	}
+
+	return b.(*Built), true
+}
 
 // IsBuilt reports whether plain, or the type a pointer to it points at, has
 // been built as a plain block type: a value of it is a copy of an entity,
@@ -343,16 +352,53 @@ func PlainOf(engine reflect.Type) (reflect.Type, bool) {
 // own. A property that is itself a map or slice is still shared.
 func copyMeta(meta types.Meta) types.Meta {
 	meta.Links = slices.Clone(meta.Links)
+	meta.DependsOn = slices.Clone(meta.DependsOn)
 	meta.References = maps.Clone(meta.References)
 	meta.Properties = maps.Clone(meta.Properties)
 
 	return meta
 }
 
+// FromPlain copies a value of the plain type, or a pointer to one, back into
+// entity, a pointer to an entity of the engine type: its fields, and its Meta
+// field where it has one. Labels, the disabled flag and the dependencies are
+// left alone, as only configuration sets them, and so is anything of the
+// entity's the plain type cannot hold.
+func (b *Built) FromPlain(entity any, plain any) error {
+	target := reflect.ValueOf(entity)
+	if target.Kind() != reflect.Pointer || target.Elem().Type() != b.Engine {
+		return fmt.Errorf("%T is not a pointer to an entity of %s", entity, b.Plain)
+	}
+	target = target.Elem()
+
+	source := reflect.ValueOf(plain)
+	if source.Kind() == reflect.Pointer {
+		source = source.Elem()
+	}
+
+	if source.Type() != b.Plain {
+		return fmt.Errorf("%T is not a %s", plain, b.Plain)
+	}
+
+	for _, f := range b.copied {
+		target.Field(f.engine).Set(source.FieldByIndex(f.plain))
+	}
+
+	base := target.Field(0).Addr().Interface().(*types.ResourceBase)
+
+	if b.meta != nil {
+		base.Meta = copyMeta(source.FieldByIndex(b.meta).Interface().(types.Meta))
+		base.Meta.Disabled = false
+		base.Meta.DependsOn = nil
+	}
+
+	return nil
+}
+
 // ToPlain copies an entity of the engine type into a new value of the plain
 // type and returns a pointer to it. Labels are filled from the entity's
-// metadata, the mirror fields from its types.ResourceBase, and a Meta field
-// with a copy of its metadata.
+// metadata, and a Meta field with a copy of its metadata, the disabled flag
+// and dependencies from its types.ResourceBase among it.
 //
 // The result is a copy: changing it does not change the stored entity.
 func (b *Built) ToPlain(entity any) (any, error) {
@@ -381,15 +427,11 @@ func (b *Built) ToPlain(entity any) (any, error) {
 	}
 
 	if b.meta != nil {
-		target.FieldByIndex(b.meta).Set(reflect.ValueOf(copyMeta(base.Meta)))
-	}
+		meta := copyMeta(base.Meta)
+		meta.Disabled = base.Disabled
+		meta.DependsOn = slices.Clone(base.DependsOn)
 
-	if b.disabled != nil {
-		target.FieldByIndex(b.disabled).SetBool(base.Disabled)
-	}
-
-	if b.dependsOn != nil && base.DependsOn != nil {
-		target.FieldByIndex(b.dependsOn).Set(reflect.ValueOf(append([]string{}, base.DependsOn...)))
+		target.FieldByIndex(b.meta).Set(reflect.ValueOf(meta))
 	}
 
 	return target.Addr().Interface(), nil

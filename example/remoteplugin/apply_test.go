@@ -13,9 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// These tests run the example as a reader would: they fetch the release key
-// from xcl.dev, install jumppad-labs/xcl-plugin-docker from its GitHub release
-// and create a real Docker network and container. They need the network and a
+// These tests run the example as a reader would: they install
+// jumppad-labs/xcl-plugin-docker from a signed GitHub release and create a
+// real Docker network and container. The release is the Docker plugin built
+// from this repository, served by a fake GitHub with the key it is signed
+// with, so the plugin always speaks the xcl it is tested with. They need a
 // Docker engine, and skip when no engine answers or when run with -short.
 
 // requireDocker skips the test when it runs with -short or no Docker engine,
@@ -80,6 +82,7 @@ func inTempDir(t *testing.T) string {
 func applyExample(t *testing.T, stateDir string) string {
 	t.Helper()
 
+	useFakeRelease(t)
 	config := inTempDir(t)
 
 	t.Cleanup(func() {

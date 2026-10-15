@@ -20,6 +20,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/modules"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
+	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
@@ -885,12 +886,10 @@ func (p *Parser) parseResourcesInFile(file string, module string) []error {
 
 	for _, b := range body.Blocks {
 
-		// check the resource has a name
-		if len(b.Labels) == 0 {
-			de := p.inBlock(b, module, nil, problem{
-				summary: "Missing name",
-				detail:  fmt.Sprintf("resource '%s' has no name, please specify resources using the syntax 'resource_type \"name\" {}'", b.Type),
-			})
+		// check the block has its labels, which a singleton never has
+		if len(b.Labels) == 0 && !p.isSingleton(b.Type) {
+			takes, _ := p.takesSubtype(b.Type)
+			de := p.inBlock(b, module, nil, missingLabels(b.Type, takes))
 
 			emitParse(&p.options, "", "", file, de)
 			blockErrors = append(blockErrors, de)
@@ -959,6 +958,12 @@ func (p *Parser) takesSubtype(entityType string) (bool, bool) {
 	return p.catalog.TakesSubtype(entityType)
 }
 
+// isSingleton reports whether the type keyword entityType is a singleton,
+// whose block has no labels
+func (p *Parser) isSingleton(entityType string) bool {
+	return p.catalog != nil && p.catalog.IsSingleton(entityType)
+}
+
 // isReferenceRoot reports whether name, the first segment of a traversal in an
 // expression, names something a reference can point at: one of the builtin
 // keywords, "resource", or the type of any known entity
@@ -983,6 +988,9 @@ func (p *Parser) blockResource(b *hclsyntax.Block, module string) (string, strin
 	takes, _ := p.takesSubtype(b.Type)
 
 	switch {
+	case p.isSingleton(b.Type):
+		// a singleton is its type, whatever labels it was wrongly given
+		return fqrn.String(), fqrn.String()
 	case takes && len(b.Labels) == 2:
 		fqrn.Subtype = b.Labels[0]
 		fqrn.Resource = b.Labels[1]
@@ -1041,26 +1049,27 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 		subtype := ""
 		name := ""
 
+		singleton := p.isSingleton(b.Type)
+
 		switch {
+		case singleton && len(b.Labels) == 0:
+		case singleton:
+			return p.inBlock(b, moduleName, labelsRange(b), unexpectedLabels(b))
 		case takes && len(b.Labels) == 2:
 			subtype = b.Labels[0]
 			name = b.Labels[1]
 		case takes:
-			return fail(problem{
-				summary: "Invalid block labels",
-				detail:  fmt.Sprintf(`invalid format for '%s', it is declared with a subtype and a name, i.e. '%s "subtype" "name" {}'`, b.Type, b.Type),
-			})
+			return fail(wrongLabels(b.Type, true))
 		case len(b.Labels) == 1:
 			name = b.Labels[0]
 		default:
-			return fail(problem{
-				summary: "Invalid block labels",
-				detail:  fmt.Sprintf(`invalid format for '%s', it is declared with only a name, i.e. '%s "name" {}'`, b.Type, b.Type),
-			})
+			return fail(wrongLabels(b.Type, false))
 		}
 
-		if err := validateResourceName(name); err != nil {
-			return fail(invalidName(err))
+		if !singleton {
+			if err := validateResourceName(name); err != nil {
+				return fail(invalidName(err))
+			}
 		}
 
 		rt, err = p.catalog.CreateEntity(b.Type, subtype, name)
@@ -1092,6 +1101,16 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 	// Set the ID from the FQRN
 	fqrn := resources.FQRNFromResource(rt)
 	rtMeta.ID = fqrn.String()
+
+	if earlier, declared := p.parsedResources.headers[rtMeta.ID]; declared {
+		return fail(duplicateBlock(rtMeta.ID, p.isSingleton(rtMeta.Type), earlier))
+	}
+
+	// a block type that holds itself is built only this deep, see
+	// schema.MaxNestingDepth, and every type nests no deeper so they agree
+	if deep, depth := nestedTooDeep(b, schema.MaxNestingDepth); deep != nil {
+		return p.inBlock(b, moduleName, deep.TypeRange.Ptr(), tooDeep(deep.Type, depth, schema.MaxNestingDepth))
+	}
 
 	// We now need to get all the dependent resources for this resource
 	// so that we can build the dependency graph

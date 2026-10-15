@@ -10,11 +10,9 @@ const TypeTemplate = "template"
 
 // Template allows the process of user defined templates
 type Template struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
-	Depends []string `xcl:"depends_on,optional" json:"depends,omitempty"`
-
-	Source      string    `xcl:"source" json:"source"`                // Source template to be processed as string
+	Source     string    `xcl:"source" json:"source"`                // Source template to be processed as string
 	Destination string    `xcl:"destination" json:"destination"`      // Destination filename to write
 	Vars        cty.Value `xcl:"vars,optional" json:"vars,omitempty"` // Variables to be processed in the template
 	//InternalVars map[string]any // stores a converted go type version of the hcl.Value types

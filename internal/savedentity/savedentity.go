@@ -76,8 +76,9 @@ func Decode(registry *catalog.Catalog, data []byte, read ReadOptions) (any, erro
 	// both of which are written to state
 	subtype, _ := meta["subtype"].(string)
 
-	name, ok := meta["name"].(string)
-	if !ok || name == "" {
+	// a singleton has no name
+	name, _ := meta["name"].(string)
+	if name == "" && !registry.IsSingleton(entityType) {
 		return nil, &xclerrors.InvalidSavedDataError{ID: id, Err: fmt.Errorf("record has no name")}
 	}
 

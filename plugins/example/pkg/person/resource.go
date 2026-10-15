@@ -2,9 +2,12 @@ package person
 
 import "github.com/jumppad-labs/xcl/types"
 
-// Person is an example resource that implements types.Resource
+// Person is an example resource, written resource "person" "<name>" {}. Its
+// label fields hold the block's two labels, the subtype and the name; a type
+// that reads its metadata declares a Meta field of type types.Meta instead
 type Person struct {
-	types.ResourceBase `xcl:",remain"`
+	Subtype string `xcl:"subtype,label" json:"subtype"`
+	Name    string `xcl:"name,label" json:"name"`
 
 	// Basic person fields
 	FirstName   string `xcl:"first_name" json:"first_name"`

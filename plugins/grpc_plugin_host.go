@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
+	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins/proto"
 	"google.golang.org/grpc/codes"
@@ -232,14 +233,23 @@ func (w *grpcPluginWrapper) GetTypes() []RegisteredType {
 	types := make([]RegisteredType, len(resp.Types))
 	for i, t := range resp.Types {
 		types[i] = RegisteredType{
-			Type:    t.Type,
-			SubType: t.SubType,
-			Schema:  t.Schema,
+			Type:      t.Type,
+			SubType:   t.SubType,
+			Schema:    t.Schema,
+			Singleton: schemaSingleton(t.Schema),
 			// Note: Adapter is set to nil for remote plugins as it's handled by the gRPC wrapper
 		}
 	}
 
 	return types
+}
+
+// schemaSingleton reports whether a type's schema v1 document marks it as a
+// singleton; a document that does not parse fails when the host builds the
+// type from it, where the error is reported
+func schemaSingleton(doc []byte) bool {
+	s, err := schema.ParseV1(doc)
+	return err == nil && s.Singleton
 }
 
 func (w *grpcPluginWrapper) Validate(ctx context.Context, entityType, entitySubType string, entityData []byte) error {
@@ -423,10 +433,11 @@ func (h *GRPCPluginHost) GetTypes() []RegisteredType {
 		adapter := NewGRPCResourceProviderAdapter(wrapper, t.Type, t.SubType)
 
 		h.cachedTypes[i] = RegisteredType{
-			Type:    t.Type,
-			SubType: t.SubType,
-			Schema:  t.Schema,
-			Adapter: adapter,
+			Type:      t.Type,
+			SubType:   t.SubType,
+			Schema:    t.Schema,
+			Singleton: t.Singleton,
+			Adapter:   adapter,
 		}
 	}
 

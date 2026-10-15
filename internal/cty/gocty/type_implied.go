@@ -70,6 +70,11 @@ func impliedType(rt reflect.Type, path cty.Path, constraint bool) (cty.Type, err
 		if err != nil {
 			return cty.NilType, err
 		}
+		// elements of any type may differ from each other, which a list
+		// cannot hold, so the value is typed by what it holds, a tuple
+		if ety == cty.DynamicPseudoType && !constraint {
+			return cty.DynamicPseudoType, nil
+		}
 		return cty.List(ety), nil
 	case reflect.Map:
 		if !stringType.AssignableTo(rt.Key()) {
@@ -80,11 +85,24 @@ func impliedType(rt reflect.Type, path cty.Path, constraint bool) (cty.Type, err
 		if err != nil {
 			return cty.NilType, err
 		}
+		// likewise a map of any is typed by what it holds, an object
+		if ety == cty.DynamicPseudoType && !constraint {
+			return cty.DynamicPseudoType, nil
+		}
 		return cty.Map(ety), nil
 
 	// Structural types
 	case reflect.Struct:
 		return impliedStructType(rt, path, constraint)
+
+	case reflect.Interface:
+		// an empty interface holds a value of any type, known only from the
+		// value itself
+		if rt.NumMethod() == 0 {
+			return cty.DynamicPseudoType, nil
+		}
+
+		return cty.NilType, path.NewErrorf("no cty.Type for %s", rt)
 
 	default:
 		return cty.NilType, path.NewErrorf("no cty.Type for %s", rt)

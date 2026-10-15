@@ -10,18 +10,28 @@
 //	v.SetConfigFile("runner.xcl")
 //	err := v.ReadInConfig()
 //
+// Read does the same for a file or a directory, reading every .xcl file in a
+// directory as one configuration.
+//
 // Every block is laid out in Viper's keys as
 //
 //	<type>[.<subtype>].<name>.<attribute>
 //
 // with attributes named as the struct's xcl tags name them, nested blocks as
 // nested keys, and repeated blocks keyed by their label when they have one:
-// `agent "claude" { models = [...] }` is agent.claude.models. Everything else
-// Viper does — defaults, environment variables, flags — works as it does for
-// any other format.
+// `agent "claude" { models = [...] }` is agent.claude.models. A singleton, a
+// type with neither label fields nor a Meta field, is written without labels
+// and laid out under its type alone: `runner { server = ... }` is
+// runner.server. A value that is a labelled block, such as a
+// reference to one, keeps its label among its attributes, under the label
+// field's name, so a list of them keeps its order:
+// `agents = [agent.claude, agent.local]` is a list whose first element's name
+// is claude. Everything else Viper does — defaults, environment variables,
+// flags — works as it does for any other format.
 package xclviper
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,13 +65,29 @@ type optionFunc func(*settings)
 func (f optionFunc) apply(s *settings) { f(s) }
 
 // Type declares the Go type T, a struct, as a block type: name is the block
-// type and an optional subtype, as registry.Register takes them.
+// type and an optional subtype, as registry.Register takes them. A T with
+// neither label fields nor a Meta field is a singleton, written without
+// labels.
 func Type[T any](name ...string) Option {
 	return optionFunc(func(s *settings) {
 		s.types = append(s.types, func(r registry.TypeRegistrar) {
 			registry.Register[T](r, name...)
 		})
 	})
+}
+
+// Read reads the configuration at path, a file or a directory, into v, which
+// New returned, replacing what v read before as ReadInConfig does. A
+// directory is read as one configuration, every .xcl file in it, so a block
+// in one file can refer to a block in another. Errors name the file and line
+// at fault.
+func Read(v *viper.Viper, path string) error {
+	v.SetConfigFile(path)
+	v.SetConfigType(Extension)
+
+	// the codec applies the path Viper was given and never reads the bytes,
+	// so none are passed: Viper's own reading would refuse a directory
+	return v.ReadConfig(bytes.NewReader(nil))
 }
 
 // With passes options to Viper itself, such as viper.KeyDelimiter.
@@ -176,7 +202,13 @@ func (c *codec) Decode(b []byte, out map[string]any) error {
 				return err
 			}
 
-			put(out, append(slices.Clone(segments), meta.Name), attributes(reflect.ValueOf(entity)))
+			// a singleton has no name, and is laid out under its type
+			path := slices.Clone(segments)
+			if meta.Name != "" {
+				path = append(path, meta.Name)
+			}
+
+			put(out, path, attributes(reflect.ValueOf(entity), false))
 		}
 	}
 
@@ -199,9 +231,11 @@ func put(out map[string]any, path []string, value any) {
 }
 
 // attributes lays a struct out by its xcl tags. Fields without a named tag —
-// types.ResourceBase, the marker naming a plain type — and labels are left
-// out: a block's labels are its keys.
-func attributes(v reflect.Value) map[string]any {
+// types.ResourceBase, the marker naming a plain type — are left out, and so
+// are labels unless withLabels: a block's labels are its keys, while a value
+// holding a labelled block, such as a reference to one, has nothing else to
+// keep them in.
+func attributes(v reflect.Value, withLabels bool) map[string]any {
 	v = reflect.Indirect(v)
 	out := map[string]any{}
 
@@ -213,11 +247,18 @@ func attributes(v reflect.Value) map[string]any {
 		}
 
 		parsed, err := tags.Parse(tag)
-		if err != nil || parsed.Name == "" || parsed.Kind == tags.KindLabel {
+		if err != nil || parsed.Name == "" {
 			continue
 		}
 
-		if value, set := plain(v.Field(i), false); set {
+		if parsed.Kind == tags.KindLabel {
+			if withLabels {
+				out[parsed.Name] = fmt.Sprint(v.Field(i).Interface())
+			}
+			continue
+		}
+
+		if value, set := plain(v.Field(i), false, parsed.Kind == tags.KindBlock); set {
 			out[parsed.Name] = value
 		}
 	}
@@ -255,7 +296,11 @@ var sensitiveType = reflect.TypeFor[types.SensitiveValue]()
 // all, so a zero is left out; a pointer can, so a set pointer is kept whatever
 // it points at. A sensitive value is revealed: Viper has no notion of one, and
 // the application reading its configuration is who it is for.
-func plain(v reflect.Value, set bool) (any, bool) {
+//
+// block is whether the field holds nested blocks. Repeated labelled blocks are
+// keyed by their label; labelled values anywhere else, such as a list of
+// references, stay a list in the order written, each keeping its label.
+func plain(v reflect.Value, set, block bool) (any, bool) {
 	if v.Type().Implements(sensitiveType) && v.CanInterface() {
 		return v.Interface().(types.SensitiveValue).RevealAny(), true
 	}
@@ -265,22 +310,22 @@ func plain(v reflect.Value, set bool) (any, bool) {
 		if v.IsNil() {
 			return nil, false
 		}
-		return plain(v.Elem(), true)
+		return plain(v.Elem(), true, block)
 
 	case reflect.Struct:
-		return attributes(v), true
+		return attributes(v, !block), true
 
 	case reflect.Slice, reflect.Array:
 		if v.Kind() == reflect.Slice && v.IsNil() {
 			return nil, false
 		}
 
-		if v.Len() > 0 {
+		if block && v.Len() > 0 {
 			if _, labelled := labelOf(v.Index(0)); labelled {
 				out := map[string]any{}
 				for i := range v.Len() {
 					label, _ := labelOf(v.Index(i))
-					out[label], _ = plain(v.Index(i), true)
+					out[label], _ = plain(v.Index(i), true, true)
 				}
 				return out, true
 			}
@@ -288,7 +333,7 @@ func plain(v reflect.Value, set bool) (any, bool) {
 
 		out := make([]any, 0, v.Len())
 		for i := range v.Len() {
-			item, _ := plain(v.Index(i), true)
+			item, _ := plain(v.Index(i), true, block)
 			out = append(out, item)
 		}
 		return out, true
@@ -300,7 +345,7 @@ func plain(v reflect.Value, set bool) (any, bool) {
 
 		out := map[string]any{}
 		for _, key := range v.MapKeys() {
-			item, _ := plain(v.MapIndex(key), true)
+			item, _ := plain(v.MapIndex(key), true, block)
 			out[fmt.Sprint(key.Interface())] = item
 		}
 		return out, true

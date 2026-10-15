@@ -3,8 +3,10 @@ package plugins
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 
 	"github.com/jumppad-labs/xcl/entity"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/wire"
 	"github.com/jumppad-labs/xcl/logger"
 )
@@ -70,6 +72,68 @@ type TypedProviderAdapter[T any] struct {
 	// name is the block type the provider handles, when set the plugin
 	// scoped logger passed to the provider adds the detail provider=<name>
 	name string
+
+	// built is the engine type a plain T is stored as, nil when T embeds
+	// types.ResourceBase and is stored as itself
+	built *plaintype.Built
+}
+
+// decode turns an entity's JSON into the T the provider works with. For a
+// plain T it also returns the entity as the engine stores it, which encode
+// writes the provider's result back into, so what T cannot hold, such as its
+// metadata, is kept. Without data the resource is the zero value of T when
+// optional, and an error otherwise.
+func (a *TypedProviderAdapter[T]) decode(data []byte, optional bool) (T, any, error) {
+	var resource T
+	read := data != nil || !optional
+
+	if a.built == nil {
+		if read {
+			if err := json.Unmarshal(data, &resource); err != nil {
+				return resource, nil, err
+			}
+		}
+
+		return resource, nil, nil
+	}
+
+	// without data the provider is given the zero value, nil for a pointer,
+	// as it is for any T; what it returns is written into a new entity
+	stored := a.built.New()
+	if !read {
+		return resource, stored, nil
+	}
+
+	if err := json.Unmarshal(data, stored); err != nil {
+		return resource, nil, err
+	}
+
+	plain, err := a.built.ToPlain(stored)
+	if err != nil {
+		return resource, nil, err
+	}
+
+	// ToPlain returns a pointer to the plain struct, which is T itself when
+	// the provider works with pointers
+	if converted, ok := plain.(T); ok {
+		return converted, stored, nil
+	}
+
+	return reflect.ValueOf(plain).Elem().Interface().(T), stored, nil
+}
+
+// encode turns the provider's result into the entity's JSON. stored is what
+// decode returned with the resource the provider was given.
+func (a *TypedProviderAdapter[T]) encode(resource T, stored any) ([]byte, error) {
+	if a.built == nil {
+		return wire.Marshal(resource)
+	}
+
+	if err := a.built.FromPlain(stored, resource); err != nil {
+		return nil, err
+	}
+
+	return wire.Marshal(stored)
 }
 
 // NewTypedProviderAdapter creates a new adapter for a typed provider
@@ -93,129 +157,80 @@ func (a *TypedProviderAdapter[T]) Init(state State, functions ProviderFunctions,
 	return a.provider.Init(state, functions, log)
 }
 
+// Validate checks that the entity's JSON decodes into T.
 func (a *TypedProviderAdapter[T]) Validate(ctx context.Context, entityData []byte) error {
-	// Create a new instance of type T to unmarshal into
-	var resource T
-
-	// Try to unmarshal JSON bytes into the concrete type
-	// This serves as basic validation - if it can't unmarshal, it's invalid
-	if err := json.Unmarshal(entityData, &resource); err != nil {
-		return err
-	}
-
-	// Additional validation could be added here by calling a Validate method
-	// on the resource if it implements a Validator interface
-
-	return nil
+	_, _, err := a.decode(entityData, false)
+	return err
 }
 
 func (a *TypedProviderAdapter[T]) Create(ctx context.Context, entityData []byte) ([]byte, error) {
-	// Create a new instance of type T to unmarshal into
-	var resource T
-
-	// Unmarshal JSON bytes into the concrete type
-	if err := json.Unmarshal(entityData, &resource); err != nil {
-		return nil, err
-	}
-
-	// Call the provider's Create method with the concrete type
-	// (provider was already initialized during registration)
-	mutatedResource, err := a.provider.Create(ctx, resource)
+	resource, stored, err := a.decode(entityData, false)
 	if err != nil {
 		return nil, err
 	}
 
-	// Serialize the mutated resource back to JSON
-	mutatedData, err := wire.Marshal(mutatedResource)
+	// the provider was initialized during registration
+	created, err := a.provider.Create(ctx, resource)
 	if err != nil {
 		return nil, err
 	}
 
-	return mutatedData, nil
+	return a.encode(created, stored)
 }
 
 func (a *TypedProviderAdapter[T]) Destroy(ctx context.Context, entityData []byte, force bool) error {
-	// Create a new instance of type T to unmarshal into
-	var resource T
-
-	// Unmarshal JSON bytes into the concrete type
-	if err := json.Unmarshal(entityData, &resource); err != nil {
+	resource, _, err := a.decode(entityData, false)
+	if err != nil {
 		return err
 	}
 
-	// Call the provider's Destroy method with the concrete type
-	// (provider was already initialized during registration)
 	return a.provider.Destroy(ctx, resource, force)
 }
 
 func (a *TypedProviderAdapter[T]) Read(ctx context.Context, oldEntityData []byte, newEntityData []byte) ([]byte, error) {
-	// Create instances for old and new resources, when no data is provided
-	// the resource is the zero value of T
-	var oldResource, newResource T
-
-	if oldEntityData != nil {
-		if err := json.Unmarshal(oldEntityData, &oldResource); err != nil {
-			return nil, err
-		}
-	}
-
-	if newEntityData != nil {
-		if err := json.Unmarshal(newEntityData, &newResource); err != nil {
-			return nil, err
-		}
-	}
-
-	// Call the provider's Read method with the concrete types, the error is
-	// returned unwrapped so that callers can check for ErrNotFound
-	readResource, err := a.provider.Read(ctx, oldResource, newResource)
+	// when no data is provided the resource is the zero value of T
+	oldResource, _, err := a.decode(oldEntityData, true)
 	if err != nil {
 		return nil, err
 	}
 
-	// Serialize the read resource back to JSON
-	readData, err := wire.Marshal(readResource)
+	newResource, stored, err := a.decode(newEntityData, true)
 	if err != nil {
 		return nil, err
 	}
 
-	return readData, nil
+	// the error is returned unwrapped so that callers can check for
+	// ErrNotFound
+	read, err := a.provider.Read(ctx, oldResource, newResource)
+	if err != nil {
+		return nil, err
+	}
+
+	return a.encode(read, stored)
 }
 
 func (a *TypedProviderAdapter[T]) Update(ctx context.Context, entityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) ([]byte, error) {
-	// Create a new instance of type T to unmarshal into
-	var resource T
-
-	// Unmarshal JSON bytes into the concrete type
-	if err := json.Unmarshal(entityData, &resource); err != nil {
-		return nil, err
-	}
-
-	// Call the provider's Update method with the concrete type
-	updatedResource, err := a.provider.Update(ctx, resource, changes, dependencies)
+	resource, stored, err := a.decode(entityData, false)
 	if err != nil {
 		return nil, err
 	}
 
-	// Serialize the updated resource back to JSON
-	updatedData, err := wire.Marshal(updatedResource)
+	updated, err := a.provider.Update(ctx, resource, changes, dependencies)
 	if err != nil {
 		return nil, err
 	}
 
-	return updatedData, nil
+	return a.encode(updated, stored)
 }
 
 func (a *TypedProviderAdapter[T]) Changed(ctx context.Context, oldEntityData []byte, newEntityData []byte, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
-	// Create instances for old and new resources
-	var oldResource, newResource T
-
-	// Unmarshal old resource data
-	if err := json.Unmarshal(oldEntityData, &oldResource); err != nil {
+	oldResource, _, err := a.decode(oldEntityData, false)
+	if err != nil {
 		return entity.NoChange, err
 	}
 
-	// Unmarshal new resource data
-	if err := json.Unmarshal(newEntityData, &newResource); err != nil {
+	newResource, _, err := a.decode(newEntityData, false)
+	if err != nil {
 		return entity.NoChange, err
 	}
 

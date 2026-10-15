@@ -13,7 +13,7 @@ import (
 
 // Vault is a plugin resource type with a supported sensitive field
 type Vault struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Token types.Sensitive[string] `xcl:"token" json:"token"`
 }
@@ -21,7 +21,7 @@ type Vault struct {
 // BadVault is a plugin resource type whose sensitive field uses an
 // instantiation the host cannot rebuild
 type BadVault struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Secret types.Sensitive[uint8] `xcl:"secret" json:"secret"`
 }
