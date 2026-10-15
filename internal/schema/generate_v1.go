@@ -89,7 +89,9 @@ func (g *generatorV1) fields(t reflect.Type, path string) ([]FieldV1, error) {
 			where = path + "." + sf.Name
 		}
 
-		if sf.Anonymous && sf.Type == resourceBaseField.Type {
+		// an entity's metadata, embedded or as a Meta field, is described by
+		// the entity form, see valueType, and added back by BuildTypeV1
+		if (sf.Anonymous && sf.Type == resourceBaseField.Type) || isMetaField(sf) {
 			continue
 		}
 
@@ -419,7 +421,7 @@ func (g *generatorV1) valueType(t reflect.Type, where string) (json.RawMessage, 
 
 			// an entity, as a reference to a block gives it, keeps its meta
 			form := "object"
-			if embedsResourceBase(t) {
+			if isEntity(t) {
 				form = "entity"
 			}
 
@@ -448,11 +450,16 @@ func holdsAny(t reflect.Type) bool {
 	return false
 }
 
-// embedsResourceBase reports whether t, a struct, is an entity type, embedding
-// types.ResourceBase itself or through a struct it embeds
-func embedsResourceBase(t reflect.Type) bool {
+// isEntity reports whether t, a struct, is an entity type: one holding its
+// metadata, in a Meta field or through types.ResourceBase, itself or in a
+// struct it embeds
+func isEntity(t reflect.Type) bool {
 	for i := range t.NumField() {
 		sf := t.Field(i)
+		if isMetaField(sf) {
+			return true
+		}
+
 		if !sf.Anonymous {
 			continue
 		}
@@ -462,12 +469,19 @@ func embedsResourceBase(t reflect.Type) bool {
 			embedded = embedded.Elem()
 		}
 
-		if embedded == resourceBaseField.Type || (embedded.Kind() == reflect.Struct && embedsResourceBase(embedded)) {
+		if embedded == resourceBaseField.Type || (embedded.Kind() == reflect.Struct && isEntity(embedded)) {
 			return true
 		}
 	}
 
 	return false
+}
+
+// isMetaField reports whether sf is a plain type's Meta field, which xcl
+// fills with the entity's metadata
+func isMetaField(sf reflect.StructField) bool {
+	_, tagged := sf.Tag.Lookup(tags.Name)
+	return sf.Name == "Meta" && sf.Type == metaField.Type && !tagged
 }
 
 // sensitiveInnerV1 maps every types.Sensitive instantiation sensitiveTypes holds

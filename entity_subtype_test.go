@@ -50,7 +50,7 @@ func TestFindResourceReachesAnEntityByTypeSubtypeAndName(t *testing.T) {
 	entity, err := c.FindResource("server.big.web")
 	require.NoError(t, err)
 
-	server, ok := entity.(*registered.Server)
+	server, ok := plainAs[registered.Server](entity)
 	require.True(t, ok, "expected *registered.Server, got %T", entity)
 	require.Equal(t, "eu-west", server.Location)
 }

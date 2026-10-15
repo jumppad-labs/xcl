@@ -19,7 +19,6 @@ import (
 	"github.com/jumppad-labs/xcl/plugins"
 	"github.com/jumppad-labs/xcl/plugins/example/pkg/person"
 	"github.com/jumppad-labs/xcl/registry"
-	"github.com/jumppad-labs/xcl/types"
 )
 
 // personConfiguration declares two people, the tests rename the first
@@ -145,7 +144,6 @@ func personApplyValues(t *testing.T, s *diffScenario) map[string]person.Person {
 		found, err := xcl.Find[person.Person](s.config, id)
 		require.NoError(t, err)
 
-		found.ResourceBase = types.ResourceBase{}
 		values[id] = *found
 	}
 
@@ -191,12 +189,16 @@ func TestPersonNameChangeLeavesTheSameValuesInProcessAndExternal(t *testing.T) {
 
 	expected := map[string]person.Person{
 		"resource.person.renamed": {
+			Subtype:   "person",
+			Name:      "renamed",
 			FirstName: "Augusta",
 			LastName:  "Lovelace",
 			Age:       36,
 			PersonID:  "person-augusta-lovelace",
 		},
 		"resource.person.kept": {
+			Subtype:   "person",
+			Name:      "kept",
 			FirstName: "Grace",
 			LastName:  "Hopper",
 			PersonID:  "person-grace-hopper",

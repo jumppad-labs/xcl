@@ -87,8 +87,8 @@ func TestDeclaredTypesDecodeIntoGoValues(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, target.Databases, 1)
-	require.Same(t, database, target.Databases[0])
+	require.Equal(t, database, target.Databases[0])
 
 	require.Len(t, target.Caches, 1)
-	require.Same(t, cache, target.Caches[0])
+	require.Equal(t, cache, target.Caches[0])
 }

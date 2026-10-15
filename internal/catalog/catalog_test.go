@@ -14,6 +14,7 @@ import (
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/cty"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/testutil"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -24,7 +25,7 @@ import (
 
 // Thing is a plain Go resource type used to test type registration
 type Thing struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Size int `xcl:"size" json:"size"`
 }
@@ -32,19 +33,37 @@ type Thing struct {
 // Gadget is a second plain Go resource type, used to check that a clash
 // leaves the first registered type in place
 type Gadget struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Colour string `xcl:"colour" json:"colour"`
 }
 
 // ComputedThing is a resource type with a computed field
 type ComputedThing struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Size int `xcl:"size" json:"size"`
 
 	// ProviderID is a computed field
 	ProviderID string `xcl:"provider_id,optional,computed" json:"provider_id,omitempty"`
+}
+
+// storedAs is the plain copy of entity, which must be stored as the type
+// built from T, as a program reading it back gets it
+func storedAs[T any](t *testing.T, entity any) *T {
+	t.Helper()
+
+	plain, ok := plaintype.PlainOf(reflect.TypeOf(entity))
+	require.True(t, ok, "expected the type built from %s, got %T", reflect.TypeFor[T](), entity)
+	require.Equal(t, reflect.TypeFor[T](), plain)
+
+	built, ok := plaintype.LookupPlain(plain)
+	require.True(t, ok)
+
+	copied, err := built.ToPlain(entity)
+	require.NoError(t, err)
+
+	return copied.(*T)
 }
 
 // NotAResource is a struct that does not embed types.ResourceBase
@@ -192,9 +211,8 @@ func createThing(t *testing.T, c *Catalog) {
 	data, err := json.Marshal(&Thing{Size: 1})
 	require.NoError(t, err)
 
-	thing := &Thing{}
-	thing.Meta.Type = types.TypeResource
-	thing.Meta.Subtype = "thing"
+	thing, err := c.CreateEntity(types.TypeResource, "thing", "one")
+	require.NoError(t, err)
 
 	provider := c.GetProvider(thing)
 	require.NotNil(t, provider, "no loaded plugin provides the type thing")
@@ -222,8 +240,7 @@ func TestCreateResourceReturnsRegisteredGoType(t *testing.T) {
 	resource, err := c.CreateEntity("resource", "thing", "my_thing")
 	require.NoError(t, err)
 
-	thing, ok := resource.(*Thing)
-	require.True(t, ok, "expected *Thing, got %T", resource)
+	thing := storedAs[Thing](t, resource)
 	require.Equal(t, "my_thing", thing.Meta.Name)
 	require.Equal(t, types.TypeResource, thing.Meta.Type)
 	require.Equal(t, "thing", thing.Meta.Subtype)
@@ -280,8 +297,7 @@ func TestDeclareTypeFailureForDuplicateNameKeepsTheFirstType(t *testing.T) {
 	resource, err := c.CreateEntity("resource", "thing", "my_thing")
 	require.NoError(t, err)
 
-	thing, ok := resource.(*Thing)
-	require.True(t, ok, "expected *Thing, got %T", resource)
+	thing := storedAs[Thing](t, resource)
 	require.Equal(t, "my_thing", thing.Meta.Name)
 }
 
@@ -357,8 +373,7 @@ func TestRegisterTypeAcceptsComputedField(t *testing.T) {
 	resource, err := c.CreateEntity("resource", "computed_thing", "my_thing")
 	require.NoError(t, err)
 
-	thing, ok := resource.(*ComputedThing)
-	require.True(t, ok, "expected *ComputedThing, got %T", resource)
+	thing := storedAs[ComputedThing](t, resource)
 	require.Equal(t, "my_thing", thing.Meta.Name)
 	require.Equal(t, types.TypeResource, thing.Meta.Type)
 	require.Equal(t, "computed_thing", thing.Meta.Subtype)
@@ -518,8 +533,7 @@ func TestCreateEntityWithoutASubtypeMakesTheTypeItsOwn(t *testing.T) {
 	entity, err := c.CreateEntity("thing", "", "my_thing")
 	require.NoError(t, err)
 
-	thing, ok := entity.(*Thing)
-	require.True(t, ok, "expected *Thing, got %T", entity)
+	thing := storedAs[Thing](t, entity)
 	require.Equal(t, "my_thing", thing.Meta.Name)
 	require.Equal(t, "thing", thing.Meta.Type)
 	require.Equal(t, "", thing.Meta.Subtype)
@@ -533,8 +547,7 @@ func TestCreateEntityWithASubtypeOfAnyTypeSetsBoth(t *testing.T) {
 	entity, err := c.CreateEntity("server", "big", "web")
 	require.NoError(t, err)
 
-	thing, ok := entity.(*Thing)
-	require.True(t, ok, "expected *Thing, got %T", entity)
+	thing := storedAs[Thing](t, entity)
 	require.Equal(t, "web", thing.Meta.Name)
 	require.Equal(t, "server", thing.Meta.Type)
 	require.Equal(t, "big", thing.Meta.Subtype)
@@ -548,8 +561,7 @@ func TestCreateEntityUnderTheResourceTypeSetsBoth(t *testing.T) {
 	entity, err := c.CreateEntity("resource", "thing", "my_thing")
 	require.NoError(t, err)
 
-	thing, ok := entity.(*Thing)
-	require.True(t, ok, "expected *Thing, got %T", entity)
+	thing := storedAs[Thing](t, entity)
 	require.Equal(t, types.TypeResource, thing.Meta.Type)
 	require.Equal(t, "thing", thing.Meta.Subtype)
 }
@@ -1385,7 +1397,7 @@ func TestUseStopsPluginsStartedBeforeAFailedLoad(t *testing.T) {
 // BadBlockThing is a resource type whose block field is a string, which
 // cannot hold blocks
 type BadBlockThing struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Listener string `xcl:"listener,block"`
 }
@@ -1397,7 +1409,7 @@ type VolumeBlock struct {
 
 // MappedBlocksThing is a resource type that collects its blocks into a map
 type MappedBlocksThing struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Volumes map[string]VolumeBlock `xcl:"volume,block"`
 }

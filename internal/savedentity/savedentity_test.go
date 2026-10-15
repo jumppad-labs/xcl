@@ -13,12 +13,14 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/jumppad-labs/xcl"
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/parser"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
@@ -28,6 +30,22 @@ import (
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
+
+// plainAs is the plain copy of entity, a stored entity of the plain type T,
+// as a program is handed it, and false when entity is not one
+func plainAs[T any](entity any) (*T, bool) {
+	built, ok := plaintype.LookupPlain(reflect.TypeFor[T]())
+	if !ok {
+		return nil, false
+	}
+
+	plain, err := built.ToPlain(entity)
+	if err != nil {
+		return nil, false
+	}
+
+	return plain.(*T), true
+}
 
 // registeredConfig declares a variable, a resource carrying a variety, a module
 // and, inside that module, a further resource and an output. Between them they
@@ -164,7 +182,7 @@ func TestDecodeReturnsTypedRegisteredEntity(t *testing.T) {
 	entity, err := savedentity.Decode(reg, record, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
-	database, ok := entity.(*registered.Database)
+	database, ok := plainAs[registered.Database](entity)
 	require.True(t, ok)
 
 	require.Equal(t, "resource.database.main", database.Meta.ID)
@@ -426,7 +444,7 @@ func TestDecodeOpensAESEnvelopeWithTheSameMasker(t *testing.T) {
 	entity, err := savedentity.Decode(reg, record, savedentity.ReadOptions{Mask: masker})
 	require.NoError(t, err)
 
-	secret, ok := entity.(*registered.Secret)
+	secret, ok := plainAs[registered.Secret](entity)
 	require.True(t, ok, "expected *registered.Secret, got %T", entity)
 
 	require.Equal(t, testSecretID, secret.Meta.ID)
@@ -541,7 +559,7 @@ func TestDecodeForDisplayGivesTheMarkerForAESEnvelope(t *testing.T) {
 	entity, err := savedentity.Decode(reg, record, savedentity.ReadOptions{ForDisplay: true})
 	require.NoError(t, err)
 
-	secret, ok := entity.(*registered.Secret)
+	secret, ok := plainAs[registered.Secret](entity)
 	require.True(t, ok, "expected *registered.Secret, got %T", entity)
 
 	require.True(t, types.IsRedacted(secret.Password))
@@ -576,7 +594,7 @@ func TestDecodeForDisplayGivesTheMarkerForHMACEnvelope(t *testing.T) {
 	entity, err := savedentity.Decode(reg, record, savedentity.ReadOptions{ForDisplay: true})
 	require.NoError(t, err)
 
-	secret, ok := entity.(*registered.Secret)
+	secret, ok := plainAs[registered.Secret](entity)
 	require.True(t, ok, "expected *registered.Secret, got %T", entity)
 
 	require.True(t, types.IsRedacted(secret.Password))
@@ -599,7 +617,7 @@ func TestDecodeReadsPlainRecordWithoutAMasker(t *testing.T) {
 	entity, err := savedentity.Decode(reg, record, savedentity.ReadOptions{})
 	require.NoError(t, err)
 
-	secret, ok := entity.(*registered.Secret)
+	secret, ok := plainAs[registered.Secret](entity)
 	require.True(t, ok, "expected *registered.Secret, got %T", entity)
 
 	require.Equal(t, testSecretID, secret.Meta.ID)
@@ -618,7 +636,7 @@ func TestDecodeReadsPlainRecordWithAnAESMasker(t *testing.T) {
 	entity, err := savedentity.Decode(reg, record, savedentity.ReadOptions{Mask: testAESMasker(t, 1)})
 	require.NoError(t, err)
 
-	secret, ok := entity.(*registered.Secret)
+	secret, ok := plainAs[registered.Secret](entity)
 	require.True(t, ok, "expected *registered.Secret, got %T", entity)
 
 	require.Equal(t, testSecretID, secret.Meta.ID)

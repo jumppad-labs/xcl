@@ -27,7 +27,8 @@ import (
 // Template defines the block type template, a Handlebars template rendered to
 // a file
 type Template struct {
-	types.ResourceBase `xcl:",remain"`
+	// Meta is the block's metadata, which the status view reads
+	Meta types.Meta
 
 	// Source is the Handlebars template text, use file() to read it from a
 	// file

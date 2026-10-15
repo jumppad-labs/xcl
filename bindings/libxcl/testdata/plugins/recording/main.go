@@ -22,7 +22,7 @@ import (
 
 // Recording is the block type resource "recording" "<name>" {}
 type Recording struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	// Log is the path of the file every lifecycle call appends its record to
 	Log string `xcl:"log" json:"log"`

@@ -61,7 +61,7 @@ func applyWebApp(t *testing.T, h *registeredHarness, source string) *registered.
 	entity, err := findByID(st.GetResources(), "app.web")
 	require.NoError(t, err)
 
-	app, ok := entity.(*registered.WebApp)
+	app, ok := plainAs[registered.WebApp](entity)
 	require.True(t, ok, "expected *registered.WebApp, got %T", entity)
 
 	return app

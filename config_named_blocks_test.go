@@ -9,7 +9,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
-	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -321,11 +320,8 @@ func TestApplyResolvesReferenceToNamedBlock(t *testing.T) {
 
 	require.Equal(t, 443, gateway.Port)
 
-	meta, err := types.GetMeta(gateway)
-	require.NoError(t, err)
-
-	require.Equal(t, []string{"app.web.listener.https.port"}, meta.Links)
-	require.Equal(t, "app.web.listener.https.port", meta.References["port"])
+	require.Equal(t, []string{"app.web.listener.https.port"}, gateway.Meta.Links)
+	require.Equal(t, "app.web.listener.https.port", gateway.Meta.References["port"])
 }
 
 func TestApplyEvaluatesForOverNamedBlocks(t *testing.T) {
@@ -337,10 +333,7 @@ func TestApplyEvaluatesForOverNamedBlocks(t *testing.T) {
 
 	require.Equal(t, map[string]int{"http": 80, "https": 443}, gateway.Ports)
 
-	meta, err := types.GetMeta(gateway)
-	require.NoError(t, err)
-
-	require.Equal(t, []string{"app.web.listener"}, meta.Links)
+	require.Equal(t, []string{"app.web.listener"}, gateway.Meta.Links)
 }
 
 func TestApplyRecordsReferenceInsideNamedBlockByName(t *testing.T) {
@@ -352,18 +345,16 @@ func TestApplyRecordsReferenceInsideNamedBlockByName(t *testing.T) {
 
 	require.Equal(t, 443, app.Listeners["https"].Port)
 
-	meta, err := types.GetMeta(app)
-	require.NoError(t, err)
-
-	require.Equal(t, map[string]string{`listener["https"].port`: "variable.https_port"}, meta.References)
-	require.Equal(t, []string{"variable.https_port"}, meta.Links)
+	require.Equal(t, map[string]string{`listener["https"].port`: "variable.https_port"}, app.Meta.References)
+	require.Equal(t, []string{"variable.https_port"}, app.Meta.Links)
 }
 
 func TestEncodeEntityWritesReferenceBackInsideNamedBlock(t *testing.T) {
 	f := setupNamedBlocks(t)
 	c := f.applyConfig(t, referenceInsideNamedBlockConfig)
 
-	app, err := Find[registered.WebApp](c, "app.web")
+	// the entity the configuration stores, which knows what it was declared as
+	app, err := c.FindResource("app.web")
 	require.NoError(t, err)
 
 	out, err := EncodeEntity(app, ShowReferences())

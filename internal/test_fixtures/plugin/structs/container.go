@@ -10,8 +10,8 @@ const TypeSidecar = "sidecar"
 
 // Container defines a structure for creating Docker containers
 type ContainerBase struct {
-	// embedded type holding name, etc
-	types.ResourceBase `xcl:"rm,remain"`
+	// Meta is the block's metadata, its label among it
+	Meta types.Meta
 
 	Default string `xcl:"default,optional" json:"default,omitempty" default:"hello world"` // A default value
 

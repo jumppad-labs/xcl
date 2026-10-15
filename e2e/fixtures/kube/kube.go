@@ -15,7 +15,7 @@ import "github.com/jumppad-labs/xcl/types"
 // ahead of time, and a single value can be read from it with
 // `config_map.api.data.db_host`.
 type ConfigMap struct {
-	types.ResourceBase `xcl:",remain"`
+	Name string `xcl:"name,label" json:"name"`
 
 	Data map[string]string `xcl:"data" json:"data"`
 }
@@ -28,7 +28,7 @@ type ConfigMap struct {
 // one through a secret_key_ref naming the secret and the key, which are plain
 // strings, so the deployment never becomes sensitive itself.
 type Secret struct {
-	types.ResourceBase `xcl:",remain"`
+	Name string `xcl:"name,label" json:"name"`
 
 	Data types.Sensitive[map[string]string] `xcl:"data" json:"data"`
 }
@@ -36,7 +36,7 @@ type Secret struct {
 // Deployment defines the block type `deployment`. It holds repeated container
 // blocks, each of which nests further blocks of its own.
 type Deployment struct {
-	types.ResourceBase `xcl:",remain"`
+	Name string `xcl:"name,label" json:"name"`
 
 	Replicas int `xcl:"replicas,optional" json:"replicas,omitempty"`
 
@@ -134,7 +134,7 @@ type Volume struct {
 // does, so the service names the deployment by its id and reads the port out
 // of it, and the two can not drift apart.
 type Service struct {
-	types.ResourceBase `xcl:",remain"`
+	Name string `xcl:"name,label" json:"name"`
 
 	Deployment string `xcl:"deployment" json:"deployment"`
 	Port       int    `xcl:"port" json:"port"`
@@ -143,7 +143,7 @@ type Service struct {
 
 // Ingress defines the block type `ingress`, it routes a host to a service
 type Ingress struct {
-	types.ResourceBase `xcl:",remain"`
+	Name string `xcl:"name,label" json:"name"`
 
 	Host  string `xcl:"host" json:"host"`
 	Rules []Rule `xcl:"rule,block" json:"rule"`

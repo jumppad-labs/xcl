@@ -10,7 +10,7 @@ import "github.com/jumppad-labs/xcl/types"
 // Network defines the block type docker "network", a Docker bridge network
 // named after the block
 type Network struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	// Subnet is the network's address range, i.e. 10.42.0.0/24. When it is
 	// not set Docker picks one.

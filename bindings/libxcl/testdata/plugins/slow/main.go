@@ -17,7 +17,7 @@ import (
 
 // Slow is the block type resource "slow" "<name>" {}
 type Slow struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	// DelayMs is how long create, update and destroy take, in milliseconds
 	DelayMs int `xcl:"delay_ms,optional" json:"delay_ms,omitempty" default:"500"`

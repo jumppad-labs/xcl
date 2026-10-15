@@ -26,7 +26,7 @@ import (
 // greetingEntity matches the fixture plugin's Greeting, it is the in-process
 // plugin's type and the type an external greeting is read back into
 type greetingEntity struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	// Target is the value to greet, configuration sets it from greet(...)
 	Target string `xcl:"target" json:"target"`

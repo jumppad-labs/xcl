@@ -565,7 +565,7 @@ func TestStateWithoutReferencesStillLoads(t *testing.T) {
 
 	var database *registered.Database
 	for _, entity := range loaded {
-		candidate, ok := entity.(*registered.Database)
+		candidate, ok := plainAs[registered.Database](entity)
 		if ok && candidate.Meta.ID == encodeDatabaseID {
 			database = candidate
 		}
@@ -599,8 +599,9 @@ func TestStateWithoutReferencesStillLoads(t *testing.T) {
 	err = second.Apply(path)
 	require.NoError(t, err)
 
-	applied := encodeEntityByID(t, second, encodeDatabaseID)
-	require.Equal(t, "us-east", applied.(*registered.Database).Location)
+	applied, ok := plainAs[registered.Database](encodeEntityByID(t, second, encodeDatabaseID))
+	require.True(t, ok)
+	require.Equal(t, "us-east", applied.Location)
 }
 
 // TestApplyPerformsProviderDecidedReplacement changes the api container's

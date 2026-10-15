@@ -1,6 +1,7 @@
 package xcl
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -84,8 +85,10 @@ func asType(entity any, want reflect.Type) (any, error) {
 
 	// an entity of a plain type is held as the type built from it, and is
 	// handed back as the plain type it was declared with, labels included;
-	// like any registered type it converts into nothing else
-	if built, ok := plaintype.Lookup(reflect.TypeOf(entity)); ok {
+	// like any registered type it converts into nothing else. A type built
+	// from a schema, a plugin's or another language's, is unnamed and has no
+	// Go type of its own here, so it converts as any entity does, below
+	if built, ok := plaintype.Lookup(reflect.TypeOf(entity)); ok && built.Plain.Name() != "" {
 		if built.Plain != want {
 			return nil, &xclerrors.TypeMismatchError{
 				Address: entityAddress(entity),
@@ -471,7 +474,14 @@ func all[T any](c *Config) ([]*T, error) {
 // how it was registered, refusing a type with no address of its own and one
 // the registry cannot reach, such as a plugin provided type.
 func (c *Config) typePath(want reflect.Type) ([]string, error) {
+	// with no path to go by, a plain struct nothing registered may be a
+	// plugin's type as much as a nested block, so both are named
 	if err := c.addressableType(want); err != nil {
+		var notEntity *xclerrors.NotAnEntityError
+		if errors.As(err, &notEntity) {
+			return nil, &xclerrors.NotRegisteredError{Type: want, Use: "FindByType with the type and subtype", MayBeNested: true}
+		}
+
 		return nil, err
 	}
 

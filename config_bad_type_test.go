@@ -22,14 +22,14 @@ import (
 // badType is a declared type whose block field is a string, which cannot
 // hold blocks
 type badType struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Listener string `xcl:"listener,block"`
 }
 
 // badPluginType is the same shape, provided by an in-process plugin
 type badPluginType struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Listener string `xcl:"listener,block"`
 }

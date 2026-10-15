@@ -64,19 +64,22 @@ plugins.RegisterResourceProvider(&p.PluginBase, log, state, "container", "", &Co
   {}` gives `Name` the value `web`. A type registered with a subtype takes
   two label fields, the subtype and the label. Configuration cannot set them.
 - A field called `Meta`, a `types.Meta` with no tag, receives the entity's
-  metadata, such as `Meta.ID`. Changes the provider makes to
-  `Meta.Properties` are kept.
-- Fields tagged `disabled` (a `bool`) or `depends_on` (a `[]string`) receive
-  the values every block has.
+  metadata, such as `Meta.ID`, and the `disabled` flag and `depends_on`
+  list configuration set on the block, as `Meta.Disabled` and
+  `Meta.DependsOn`. Changes the provider makes to `Meta.Properties` are
+  kept; the disabled flag and dependencies are configuration's, and changes
+  to them are not.
 - A type with neither label fields nor a `Meta` field cannot read a label,
   so it is a singleton: its block is written without labels, `hub { … }`, a
   module holds one of it, and it is addressed by its type alone, `hub.address`.
   A singleton takes no subtype.
 
-xcl stores the entity as a type built from yours, and converts it to and
-from your struct around every provider call, so the provider only ever sees
-`T`. A struct embedding `types.ResourceBase` is still accepted and used as it
-is; it is always named.
+Every block takes `disabled` and `depends_on` in configuration, so a type
+declares no fields by those names, nor `meta`. xcl stores the entity as a
+type built from yours, which embeds `types.ResourceBase`, and converts it to
+and from your struct around every provider call, so the provider only ever
+sees `T`. A type of your own that embeds `types.ResourceBase` is refused when
+it is registered.
 
 ### How the host sees the type
 

@@ -119,25 +119,22 @@ func destroyContext(recorder *eventRecorder) context.Context {
 	return plugins.WithLogger(context.Background(), callLogger)
 }
 
-// loggingTestPerson is the person created by the logging tests
+// loggingTestPerson is the person created by the logging tests, as the host
+// sends an entity to a provider: its fields beside its meta
 func loggingTestPerson(t *testing.T) []byte {
 	t.Helper()
 
-	p := &person.Person{
-		ResourceBase: types.ResourceBase{
-			Meta: types.Meta{
-				ID:      "test-person",
-				Type:    "resource",
-				Subtype: "person",
-				Name:    "john",
-			},
+	personJSON, err := json.Marshal(map[string]any{
+		"meta": types.Meta{
+			ID:      "test-person",
+			Type:    "resource",
+			Subtype: "person",
+			Name:    "john",
 		},
-		FirstName: "John",
-		LastName:  "Doe",
-		Age:       30,
-	}
-
-	personJSON, err := json.Marshal(p)
+		"first_name": "John",
+		"last_name":  "Doe",
+		"age":        30,
+	})
 	require.NoError(t, err)
 
 	return personJSON

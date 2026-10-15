@@ -361,8 +361,7 @@ func TestContextValueMakesComputedFieldsOfPendingEntityUnknown(t *testing.T) {
 	recorder := newDiffRecorder()
 	recorder.markPending(diffUnknownNetworkTwoID)
 
-	network := &structs.Network{Subnet: "10.1.0.0/16"}
-	network.Meta = types.Meta{ID: diffUnknownNetworkTwoID}
+	network := storedPluginEntity(structs.Network{}, structs.TypeNetwork, diffUnknownNetworkTwoID)
 
 	value := cty.ObjectVal(map[string]cty.Value{
 		"subnet":      cty.StringVal("10.1.0.0/16"),
@@ -380,8 +379,7 @@ func TestContextValueMakesComputedFieldsOfPendingEntityUnknown(t *testing.T) {
 func TestContextValueLeavesEntityThatIsNotPendingAsItIs(t *testing.T) {
 	recorder := newDiffRecorder()
 
-	network := &structs.Network{Subnet: "10.0.0.0/16", ProviderID: "id-one"}
-	network.Meta = types.Meta{ID: diffUnknownNetworkOneID}
+	network := storedPluginEntity(structs.Network{}, structs.TypeNetwork, diffUnknownNetworkOneID)
 
 	value := cty.ObjectVal(map[string]cty.Value{
 		"subnet":      cty.StringVal("10.0.0.0/16"),
@@ -398,8 +396,7 @@ func TestContextValueMakesComputedFieldOfEveryNestedBlockUnknown(t *testing.T) {
 	recorder := newDiffRecorder()
 	recorder.markPending(diffUnknownUserID)
 
-	container := &structs.Container{}
-	container.Meta = types.Meta{ID: diffUnknownUserID}
+	container := storedPluginEntity(structs.Container{}, structs.TypeContainer, diffUnknownUserID)
 
 	attachment := func(name string) cty.Value {
 		return cty.ObjectVal(map[string]cty.Value{
@@ -430,8 +427,7 @@ func TestContextValueMakesRecordedUnknownPathOfSavedEntityUnknown(t *testing.T) 
 		diff.Path{}.Attribute("network").Index(0).Attribute("name"),
 	})
 
-	container := &structs.Container{}
-	container.Meta = types.Meta{ID: diffUnknownUserID}
+	container := storedPluginEntity(structs.Container{}, structs.TypeContainer, diffUnknownUserID)
 
 	value := cty.ObjectVal(map[string]cty.Value{
 		"default": cty.StringVal(diffUnknownDefaultContainer),
