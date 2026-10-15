@@ -241,3 +241,184 @@ client "web" {
 	_, err = Find[plain.Client](c, "module.two.client.web")
 	require.NoError(t, err)
 }
+
+func TestEachInstanceOfAModuleHoldsASingletonOfItsOwn(t *testing.T) {
+	dir := writeSingletonFiles(t, map[string]string{
+		"main.xcl": `
+module "one" {
+  source = "./shared"
+}
+
+module "two" {
+  source = "./shared"
+}
+`,
+		"shared/main.xcl": `
+runner {
+  server = "https://example.com"
+}
+`,
+	})
+
+	c, err := NewConfig(WithRegistry(singletonRegistry()), WithStatePath(t.TempDir()))
+	require.NoError(t, err)
+	require.NoError(t, c.Apply(dir))
+
+	_, err = Find[plain.Runner](c, "module.one.runner")
+	require.NoError(t, err)
+
+	_, err = Find[plain.Runner](c, "module.two.runner")
+	require.NoError(t, err)
+}
+
+func TestRootSingletonIsPassedIntoAModule(t *testing.T) {
+	dir := writeSingletonFiles(t, map[string]string{
+		"main.xcl": `
+runner {
+  server = "https://maalstrom.app"
+}
+
+module "nas" {
+  source = "./nas"
+
+  variables = {
+    server = runner.server
+  }
+}
+`,
+		"nas/main.xcl": `
+variable "server" {
+  default = ""
+}
+
+client "web" {
+  server = variable.server
+}
+`,
+	})
+
+	c, err := NewConfig(WithRegistry(singletonRegistry()), WithStatePath(t.TempDir()))
+	require.NoError(t, err)
+	require.NoError(t, c.Apply(dir))
+
+	client, err := Find[plain.Client](c, "module.nas.client.web")
+	require.NoError(t, err)
+	require.Equal(t, "https://maalstrom.app", client.Server)
+}
+
+func TestSingletonInAModuleCannotBeReferencedFromOutsideIt(t *testing.T) {
+	dir := writeSingletonFiles(t, map[string]string{
+		"main.xcl": `
+module "nas" {
+  source = "./nas"
+}
+
+client "web" {
+  server = module.nas.runner.server
+}
+`,
+		"nas/main.xcl": `
+runner {
+  server = "https://maalstrom.app"
+}
+`,
+	})
+
+	c, err := NewConfig(WithRegistry(singletonRegistry()), WithStatePath(t.TempDir()))
+	require.NoError(t, err)
+
+	err = c.Validate(dir)
+	require.Error(t, err)
+
+	d := requireDiagnostic(t, err)
+	require.Contains(t, d.Detail, "'module.nas.runner.server', which is inside module 'nas'; only a module's outputs can be referenced from outside it")
+	require.NotContains(t, d.Detail, "not defined")
+}
+
+func TestDependsOnASingletonInAModuleIsRefused(t *testing.T) {
+	dir := writeSingletonFiles(t, map[string]string{
+		"main.xcl": `
+module "nas" {
+  source = "./nas"
+}
+
+client "web" {
+  depends_on = ["module.nas.runner"]
+
+  server = "https://example.com"
+}
+`,
+		"nas/main.xcl": `
+runner {
+  server = "https://maalstrom.app"
+}
+`,
+	})
+
+	c, err := NewConfig(WithRegistry(singletonRegistry()), WithStatePath(t.TempDir()))
+	require.NoError(t, err)
+
+	err = c.Validate(dir)
+	require.Error(t, err)
+
+	d := requireDiagnostic(t, err)
+	require.Contains(t, d.Detail, "'module.nas.runner', which is inside module 'nas'; only a module's outputs can be referenced from outside it")
+}
+
+func TestSingletonDeclaredTwiceInAModuleIsRefused(t *testing.T) {
+	dir := writeSingletonFiles(t, map[string]string{
+		"main.xcl": `
+module "nas" {
+  source = "./nas"
+}
+`,
+		"nas/main.xcl": `
+runner {
+  server = "https://maalstrom.app"
+}
+
+runner {
+  server = "https://example.com"
+}
+`,
+	})
+
+	c, err := NewConfig(WithRegistry(singletonRegistry()), WithStatePath(t.TempDir()))
+	require.NoError(t, err)
+
+	err = c.Validate(dir)
+	require.Error(t, err)
+
+	d := requireDiagnostic(t, err)
+	require.Contains(t, d.Error(), "Duplicate block")
+	require.Equal(t, filepath.Join(dir, "nas", "main.xcl"), d.Subject.Filename)
+	require.Equal(t, 6, d.Subject.Start.Line)
+}
+
+func TestSingletonInAModuleSurvivesSavedState(t *testing.T) {
+	dir := writeSingletonFiles(t, map[string]string{
+		"main.xcl": `
+module "nas" {
+  source = "./nas"
+}
+`,
+		"nas/main.xcl": `
+runner {
+  server = "https://maalstrom.app"
+}
+`,
+	})
+	state := t.TempDir()
+
+	c, err := NewConfig(WithRegistry(singletonRegistry()), WithStatePath(state))
+	require.NoError(t, err)
+	require.NoError(t, c.Apply(dir))
+
+	loaded, err := NewConfig(WithRegistry(singletonRegistry()), WithStatePath(state))
+	require.NoError(t, err)
+	require.NoError(t, loaded.Load())
+
+	runner, err := Find[plain.Runner](loaded, "module.nas.runner")
+	require.NoError(t, err)
+	require.Equal(t, "https://maalstrom.app", runner.Server)
+}
