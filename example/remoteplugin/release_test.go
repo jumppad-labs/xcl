@@ -67,7 +67,7 @@ func (e *buildError) Error() string {
 func useFakeRelease(t *testing.T) {
 	t.Helper()
 
-	release := testutil.NewFakeGitHubRelease(t, "jumppad-labs/xcl-plugin-docker", "v0.2.0", builtDockerPlugin(t))
+	release := testutil.NewFakeGitHubRelease(t, dockerPluginRepository, dockerPluginVersion, builtDockerPlugin(t))
 
 	key := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, release.PublicKey())

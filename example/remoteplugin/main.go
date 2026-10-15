@@ -142,7 +142,7 @@ func newConfig(handler xcl.EventHandler, stateDir string) (*xcl.Config, error) {
 
 	github := registry.NewGitHub(options...)
 
-	github.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v0.2.0")
+	github.RegisterPlugin(dockerPluginRepository, dockerPluginVersion)
 
 	return xcl.NewConfig(
 		xcl.WithRegistry(github),
@@ -156,6 +156,13 @@ func newConfig(handler xcl.EventHandler, stateDir string) (*xcl.Config, error) {
 		xcl.WithEventData(xcl.EventDataProcessed),
 	)
 }
+
+// dockerPluginRepository and dockerPluginVersion name the Docker plugin
+// release the example installs
+const (
+	dockerPluginRepository = "jumppad-labs/xcl-plugin-docker"
+	dockerPluginVersion    = "v0.3.0"
+)
 
 // releaseKeyURL is where the public key that signs jumppad-labs plugin
 // releases is published
