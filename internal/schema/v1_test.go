@@ -807,17 +807,15 @@ func TestIsV1RecognisesVersionOne(t *testing.T) {
 	require.True(t, IsV1([]byte(`{"schema_version": 1, "type": "container", "fields": []}`)))
 }
 
-func TestIsV1RejectsLegacySchema(t *testing.T) {
-	type holder struct {
-		types.ResourceBase `xcl:",remain"`
+func TestIsV1RejectsADocumentWithoutAVersion(t *testing.T) {
+	require.False(t, IsV1([]byte(`{"type": "container", "properties": [{"name": "Image", "type": "string"}]}`)))
+}
 
-		Image string `xcl:"image"`
-	}
+func TestCreateInstanceFromSchemaRefusesADocumentWithoutAVersion(t *testing.T) {
+	_, err := CreateInstanceFromSchema([]byte(`{"type": "container", "properties": []}`))
 
-	data, err := GenerateSchemaFromInstance(holder{}, 10)
-	require.NoError(t, err)
-
-	require.False(t, IsV1(data))
+	require.Error(t, err)
+	require.ErrorContains(t, err, "not a schema v1 document")
 }
 
 func TestIsV1RejectsOtherVersion(t *testing.T) {
@@ -862,7 +860,7 @@ func TestCreateInstanceFromSchemaRoutesV1(t *testing.T) {
 		"fields": [
 			{"name": "image", "type": "string"}
 		]
-	}`), KnownTypes())
+	}`))
 	require.NoError(t, err)
 	require.NotNil(t, instance)
 
@@ -891,34 +889,8 @@ func TestCreateInstanceFromSchemaV1InvalidFails(t *testing.T) {
 		"fields": [
 			{"name": "image", "type": "text"}
 		]
-	}`), KnownTypes())
+	}`))
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "image")
-}
-
-func TestCreateInstanceFromSchemaKeepsLegacy(t *testing.T) {
-	type holder struct {
-		types.ResourceBase `xcl:",remain"`
-
-		Image string `xcl:"image" json:"image"`
-	}
-
-	data, err := GenerateSchemaFromInstance(holder{}, 10)
-	require.NoError(t, err)
-
-	rebuilt, err := CreateInstanceFromSchema(data, KnownTypes())
-	require.NoError(t, err)
-
-	rebuiltType := reflect.TypeOf(rebuilt)
-	require.Equal(t, reflect.Pointer, rebuiltType.Kind())
-	require.Equal(t, reflect.Struct, rebuiltType.Elem().Kind())
-
-	first := rebuiltType.Elem().Field(0)
-	require.Equal(t, "ResourceBase", first.Name)
-	require.True(t, first.Anonymous)
-
-	image := fieldByName(t, rebuiltType.Elem(), "Image")
-	require.Equal(t, reflect.TypeOf(""), image.Type)
-	require.Equal(t, "image", image.Tag.Get("xcl"))
 }

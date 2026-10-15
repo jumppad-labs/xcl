@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/internal/schema"
@@ -17,7 +18,7 @@ type credentialFixture struct {
 }
 
 func TestParseHCLFileDecodesSensitiveFields(t *testing.T) {
-	pluginSchema, err := schema.GenerateSchemaFromInstance(&credentialFixture{}, 10)
+	pluginSchema, err := schema.GenerateV1(reflect.TypeFor[credentialFixture](), "resource", "credential", false)
 	require.NoError(t, err)
 
 	result := ParseHCLFile(t, "testdata/credential.xcl", pluginSchema, credentialFixture{})

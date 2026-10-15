@@ -271,9 +271,10 @@ This does three things:
 1. Wraps `provider` in a `TypedProviderAdapter[T]` and calls `Init` on it,
    passing on `logger`, the plugin scoped logger the plugin's own `Init` was
    given.
-2. Generates a JSON schema from `resourceInstance` via
-   `schema.GenerateSchemaFromInstance` (reflects over the struct — see
-   `internal/schema/serialize.go`).
+2. Describes the type as a schema v1 document via `schema.GenerateV1`,
+   which reads the tags of the type the engine stores (see
+   `internal/schema/generate_v1.go`). A field it cannot describe fails the
+   registration, naming the field.
 3. Appends a `RegisteredType{Type, SubType, Schema, Adapter}` to
    `PluginBase.registeredTypes`.
 
@@ -302,6 +303,11 @@ entity of a given type needs to be *instantiated* from HCL (not just
 passed through as `[]byte`), the host reconstructs a Go type dynamically
 from the schema via `schema.CreateInstanceFromSchema` — see
 [`internal/catalog/catalog.go:createEntityFromPlugins`](../internal/catalog/catalog.go).
+It is the same schema v1 a host in another language declares its types with,
+so a plugin's types and an application's are built the same way. A block
+type that holds itself is described once among the document's
+`definitions` and built `schema.MaxNestingDepth` blocks deep, which is as
+deep as configuration nests blocks.
 
 ## Registries and the catalog — tying it together
 

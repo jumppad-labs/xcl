@@ -18,10 +18,13 @@ import (
 // carries the xcl, json and default tags t carries, so configuration decodes
 // into it as it does into t, and the JSON of one decodes into the other.
 //
-// An embedded struct's fields are described as the type's own. A shape the
-// document cannot describe is an error naming the field: a field without an
-// xcl tag, a json name other than its xcl name, a map keyed by anything but a
-// string, and a sensitive value KnownTypes does not hold.
+// An embedded struct's fields are described as the type's own. A block
+// element that holds itself, directly or through other blocks, is described
+// once among the document's definitions, named after its block, and referred
+// to wherever it is used. A shape the document cannot describe is an error
+// naming the field: a field without an xcl tag, a json name other than its
+// xcl name, a map keyed by anything but a string, a value that holds itself,
+// and a sensitive value of a type sensitiveTypes does not hold.
 func GenerateV1(t reflect.Type, typeName, subtype string, singleton bool) ([]byte, error) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
@@ -31,24 +34,51 @@ func GenerateV1(t reflect.Type, typeName, subtype string, singleton bool) ([]byt
 		return nil, fmt.Errorf("%s is not a struct", t)
 	}
 
-	fields, err := generateFieldsV1(t, "")
+	g := &generatorV1{
+		inside:      map[reflect.Type]string{t: ""},
+		recurring:   map[reflect.Type]string{},
+		definitions: map[string][]FieldV1{},
+	}
+
+	fields, err := g.fields(t, "")
 	if err != nil {
 		return nil, fmt.Errorf("type %s: %w", types.TypeKey(typeName, subtype), err)
 	}
 
-	return json.Marshal(SchemaV1{
+	doc := SchemaV1{
 		SchemaVersion: SchemaVersion1,
 		Type:          typeName,
 		Subtype:       subtype,
 		Singleton:     singleton,
 		Fields:        fields,
-	})
+	}
+
+	if len(g.definitions) > 0 {
+		doc.Definitions = g.definitions
+	}
+
+	return json.Marshal(doc)
 }
 
-// generateFieldsV1 describes the fields of one struct. path names the
-// enclosing field in errors, empty at the top level. types.ResourceBase is
-// never among them: BuildTypeV1 adds it to a block type and to an entity.
-func generateFieldsV1(t reflect.Type, path string) ([]FieldV1, error) {
+// generatorV1 describes one block type
+type generatorV1 struct {
+	// inside holds the struct types being described on the current path,
+	// each with the name of the block it was entered through, empty for the
+	// block type itself and for a value
+	inside map[reflect.Type]string
+
+	// recurring holds the block element types found inside themselves, each
+	// with the name of its definition
+	recurring map[reflect.Type]string
+
+	// definitions are the described recurring element types, by name
+	definitions map[string][]FieldV1
+}
+
+// fields describes the fields of one struct. path names the enclosing field
+// in errors, empty at the top level. types.ResourceBase is never among them:
+// BuildTypeV1 adds it to a block type and to an entity.
+func (g *generatorV1) fields(t reflect.Type, path string) ([]FieldV1, error) {
 	fields := []FieldV1{}
 
 	for i := range t.NumField() {
@@ -81,7 +111,7 @@ func generateFieldsV1(t reflect.Type, path string) ([]FieldV1, error) {
 				return nil, fmt.Errorf("field %s: an embedded %s cannot be described", where, embedded)
 			}
 
-			lifted, err := generateFieldsV1(embedded, path)
+			lifted, err := g.fields(embedded, path)
 			if err != nil {
 				return nil, err
 			}
@@ -113,12 +143,12 @@ func generateFieldsV1(t reflect.Type, path string) ([]FieldV1, error) {
 		var field FieldV1
 		switch parsed.Kind {
 		case tags.KindAttr, tags.KindOptional:
-			field, err = generateAttributeV1(sf, parsed, where)
+			field, err = g.attribute(sf, parsed, where)
 		case tags.KindBlock:
-			field, err = generateBlockV1(sf, parsed, where)
+			field, err = g.block(sf, parsed, where)
 		case tags.KindLabel:
 			// a block element's label is named by the block that holds it,
-			// see generateBlockV1
+			// see block
 			continue
 		default:
 			return nil, fmt.Errorf("field %s: a %s field cannot be described", where, parsed.Kind)
@@ -134,8 +164,8 @@ func generateFieldsV1(t reflect.Type, path string) ([]FieldV1, error) {
 	return fields, nil
 }
 
-// generateAttributeV1 describes an attribute: name = value.
-func generateAttributeV1(sf reflect.StructField, parsed tags.Field, where string) (FieldV1, error) {
+// attribute describes an attribute: name = value.
+func (g *generatorV1) attribute(sf reflect.StructField, parsed tags.Field, where string) (FieldV1, error) {
 	// a computed field is set by the provider, so configuration leaves it out
 	if parsed.Computed && parsed.Kind != tags.KindOptional {
 		return FieldV1{}, fmt.Errorf("field %s: a computed field must also be optional, i.e. `xcl:\"%s,optional,computed\"`", where, parsed.Name)
@@ -165,7 +195,7 @@ func generateAttributeV1(sf reflect.StructField, parsed tags.Field, where string
 		goType = inner
 	}
 
-	valueType, format, err := generateValueTypeV1(goType, where)
+	valueType, format, err := g.valueType(goType, where)
 	if err != nil {
 		return FieldV1{}, err
 	}
@@ -180,9 +210,9 @@ func generateAttributeV1(sf reflect.StructField, parsed tags.Field, where string
 	return field, nil
 }
 
-// generateBlockV1 describes a block field: a nested block, a list of blocks or
-// a map of named blocks.
-func generateBlockV1(sf reflect.StructField, parsed tags.Field, where string) (FieldV1, error) {
+// block describes a block field: a nested block, a list of blocks or a map of
+// named blocks.
+func (g *generatorV1) block(sf reflect.StructField, parsed tags.Field, where string) (FieldV1, error) {
 	field := FieldV1{Name: parsed.Name, Kind: FieldKindBlock}
 
 	element := sf.Type
@@ -218,26 +248,84 @@ func generateBlockV1(sf reflect.StructField, parsed tags.Field, where string) (F
 	}
 	field.Label = label
 
-	objectFields, err := generateFieldsV1(element, where)
-	if err != nil {
-		return FieldV1{}, err
-	}
-
-	object, err := json.Marshal(map[string]any{"object": objectFields})
+	elementType, err := g.element(element, parsed.Name, where)
 	if err != nil {
 		return FieldV1{}, err
 	}
 
 	if named {
-		object, err = json.Marshal(map[string]json.RawMessage{"map": object})
+		elementType, err = json.Marshal(map[string]json.RawMessage{"map": elementType})
 		if err != nil {
 			return FieldV1{}, err
 		}
 	}
 
-	field.Type = object
+	field.Type = elementType
 
 	return field, nil
+}
+
+// element describes a block's element type, entered through the block called
+// name: {"object": [fields]}, or {"ref": definition} for an element type that
+// holds itself, found when it is met again inside itself.
+func (g *generatorV1) element(element reflect.Type, name, where string) (json.RawMessage, error) {
+	if entered, inside := g.inside[element]; inside {
+		if entered == "" {
+			return nil, fmt.Errorf("field %s: the block holds a %s, which holds the block, and only a block's own blocks can hold themselves", where, element)
+		}
+
+		return ref(g.recur(element, entered))
+	}
+
+	g.inside[element] = name
+	fields, err := g.fields(element, where)
+	delete(g.inside, element)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// met inside itself, so described once and referred to here as well
+	if definition, recurring := g.recurring[element]; recurring {
+		g.definitions[definition] = fields
+		return ref(definition)
+	}
+
+	return json.Marshal(map[string]any{"object": fields})
+}
+
+// recur names the definition of element, a block element type met inside
+// itself, after the block it was entered through, and a number after that
+// when another type already has the name
+func (g *generatorV1) recur(element reflect.Type, block string) string {
+	if definition, ok := g.recurring[element]; ok {
+		return definition
+	}
+
+	definition := block
+	for n := 2; g.named(definition); n++ {
+		definition = fmt.Sprintf("%s_%d", block, n)
+	}
+
+	g.recurring[element] = definition
+
+	return definition
+}
+
+// named reports whether a recurring type has the definition name already
+func (g *generatorV1) named(definition string) bool {
+	for _, taken := range g.recurring {
+		if taken == definition {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ref is a block element type referring to a definition
+func ref(definition string) (json.RawMessage, error) {
+	return json.Marshal(map[string]string{"ref": definition})
 }
 
 // blockLabelV1 returns the name of the label field of a block's element, or
@@ -265,9 +353,9 @@ func blockLabelV1(element reflect.Type, where string) (string, error) {
 	return label, nil
 }
 
-// generateValueTypeV1 describes a value's type, and the number format when it
-// is a number.
-func generateValueTypeV1(t reflect.Type, where string) (json.RawMessage, string, error) {
+// valueType describes a value's type, and the number format when it is a
+// number.
+func (g *generatorV1) valueType(t reflect.Type, where string) (json.RawMessage, string, error) {
 	switch t.Kind() {
 	case reflect.String:
 		return json.RawMessage(`"string"`), "", nil
@@ -283,7 +371,7 @@ func generateValueTypeV1(t reflect.Type, where string) (json.RawMessage, string,
 			return json.RawMessage(`"any"`), "", nil
 		}
 	case reflect.Pointer:
-		return generateValueTypeV1(t.Elem(), where)
+		return g.valueType(t.Elem(), where)
 	}
 
 	// any is a value of its own, never the element of a list or map, so a
@@ -294,7 +382,7 @@ func generateValueTypeV1(t reflect.Type, where string) (json.RawMessage, string,
 
 	switch t.Kind() {
 	case reflect.Slice, reflect.Array:
-		element, format, err := generateValueTypeV1(t.Elem(), where)
+		element, format, err := g.valueType(t.Elem(), where)
 		if err != nil {
 			return nil, "", err
 		}
@@ -306,7 +394,7 @@ func generateValueTypeV1(t reflect.Type, where string) (json.RawMessage, string,
 			return nil, "", fmt.Errorf("field %s: a map must be keyed by a string, not %s", where, t.Key())
 		}
 
-		element, format, err := generateValueTypeV1(t.Elem(), where)
+		element, format, err := g.valueType(t.Elem(), where)
 		if err != nil {
 			return nil, "", err
 		}
@@ -315,7 +403,16 @@ func generateValueTypeV1(t reflect.Type, where string) (json.RawMessage, string,
 		return m, format, err
 	case reflect.Struct:
 		if !isSensitiveType(t) {
-			fields, err := generateFieldsV1(t, where)
+			// configuration writes a value out whole, so one cannot hold
+			// itself as a block can
+			if _, inside := g.inside[t]; inside {
+				return nil, "", fmt.Errorf("field %s: a value of type %s holds itself, which only a block can", where, t)
+			}
+
+			g.inside[t] = ""
+			fields, err := g.fields(t, where)
+			delete(g.inside, t)
+
 			if err != nil {
 				return nil, "", err
 			}
@@ -373,7 +470,7 @@ func embedsResourceBase(t reflect.Type) bool {
 	return false
 }
 
-// sensitiveInnerV1 maps every types.Sensitive instantiation KnownTypes holds
+// sensitiveInnerV1 maps every types.Sensitive instantiation sensitiveTypes holds
 // to the type of the value it holds.
 var sensitiveInnerV1 = map[string]reflect.Type{
 	sensitiveTypePrefix + "string]":            reflect.TypeOf(""),

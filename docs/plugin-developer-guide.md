@@ -78,6 +78,29 @@ from your struct around every provider call, so the provider only ever sees
 `T`. A struct embedding `types.ResourceBase` is still accepted and used as it
 is; it is always named.
 
+### How the host sees the type
+
+The host does not have your Go type compiled in. When the plugin registers a
+type, xcl describes it from its tags as a schema v1 document, and the host
+builds its own copy of the type from that. So a type's fields follow a few
+rules, and one that breaks them fails the plugin's registration, naming the
+type and the field:
+
+- Every field carries an `xcl` tag. A field the provider sets and the user
+  does not is tagged as computed, `xcl:"address,optional,computed"`; one
+  without a tag would be dropped by the host.
+- A field's `json` name is its `xcl` name, `xcl:"network,block"
+  json:"network"`, as state holds it under that name.
+- A computed field is also optional.
+- An embedded struct's fields are the type's own.
+- A field holding another entity, as a reference to a block gives it, keeps
+  that entity's `Meta`.
+- A block may hold itself, directly or through other blocks, such as a
+  column holding rows holding columns: write the types as they are, and the
+  schema describes each once. Configuration nests blocks at most ten deep, in
+  every block, and a block deeper than that is reported where it is written.
+  A value that is not a block cannot hold itself.
+
 ## The two copies of an entity
 
 Every call on an entity that already exists works with two copies of it:
@@ -135,9 +158,7 @@ A plugin type is rebuilt on the host from its schema, and Go cannot build a
 generic type at run time, so a plugin type may use only these instantiations:
 `types.Sensitive[string]`, `[int]`, `[int64]`, `[float64]`, `[bool]`,
 `[[]string]` and `[map[string]string]`. A plugin type with any other fails to
-load, with an error naming the type and the field. Rebuild an external plugin
-against the version of xcl it is loaded by, so its type names match the
-host's.
+register, with an error naming the type and the field.
 
 Read the real value with `Reveal()`, only where it is needed, such as when
 connecting to the service the provider manages:

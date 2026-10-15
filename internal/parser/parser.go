@@ -20,6 +20,7 @@ import (
 	"github.com/jumppad-labs/xcl/internal/modules"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/savedentity"
+	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/xcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/gohcl"
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
@@ -1103,6 +1104,12 @@ func (p *Parser) parseResource(file string, b *hclsyntax.Block, moduleName strin
 
 	if earlier, declared := p.parsedResources.headers[rtMeta.ID]; declared {
 		return fail(duplicateBlock(rtMeta.ID, p.isSingleton(rtMeta.Type), earlier))
+	}
+
+	// a block type that holds itself is built only this deep, see
+	// schema.MaxNestingDepth, and every type nests no deeper so they agree
+	if deep, depth := nestedTooDeep(b, schema.MaxNestingDepth); deep != nil {
+		return p.inBlock(b, moduleName, deep.TypeRange.Ptr(), tooDeep(deep.Type, depth, schema.MaxNestingDepth))
 	}
 
 	// We now need to get all the dependent resources for this resource

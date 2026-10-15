@@ -9,7 +9,6 @@ import (
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
-	"github.com/jumppad-labs/xcl/internal/cty"
 )
 
 func TestGoStructToCtyValue(t *testing.T) {
@@ -56,16 +55,10 @@ func TestGoStructToCtyValueWithEmbeddedStruct(t *testing.T) {
 func TestGoToCtyWorksWithDeserializedTypes(t *testing.T) {
 	con1 := structs.Template{}
 
-	s, err := schema.GenerateSchemaFromInstance(con1, 10)
+	s, err := schema.GenerateV1(reflect.TypeOf(con1), "resource", "template", false)
 	require.NoError(t, err)
 
-	typeMapping := map[string]reflect.Type{
-		"types.Meta":         reflect.TypeOf(types.Meta{}),
-		"types.ResourceBase": reflect.TypeOf(types.ResourceBase{}),
-		"cty.Value":          reflect.TypeOf(cty.Value{}), // Treat cty.Value as interface{}
-	}
-
-	con2, err := schema.CreateInstanceFromSchema(s, typeMapping)
+	con2, err := schema.CreateInstanceFromSchema(s)
 	require.NoError(t, err)
 
 	setField(con2, "Meta", types.Meta{

@@ -30,7 +30,18 @@ type SchemaV1 struct {
 	Singleton bool `json:"singleton,omitempty"`
 
 	Fields []FieldV1 `json:"fields"`
+
+	// Definitions are block element types named so a block can refer to one,
+	// {"ref": "column"}, wherever it is used, including from within itself:
+	// a column holding rows that hold columns is described once, and
+	// configuration nests it as deep as MaxNestingDepth allows
+	Definitions map[string][]FieldV1 `json:"definitions,omitempty"`
 }
+
+// MaxNestingDepth is how deep configuration nests blocks within a block:
+// a block's own blocks are at depth one. A block type that holds itself is
+// built this deep and no deeper.
+const MaxNestingDepth = 10
 
 // FieldV1 is one field of a SchemaV1 block type.
 type FieldV1 struct {
@@ -40,7 +51,9 @@ type FieldV1 struct {
 	// Type is the value's type: "string", "number", "bool", "any",
 	// {"list": T}, {"map": T}, {"object": [fields]}, or {"entity": [fields]}
 	// for a value holding a block, as a reference to one gives it, which
-	// carries meta, disabled and depends_on beside its fields
+	// carries meta, disabled and depends_on beside its fields. A block's
+	// element is {"object": [fields]}, or {"ref": "name"} for one of the
+	// schema's Definitions, and either within {"map": …} for named blocks
 	Type json.RawMessage `json:"type"`
 
 	// Kind is "attribute", the default, or "block"
@@ -131,7 +144,7 @@ func ParseV1(data []byte) (*SchemaV1, error) {
 // computed carry-over read, so they run on it with no knowledge that it came
 // from a schema.
 //
-// A sensitive field is limited to the instantiations in KnownTypes; any other
+// A sensitive field is limited to the instantiations in sensitiveTypes; any other
 // shape, and an unknown type, kind or format, is an error naming the field.
 func BuildTypeV1(data []byte) (reflect.Type, *SchemaV1, error) {
 	s, err := ParseV1(data)
@@ -139,7 +152,12 @@ func BuildTypeV1(data []byte) (reflect.Type, *SchemaV1, error) {
 		return nil, nil, err
 	}
 
-	fields, err := buildFieldsV1(s.Fields, "", true)
+	expanded, err := expandRefsV1(s.Fields, s.Definitions, "", 0)
+	if err != nil {
+		return nil, nil, fmt.Errorf("schema for type %s: %w", types.TypeKey(s.Type, s.Subtype), err)
+	}
+
+	fields, err := buildFieldsV1(expanded, "", true)
 	if err != nil {
 		return nil, nil, fmt.Errorf("schema for type %s: %w", types.TypeKey(s.Type, s.Subtype), err)
 	}
@@ -374,6 +392,94 @@ func buildBlockV1(f FieldV1, where, goName string) (reflect.StructField, error) 
 	return reflect.StructField{Name: goName, Type: goType, Tag: reflect.StructTag(tag)}, nil
 }
 
+// expandRefsV1 replaces every block that refers to a definition with the
+// definition's fields, so the builders see only objects. depth is how deep
+// fields are nested within the block type, zero at its top level: a block
+// whose elements would sit deeper than MaxNestingDepth is left out, which is
+// where a block type that holds itself stops.
+func expandRefsV1(fields []FieldV1, definitions map[string][]FieldV1, path string, depth int) ([]FieldV1, error) {
+	expanded := make([]FieldV1, 0, len(fields))
+
+	for _, f := range fields {
+		if f.Kind != FieldKindBlock {
+			expanded = append(expanded, f)
+			continue
+		}
+
+		where := f.Name
+		if path != "" {
+			where = path + "." + f.Name
+		}
+
+		element, ref, named, err := blockShapeV1(f.Type, where)
+		if err != nil {
+			return nil, err
+		}
+
+		if ref != "" {
+			definition, ok := definitions[ref]
+			if !ok {
+				return nil, fmt.Errorf("field %s: refers to %q, which the schema does not define", where, ref)
+			}
+
+			if depth+1 > MaxNestingDepth {
+				continue
+			}
+
+			element = definition
+		}
+
+		children, err := expandRefsV1(element, definitions, where, depth+1)
+		if err != nil {
+			return nil, err
+		}
+
+		object, err := json.Marshal(map[string][]FieldV1{"object": children})
+		if err != nil {
+			return nil, err
+		}
+
+		if named {
+			object, err = json.Marshal(map[string]json.RawMessage{"map": object})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		f.Type = object
+		expanded = append(expanded, f)
+	}
+
+	return expanded, nil
+}
+
+// blockShapeV1 reads a block's type as written: its element's fields, or the
+// name of the definition it refers to, {"ref": "column"}, and whether it is a
+// map of named blocks, {"map": {"ref": "column"}}.
+func blockShapeV1(raw json.RawMessage, where string) ([]FieldV1, string, bool, error) {
+	var typed struct {
+		Ref string          `json:"ref"`
+		Map json.RawMessage `json:"map"`
+	}
+
+	if len(raw) > 0 && raw[0] == '{' && json.Unmarshal(raw, &typed) == nil {
+		if typed.Ref != "" {
+			return nil, typed.Ref, false, nil
+		}
+
+		var inner struct {
+			Ref string `json:"ref"`
+		}
+
+		if len(typed.Map) > 0 && typed.Map[0] == '{' && json.Unmarshal(typed.Map, &inner) == nil && inner.Ref != "" {
+			return nil, inner.Ref, true, nil
+		}
+	}
+
+	fields, named, err := blockElementV1(raw, where)
+	return fields, "", named, err
+}
+
 // blockElementV1 reads a block's type, which is {"object": [fields]} for a
 // nested block or a list of blocks, and {"map": {"object": [fields]}} for a
 // map of named blocks. It returns the element's fields and whether the
@@ -501,11 +607,11 @@ func valueTypeV1(raw json.RawMessage, format, where string) (reflect.Type, error
 
 // sensitiveTypeV1 wraps a value type in the matching types.Sensitive
 // instantiation. Go cannot instantiate a generic at run time, so only the
-// shapes in KnownTypes are available.
+// shapes in sensitiveTypes are available.
 func sensitiveTypeV1(inner reflect.Type, where string) (reflect.Type, error) {
 	key := sensitiveTypePrefix + inner.String() + "]"
 
-	wrapped, ok := KnownTypes()[key]
+	wrapped, ok := sensitiveTypes[key]
 	if !ok {
 		return nil, fmt.Errorf("field %s: a sensitive value of type %s cannot be held, sensitive values may be string, number, bool, {\"list\": \"string\"} or {\"map\": \"string\"}", where, inner)
 	}

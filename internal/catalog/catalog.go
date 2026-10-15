@@ -558,7 +558,7 @@ func (c *Catalog) checkHostTypes(host plugins.PluginHost, plugin, registryName s
 			problems = append(problems, err)
 		}
 
-		instance, err := schema.CreateInstanceFromSchema(t.Schema, schema.KnownTypes())
+		instance, err := schema.CreateInstanceFromSchema(t.Schema)
 		if err != nil {
 			problems = append(problems, fmt.Errorf("plugin type %s cannot be rebuilt from its schema: %w", key, err))
 			continue
@@ -607,16 +607,13 @@ func describeGoType(prototype any) string {
 // createEntityFromPlugins attempts to create an entity using loaded plugins,
 // mu must be held
 func (c *Catalog) createEntityFromPlugins(entityType, subtype, name string) (any, error) {
-	// the Go types the host rebuilds plugin types with
-	typeMapping := schema.KnownTypes()
-
 	key := types.TypeKey(entityType, subtype)
 
 	for _, loaded := range c.hosts {
 		for _, t := range loaded.host.GetTypes() {
 			if t.Type == entityType && t.SubType == subtype {
 				// Create an instance from the schema
-				rawEntity, err := schema.CreateInstanceFromSchema(t.Schema, typeMapping)
+				rawEntity, err := schema.CreateInstanceFromSchema(t.Schema)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create entity from schema for type %s: %w", key, err)
 				}

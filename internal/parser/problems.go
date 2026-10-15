@@ -160,6 +160,36 @@ func duplicateBlock(id string, singleton bool, earlier hcl.Range) problem {
 	}
 }
 
+// nestedTooDeep returns the first block within b nested deeper than limit,
+// its own blocks being at depth one, and its depth, or nil when none is
+func nestedTooDeep(b *hclsyntax.Block, limit int) (*hclsyntax.Block, int) {
+	var walk func(body *hclsyntax.Body, depth int) (*hclsyntax.Block, int)
+	walk = func(body *hclsyntax.Body, depth int) (*hclsyntax.Block, int) {
+		for _, nested := range body.Blocks {
+			if depth > limit {
+				return nested, depth
+			}
+
+			if deep, at := walk(nested.Body, depth+1); deep != nil {
+				return deep, at
+			}
+		}
+
+		return nil, 0
+	}
+
+	return walk(b.Body, 1)
+}
+
+// tooDeep is the problem with a block nested depth blocks deep, deeper than
+// configuration nests them
+func tooDeep(block string, depth, limit int) problem {
+	return problem{
+		summary: "Blocks nested too deep",
+		detail:  fmt.Sprintf("%s is nested %d blocks deep, and blocks nest at most %d deep", block, depth, limit),
+	}
+}
+
 // missingMeta is the problem with an entity xcl made but can not read the
 // meta of, which never happens to a type it accepted
 func missingMeta(err error) problem {

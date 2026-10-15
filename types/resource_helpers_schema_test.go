@@ -14,12 +14,12 @@ import (
 
 type SchemaTestBaseResource struct {
 	types.ResourceBase
-	Name string
+	Name string `xcl:"name" json:"name"`
 }
 
 type SchemaTestExtendedResource struct {
 	SchemaTestBaseResource
-	ExtraField string
+	ExtraField string `xcl:"extra_field" json:"extra_field"`
 }
 
 func schemaTestCreateExtendedResource() *SchemaTestExtendedResource {
@@ -44,15 +44,10 @@ func schemaTestCreateExtendedResource() *SchemaTestExtendedResource {
 func TestCanGetMetaOnExtendedResourceWhenCreatedFromSchema(t *testing.T) {
 	te := schemaTestCreateExtendedResource()
 
-	sch, err := schema.GenerateSchemaFromInstance(te, 10)
+	sch, err := schema.GenerateV1(reflect.TypeOf(te), types.TypeResource, "test-type", false)
 	require.NoError(t, err)
 
-	typeMapping := map[string]reflect.Type{
-		"types.Meta":         reflect.TypeOf(types.Meta{}),
-		"types.ResourceBase": reflect.TypeOf(types.ResourceBase{}),
-	}
-
-	ni, err := schema.CreateInstanceFromSchema(sch, typeMapping)
+	ni, err := schema.CreateInstanceFromSchema(sch)
 	require.NoError(t, err)
 
 	// The schema doesn't preserve values, only structure.

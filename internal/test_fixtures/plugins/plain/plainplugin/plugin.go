@@ -1,6 +1,7 @@
 // Package plainplugin is a test plugin whose types are plain structs, with
-// no types.ResourceBase: gadget, named by its label field, and hub, a
-// singleton with neither label fields nor a Meta field. Its providers fill
+// no types.ResourceBase: gadget, named by its label field, hub, a singleton
+// with neither label fields nor a Meta field, and layout, whose columns and
+// rows hold each other. Its providers fill
 // computed fields from what they receive, which proves the plain values
 // crossed into the provider and back. It is used in process and, through
 // the main package beside it, as a plugin binary.
@@ -174,7 +175,73 @@ func (p *gizmoProvider) Functions() plugins.ProviderFunctions {
 	return nil
 }
 
-// Plugin registers gadget, hub and gizmo
+// Layout is the block type layout, written layout "<label>" {}: columns
+// holding rows holding columns, as deep as configuration nests them
+type Layout struct {
+	Handle  string   `xcl:"handle,label" json:"handle"`
+	Columns []Column `xcl:"column,block" json:"column,omitempty"`
+
+	// Counted is computed: the provider counts the columns it received, at
+	// every depth
+	Counted int `xcl:"counted,optional,computed" json:"counted,omitempty"`
+}
+
+// Column is a column of a layout, which may hold rows
+type Column struct {
+	Width string `xcl:"width,optional" json:"width,omitempty"`
+	Rows  []Row  `xcl:"row,block" json:"row,omitempty"`
+}
+
+// Row is a row of a column, which may hold columns
+type Row struct {
+	Height  string   `xcl:"height,optional" json:"height,omitempty"`
+	Columns []Column `xcl:"column,block" json:"column,omitempty"`
+}
+
+// countColumns counts columns and every column within them
+func countColumns(columns []Column) int {
+	count := len(columns)
+	for _, column := range columns {
+		for _, row := range column.Rows {
+			count += countColumns(row.Columns)
+		}
+	}
+
+	return count
+}
+
+type layoutProvider struct {
+	plugins.DefaultChanged[*Layout]
+}
+
+func (p *layoutProvider) Init(state plugins.State, functions plugins.ProviderFunctions, log logger.Logger) error {
+	return nil
+}
+
+func (p *layoutProvider) Create(ctx context.Context, l *Layout) (*Layout, error) {
+	l.Counted = countColumns(l.Columns)
+	return l, nil
+}
+
+func (p *layoutProvider) Destroy(ctx context.Context, l *Layout, force bool) error {
+	return nil
+}
+
+func (p *layoutProvider) Read(ctx context.Context, old *Layout, new *Layout) (*Layout, error) {
+	new.Counted = old.Counted
+	return new, nil
+}
+
+func (p *layoutProvider) Update(ctx context.Context, l *Layout, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (*Layout, error) {
+	l.Counted = countColumns(l.Columns)
+	return l, nil
+}
+
+func (p *layoutProvider) Functions() plugins.ProviderFunctions {
+	return nil
+}
+
+// Plugin registers gadget, hub, gizmo and layout
 type Plugin struct {
 	plugins.PluginBase
 }
@@ -185,6 +252,10 @@ func (p *Plugin) Init(log logger.Logger, state plugins.State) error {
 	}
 
 	if err := plugins.RegisterResourceProvider(&p.PluginBase, log, state, "gizmo", "small", &Gizmo{}, &gizmoProvider{}); err != nil {
+		return err
+	}
+
+	if err := plugins.RegisterResourceProvider(&p.PluginBase, log, state, "layout", "", &Layout{}, &layoutProvider{}); err != nil {
 		return err
 	}
 
