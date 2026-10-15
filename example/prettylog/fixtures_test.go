@@ -26,7 +26,7 @@ const typeContainer = "container"
 // Database is a registered type with a nested block and a computed field,
 // registered without a plugin so nothing ever sets the computed field
 type Database struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Location string `xcl:"location" json:"location"`
 	Port     int    `xcl:"port" json:"port"`
@@ -45,7 +45,7 @@ type Timeouts struct {
 // Cache is registered as the type "cache" without a subtype, it is addressed
 // cache.<name>
 type Cache struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Location string `xcl:"location" json:"location"`
 }
@@ -53,7 +53,7 @@ type Cache struct {
 // Network is provided by fixturePlugin, whose provider fills in the computed
 // ProviderID on create
 type Network struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Subnet string `xcl:"subnet" json:"subnet"`
 
@@ -62,10 +62,10 @@ type Network struct {
 
 // Container is provided by fixturePlugin, it has a repeated network block
 type Container struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Command  []string            `xcl:"command,optional" json:"command,omitempty"`
-	Networks []NetworkAttachment `xcl:"network,block" json:"networks,omitempty"`
+	Networks []NetworkAttachment `xcl:"network,block" json:"network,omitempty"`
 }
 
 // NetworkAttachment is one repeated network block of a Container, the

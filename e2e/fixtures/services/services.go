@@ -12,7 +12,7 @@ import "github.com/jumppad-labs/xcl/types"
 
 // PostgreSQL defines the block type `postgres`
 type PostgreSQL struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Location string `xcl:"location" json:"location"`
 	Port     int    `xcl:"port" json:"port"`
@@ -43,7 +43,7 @@ type Timeouts struct {
 // Redis defines the block type `redis`, the second type the in-process plugin
 // provides
 type Redis struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Location string `xcl:"location" json:"location"`
 	Port     int    `xcl:"port" json:"port"`
@@ -56,7 +56,7 @@ type Redis struct {
 // App defines the block type `app`, its values are read from a variable, a
 // postgres block, a redis block and a module output
 type App struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	DatabaseLocation  string `xcl:"database_location" json:"database_location"`
 	DatabaseUser      string `xcl:"database_user" json:"database_user"`
@@ -76,7 +76,7 @@ type App struct {
 // Ingress defines the block type `ingress`, the second type the external
 // plugin provides. It routes a hostname to an app.
 type Ingress struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Hostname string `xcl:"hostname" json:"hostname"`
 

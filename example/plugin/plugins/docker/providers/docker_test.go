@@ -87,24 +87,20 @@ func removeContainerOnCleanup(t *testing.T, c docker.Docker, name string) {
 
 func integrationNetwork(name string) *entities.Network {
 	return &entities.Network{
-		ResourceBase: types.ResourceBase{
-			Meta: types.Meta{
-				ID:   "docker.network." + name,
-				Name: name,
-				Type: "docker",
-			},
+		Meta: types.Meta{
+			ID:   "docker.network." + name,
+			Name: name,
+			Type: "docker",
 		},
 	}
 }
 
 func integrationContainer(name string, networkName string) *entities.Container {
 	return &entities.Container{
-		ResourceBase: types.ResourceBase{
-			Meta: types.Meta{
-				ID:   "docker.container." + name,
-				Name: name,
-				Type: "docker",
-			},
+		Meta: types.Meta{
+			ID:   "docker.container." + name,
+			Name: name,
+			Type: "docker",
 		},
 		Image: testImage,
 		Networks: []entities.NetworkAttachment{

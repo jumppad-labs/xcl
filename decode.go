@@ -15,8 +15,8 @@ import (
 //
 //   - A []*T field, where T is a registered type or a builtin such as
 //     types.Output, receives every entity of T, exactly as All returns them:
-//     in declaration order, disabled entities included, and as the
-//     configuration's own instances rather than copies.
+//     in declaration order, disabled entities included, each a copy, so
+//     changing one leaves the configuration as it is.
 //     None declared gives an empty, non-nil slice.
 //   - A *T field, where T is a registered type, receives the one entity of T.
 //     None declared sets it to nil. More than one makes the call fail with the

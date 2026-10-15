@@ -14,7 +14,7 @@ import (
 // sensitiveResource is a resource with a sensitive field, as a provider
 // resource that holds a credential would be.
 type sensitiveResource struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Name     string                  `xcl:"name" json:"name"`
 	Password types.Sensitive[string] `xcl:"password" json:"password"`

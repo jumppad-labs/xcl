@@ -3,8 +3,10 @@ package xcl
 import (
 	"errors"
 	"path/filepath"
+	"reflect"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/registry"
@@ -12,6 +14,22 @@ import (
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
+
+// plainAs is the plain copy of entity, a stored entity of the plain type T,
+// as a program is handed it, and false when entity is not one
+func plainAs[T any](entity any) (*T, bool) {
+	built, ok := plaintype.LookupPlain(reflect.TypeFor[T]())
+	if !ok {
+		return nil, false
+	}
+
+	plain, err := built.ToPlain(entity)
+	if err != nil {
+		return nil, false
+	}
+
+	return plain.(*T), true
+}
 
 // The address lookup is exercised against a real applied configuration rather
 // than a hand built state, so what it resolves is what an apply actually
@@ -126,8 +144,8 @@ func TestFindResolvesTheSameEntityFromEveryFormOfItsAddress(t *testing.T) {
 	withAttribute, err := Find[registered.Database](c, "module.shared.resource.database.shared.location")
 	require.NoError(t, err)
 
-	require.Same(t, moduleRelative, nonNormalised)
-	require.Same(t, moduleRelative, withAttribute)
+	require.Equal(t, moduleRelative, nonNormalised)
+	require.Equal(t, moduleRelative, withAttribute)
 }
 
 func TestFindResolvesATrailingAttributeOnARootAddress(t *testing.T) {
@@ -139,7 +157,7 @@ func TestFindResolvesATrailingAttributeOnARootAddress(t *testing.T) {
 	withoutAttribute, err := Find[registered.Database](c, "resource.database.main")
 	require.NoError(t, err)
 
-	require.Same(t, withoutAttribute, withAttribute)
+	require.Equal(t, withoutAttribute, withAttribute)
 	require.Equal(t, "us-east", withAttribute.Location)
 }
 
@@ -154,7 +172,7 @@ func TestFindResourceResolvesARootAddress(t *testing.T) {
 	entity, err := c.FindResource("resource.database.main")
 	require.NoError(t, err)
 
-	database, isDatabase := entity.(*registered.Database)
+	database, isDatabase := plainAs[registered.Database](entity)
 	require.True(t, isDatabase, "expected a *registered.Database, got %T", entity)
 
 	require.Equal(t, "resource.database.main", database.Meta.ID)
@@ -167,7 +185,7 @@ func TestFindResourceResolvesAModuleRelativeAddress(t *testing.T) {
 	entity, err := c.FindResource("module.shared.resource.database.shared")
 	require.NoError(t, err)
 
-	database, isDatabase := entity.(*registered.Database)
+	database, isDatabase := plainAs[registered.Database](entity)
 	require.True(t, isDatabase, "expected a *registered.Database, got %T", entity)
 
 	require.Equal(t, "module.shared.resource.database.shared", database.Meta.ID)
@@ -349,7 +367,7 @@ func TestFindReturnsNotFoundForAModuleEntityAddressedAtTheRoot(t *testing.T) {
 // type, and is the seam between enumerating a configuration and typing what
 // comes back.
 
-func TestAsReturnsTheEntityItselfWhenItAlreadyIsTheRequestedType(t *testing.T) {
+func TestAsReturnsACopyOfTheEntityAsTheRequestedType(t *testing.T) {
 	c := setupFindConfig(t)
 
 	stored, err := c.FindResource("resource.database.main")
@@ -358,8 +376,11 @@ func TestAsReturnsTheEntityItselfWhenItAlreadyIsTheRequestedType(t *testing.T) {
 	database, err := As[registered.Database](stored)
 	require.NoError(t, err)
 
-	// the caller holds what the configuration holds, not a copy of it
-	require.Same(t, stored, database)
+	// the caller holds a copy of what the configuration holds
+	want, ok := plainAs[registered.Database](stored)
+	require.True(t, ok)
+	require.Equal(t, want, database)
+	require.NotSame(t, stored, database)
 }
 
 func TestAsRefusesAnEntityOfAnotherNamedType(t *testing.T) {
@@ -406,12 +427,11 @@ func TestAsConvertsAnEnumeratedEntityToWhatFindReturns(t *testing.T) {
 	require.Equal(t, "eu-west", converted.SharedLocation)
 }
 
-// An entity the configuration already holds as the caller's Go type is handed
-// back as it stands, so the caller holds the configuration's value rather than
-// a copy of it. A plugin backed entity has no Go type in the configuration at
-// all, so there is nothing to hand back and the caller gets a filled in copy.
+// The caller gets a copy of what the configuration holds, as the Go type it
+// asks for: a declared type's copy carries its labels and Meta, and a plugin
+// backed entity is filled into the caller's type.
 
-func TestFindReturnsTheEntityTheConfigurationHolds(t *testing.T) {
+func TestFindReturnsACopyOfTheEntityTheConfigurationHolds(t *testing.T) {
 	c := setupFindConfig(t)
 
 	stored, err := c.FindResource("resource.database.main")
@@ -420,7 +440,9 @@ func TestFindReturnsTheEntityTheConfigurationHolds(t *testing.T) {
 	database, err := Find[registered.Database](c, "resource.database.main")
 	require.NoError(t, err)
 
-	require.Same(t, stored, database)
+	want, ok := plainAs[registered.Database](stored)
+	require.True(t, ok)
+	require.Equal(t, want, database)
 	require.Equal(t, "us-east", database.Location)
 	require.Equal(t, 5432, database.Port)
 }

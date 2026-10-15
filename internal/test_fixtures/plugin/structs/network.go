@@ -7,7 +7,7 @@ const TypeNetwork = "network"
 
 // Network defines a Docker network
 type Network struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Subnet string `xcl:"subnet" json:"subnet"`
 

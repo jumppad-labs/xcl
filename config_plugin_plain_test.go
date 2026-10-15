@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jumppad-labs/xcl/internal/schema"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugins/plain/plainplugin"
 	"github.com/jumppad-labs/xcl/registry"
 	"github.com/stretchr/testify/require"
@@ -328,4 +329,62 @@ func TestDestroyRemovesExternalPluginSingleton(t *testing.T) {
 	require.Len(t, destroyed, 1)
 	require.Equal(t, "hub", destroyed[0].ResourceID)
 	require.Equal(t, 0, f.config.ResourceCount())
+}
+
+// nestedLayout is a layout whose blocks nest depth deep, a column holding a
+// row holding a column and so on, two columns beside each other at every
+// column level
+func nestedLayout(depth int) string {
+	var body func(level int) string
+	body = func(level int) string {
+		if level > depth {
+			return ""
+		}
+
+		if level%2 == 1 {
+			return fmt.Sprintf("column {\n%s}\ncolumn {}\n", body(level+1))
+		}
+
+		return fmt.Sprintf("row {\n%s}\n", body(level+1))
+	}
+
+	return fmt.Sprintf("layout \"main\" {\n%s}\n", body(1))
+}
+
+// columnsIn counts the columns nestedLayout writes depth deep
+func columnsIn(depth int) int {
+	return 2 * ((depth + 1) / 2)
+}
+
+func TestApplyNestsALayoutAsDeepAsConfigurationMay(t *testing.T) {
+	binary := buildPlainPlugin(t)
+	isolateHome(t)
+
+	for name, local := range map[string]*registry.Local{
+		"in process": inProcessPlainRegistry(),
+		"external":   externalPlainRegistry(binary),
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newPersonConfig(t, local, writePlainPluginConfig(t, nestedLayout(schema.MaxNestingDepth)), t.TempDir())
+			require.NoError(t, f.config.Apply(f.configFile))
+
+			// the provider counts the columns it received, at every depth
+			layout, err := Find[plainplugin.Layout](f.config, "layout.main")
+			require.NoError(t, err)
+			require.Equal(t, columnsIn(schema.MaxNestingDepth), layout.Counted)
+		})
+	}
+}
+
+func TestValidateRefusesALayoutNestedDeeperThanConfigurationMay(t *testing.T) {
+	isolateHome(t)
+
+	f := newPersonConfig(t, inProcessPlainRegistry(), writePlainPluginConfig(t, nestedLayout(schema.MaxNestingDepth+1)), t.TempDir())
+
+	err := f.config.Validate(f.configFile)
+	require.Error(t, err)
+
+	d := requireDiagnostic(t, err)
+	require.Equal(t, "Blocks nested too deep", d.Summary)
+	require.Equal(t, fmt.Sprintf("column is nested %d blocks deep, and blocks nest at most %d deep", schema.MaxNestingDepth+1, schema.MaxNestingDepth), d.Detail)
 }

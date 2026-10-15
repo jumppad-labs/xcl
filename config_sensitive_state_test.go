@@ -123,7 +123,7 @@ func TestLoadedStateHoldsRealSensitiveValue(t *testing.T) {
 
 	var literal *registered.Secret
 	for _, entity := range loaded {
-		secret, ok := entity.(*registered.Secret)
+		secret, ok := plainAs[registered.Secret](entity)
 		if ok && secret.Meta.ID == "resource.secret.literal" {
 			literal = secret
 		}

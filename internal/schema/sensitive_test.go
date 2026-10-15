@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -9,18 +8,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// rebuildFieldType generates a schema from instance and rebuilds a struct from
-// it the way the host does, returning the type of the first field.
-func rebuildFieldType(t *testing.T, instance any) reflect.Type {
+// rebuildFieldType describes holder as a plugin does and rebuilds a struct
+// from the description the way the host does, returning the type of the field
+// called Secret.
+func rebuildFieldType(t *testing.T, holder any) reflect.Type {
 	t.Helper()
 
-	data, err := GenerateSchemaFromInstance(instance, 10)
+	data, err := GenerateV1(reflect.TypeOf(holder), "holder", "", false)
 	require.NoError(t, err)
 
-	rebuilt, err := CreateInstanceFromSchema(data, KnownTypes())
+	rebuilt, err := CreateInstanceFromSchema(data)
 	require.NoError(t, err)
 
-	return reflect.TypeOf(rebuilt).Elem().Field(0).Type
+	field, ok := reflect.TypeOf(rebuilt).Elem().FieldByName("Secret")
+	require.True(t, ok)
+
+	return field.Type
 }
 
 func TestSensitiveStringFieldIsRebuiltWithSensitiveType(t *testing.T) {
@@ -28,9 +31,7 @@ func TestSensitiveStringFieldIsRebuiltWithSensitiveType(t *testing.T) {
 		Secret types.Sensitive[string] `xcl:"secret"`
 	}
 
-	fieldType := rebuildFieldType(t, holder{})
-
-	require.Equal(t, reflect.TypeOf(types.Sensitive[string]{}), fieldType)
+	require.Equal(t, reflect.TypeOf(types.Sensitive[string]{}), rebuildFieldType(t, holder{}))
 }
 
 func TestSensitiveIntFieldIsRebuiltWithSensitiveType(t *testing.T) {
@@ -38,19 +39,16 @@ func TestSensitiveIntFieldIsRebuiltWithSensitiveType(t *testing.T) {
 		Secret types.Sensitive[int] `xcl:"secret"`
 	}
 
-	fieldType := rebuildFieldType(t, holder{})
-
-	require.Equal(t, reflect.TypeOf(types.Sensitive[int]{}), fieldType)
+	require.Equal(t, reflect.TypeOf(types.Sensitive[int]{}), rebuildFieldType(t, holder{}))
 }
 
-func TestSensitiveInt64FieldIsRebuiltWithSensitiveType(t *testing.T) {
+func TestSensitiveInt64FieldIsRebuiltAsASensitiveInt(t *testing.T) {
+	// a schema has one kind of whole number, which the host holds as an int
 	type holder struct {
 		Secret types.Sensitive[int64] `xcl:"secret"`
 	}
 
-	fieldType := rebuildFieldType(t, holder{})
-
-	require.Equal(t, reflect.TypeOf(types.Sensitive[int64]{}), fieldType)
+	require.Equal(t, reflect.TypeOf(types.Sensitive[int]{}), rebuildFieldType(t, holder{}))
 }
 
 func TestSensitiveFloat64FieldIsRebuiltWithSensitiveType(t *testing.T) {
@@ -58,9 +56,7 @@ func TestSensitiveFloat64FieldIsRebuiltWithSensitiveType(t *testing.T) {
 		Secret types.Sensitive[float64] `xcl:"secret"`
 	}
 
-	fieldType := rebuildFieldType(t, holder{})
-
-	require.Equal(t, reflect.TypeOf(types.Sensitive[float64]{}), fieldType)
+	require.Equal(t, reflect.TypeOf(types.Sensitive[float64]{}), rebuildFieldType(t, holder{}))
 }
 
 func TestSensitiveBoolFieldIsRebuiltWithSensitiveType(t *testing.T) {
@@ -68,9 +64,7 @@ func TestSensitiveBoolFieldIsRebuiltWithSensitiveType(t *testing.T) {
 		Secret types.Sensitive[bool] `xcl:"secret"`
 	}
 
-	fieldType := rebuildFieldType(t, holder{})
-
-	require.Equal(t, reflect.TypeOf(types.Sensitive[bool]{}), fieldType)
+	require.Equal(t, reflect.TypeOf(types.Sensitive[bool]{}), rebuildFieldType(t, holder{}))
 }
 
 func TestSensitiveStringSliceFieldIsRebuiltWithSensitiveType(t *testing.T) {
@@ -78,9 +72,7 @@ func TestSensitiveStringSliceFieldIsRebuiltWithSensitiveType(t *testing.T) {
 		Secret types.Sensitive[[]string] `xcl:"secret"`
 	}
 
-	fieldType := rebuildFieldType(t, holder{})
-
-	require.Equal(t, reflect.TypeOf(types.Sensitive[[]string]{}), fieldType)
+	require.Equal(t, reflect.TypeOf(types.Sensitive[[]string]{}), rebuildFieldType(t, holder{}))
 }
 
 func TestSensitiveStringMapFieldIsRebuiltWithSensitiveType(t *testing.T) {
@@ -88,88 +80,17 @@ func TestSensitiveStringMapFieldIsRebuiltWithSensitiveType(t *testing.T) {
 		Secret types.Sensitive[map[string]string] `xcl:"secret"`
 	}
 
-	fieldType := rebuildFieldType(t, holder{})
-
-	require.Equal(t, reflect.TypeOf(types.Sensitive[map[string]string]{}), fieldType)
+	require.Equal(t, reflect.TypeOf(types.Sensitive[map[string]string]{}), rebuildFieldType(t, holder{}))
 }
 
-func TestSensitiveFieldSchemaHasNoProperties(t *testing.T) {
-	type holder struct {
-		Secret types.Sensitive[string] `xcl:"secret"`
-	}
-
-	data, err := GenerateSchemaFromInstance(holder{}, 10)
-	require.NoError(t, err)
-
-	parsed := Attribute{}
-	require.NoError(t, json.Unmarshal(data, &parsed))
-	require.Len(t, parsed.Properties, 1)
-
-	secret := parsed.Properties[0]
-	require.Equal(t, "types.Sensitive[string]", secret.Type)
-	require.Empty(t, secret.Properties)
-}
-
-func TestCreateInstanceFromSchemaRejectsUnsupportedSensitiveType(t *testing.T) {
+func TestGenerateV1RefusesUnsupportedSensitiveType(t *testing.T) {
 	type holder struct {
 		Secret types.Sensitive[uint8] `xcl:"secret"`
 	}
 
-	data, err := GenerateSchemaFromInstance(holder{}, 10)
-	require.NoError(t, err)
-
-	_, err = CreateInstanceFromSchema(data, KnownTypes())
+	_, err := GenerateV1(reflect.TypeOf(holder{}), "holder", "", false)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "unsupported sensitive type")
 	require.ErrorContains(t, err, "types.Sensitive[uint8]")
 	require.ErrorContains(t, err, "field Secret")
-}
-
-func TestParseTypeMapOfSensitive(t *testing.T) {
-	pt, err := parseType("map[string]types.Sensitive[string]")
-	require.NoError(t, err)
-
-	require.True(t, pt.Map)
-	require.Equal(t, "string", pt.MapKey)
-	require.Equal(t, "types.Sensitive[string]", pt.Type)
-}
-
-func TestParseTypeSensitiveOfMap(t *testing.T) {
-	pt, err := parseType("types.Sensitive[map[string]string]")
-	require.NoError(t, err)
-
-	require.False(t, pt.Map)
-	require.False(t, pt.Slice)
-	require.Equal(t, "types.Sensitive[map[string]string]", pt.Type)
-}
-
-func TestParseTypeSliceOfSensitive(t *testing.T) {
-	pt, err := parseType("[]types.Sensitive[int]")
-	require.NoError(t, err)
-
-	require.True(t, pt.Slice)
-	require.Equal(t, "types.Sensitive[int]", pt.Type)
-}
-
-func TestParseTypePointerToSliceOfSensitive(t *testing.T) {
-	pt, err := parseType("*[]types.Sensitive[int]")
-	require.NoError(t, err)
-
-	require.True(t, pt.OuterPointer)
-	require.True(t, pt.Slice)
-	require.Equal(t, "types.Sensitive[int]", pt.Type)
-}
-
-func TestParseTypeMapOfMap(t *testing.T) {
-	pt, err := parseType("map[string]map[string]string")
-	require.NoError(t, err)
-
-	require.True(t, pt.Map)
-	require.Equal(t, "string", pt.MapKey)
-	require.Equal(t, "map[string]string", pt.Type)
-}
-
-func TestParseTypeRejectsUnclosedMapKey(t *testing.T) {
-	_, err := parseType("map[string")
-	require.Error(t, err)
 }

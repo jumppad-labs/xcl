@@ -204,12 +204,10 @@ func (x *GetTypesResponse) GetTypes() []*RegisteredType {
 }
 
 type RegisteredType struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	Type    string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	SubType string                 `protobuf:"bytes,2,opt,name=sub_type,json=subType,proto3" json:"sub_type,omitempty"`
-	Schema  []byte                 `protobuf:"bytes,3,opt,name=schema,proto3" json:"schema,omitempty"`
-	// singleton is true for a type whose block is written without labels
-	Singleton     bool `protobuf:"varint,4,opt,name=singleton,proto3" json:"singleton,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	SubType       string                 `protobuf:"bytes,2,opt,name=sub_type,json=subType,proto3" json:"sub_type,omitempty"`
+	Schema        []byte                 `protobuf:"bytes,3,opt,name=schema,proto3" json:"schema,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -263,13 +261,6 @@ func (x *RegisteredType) GetSchema() []byte {
 		return x.Schema
 	}
 	return nil
-}
-
-func (x *RegisteredType) GetSingleton() bool {
-	if x != nil {
-		return x.Singleton
-	}
-	return false
 }
 
 type ValidateRequest struct {
@@ -1730,12 +1721,11 @@ const file_plugins_plugin_proto_rawDesc = "" +
 	"\x14plugins/plugin.proto\x12\x05proto\"\x11\n" +
 	"\x0fGetTypesRequest\"?\n" +
 	"\x10GetTypesResponse\x12+\n" +
-	"\x05types\x18\x01 \x03(\v2\x15.proto.RegisteredTypeR\x05types\"u\n" +
+	"\x05types\x18\x01 \x03(\v2\x15.proto.RegisteredTypeR\x05types\"W\n" +
 	"\x0eRegisteredType\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x19\n" +
 	"\bsub_type\x18\x02 \x01(\tR\asubType\x12\x16\n" +
-	"\x06schema\x18\x03 \x01(\fR\x06schema\x12\x1c\n" +
-	"\tsingleton\x18\x04 \x01(\bR\tsingleton\"{\n" +
+	"\x06schema\x18\x03 \x01(\fR\x06schema\"{\n" +
 	"\x0fValidateRequest\x12\x1f\n" +
 	"\ventity_type\x18\x01 \x01(\tR\n" +
 	"entityType\x12&\n" +

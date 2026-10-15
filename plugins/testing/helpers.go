@@ -248,7 +248,7 @@ func ParseHCLFile[T any](t *testing.T, hclFilePath string, pluginSchema []byte, 
 	// Create wire type from plugin schema
 	// rebuild the type the way the host does, so a field such as a
 	// types.Sensitive one decodes the same in tests as in real use
-	wireType, err := schema.CreateInstanceFromSchema(pluginSchema, schema.KnownTypes())
+	wireType, err := schema.CreateInstanceFromSchema(pluginSchema)
 	require.NoError(t, err, "Should be able to create struct from schema")
 
 	// Parse HCL file

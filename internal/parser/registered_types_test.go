@@ -10,12 +10,43 @@ import (
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/internal/catalog"
 	"github.com/jumppad-labs/xcl/internal/parser/mocks"
+	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/resources"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/registered"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/stretchr/testify/require"
 )
+
+// plainAs is the plain copy of entity, a stored entity of the plain type T,
+// as a program is handed it, and false when entity is not one
+func plainAs[T any](entity any) (*T, bool) {
+	built, ok := plaintype.LookupPlain(reflect.TypeFor[T]())
+	if !ok {
+		return nil, false
+	}
+
+	plain, err := built.ToPlain(entity)
+	if err != nil {
+		return nil, false
+	}
+
+	return plain.(*T), true
+}
+
+// storedAs is plain stored as an entity is, in the type built from its plain
+// type for a block with labels labels
+func storedAs(t *testing.T, plain any, labels int) any {
+	t.Helper()
+
+	built, err := plaintype.Build(reflect.TypeOf(plain).Elem(), labels)
+	require.NoError(t, err)
+
+	stored := built.New()
+	require.NoError(t, built.FromPlain(stored, plain))
+
+	return stored
+}
 
 const (
 	registeredBasicConfig         = "../test_fixtures/config/registered/basic/main.xcl"
@@ -144,15 +175,15 @@ func requireMeta(t *testing.T, entities []any, id string) *types.Meta {
 	return meta
 }
 
-// requireDatabase returns the entity with the given ID in entities, requiring
-// it to be exactly a *registered.Database
+// requireDatabase returns the plain copy of the entity with the given ID in
+// entities, requiring it to be a stored registered.Database
 func requireDatabase(t *testing.T, entities []any, id string) *registered.Database {
 	t.Helper()
 
 	r, err := findByID(entities, id)
 	require.NoError(t, err)
 
-	db, ok := r.(*registered.Database)
+	db, ok := plainAs[registered.Database](r)
 	require.True(t, ok, "expected *registered.Database, got %T", r)
 
 	return db
@@ -190,27 +221,32 @@ func TestApplyRegisteredTypeDecodesValuesAndNestedBlock(t *testing.T) {
 	require.Equal(t, 60, db.Timeouts.Read)
 }
 
-func TestApplyRegisteredTypeReturnsRegisteredGoType(t *testing.T) {
+func TestApplyRegisteredTypeStoresEntitiesOfTheRegisteredGoType(t *testing.T) {
 	h := setupRegisteredTypes(t)
 	p := h.newParser(t, nil)
 
 	st, err := p.Apply(context.Background(), registeredBasicConfig)
 	require.NoError(t, err)
 
+	// each is stored in the type built from its registered Go type, whose
+	// plain copy is that type
 	r, err := findByID(st.GetResources(), registeredDatabaseID)
 	require.NoError(t, err)
-	require.Equal(t, reflect.TypeOf(&registered.Database{}), reflect.TypeOf(r))
 
-	_, ok := r.(*registered.Database)
-	require.True(t, ok)
+	_, ok := plainAs[registered.Database](r)
+	require.True(t, ok, "expected a stored registered.Database, got %T", r)
 
 	r, err = findByID(st.GetResources(), registeredAppID)
 	require.NoError(t, err)
-	require.Equal(t, reflect.TypeOf(&registered.App{}), reflect.TypeOf(r))
+
+	_, ok = plainAs[registered.App](r)
+	require.True(t, ok, "expected a stored registered.App, got %T", r)
 
 	r, err = findByID(st.GetResources(), registeredConsumerID)
 	require.NoError(t, err)
-	require.Equal(t, reflect.TypeOf(&registered.Consumer{}), reflect.TypeOf(r))
+
+	_, ok = plainAs[registered.Consumer](r)
+	require.True(t, ok, "expected a stored registered.Consumer, got %T", r)
 }
 
 func TestApplyRegisteredTypeResolvesReferences(t *testing.T) {
@@ -222,7 +258,7 @@ func TestApplyRegisteredTypeResolvesReferences(t *testing.T) {
 
 	r, err := findByID(st.GetResources(), registeredAppID)
 	require.NoError(t, err)
-	app, ok := r.(*registered.App)
+	app, ok := plainAs[registered.App](r)
 	require.True(t, ok)
 
 	require.Equal(t, "production", app.Environment)
@@ -231,7 +267,7 @@ func TestApplyRegisteredTypeResolvesReferences(t *testing.T) {
 
 	r, err = findByID(st.GetResources(), registeredConsumerID)
 	require.NoError(t, err)
-	consumer, ok := r.(*registered.Consumer)
+	consumer, ok := plainAs[registered.Consumer](r)
 	require.True(t, ok)
 
 	require.Equal(t, "production", consumer.AppEnvironment)
@@ -246,7 +282,7 @@ func TestApplyRegisteredTypeReadsModuleOutput(t *testing.T) {
 
 	r, err := findByID(st.GetResources(), registeredAppID)
 	require.NoError(t, err)
-	app, ok := r.(*registered.App)
+	app, ok := plainAs[registered.App](r)
 	require.True(t, ok)
 
 	require.Equal(t, "eu-west", app.SharedLocation)
@@ -360,9 +396,12 @@ func TestApplyRegisteredTypeInModuleIsStoredUnderModulePath(t *testing.T) {
 	require.NotNil(t, db.Timeouts)
 	require.Equal(t, 10, db.Timeouts.Connect)
 
+	stored, err := findByID(st.GetResources(), registeredModuleDatabaseID)
+	require.NoError(t, err)
+
 	moduleResources, err := findModule(st, resources.NewAddressParser(nil), "module.shared", false)
 	require.NoError(t, err)
-	require.Contains(t, moduleResources, any(db))
+	require.Contains(t, moduleResources, stored)
 }
 
 func TestApplyMarksDisabledRegisteredTypeDisabled(t *testing.T) {
@@ -438,7 +477,7 @@ func TestRegisteredResourcesAreInStateAndFoundByPath(t *testing.T) {
 
 	r, err := findByID(loaded, registeredAppID)
 	require.NoError(t, err)
-	app, ok := r.(*registered.App)
+	app, ok := plainAs[registered.App](r)
 	require.True(t, ok, "expected *registered.App, got %T", r)
 	require.Equal(t, "production", app.Environment)
 	require.Equal(t, "us-east", app.DatabaseLocation)
@@ -447,10 +486,10 @@ func TestRegisteredResourcesAreInStateAndFoundByPath(t *testing.T) {
 
 	r, err = findByID(loaded, registeredConsumerID)
 	require.NoError(t, err)
-	consumer, ok := r.(*registered.Consumer)
+	consumer, ok := plainAs[registered.Consumer](r)
 	require.True(t, ok, "expected *registered.Consumer, got %T", r)
 	require.Equal(t, "production", consumer.AppEnvironment)
-	require.Equal(t, []string{registeredAppID}, consumer.DependsOn)
+	require.Equal(t, []string{registeredAppID}, consumer.Meta.DependsOn)
 }
 
 func TestDestroyWalkSkipsProviderForRegisteredType(t *testing.T) {
@@ -459,18 +498,16 @@ func TestDestroyWalkSkipsProviderForRegisteredType(t *testing.T) {
 	// no expectations, any provider lookup fails the test
 	resolver := mocks.NewMockProviderResolver(t)
 
-	db := &registered.Database{
-		ResourceBase: types.ResourceBase{
-			Meta: types.Meta{
-				ID:      registeredDatabaseID,
-				Name:    "main",
-				Type:    types.TypeResource,
-				Subtype: registered.TypeDatabase,
-			},
+	db := storedAs(t, &registered.Database{
+		Meta: types.Meta{
+			ID:      registeredDatabaseID,
+			Name:    "main",
+			Type:    types.TypeResource,
+			Subtype: registered.TypeDatabase,
 		},
 		Location: "us-east",
 		Port:     5432,
-	}
+	}, 2)
 
 	working := NewState()
 	err := working.AppendResource(db)
@@ -565,7 +602,7 @@ func TestApplyGivesResourceTheFieldValuesOfAnotherResource(t *testing.T) {
 
 	r, err := findByID(st.GetResources(), registeredAppID)
 	require.NoError(t, err)
-	app, ok := r.(*registered.App)
+	app, ok := plainAs[registered.App](r)
 	require.True(t, ok, "expected *registered.App, got %T", r)
 
 	// app.web reads resource.database.main.location and .port
@@ -574,7 +611,7 @@ func TestApplyGivesResourceTheFieldValuesOfAnotherResource(t *testing.T) {
 
 	r, err = findByID(st.GetResources(), registeredConsumerID)
 	require.NoError(t, err)
-	consumer, ok := r.(*registered.Consumer)
+	consumer, ok := plainAs[registered.Consumer](r)
 	require.True(t, ok, "expected *registered.Consumer, got %T", r)
 
 	// consumer.reader reads resource.app.web.environment, itself a value the
@@ -591,7 +628,7 @@ func TestApplyGivesResourceTheValueOfAVariable(t *testing.T) {
 
 	r, err := findByID(st.GetResources(), registeredAppID)
 	require.NoError(t, err)
-	app, ok := r.(*registered.App)
+	app, ok := plainAs[registered.App](r)
 	require.True(t, ok, "expected *registered.App, got %T", r)
 
 	// app.web reads variable.environment, whose default is "production"
@@ -618,7 +655,7 @@ func TestApplyGivesResourceTheValueOfAModuleOutput(t *testing.T) {
 	// and app.web, outside the module, reads module.shared.output.location
 	r, err = findByID(st.GetResources(), registeredAppID)
 	require.NoError(t, err)
-	app, ok := r.(*registered.App)
+	app, ok := plainAs[registered.App](r)
 	require.True(t, ok, "expected *registered.App, got %T", r)
 	require.Equal(t, "eu-west", app.SharedLocation)
 }
@@ -688,10 +725,10 @@ func TestParseGivesEachDeclarationFormItsOwnAddress(t *testing.T) {
 
 	require.NotSame(t, bare, kindLed)
 
-	_, ok := bare.(*registered.Cache)
+	_, ok := plainAs[registered.Cache](bare)
 	require.True(t, ok, "expected *registered.Cache, got %T", bare)
 
-	_, ok = kindLed.(*registered.Database)
+	_, ok = plainAs[registered.Database](kindLed)
 	require.True(t, ok, "expected *registered.Database, got %T", kindLed)
 
 	require.Equal(t, registeredCacheID, requireMeta(t, st.GetResources(), registeredCacheID).ID)
@@ -717,7 +754,7 @@ func TestApplyDeclaresAnEntityOfATypeWithASubtype(t *testing.T) {
 	server, err := findByID(st.GetResources(), registeredServerID)
 	require.NoError(t, err)
 
-	typed, ok := server.(*registered.Server)
+	typed, ok := plainAs[registered.Server](server)
 	require.True(t, ok, "expected *registered.Server, got %T", server)
 	require.Equal(t, "eu-west", typed.Location)
 	require.Equal(t, 3, typed.Size)
@@ -733,7 +770,7 @@ func TestApplyResolvesAReferenceToAnEntityWithASubtypeFromATypeWithout(t *testin
 	cache, err := findByID(st.GetResources(), registeredCacheID)
 	require.NoError(t, err)
 
-	typed, ok := cache.(*registered.Cache)
+	typed, ok := plainAs[registered.Cache](cache)
 	require.True(t, ok, "expected *registered.Cache, got %T", cache)
 	require.Equal(t, "eu-west", typed.Location)
 }
@@ -748,7 +785,7 @@ func TestApplyResolvesReferencesToEntitiesOfOtherTypesFromAResource(t *testing.T
 	app, err := findByID(st.GetResources(), registeredAPIID)
 	require.NoError(t, err)
 
-	typed, ok := app.(*registered.App)
+	typed, ok := plainAs[registered.App](app)
 	require.True(t, ok, "expected *registered.App, got %T", app)
 	require.Equal(t, "eu-west", typed.DatabaseLocation)
 	require.Equal(t, 3, typed.DatabasePort)
@@ -783,7 +820,7 @@ func TestApplyReadsAnEntityWithASubtypeBackFromSavedState(t *testing.T) {
 	server, err := findByID(saved, registeredServerID)
 	require.NoError(t, err)
 
-	typed, ok := server.(*registered.Server)
+	typed, ok := plainAs[registered.Server](server)
 	require.True(t, ok, "expected *registered.Server, got %T", server)
 	require.Equal(t, registered.TypeServer, typed.Meta.Type)
 	require.Equal(t, registered.SubtypeBig, typed.Meta.Subtype)
@@ -836,7 +873,7 @@ func TestApplyEvaluatesForExpressionOverEntity(t *testing.T) {
 
 	r, err := findByID(st.GetResources(), registeredGatewayID)
 	require.NoError(t, err)
-	gateway, ok := r.(*registered.Gateway)
+	gateway, ok := plainAs[registered.Gateway](r)
 	require.True(t, ok)
 
 	require.Equal(t, map[string]int{"http": 80, "https": 443}, gateway.Ports)
@@ -853,7 +890,7 @@ func TestApplyResolvesVariableDefaultBuiltFromEntity(t *testing.T) {
 
 	r, err := findByID(st.GetResources(), registeredGatewayID)
 	require.NoError(t, err)
-	gateway, ok := r.(*registered.Gateway)
+	gateway, ok := plainAs[registered.Gateway](r)
 	require.True(t, ok)
 
 	require.Equal(t, "http://api.local", gateway.Address)
@@ -880,7 +917,7 @@ func TestApplyAllowsOmittedOptionalFieldInObjectAndMapValues(t *testing.T) {
 
 	r, err := findByID(st.GetResources(), registeredProxyID)
 	require.NoError(t, err)
-	proxy, ok := r.(*registered.Proxy)
+	proxy, ok := plainAs[registered.Proxy](r)
 	require.True(t, ok, "expected *registered.Proxy, got %T", r)
 
 	// default_endpoint = { port = 8080 } leaves tls out

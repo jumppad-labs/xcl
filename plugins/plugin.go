@@ -43,10 +43,11 @@ type RegisteredType struct {
 	Type string
 	// the optional sub type, i.e. k8s_config
 	SubType string
-	// The json schema for the type
+	// The schema v1 document describing the type
 	Schema []byte
 	// Singleton is true for a type whose block is written without labels,
-	// i.e. runner {}: a plain type with neither label fields nor a Meta field
+	// i.e. runner {}: a plain type with neither label fields nor a Meta field.
+	// It is what Schema says, read once so the host need not parse it again
 	Singleton bool
 	// The provider adapter that handles this type
 	Adapter ProviderAdapter
@@ -83,9 +84,8 @@ type PluginEntityProvider interface {
 // cannot be registered both with and without a subtype.
 //
 // resourceInstance is a pointer to a plain struct, laid out as RegisterType
-// describes, or to one embedding types.ResourceBase. A plain struct with
-// neither label fields nor a Meta field is a singleton, written <type> {} and
-// addressed <type>, and takes no subtype.
+// describes. One with neither label fields nor a Meta field is a singleton,
+// written <type> {} and addressed <type>, and takes no subtype.
 //
 // logger is plugin scoped, it is for messages the provider writes outside a
 // provider call, such as in Init. During a call use Logger(ctx), which is
@@ -160,23 +160,16 @@ func (p *PluginBase) SetState(state State) {
 // application declares: labels, a Meta field and the disabled and depends_on
 // mirrors are fields it asks for, and one with neither label fields nor a
 // Meta field is a singleton, written without labels. A struct embedding
-// types.ResourceBase is used as it is.
+// types.ResourceBase is refused.
 func (p *PluginBase) RegisterType(typeName, subTypeName string, t any, prov ProviderAdapter) error {
 	built, err := plainShape(t, subTypeName)
 	if err != nil {
 		return fmt.Errorf("type %s: %w", types.TypeKey(typeName, subTypeName), err)
 	}
 
-	// a plain type is described to the host as the type the engine stores,
-	// which embeds types.ResourceBase as every block type does
-	instance := t
-	singleton := false
-	if built != nil {
-		instance = built.New()
-		singleton = built.IsSingleton()
-	}
-
-	entitySchema, err := schema.GenerateSchemaFromInstance(instance, 10)
+	// described to the host as the type the engine stores, which embeds
+	// types.ResourceBase as every block type does
+	entitySchema, err := schema.GenerateV1(built.Engine, typeName, subTypeName, built.IsSingleton())
 	if err != nil {
 		return err
 	}
@@ -189,17 +182,17 @@ func (p *PluginBase) RegisterType(typeName, subTypeName string, t any, prov Prov
 		Type:      typeName,
 		SubType:   subTypeName,
 		Schema:    entitySchema,
-		Singleton: singleton,
+		Singleton: built.IsSingleton(),
 		Adapter:   prov,
 	})
 
 	return nil
 }
 
-// plainShape builds the engine type for t when it is a plain struct, or a
-// pointer to one, and returns nil for one embedding types.ResourceBase. A
-// block of a type registered with subTypeName has two labels, one without
-// has one, unless the type is a singleton.
+// plainShape builds the engine type for t, a plain struct or a pointer to
+// one, and refuses one embedding types.ResourceBase. A block of a type
+// registered with subTypeName has two labels, one without has one, unless
+// the type is a singleton.
 func plainShape(t any, subTypeName string) (*plaintype.Built, error) {
 	plain := reflect.TypeOf(t)
 	for plain != nil && plain.Kind() == reflect.Pointer {
@@ -211,7 +204,7 @@ func plainShape(t any, subTypeName string) (*plaintype.Built, error) {
 	}
 
 	if !declaration.IsPlain(reflect.New(plain).Interface()) {
-		return nil, nil
+		return nil, declaration.ErrEmbedsResourceBase
 	}
 
 	labels := 1

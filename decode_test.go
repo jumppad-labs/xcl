@@ -228,8 +228,8 @@ func TestDecodeFillsAnOutputsField(t *testing.T) {
 	require.Equal(t, "eu-west", target.Outputs[1].Value)
 }
 
-// A collection field holds exactly what All returns for its type: the same
-// entities, not equal copies, element for element, disabled ones included.
+// A collection field holds what All returns for its type, element for
+// element, disabled ones included.
 
 func TestDecodeMatchesAllElementForElement(t *testing.T) {
 	c := setupFindConfig(t)
@@ -243,7 +243,7 @@ func TestDecodeMatchesAllElementForElement(t *testing.T) {
 
 	require.Len(t, target.Databases, len(databases))
 	for i := range databases {
-		require.Same(t, databases[i], target.Databases[i])
+		require.Equal(t, databases[i], target.Databases[i])
 	}
 
 	apps, err := All[registered.App](c)
@@ -251,7 +251,7 @@ func TestDecodeMatchesAllElementForElement(t *testing.T) {
 
 	require.Len(t, target.Apps, len(apps))
 	for i := range apps {
-		require.Same(t, apps[i], target.Apps[i])
+		require.Equal(t, apps[i], target.Apps[i])
 	}
 }
 
@@ -267,12 +267,12 @@ func TestDecodeMatchesAllIncludingADisabledBlock(t *testing.T) {
 
 	require.Len(t, target.Databases, 1)
 	require.Len(t, databases, 1)
-	require.Same(t, databases[0], target.Databases[0])
+	require.Equal(t, databases[0], target.Databases[0])
 
-	require.True(t, target.Databases[0].Disabled)
+	require.True(t, target.Databases[0].Meta.Disabled)
 }
 
-func TestDecodeReturnsTheSameInstanceAsFind(t *testing.T) {
+func TestDecodeReturnsWhatFindReturns(t *testing.T) {
 	c := setupFindConfig(t)
 
 	target := databasesOnly{}
@@ -289,14 +289,15 @@ func TestDecodeReturnsTheSameInstanceAsFind(t *testing.T) {
 
 	found, err := Find[registered.Database](c, "resource.database.main")
 	require.NoError(t, err)
-	require.Same(t, found, decoded)
+	require.Equal(t, found, decoded)
 
-	// a change made through the decoded field is seen through the lookup
+	// the decoded field is a copy, a change made through it is not seen
+	// through the lookup
 	decoded.Location = "ap-south"
 
 	again, err := Find[registered.Database](c, "resource.database.main")
 	require.NoError(t, err)
-	require.Equal(t, "ap-south", again.Location)
+	require.Equal(t, "us-east", again.Location)
 }
 
 // A single field receives the one entity of its type, is left nil when there
@@ -380,7 +381,7 @@ func TestDecodeIgnoresFieldNames(t *testing.T) {
 	require.Len(t, renamed.Anything, 2)
 	require.Len(t, renamed.Anything, len(named.Databases))
 	for i := range named.Databases {
-		require.Same(t, named.Databases[i], renamed.Anything[i])
+		require.Equal(t, named.Databases[i], renamed.Anything[i])
 	}
 }
 
@@ -535,16 +536,6 @@ func TestDecodeMethodAndFunctionGiveEqualResults(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, byFunction, byMethod)
-
-	require.Len(t, byMethod.Databases, len(byFunction.Databases))
-	for i := range byFunction.Databases {
-		require.Same(t, byFunction.Databases[i], byMethod.Databases[i])
-	}
-
-	require.Len(t, byMethod.Apps, len(byFunction.Apps))
-	for i := range byFunction.Apps {
-		require.Same(t, byFunction.Apps[i], byMethod.Apps[i])
-	}
 }
 
 func TestDecodeMethodAndFunctionGiveEqualErrors(t *testing.T) {
@@ -607,19 +598,19 @@ func TestDecodeFillsEveryRegisteredTypeInOneCall(t *testing.T) {
 	require.Len(t, target.Databases, 2)
 	require.Len(t, target.Databases, len(databases))
 	for i := range databases {
-		require.Same(t, databases[i], target.Databases[i])
+		require.Equal(t, databases[i], target.Databases[i])
 	}
 
 	app, err := FindOne[registered.App](c, "resource", "app")
 	require.NoError(t, err)
-	require.Same(t, app, target.App)
+	require.Equal(t, app, target.App)
 
 	consumers, err := All[registered.Consumer](c)
 	require.NoError(t, err)
 	require.Len(t, target.Consumers, 1)
 	require.Len(t, target.Consumers, len(consumers))
 	for i := range consumers {
-		require.Same(t, consumers[i], target.Consumers[i])
+		require.Equal(t, consumers[i], target.Consumers[i])
 	}
 }
 
@@ -639,7 +630,7 @@ func TestDecodeFillsAFieldForANewlyDeclaredTypeWithNoOtherCode(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, after.Databases, 1)
-	require.Same(t, before.Databases[0], after.Databases[0])
+	require.Equal(t, before.Databases[0], after.Databases[0])
 
 	require.Len(t, after.Caches, 1)
 	require.Equal(t, "cache.main", after.Caches[0].Meta.ID)

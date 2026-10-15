@@ -25,73 +25,73 @@ import (
 // Accepted paths.
 
 func TestCheckPropertyPathAcceptsEmptyPath(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsMetaID(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "meta.id")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "meta.id")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsMetaName(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "meta.name")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "meta.name")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsDNS(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "dns")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "dns")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsNetworkPositionID(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "network[0].id")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "network[0].id")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsNetworkPositionIPAddress(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "network[0].ip_address")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "network[0].ip_address")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsSecondNetworkPositionName(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "network[1].name")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "network[1].name")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsResourcesCPUPin(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "resources.cpu_pin")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "resources.cpu_pin")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsResourcesMemory(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "resources.memory")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "resources.memory")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsResourcesUser(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "resources.user")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "resources.user")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsVolumePositionSource(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "volume[0].source")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "volume[0].source")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsVolumePositionDestination(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "volume[0].destination")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "volume[0].destination")
 
 	require.Equal(t, "", missing)
 }
@@ -99,7 +99,7 @@ func TestCheckPropertyPathAcceptsVolumePositionDestination(t *testing.T) {
 func TestCheckPropertyPathAcceptsVolumeDottedPositionSource(t *testing.T) {
 	// the dotted spelling `volume.0.source` selects the same member as the
 	// bracketed one and must be treated identically.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "volume.0.source")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "volume.0.source")
 
 	require.Equal(t, "", missing)
 }
@@ -109,31 +109,31 @@ func TestCheckPropertyPathAcceptsVolumeSplatDestination(t *testing.T) {
 	// do have. This is the accepting half of the pair that matters most: it is
 	// what a checker that stopped walking at the splat would still pass, and
 	// what a checker that treated `*` as a property name would wrongly reject.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "volume.*.destination")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "volume.*.destination")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsVolumeWithNoMemberSelected(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "volume")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "volume")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsCreatedNetwork(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "created_network")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "created_network")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsCreatedNetworkSplatName(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "created_network.*.name")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "created_network.*.name")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsCreatedNetworkMap(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "created_network_map")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "created_network_map")
 
 	require.Equal(t, "", missing)
 }
@@ -143,13 +143,13 @@ func TestCheckPropertyPathAcceptsCreatedNetworkMapKeyThenSubnet(t *testing.T) {
 	// recognisable as a key only by the map it stands against, which is why any
 	// segment standing against a collection selects a member rather than naming
 	// a property on the collection itself.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "created_network_map.one.subnet")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "created_network_map.one.subnet")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsCreatedNetworkMapSplatThenSubnet(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "created_network_map.*.subnet")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "created_network_map.*.subnet")
 
 	require.Equal(t, "", missing)
 }
@@ -157,7 +157,7 @@ func TestCheckPropertyPathAcceptsCreatedNetworkMapSplatThenSubnet(t *testing.T) 
 func TestCheckPropertyPathAcceptsCreatedNetworkMapKeyThenNestedMetaName(t *testing.T) {
 	// the walk continues past the selected member and through a property of its
 	// own, so `meta.name` is checked against the Network the map holds.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "created_network_map.one.meta.name")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "created_network_map.one.meta.name")
 
 	require.Equal(t, "", missing)
 }
@@ -166,13 +166,13 @@ func TestCheckPropertyPathAcceptsEnvKey(t *testing.T) {
 	// env is a map of strings. Which member is meant no longer matters once the
 	// members are scalars, so the walk stops and accepts rather than judging an
 	// arbitrary key against a property list.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "env.MY_VAR")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "env.MY_VAR")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsEnvWithNoKeySelected(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "env")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "env")
 
 	require.Equal(t, "", missing)
 }
@@ -205,16 +205,17 @@ func TestCheckPropertyPathAcceptsAnyPropertyBeneathAVariable(t *testing.T) {
 }
 
 func TestCheckPropertyPathAcceptsPropertyBeneathACtyValue(t *testing.T) {
-	// Template.Vars is a cty.Value, which carries whatever the configuration
-	// puts in it. Nothing beneath it is knowable before the configuration is
-	// applied, so the remainder of the path is accepted.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Template{}), "vars.data_dir")
+	// Template.Vars is a cty.Value, which the host holds as any: it carries
+	// whatever the configuration puts in it. Nothing beneath it is knowable
+	// before the configuration is applied, so the remainder of the path is
+	// accepted.
+	missing := checkPropertyPath(storedPluginType(structs.Template{}, structs.TypeTemplate), "vars.data_dir")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsMemberSelectedFromACtyValue(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Template{}), "vars.*.anything")
+	missing := checkPropertyPath(storedPluginType(structs.Template{}, structs.TypeTemplate), "vars.*.anything")
 
 	require.Equal(t, "", missing)
 }
@@ -222,13 +223,13 @@ func TestCheckPropertyPathAcceptsMemberSelectedFromACtyValue(t *testing.T) {
 func TestCheckPropertyPathAcceptsMemberSelectedFromACollectionOfScalars(t *testing.T) {
 	// dns is a list of strings. Selecting a position gives a scalar, beneath
 	// which nothing can be named, so the walk stops and accepts.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "dns.0.anything")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "dns.0.anything")
 
 	require.Equal(t, "", missing)
 }
 
 func TestCheckPropertyPathAcceptsPropertyBeneathAScalarMapMember(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "env.MY_VAR.anything")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "env.MY_VAR.anything")
 
 	require.Equal(t, "", missing)
 }
@@ -265,49 +266,49 @@ func TestCheckPropertyPathRejectsVolumeSplatMisspelledDestination(t *testing.T) 
 	// misspelling of a real property of a volume, named after selecting every
 	// volume at once, and a checker that stopped walking at the splat would let
 	// it through silently.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "volume.*.destnation")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "volume.*.destnation")
 
 	require.Equal(t, "destnation", missing)
 }
 
 func TestCheckPropertyPathRejectsVolumeDottedPositionMisspelledDestination(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "volume.0.destnation")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "volume.0.destnation")
 
 	require.Equal(t, "destnation", missing)
 }
 
 func TestCheckPropertyPathRejectsVolumePositionMisspelledDestination(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "volume[0].destnation")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "volume[0].destnation")
 
 	require.Equal(t, "destnation", missing)
 }
 
 func TestCheckPropertyPathRejectsCreatedNetworkMapKeyThenMisspelledSubnet(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "created_network_map.one.subnett")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "created_network_map.one.subnett")
 
 	require.Equal(t, "subnett", missing)
 }
 
 func TestCheckPropertyPathRejectsCreatedNetworkMapSplatThenMisspelledSubnet(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "created_network_map.*.subnett")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "created_network_map.*.subnett")
 
 	require.Equal(t, "subnett", missing)
 }
 
 func TestCheckPropertyPathRejectsPropertyTheResourceDoesNotHave(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "nosuchprop")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "nosuchprop")
 
 	require.Equal(t, "nosuchprop", missing)
 }
 
 func TestCheckPropertyPathRejectsPropertyNestedResourcesDoesNotHave(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "resources.nosuch")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "resources.nosuch")
 
 	require.Equal(t, "nosuch", missing)
 }
 
 func TestCheckPropertyPathRejectsMisspelledMetaName(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "meta.nam")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "meta.nam")
 
 	require.Equal(t, "nam", missing)
 }
@@ -316,13 +317,13 @@ func TestCheckPropertyPathRejectsMetaPropertiesWhichCarriesNoHCLTag(t *testing.T
 	// Meta.Properties is a real Go field, but it carries only a json tag and is
 	// therefore invisible to configuration. Naming it is naming something that
 	// does not exist as far as a configuration author is concerned.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "meta.properties")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "meta.properties")
 
 	require.Equal(t, "properties", missing)
 }
 
 func TestCheckPropertyPathRejectsMetaLinksWhichCarriesNoHCLTag(t *testing.T) {
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "meta.links")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "meta.links")
 
 	require.Equal(t, "links", missing)
 }
@@ -330,7 +331,7 @@ func TestCheckPropertyPathRejectsMetaLinksWhichCarriesNoHCLTag(t *testing.T) {
 func TestCheckPropertyPathReportsOnlyTheFirstUnknownSegment(t *testing.T) {
 	// once a segment is unknown, the type beyond it is unknown too, so later
 	// segments cannot be judged. Only the first is named.
-	missing := checkPropertyPath(reflect.TypeOf(structs.Container{}), "nosuchprop.alsomissing")
+	missing := checkPropertyPath(storedPluginType(structs.Container{}, structs.TypeContainer), "nosuchprop.alsomissing")
 
 	require.Equal(t, "nosuchprop", missing)
 }

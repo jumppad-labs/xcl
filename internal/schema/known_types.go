@@ -3,7 +3,6 @@ package schema
 import (
 	"reflect"
 
-	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/types"
 )
 
@@ -11,20 +10,11 @@ import (
 // instantiation.
 const sensitiveTypePrefix = "types.Sensitive["
 
-// KnownTypes returns the Go types the host rebuilds plugin types with, keyed
-// by the type name a plugin's schema records for them. The plugin registry
-// and the plugin test helpers both use it, so a plugin type is rebuilt the
-// same way in tests as in real use.
-//
-// Go cannot instantiate a generic type at run time, so every types.Sensitive
-// instantiation a plugin type may use is listed here. A plugin type using any
-// other instantiation fails to load.
-func KnownTypes() map[string]reflect.Type {
-	known := map[string]reflect.Type{
-		"types.Meta":         reflect.TypeOf(types.Meta{}),
-		"types.ResourceBase": reflect.TypeOf(types.ResourceBase{}),
-		"cty.Value":          reflect.TypeOf(cty.Value{}),
-	}
+// sensitiveTypes are the types.Sensitive instantiations a schema's sensitive
+// fields are built as, keyed by type name. Go cannot instantiate a generic
+// type at run time, so a sensitive value of any other type is refused.
+var sensitiveTypes = func() map[string]reflect.Type {
+	known := map[string]reflect.Type{}
 
 	for _, sensitiveType := range []reflect.Type{
 		reflect.TypeOf(types.Sensitive[string]{}),
@@ -39,7 +29,7 @@ func KnownTypes() map[string]reflect.Type {
 	}
 
 	return known
-}
+}()
 
 var sensitiveValueType = reflect.TypeOf((*types.SensitiveValue)(nil)).Elem()
 

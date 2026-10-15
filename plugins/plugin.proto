@@ -43,8 +43,6 @@ message RegisteredType {
   string type = 1;
   string sub_type = 2;
   bytes schema = 3;
-  // singleton is true for a type whose block is written without labels
-  bool singleton = 4;
 }
 
 message ValidateRequest {

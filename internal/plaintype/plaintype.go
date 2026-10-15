@@ -16,10 +16,11 @@
 //   - fields tagged as labels are filled from the block's labels, in order,
 //     when an entity is made, rather than decoded: configuration cannot set
 //     one, and an expression reads it like any attribute;
-//   - fields tagged `disabled` or `depends_on` mirror the values every block
-//     has, filled from types.ResourceBase rather than decoded twice;
 //   - a field called Meta, which must be a types.Meta with no tag, is filled
-//     with the block's metadata, as a type embedding types.ResourceBase has it.
+//     with the block's metadata, its disabled flag and dependencies among it.
+//
+// disabled, depends_on and meta are every block's, so a plain type declares
+// no field by those names.
 package plaintype
 
 import (
@@ -82,11 +83,6 @@ type Built struct {
 	labels      [][]int
 	labelFields []int
 
-	// disabled and dependsOn are the index paths of Plain's mirror fields,
-	// nil when it has none
-	disabled  []int
-	dependsOn []int
-
 	// meta is the index path of Plain's Meta field, nil when it has none
 	meta []int
 }
@@ -103,9 +99,9 @@ type copiedField struct {
 // read a name, so it is a singleton, see Singleton, and takes no subtype.
 //
 // The error names the field at fault: a reserved name, a label count that does
-// not match, a subtype for a singleton, a mirror field of the wrong type, an
-// embedded field that is not a remain struct, or a second field with the same
-// Go name once embedded fields are lifted.
+// not match, a subtype for a singleton, an embedded field that is not a remain
+// struct, or a second field with the same Go name once embedded fields are
+// lifted.
 func Build(plain reflect.Type, labels int) (*Built, error) {
 	if plain.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("%s is not a struct", plain)
@@ -197,24 +193,8 @@ func Build(plain reflect.Type, labels int) (*Built, error) {
 				case parsed.Kind == tags.KindRemain || parsed.Kind == tags.KindBody:
 					return fmt.Errorf("field %s of %s: a block type's remain and body are xcl's, a plain type cannot take them", field.Name, plain)
 
-				case parsed.Name == metaName:
-					return fmt.Errorf("field %s of %s: %q is held by every block and cannot be declared", field.Name, plain, metaName)
-
-				case parsed.Name == disabledName:
-					if field.Type.Kind() != reflect.Bool {
-						return fmt.Errorf("field %s of %s: %q mirrors every block's disabled flag and must be a bool, not %s", field.Name, plain, disabledName, field.Type)
-					}
-
-					b.disabled = index
-					continue
-
-				case parsed.Name == dependsOnName:
-					if field.Type != reflect.TypeOf([]string{}) {
-						return fmt.Errorf("field %s of %s: %q mirrors every block's dependencies and must be a []string, not %s", field.Name, plain, dependsOnName, field.Type)
-					}
-
-					b.dependsOn = index
-					continue
+				case parsed.Name == metaName || parsed.Name == disabledName || parsed.Name == dependsOnName:
+					return fmt.Errorf("field %s of %s: %q is held by every block and cannot be declared, the type reads it from Meta", field.Name, plain, parsed.Name)
 				}
 			}
 
@@ -372,6 +352,7 @@ func PlainOf(engine reflect.Type) (reflect.Type, bool) {
 // own. A property that is itself a map or slice is still shared.
 func copyMeta(meta types.Meta) types.Meta {
 	meta.Links = slices.Clone(meta.Links)
+	meta.DependsOn = slices.Clone(meta.DependsOn)
 	meta.References = maps.Clone(meta.References)
 	meta.Properties = maps.Clone(meta.Properties)
 
@@ -380,9 +361,9 @@ func copyMeta(meta types.Meta) types.Meta {
 
 // FromPlain copies a value of the plain type, or a pointer to one, back into
 // entity, a pointer to an entity of the engine type: its fields, and its Meta
-// field and mirror fields where it has them. Labels are left alone, as
-// configuration cannot change them, and so is anything of the entity's the
-// plain type cannot hold.
+// field where it has one. Labels, the disabled flag and the dependencies are
+// left alone, as only configuration sets them, and so is anything of the
+// entity's the plain type cannot hold.
 func (b *Built) FromPlain(entity any, plain any) error {
 	target := reflect.ValueOf(entity)
 	if target.Kind() != reflect.Pointer || target.Elem().Type() != b.Engine {
@@ -407,14 +388,8 @@ func (b *Built) FromPlain(entity any, plain any) error {
 
 	if b.meta != nil {
 		base.Meta = copyMeta(source.FieldByIndex(b.meta).Interface().(types.Meta))
-	}
-
-	if b.disabled != nil {
-		base.Disabled = source.FieldByIndex(b.disabled).Bool()
-	}
-
-	if b.dependsOn != nil {
-		base.DependsOn = append([]string(nil), source.FieldByIndex(b.dependsOn).Interface().([]string)...)
+		base.Meta.Disabled = false
+		base.Meta.DependsOn = nil
 	}
 
 	return nil
@@ -422,8 +397,8 @@ func (b *Built) FromPlain(entity any, plain any) error {
 
 // ToPlain copies an entity of the engine type into a new value of the plain
 // type and returns a pointer to it. Labels are filled from the entity's
-// metadata, the mirror fields from its types.ResourceBase, and a Meta field
-// with a copy of its metadata.
+// metadata, and a Meta field with a copy of its metadata, the disabled flag
+// and dependencies from its types.ResourceBase among it.
 //
 // The result is a copy: changing it does not change the stored entity.
 func (b *Built) ToPlain(entity any) (any, error) {
@@ -452,15 +427,11 @@ func (b *Built) ToPlain(entity any) (any, error) {
 	}
 
 	if b.meta != nil {
-		target.FieldByIndex(b.meta).Set(reflect.ValueOf(copyMeta(base.Meta)))
-	}
+		meta := copyMeta(base.Meta)
+		meta.Disabled = base.Disabled
+		meta.DependsOn = slices.Clone(base.DependsOn)
 
-	if b.disabled != nil {
-		target.FieldByIndex(b.disabled).SetBool(base.Disabled)
-	}
-
-	if b.dependsOn != nil && base.DependsOn != nil {
-		target.FieldByIndex(b.dependsOn).Set(reflect.ValueOf(append([]string{}, base.DependsOn...)))
+		target.FieldByIndex(b.meta).Set(reflect.ValueOf(meta))
 	}
 
 	return target.Addr().Interface(), nil

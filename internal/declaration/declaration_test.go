@@ -9,6 +9,13 @@ import (
 
 // Thing is a plain Go resource type used to test declarations
 type Thing struct {
+	Meta types.Meta
+
+	Size int `xcl:"size" json:"size"`
+}
+
+// Embedding embeds types.ResourceBase, which a declared type may not
+type Embedding struct {
 	types.ResourceBase `xcl:",remain"`
 
 	Size int `xcl:"size" json:"size"`
@@ -118,5 +125,12 @@ func TestIsPlainForATypeWithoutResourceBase(t *testing.T) {
 }
 
 func TestIsPlainIsFalseForATypeWithResourceBase(t *testing.T) {
-	require.False(t, IsPlain(&Thing{}))
+	require.False(t, IsPlain(&Embedding{}))
+}
+
+func TestValidateRefusesATypeEmbeddingResourceBase(t *testing.T) {
+	err := Validate(&Embedding{}, "resource", "thing")
+
+	require.ErrorIs(t, err, ErrEmbedsResourceBase)
+	require.ErrorContains(t, err, `type "resource.thing"`)
 }

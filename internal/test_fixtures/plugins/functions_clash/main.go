@@ -9,12 +9,11 @@ import (
 	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/logger"
 	"github.com/jumppad-labs/xcl/plugins"
-	"github.com/jumppad-labs/xcl/types"
 )
 
 // Salute is the block type salute, which has no subtype
 type Salute struct {
-	types.ResourceBase `xcl:",remain"`
+	Name string `xcl:"name,label" json:"name"`
 
 	Target string `xcl:"target" json:"target"`
 }

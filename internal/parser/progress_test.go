@@ -13,8 +13,8 @@ import (
 // status, the way the parser would hold it in memory. The id is set here
 // because the parser assigns it while parsing, it is not derived when the
 // resource is stored.
-func newTestNetwork(name, subnet, status string) *structs.Network {
-	return &structs.Network{
+func newTestNetwork(name, subnet, status string) *storedNetwork {
+	return &storedNetwork{
 		ResourceBase: types.ResourceBase{
 			Meta: types.Meta{
 				ID:      fmt.Sprintf("resource.%s.%s", structs.TypeNetwork, name),
@@ -57,7 +57,7 @@ func TestBuildStateKeepsReachedResources(t *testing.T) {
 	saved, err := findByID(built.GetResources(), "resource.network.reached")
 	require.NoError(t, err)
 
-	network := saved.(*structs.Network)
+	network := saved.(*storedNetwork)
 	require.Equal(t, "10.0.0.0/16", network.Subnet)
 	require.Equal(t, types.StatusCreated, network.Meta.Status)
 	require.Equal(t, "resource.network.reached", network.Meta.ID)
@@ -81,7 +81,7 @@ func TestBuildStateKeepsFailedResourceAsFailed(t *testing.T) {
 	saved, err := findByID(built.GetResources(), "resource.network.broken")
 	require.NoError(t, err)
 
-	network := saved.(*structs.Network)
+	network := saved.(*storedNetwork)
 	require.Equal(t, types.StatusFailed, network.Meta.Status)
 	require.Equal(t, "10.0.0.0/16", network.Subnet)
 }
@@ -105,7 +105,7 @@ func TestBuildStateKeepsPreviousEntryForUnreachedExistingResource(t *testing.T) 
 	saved, err := findByID(built.GetResources(), "resource.network.unreached")
 	require.NoError(t, err)
 
-	network := saved.(*structs.Network)
+	network := saved.(*storedNetwork)
 	require.Equal(t, "10.0.0.0/16", network.Subnet)
 	require.Equal(t, "id-unreached", network.ProviderID)
 	require.Equal(t, types.StatusCreated, network.Meta.Status)

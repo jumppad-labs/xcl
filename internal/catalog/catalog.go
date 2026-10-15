@@ -257,22 +257,17 @@ func (c *Catalog) DeclareType(t registry.Type, registryName string) error {
 
 	key := types.TypeKey(t.Type, t.Subtype)
 
-	// a plain struct is stored as the type built from it, which embeds
+	// the plain struct is stored as the type built from it, which embeds
 	// types.ResourceBase as everything that handles entities expects; the
 	// application's type is recovered from it when entities are read back.
-	// One that cannot read a name is a singleton, as is a type built from a
-	// schema marked as one
-	stored := t.Prototype
-	singleton := schema.IsSingleton(reflect.TypeOf(t.Prototype).Elem())
-	if declaration.IsPlain(t.Prototype) {
-		built, err := plaintype.Build(reflect.TypeOf(t.Prototype).Elem(), len(name))
-		if err != nil {
-			return fmt.Errorf("type %q: %w", key, err)
-		}
-
-		stored = built.New()
-		singleton = built.IsSingleton()
+	// One that cannot read a name is a singleton
+	built, err := plaintype.Build(reflect.TypeOf(t.Prototype).Elem(), len(name))
+	if err != nil {
+		return fmt.Errorf("type %q: %w", key, err)
 	}
+
+	stored := built.New()
+	singleton := built.IsSingleton()
 
 	// a field configuration cannot be decoded into is reported here, where
 	// the type is declared, rather than while configuration is read
@@ -558,7 +553,7 @@ func (c *Catalog) checkHostTypes(host plugins.PluginHost, plugin, registryName s
 			problems = append(problems, err)
 		}
 
-		instance, err := schema.CreateInstanceFromSchema(t.Schema, schema.KnownTypes())
+		instance, err := schema.CreateInstanceFromSchema(t.Schema)
 		if err != nil {
 			problems = append(problems, fmt.Errorf("plugin type %s cannot be rebuilt from its schema: %w", key, err))
 			continue
@@ -601,22 +596,25 @@ func (c *Catalog) checkLoaded(entityType, subtype string) *xclerrors.TypeNameCla
 // describeGoType names a declared type by its Go type, i.e.
 // "type *main.Server", as a TypeNameClashError describes it
 func describeGoType(prototype any) string {
+	// a stored type is named by the plain type it was built from, the one the
+	// application declared
+	if plain, ok := plaintype.PlainOf(reflect.TypeOf(prototype)); ok {
+		return fmt.Sprintf("type *%s", plain.String())
+	}
+
 	return fmt.Sprintf("type %s", reflect.TypeOf(prototype).String())
 }
 
 // createEntityFromPlugins attempts to create an entity using loaded plugins,
 // mu must be held
 func (c *Catalog) createEntityFromPlugins(entityType, subtype, name string) (any, error) {
-	// the Go types the host rebuilds plugin types with
-	typeMapping := schema.KnownTypes()
-
 	key := types.TypeKey(entityType, subtype)
 
 	for _, loaded := range c.hosts {
 		for _, t := range loaded.host.GetTypes() {
 			if t.Type == entityType && t.SubType == subtype {
 				// Create an instance from the schema
-				rawEntity, err := schema.CreateInstanceFromSchema(t.Schema, typeMapping)
+				rawEntity, err := schema.CreateInstanceFromSchema(t.Schema)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create entity from schema for type %s: %w", key, err)
 				}

@@ -14,7 +14,7 @@ import (
 // plainCredential declares as plain values the fields a plugin credential
 // declares sensitive, so converting into it must be refused.
 type plainCredential struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -24,7 +24,7 @@ type plainCredential struct {
 // sensitiveCredential mirrors the plugin credential, so converting into it is
 // allowed and the sensitive values survive.
 type sensitiveCredential struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	Username string                  `json:"username"`
 	Password types.Sensitive[string] `json:"password"`

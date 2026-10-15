@@ -30,7 +30,7 @@ const (
 
 // Recorder defines the block type `recorder`
 type Recorder struct {
-	types.ResourceBase `xcl:",remain"`
+	Meta types.Meta
 
 	// Value is a plain setting, changing it answers update
 	Value string `xcl:"value,optional" json:"value,omitempty"`

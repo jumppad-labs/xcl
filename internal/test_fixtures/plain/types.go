@@ -32,13 +32,12 @@ type Organization struct {
 	Overrides []Override `xcl:"agent,block"`
 }
 
-// Job sees the dependencies, disabled flag and metadata every block has.
+// Job sees the dependencies, disabled flag and metadata every block has, in
+// its Meta.
 type Job struct {
-	Name      string   `xcl:"name,label"`
-	Disabled  bool     `xcl:"disabled,optional"`
-	DependsOn []string `xcl:"depends_on,optional"`
-	Command   string   `xcl:"command,optional"`
-	Meta      types.Meta
+	Name    string `xcl:"name,label"`
+	Command string `xcl:"command,optional"`
+	Meta    types.Meta
 }
 
 // Service reads databases by reference, as plain values of their type.
