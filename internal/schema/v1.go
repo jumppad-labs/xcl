@@ -68,7 +68,8 @@ type FieldV1 struct {
 
 	// Nullable marks an attribute the type holds as a value that may be
 	// absent, a Go pointer or a Python T | None: left out, it is null rather
-	// than its type's zero value. An optional block is always nullable
+	// than its type's zero value. An optional block is always nullable, and a
+	// sensitive value never is: left out, it is empty
 	Nullable bool `json:"nullable,omitempty"`
 
 	// Sensitive marks a value that is a secret
@@ -277,6 +278,10 @@ func buildAttributeV1(f FieldV1, where, goName string) (reflect.StructField, err
 	optional := f.Optional || f.Computed
 
 	if f.Nullable {
+		if f.Sensitive {
+			return reflect.StructField{}, fmt.Errorf("field %s: a sensitive value is never nullable, left out it is empty", where)
+		}
+
 		// the type the schema describes holds a pointer, so a value left out
 		// stays null on both sides rather than becoming its zero value here
 		goType = reflect.PointerTo(goType)

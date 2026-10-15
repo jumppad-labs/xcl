@@ -1,10 +1,10 @@
 [
   {"schema_version": 1, "type": "service", "fields": [
     {"name": "port", "type": "number", "format": "int"},
-    {"name": "ratio", "type": "number", "format": "float", "optional": true},
-    {"name": "enabled", "type": "bool", "optional": true},
-    {"name": "tags", "type": {"list": "string"}, "optional": true},
-    {"name": "labels", "type": {"map": "string"}, "optional": true},
-    {"name": "upstream", "type": "string", "optional": true}
+    {"name": "ratio", "type": "number", "format": "float", "optional": true, "nullable": true},
+    {"name": "enabled", "type": "bool", "optional": true, "nullable": true},
+    {"name": "tags", "type": {"list": "string"}, "optional": true, "nullable": true},
+    {"name": "labels", "type": {"map": "string"}, "optional": true, "nullable": true},
+    {"name": "upstream", "type": "string", "optional": true, "nullable": true}
   ]}
 ]

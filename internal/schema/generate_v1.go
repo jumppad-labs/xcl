@@ -194,7 +194,9 @@ func (g *generatorV1) attribute(sf reflect.StructField, parsed tags.Field, where
 			return FieldV1{}, fmt.Errorf("field %s: unsupported sensitive type %s, sensitive values may be string, int, int64, float64, bool, []string or map[string]string", where, goType)
 		}
 
+		// left out, a sensitive value is empty, never null
 		field.Sensitive = true
+		field.Nullable = false
 		goType = inner
 	}
 

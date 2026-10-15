@@ -571,6 +571,18 @@ func TestBuildTypeV1NullableStringIsPointer(t *testing.T) {
 	require.Equal(t, reflect.TypeOf((*string)(nil)), field.Type)
 }
 
+func TestBuildTypeV1RefusesNullableSensitiveValue(t *testing.T) {
+	_, _, err := BuildTypeV1([]byte(`{
+		"schema_version": 1,
+		"type": "vault",
+		"fields": [
+			{"name": "token", "type": "string", "optional": true, "sensitive": true, "nullable": true}
+		]
+	}`))
+
+	require.ErrorContains(t, err, "a sensitive value is never nullable")
+}
+
 func TestBuildTypeV1RefusesNullableBlock(t *testing.T) {
 	_, _, err := BuildTypeV1([]byte(`{
 		"schema_version": 1,
