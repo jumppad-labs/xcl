@@ -718,6 +718,8 @@ Its `types.json` is the schema xcl-python derives from the classes the next task
 
 **Deviations**: The fixture's unset map is declared `nullable`, because a hand-built Python instance can only spell "unset" for a map as `None`; a `default_factory=dict` map would send `{}`. The configured empty list stays `tags = []`. Go writes it even with no choices, so "an empty list" in the spec's empty-fields criterion only holds for an unset list. Every fixture's record now has an `encode` section, so the Python parity comparison fails until the Python runner writes it in the next task.
 
+**Amendments**: The spec's acceptance criterion "Empty fields default out, opt in" now says an unset list is left out and a list the configuration sets to `[]` is written as Go writes it, approved by the user after this task.
+
 **Files changed**:
 - `xcl: bindings/libxcl/cmd/parity/main.go`
 - `xcl: bindings/libxcl/cmd/parity/main_test.go`
