@@ -611,15 +611,22 @@ func (n *normaliser) path(p string) string {
 
 // text replaces the fixture and temporary directories wherever they appear
 func (n *normaliser) text(s string) string {
-	for _, dir := range []string{n.fixture, filepath.ToSlash(n.fixture)} {
+	for _, dir := range dirForms(n.fixture) {
 		s = strings.ReplaceAll(s, dir, "<fixture>")
 	}
 
-	for _, dir := range []string{n.tmp, filepath.ToSlash(n.tmp)} {
+	for _, dir := range dirForms(n.tmp) {
 		s = strings.ReplaceAll(s, dir, "<tmp>")
 	}
 
 	return s
+}
+
+// dirForms returns the ways a directory appears in the record: as it is,
+// with forward slashes, and with each backslash doubled, as configuration
+// text writes a Windows path inside a quoted string
+func dirForms(dir string) []string {
+	return []string{strings.ReplaceAll(dir, `\`, `\\`), dir, filepath.ToSlash(dir)}
 }
 
 // sortByID sorts rendered entities by their meta id
