@@ -322,7 +322,7 @@ Deliberate gaps:
 
 **Validation point**: The Go tests pass in xcl's root package and `coreservice`, and so do the descriptor tests and the protocol's lint and breaking-change checks. The new tests cover: a lookup record rendering identically to `EncodeEntity`, the reveal fill and its edge cases, each option through both calls, highlight, the errors, and refusal during an operation.
 
-#### - [ ] Task: Add the encode messages to the core-service protocol
+#### - [x] Task: Add the encode messages to the core-service protocol
 **Id:** 6990ade2-2ebb-4787-a651-6ed2516d82dc
 **Repo:** xcl
 **Depends on:** none
@@ -333,11 +333,11 @@ Adds an `EncodeOptions` message carrying the four encoding choices. Gives the sa
 *Technical detail:* [context.md#task-add-the-encode-messages-to-the-core-service-protocol](./context.md#task-add-the-encode-messages-to-the-core-service-protocol)
 
 **Acceptance criteria**:
-- [ ] The protocol defines `EncodeOptions` with include computed, include empty, reveal sensitive and show references, all off when unset.
-- [ ] The saved-record request carries an optional `EncodeOptions`, and a new `EncodeEntity` method takes an entity record, `highlight` and `EncodeOptions` and returns text.
-- [ ] The regenerated Go messages build, and the protocol passes the project's lint and breaking-change checks.
+- [x] The protocol defines `EncodeOptions` with include computed, include empty, reveal sensitive and show references, all off when unset.
+- [x] The saved-record request carries an optional `EncodeOptions`, and a new `EncodeEntity` method takes an entity record, `highlight` and `EncodeOptions` and returns text.
+- [x] The regenerated Go messages build, and the protocol passes the project's lint and breaking-change checks.
 
-#### - [ ] Task: Render an entity record with secrets filled from the engine
+#### - [x] Task: Render an entity record with secrets filled from the engine
 **Id:** e50a42b8-bc85-408d-b11e-6925f463b74f
 **Repo:** xcl
 **Depends on:** none
@@ -348,13 +348,13 @@ Adds a public `Config` method that renders an entity's JSON record, as a lookup 
 *Technical detail:* [context.md#task-render-an-entity-record-with-secrets-filled-from-the-engine](./context.md#task-render-an-entity-record-with-secrets-filled-from-the-engine)
 
 **Acceptance criteria**:
-- [ ] Rendering a looked-up entity's record gives byte-identical text to `EncodeEntity` on the configuration's own entity, for each of the four choices.
-- [ ] With reveal, an unedited sensitive field shows the configured value, an edited one shows the edit, and without reveal both show the marker.
-- [ ] Sensitive values inside nested blocks, lists of blocks and maps are filled the same way.
-- [ ] A record with no address, or with an address that matches nothing, renders with the marker and does not fail.
-- [ ] Variables, outputs, modules, records with no meta and records of an unregistered type fail with the existing encode errors and return no text.
+- [x] Rendering a looked-up entity's record gives byte-identical text to `EncodeEntity` on the configuration's own entity, for each of the four choices.
+- [x] With reveal, an unedited sensitive field shows the configured value, an edited one shows the edit, and without reveal both show the marker.
+- [x] Sensitive values inside nested blocks, lists of blocks and maps are filled the same way.
+- [x] A record with no address, or with an address that matches nothing, renders with the marker and does not fail.
+- [x] Variables, outputs, modules, records with no meta and records of an unregistered type fail with the existing encode errors and return no text.
 
-#### - [ ] Task: Serve entity encoding and saved-record choices from the core service
+#### - [x] Task: Serve entity encoding and saved-record choices from the core service
 **Id:** c8ebc79a-ce7e-46b2-92e2-24662930ad68
 **Repo:** xcl
 **Depends on:**
@@ -367,12 +367,12 @@ Adds the `EncodeEntity` handler beside the saved-record handler and passes the f
 *Technical detail:* [context.md#task-serve-entity-encoding-and-saved-record-choices-from-the-core-service](./context.md#task-serve-entity-encoding-and-saved-record-choices-from-the-core-service)
 
 **Acceptance criteria**:
-- [ ] `EncodeEntity` returns the record's text, and both calls honour each of the four choices.
-- [ ] With highlight, both calls return colour codes that strip back to the plain text, and the same record gives the same coloured text from either call.
-- [ ] Both calls are refused with `operation_in_progress` while an operation runs, and an empty record is an invalid argument.
-- [ ] Encode failures reach the host as `not_encodable`, `unregistered_type` or `invalid_saved_data`.
+- [x] `EncodeEntity` returns the record's text, and both calls honour each of the four choices.
+- [x] With highlight, both calls return colour codes that strip back to the plain text, and the same record gives the same coloured text from either call.
+- [x] Both calls are refused with `operation_in_progress` while an operation runs, and an empty record is an invalid argument.
+- [x] Encode failures reach the host as `not_encodable`, `unregistered_type` or `invalid_saved_data`.
 
-#### - [ ] Task: Describe the encode call in the xcl changelog and the shared-library design
+#### - [x] Task: Describe the encode call in the xcl changelog and the shared-library design
 **Id:** 4c8c1bfd-1489-4b31-83bb-ffee00e3a8bd
 **Repo:** xcl
 **Depends on:**
@@ -384,8 +384,8 @@ Adds a changelog entry for the new core-service call, the saved-record call's ch
 *Technical detail:* [context.md#task-describe-the-encode-call-in-the-xcl-changelog-and-the-shared-library-design](./context.md#task-describe-the-encode-call-in-the-xcl-changelog-and-the-shared-library-design)
 
 **Acceptance criteria**:
-- [ ] The changelog has an entry for this spec describing the new call, the saved-record choices, the reveal fill and the new `Config` method, with its Breaking list.
-- [ ] The design document's Lookups section lists `EncodeEntity` among the lookups refused during an operation, shows its messages, and shows `EncodeOptions` on the saved-record request.
+- [x] The changelog has an entry for this spec describing the new call, the saved-record choices, the reveal fill and the new `Config` method, with its Breaking list.
+- [x] The design document's Lookups section lists `EncodeEntity` among the lookups refused during an operation, shows its messages, and shows `EncodeOptions` on the saved-record request.
 
 ### Milestone 2: Python programs can encode the entities they hold
 
@@ -398,7 +398,7 @@ Adds a changelog entry for the new core-service call, the saved-record call's ch
 
 **Validation point**: xcl-python's unit tests and its sync and asyncio integration suites pass against an engine built from the Milestone 1 xcl branch. These cover each lookup kind, hand-built and untyped entities, each choice, edits, highlight, every error case and refusal during an operation.
 
-#### - [ ] Task: Regenerate the xcl-python protocol messages
+#### - [x] Task: Regenerate the xcl-python protocol messages
 **Id:** 90f1ff60-c805-448b-929f-3dde73d8342a
 **Repo:** xcl-python
 **Depends on:**
@@ -410,10 +410,10 @@ Regenerates the Python message classes and type stubs from the changed xcl proto
 *Technical detail:* [context.md#task-regenerate-the-xcl-python-protocol-messages](./context.md#task-regenerate-the-xcl-python-protocol-messages)
 
 **Acceptance criteria**:
-- [ ] The Python message classes include `EncodeOptions`, `EncodeEntityRequest` and `EncodeEntityResponse`, and the saved-record request has `options`.
-- [ ] The engine pin names the xcl branch carrying the change.
+- [x] The Python message classes include `EncodeOptions`, `EncodeEntityRequest` and `EncodeEntityResponse`, and the saved-record request has `options`.
+- [x] The engine pin names the xcl branch carrying the change.
 
-#### - [ ] Task: Turn a Python entity into the record the engine reads
+#### - [x] Task: Turn a Python entity into the record the engine reads
 **Id:** 23576734-7a60-4f8f-86ac-6cda987e4a36
 **Repo:** xcl-python
 **Depends on:** none
@@ -424,11 +424,11 @@ Adds the mirror image of hydration. It turns a registered dataclass instance, wh
 *Technical detail:* [context.md#task-turn-a-python-entity-into-the-record-the-engine-reads](./context.md#task-turn-a-python-entity-into-the-record-the-engine-reads)
 
 **Acceptance criteria**:
-- [ ] Building a record from a hydrated instance gives back the record it was hydrated from, for every field form hydration supports: labels, nested blocks, lists and maps of blocks, sensitive, computed, nullable and renamed fields, `meta`, `disabled` and `depends_on`.
-- [ ] A hand-built instance's record names its registered type and subtype and its name, and carries real sensitive values.
-- [ ] A non-entity raises `NotEncodableError`, and so does an unnamed named entity or a value JSON cannot write. An instance of a class the configuration did not register raises `NotRegisteredError`.
+- [x] Building a record from a hydrated instance gives back the record it was hydrated from, for every field form hydration supports: labels, nested blocks, lists and maps of blocks, sensitive, computed, nullable and renamed fields, `meta`, `disabled` and `depends_on`.
+- [x] A hand-built instance's record names its registered type and subtype and its name, and carries real sensitive values.
+- [x] A non-entity raises `NotEncodableError`, and so does an unnamed named entity or a value JSON cannot write. An instance of a class the configuration did not register raises `NotRegisteredError`.
 
-#### - [ ] Task: Add encode_entity and the saved-record choices to both configuration classes
+#### - [x] Task: Add encode_entity and the saved-record choices to both configuration classes
 **Id:** b6d32cc3-7aa8-47eb-895e-04a87aeda684
 **Repo:** xcl-python
 **Depends on:**
@@ -442,14 +442,14 @@ Adds `encode_entity` to `xcl.Config` and `xcl.aio.Config`, with `include_compute
 *Technical detail:* [context.md#task-add-encode_entity-and-the-saved-record-choices-to-both-configuration-classes](./context.md#task-add-encode_entity-and-the-saved-record-choices-to-both-configuration-classes)
 
 **Acceptance criteria**:
-- [ ] An entity from each kind of lookup encodes to one block headed `<type> "<subtype>" "<name>"` or `<type> "<name>"`, from both the sync and asyncio APIs. The lookups are by address, by type, single of type, all of class, every entity, and an event's entity.
-- [ ] A hand-built instance encodes to the same text as the same entity loaded from a file, and a generic plugin entity encodes to a block of its type.
-- [ ] Each choice is off by default and takes effect when asked for. Reveal shows a looked-up entity's configured secret, and edits show in the text.
-- [ ] With highlight the text is coloured, strips back to the plain text, and matches the saved-record call's coloured text.
-- [ ] Each error case raises its existing exception and returns no text, and encoding during an operation raises `OperationInProgressError`.
-- [ ] `encode_saved_entity` with each choice matches `encode_entity` on the live entity, and with no choices returns exactly today's text.
+- [x] An entity from each kind of lookup encodes to one block headed `<type> "<subtype>" "<name>"` or `<type> "<name>"`, from both the sync and asyncio APIs. The lookups are by address, by type, single of type, all of class, every entity, and an event's entity.
+- [x] A hand-built instance encodes to the same text as the same entity loaded from a file, and a generic plugin entity encodes to a block of its type.
+- [x] Each choice is off by default and takes effect when asked for. Reveal shows a looked-up entity's configured secret, and edits show in the text.
+- [x] With highlight the text is coloured, strips back to the plain text, and matches the saved-record call's coloured text.
+- [x] Each error case raises its existing exception and returns no text, and encoding during an operation raises `OperationInProgressError`.
+- [x] `encode_saved_entity` with each choice matches `encode_entity` on the live entity, and with no choices returns exactly today's text.
 
-#### - [ ] Task: Document entity encoding in the xcl-python README and parity record
+#### - [x] Task: Document entity encoding in the xcl-python README and parity record
 **Id:** b2c4fb8e-b6c6-4f5b-8eca-53e0befabffe
 **Repo:** xcl-python
 **Depends on:**
@@ -461,8 +461,8 @@ Moves entity encoding from "Not applicable" to the supported lookups in PARITY.m
 *Technical detail:* [context.md#task-document-entity-encoding-in-the-xcl-python-readme-and-parity-record](./context.md#task-document-entity-encoding-in-the-xcl-python-readme-and-parity-record)
 
 **Acceptance criteria**:
-- [ ] PARITY.md lists `EncodeEntity` and the saved-record call with their Python forms, sync and asyncio, and no longer lists `EncodeEntity` under "Not applicable".
-- [ ] The README shows `encode_entity`, names the four choices and highlight, and mentions `encode_saved_entity`'s new choices.
+- [x] PARITY.md lists `EncodeEntity` and the saved-record call with their Python forms, sync and asyncio, and no longer lists `EncodeEntity` under "Not applicable".
+- [x] The README shows `encode_entity`, names the four choices and highlight, and mentions `encode_saved_entity`'s new choices.
 
 ### Milestone 3: Python's text is proven identical to Go's
 
@@ -470,7 +470,7 @@ Moves entity encoding from "Not applicable" to the supported lookups in PARITY.m
 
 **Validation point**: The parity suite passes, with the Go program from the xcl branch and the Python runner from the xcl-python branch. The `encode` section is present and equal for every fixture.
 
-#### - [ ] Task: Record encoded text in the Go parity program
+#### - [x] Task: Record encoded text in the Go parity program
 **Id:** 051b8d4d-334b-4a4e-a875-926f379bacfe
 **Repo:** xcl
 **Depends on:**
@@ -482,11 +482,11 @@ Adds an `encode` stage to the bindings' parity program. For every encodable enti
 *Technical detail:* [context.md#task-record-encoded-text-in-the-go-parity-program](./context.md#task-record-encoded-text-in-the-go-parity-program)
 
 **Acceptance criteria**:
-- [ ] Every fixture's parity record has an `encode` section with `looked_up` and `saved` texts under the 16 named combinations for each encodable entity, and leaves out variables, outputs and modules.
-- [ ] A fixture that lists hand-built addresses gets a `hand_built` section for them.
-- [ ] The new fixture covers a type with and without a subtype, a sensitive field, a reference, a sensitive bare reference and template, an unset optional string, a nullable attribute left out, an empty list and an unset map.
+- [x] Every fixture's parity record has an `encode` section with `looked_up` and `saved` texts under the 16 named combinations for each encodable entity, and leaves out variables, outputs and modules.
+- [x] A fixture that lists hand-built addresses gets a `hand_built` section for them.
+- [x] The new fixture covers a type with and without a subtype, a sensitive field, a reference, a sensitive bare reference and template, an unset optional string, a nullable attribute left out, an empty list and an unset map.
 
-#### - [ ] Task: Record encoded text in the Python parity runner
+#### - [x] Task: Record encoded text in the Python parity runner
 **Id:** 364da9f7-0c57-4d8d-9fe4-990279f6a157
 **Repo:** xcl-python
 **Depends on:**
@@ -499,8 +499,8 @@ Adds the same `encode` stage to the Python parity runner. Looked-up texts come f
 *Technical detail:* [context.md#task-record-encoded-text-in-the-python-parity-runner](./context.md#task-record-encoded-text-in-the-python-parity-runner)
 
 **Acceptance criteria**:
-- [ ] The parity suite passes for every fixture with the `encode` section present on both sides, so the Python text equals Go's byte for byte for every entity and combination.
-- [ ] The new fixture's types match their `types.json`, and its hand-built instances encode to Go's text for the same addresses.
+- [x] The parity suite passes for every fixture with the `encode` section present on both sides, so the Python text equals Go's byte for byte for every entity and combination.
+- [x] The new fixture's types match their `types.json`, and its hand-built instances encode to Go's text for the same addresses.
 
 #### - [ ] Task: Release xcl with the encode call
 **Id:** bfa93d2c-8301-46d9-a68e-6f5bf7314f25
@@ -539,7 +539,7 @@ Points xcl-python's engine pin at the released xcl tag in place of the developme
 
 **Validation point**: The site builds and passes its type check, and a person has reviewed the changed Python tabs.
 
-#### - [ ] Task: Show encode_entity in the website configuration-text guide
+#### - [x] Task: Show encode_entity in the website configuration-text guide
 **Id:** 51e9f153-923a-40ed-8b0c-3b2a3e9a6a1b
 **Repo:** xcl-website
 **Depends on:**
@@ -551,10 +551,10 @@ Replaces the "not yet available from Python" notes in the configuration-text gui
 *Technical detail:* [context.md#task-show-encode_entity-in-the-website-configuration-text-guide](./context.md#task-show-encode_entity-in-the-website-configuration-text-guide)
 
 **Acceptance criteria**:
-- [ ] Each Python tab on the guide that said encoding a live entity, computed fields or references was unavailable now shows the working `encode_entity` call.
-- [ ] The guide names the four choices and highlight for Python, shows `encode_saved_entity` with the new choices, and says that a kept event entity reveals the engine's current value.
-- [ ] The events page no longer says Python must go through the saved-record call to turn an entity into text.
-- [ ] The site builds and passes its type check.
+- [x] Each Python tab on the guide that said encoding a live entity, computed fields or references was unavailable now shows the working `encode_entity` call.
+- [x] The guide names the four choices and highlight for Python, shows `encode_saved_entity` with the new choices, and says that a kept event entity reveals the engine's current value.
+- [x] The events page no longer says Python must go through the saved-record call to turn an entity into text.
+- [x] The site builds and passes its type check.
 
 ## Open Questions
 
@@ -574,3 +574,197 @@ No other open questions. Every other uncertainty was resolved during planning an
 - **Matching Go's marker-only reveal for masked event data.** By the user's decision, an event entity kept and encoded after its operation reveals the engine's current value. The difference is documented, not engineered away.
 - **The unmerged branch `origin/spek/20261015072147-b41720ce-python-encoder`.** It is neither merged, rebased nor deleted by this plan.
 - **Bumping the version badge on the xcl.dev home page.** It follows the release that ships this feature, as other site releases do, and is not part of this plan.
+
+## Changelog
+
+### 2026-10-16 — Task: Add the encode messages to the core-service protocol
+
+**What was done**: The core-service protocol gained an `EncodeOptions` message (include computed, include empty, reveal sensitive, show references), an `options = 3` field on `EncodeSavedEntityRequest`, and a new `EncodeEntity` lookup method with `EncodeEntityRequest {entity, highlight, options}` and `EncodeEntityResponse {text}`. The Go messages were regenerated with `make core-protos`.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl: proto/xcl/core/v1/core.proto`
+- `xcl: coreservice/proto/core.pb.go`
+
+**Discoveries**: Adding a method to the service makes `coreservice`'s `TestEveryServiceMethodHasAHandler` fail until a handler is registered in `coreservice/service.go`; it stays red until the task "Serve entity encoding and saved-record choices from the core service".
+
+### 2026-10-16 — Task: Render an entity record with secrets filled from the engine
+
+**What was done**: Added the public `(*Config).EncodeEntityRecord(data, options...)`, which decodes a lookup-shaped entity record with display semantics and, only with `RevealSensitive`, fills every redacted `types.Sensitive[T]` from the Config's own entity named by `meta.id` before calling the shared `encodeEntity`. The fill is a reflective side-by-side walk over struct fields, pointers, interfaces, slices by index and maps by key; it skips xcl's bookkeeping (`types.ResourceBase`, `types.Meta`), never adds elements and never overwrites a value that is not redacted.
+
+**Deviations**: Tests go beyond the plan's list: a reveal-equals-`EncodeEntity` test, list-of-blocks fill tests (with a test-local `encodeRecordVault` type, since no shared fixture has a sensitive value in a list of blocks), and a plugin-type fill test.
+
+**Files changed**:
+- `xcl: encode_record.go`
+- `xcl: encode_record_test.go`
+
+**Discoveries**: The plan's open question is resolved: a decoded record and the stored entity have the same Go type for declared types and for plugin types (`Credential` from the test plugin), so the fill works for both. `registered.SecretShape.Login` is an object attribute (pointer struct), not a block. A test module source is resolved relative to the config file, so module tests write a small module beside `main.xcl` in a temp dir.
+
+### 2026-10-16 — Task: Serve entity encoding and saved-record choices from the core service
+
+**What was done**: Added the `EncodeEntity` handler, which renders a lookup-shaped record through `Config.EncodeEntityRecord`, and made `EncodeSavedEntity` pass its `EncodeOptions` through. The two handlers share `encodeAllowed` (lookup refusal during an operation and the empty-record check), `encodeOptions` (protocol choices into Go encode options) and `colour` (terminal highlighting after rendering). `EncodeEntity` is registered in the handler table, which brings the descriptor tests back to green.
+
+**Deviations**: Tests go beyond the plan's list: `EncodeEntity` tests for each choice on and off, the three encode failures for the saved-record call as well, a highlight strip test for the saved-record call, and `TestEncodeSavedEntityDuringOperationRefused`, which was not covered before.
+
+**Files changed**:
+- `xcl: coreservice/lookups.go`
+- `xcl: coreservice/service.go`
+- `xcl: coreservice/lookups_test.go`
+- `xcl: coreservice/operations_test.go`
+
+**Discoveries**: `EncodeSavedEntity` fed a lookup record with reveal still shows the marker, because only `EncodeEntity` fills from the Config; a real saved record holds the real value. So the reveal comparisons between the two calls use a saved record on one side and a `Find` record on the other. This matters for the Python parity and integration tests.
+
+### 2026-10-16 — Task: Describe the encode call in the xcl changelog and the shared-library design
+
+**What was done**: Added the spec's entry to xcl's CHANGELOG covering `EncodeEntity`, `EncodeOptions`, the saved-record call's choices, `Config.EncodeEntityRecord`, its reveal fill by `meta.id` and the event-entity difference from Go, with `**Breaking:** None.` Updated `design:libxcl.md` through the design CLI. Its Threading list now includes `EncodeEntity` among the lookups refused during an operation, its service block lists the new method, and its Lookups section shows `EncodeOptions`, `options = 3` on the saved-record request, the new request and response, and a paragraph on how encoding works.
+
+**Deviations**: The design was written with `spektacular design author`, not `design write`, because the CLI refuses a verbatim write over a Spektacular-authored design. A first attempt passed `--spec`, which stamped `spec: 20261016064106-8931613a-python-encode-entity` into the design's frontmatter. Re-authoring without `--spec` does not remove it, so the field stays and needs a person's decision.
+
+**Files changed**:
+- `xcl: CHANGELOG.md`
+- `xcl: .spektacular/design/libxcl.md` (through the design CLI, in the project checkout)
+
+**Discoveries**: `design author` takes the body without frontmatter and keeps `created_date` and `specs`. Its `--spec` flag records the design's originating spec and is sticky, so don't pass it when revising someone else's design.
+
+### 2026-10-16 — Task: Regenerate the xcl-python protocol messages
+
+**What was done**: Regenerated xcl-python's `core_pb2.py` and `core_pb2.pyi` from the xcl feature branch's protocol with `make protos XCL_SRC=../xcl` (protoc 36.1, the same version as the checked-in code). This adds `EncodeOptions`, `EncodeEntityRequest`, `EncodeEntityResponse` and `EncodeSavedEntityRequest.options`; `transport_pb2` is unchanged. `xcl-ref.txt` now names the xcl branch `spek/20261016064106-8931613a-python-encode-entity` for review.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-python: xcl/_core/core_pb2.py`
+- `xcl-python: xcl/_core/core_pb2.pyi`
+- `xcl-python: xcl-ref.txt`
+
+**Discoveries**: In the worktree, `XCL_SRC=../xcl` resolves to the sibling xcl worktree, so `make protos engine plugins XCL_SRC=../xcl PYTHON=.venv/bin/python` builds everything from the feature branch. A local `.venv` (git-ignored) was created with `uv venv` and `uv pip install -e '.[test]'`. CI can only check out the `xcl-ref.txt` branch once it is pushed.
+
+### 2026-10-16 — Task: Turn a Python entity into the record the engine reads
+
+**What was done**: Added `Meta.to_record()`, the mirror of `Meta.from_entity`. It writes the set known keys plus `extra`, and the two now share the `_record_keys()` list. Added `record_of(entity, classes)` and `record_bytes(entity, classes)` in `xcl/_schema.py`, the mirror of hydration:
+- type and subtype come from the configuration's registration;
+- the name comes from the label field (the second of two) or from `meta.name`;
+- `disabled` and `depends_on` are written beside `meta`;
+- fields go under their schema names, with nested label fields as keys;
+- a `Sensitive` is written as its value or the marker, and `None` is omitted.
+
+An `xcl.Entity` passes through as `to_dict()`. A non-entity, a named entity with no name, or a value JSON can't write raises `NotEncodableError`, worded like the engine's. An unregistered class raises `NotRegisteredError`.
+
+**Deviations**: `_record_value` dispatches on the value hydration produced (`Sensitive`, dataclass instance, list, dict) rather than re-reading annotations; the result is the same and simpler. `record_bytes` serialises the record, and the callers share it, as the plan preferred.
+
+**Files changed**:
+- `xcl-python: xcl/_entity.py`
+- `xcl-python: xcl/_schema.py`
+- `xcl-python: tests/unit/test_record.py`
+- `xcl-python: tests/unit/test_entity.py`
+
+**Discoveries**: A registered dataclass with no `meta` field does not keep `meta.id` or `meta.references` through hydration. Its record therefore has no id to fill reveal from and no references to show, so for such a class reveal keeps the marker and show-references writes the values. Classes meant to be encoded with those choices need a `meta: xcl.Meta | None` field, and the README should say so. An unlabelled list element hydrates with its label field `""` and is written back with `"name": ""`.
+
+### 2026-10-16 — Task: Add encode_entity and the saved-record choices to both configuration classes
+
+**What was done**: `xcl.Config` and `xcl.aio.Config` gained `encode_entity(entity, *, include_computed, include_empty, reveal_sensitive, show_references, highlight)`, and `encode_saved_entity` gained the same four keywords, all off by default. Both build `EncodeOptions` through the shared `_encode_options` helper. `encode_entity` builds its record with `record_bytes` before any engine call. Unit tests check that each keyword lands in `EncodeOptions` and that bad input makes no engine call. Real-engine sync and asyncio tests cover every lookup kind, kept event entities, hand-built and untyped entities, each choice, edits, highlight, every error and refusal during an operation.
+
+**Deviations**: Verification found that a looked-up entity's text differed from Go's in three cases: hydrated `[]` and `{}` defaults were sent back and written, an unset sensitive field showed the marker, and Python-only dataclass defaults (such as a nested `interval = 10`) were written. With the user's approval, two fixes were made:
+- **A (engine):** `Config.EncodeEntityRecord` now fills marker values from its own copy whenever `meta.id` names an entity, not only with `RevealSensitive`. The encoder still writes the marker unless reveal is asked for, and an unset value is left out as Go leaves it out.
+- **B (Python):** `hydrate` remembers the JSON each top-level instance came from, keyed by `id()` with a `weakref.finalize` cleanup, so a slotted class without `__weakref__` keeps none. `record_of` writes every field still equal to what its source hydrates to exactly as the source holds it, and leaves out a field the source lacked whose value is still the hydration default. It recurses into nested blocks, lists and maps, and uses the source's `meta`, `disabled` and `depends_on` for a class with no `meta` field. Edited fields are written from the instance.
+
+The xcl CHANGELOG entry, `EncodeEntityRecord`'s godoc and `design:libxcl.md` were updated to match.
+
+**Amendments**: None to the spec. The plan's decision to fill only with `RevealSensitive` was changed by the user's approval of fix A.
+
+**Files changed**:
+- `xcl-python: xcl/config.py`
+- `xcl-python: xcl/aio.py`
+- `xcl-python: xcl/_schema.py`
+- `xcl-python: tests/unit/test_config.py`
+- `xcl-python: tests/unit/test_record.py`
+- `xcl-python: tests/integration/sync_entities.py`
+- `xcl-python: tests/integration/test_sync.py`
+- `xcl-python: tests/integration/test_aio.py`
+- `xcl: encode_record.go`
+- `xcl: encode_record_test.go`
+- `xcl: CHANGELOG.md`
+
+**Discoveries**: The engine's lookup JSON writes the marker for every `Sensitive` field, set or not, so only the engine's copy can tell the two apart. Top-level schema defaults (such as `replicas = 2`) are held by the engine as well, so Go writes them too; nested dataclass defaults are Python-only. A copy of a looked-up instance (`dataclasses.replace`) has no source and encodes from its values, defaults included. Encoding inside `on_event` is refused only while the operation still runs, so the refusal tests need the slow plugin.
+
+### 2026-10-16 — Task: Document entity encoding in the xcl-python README and parity record
+
+**What was done**: PARITY.md lists `EncodeEntity` as `encode_entity(entity, ...)` and `EncodeSavedEntity` with the four keywords, sync and asyncio, and maps each Go option to its keyword. It notes that highlight is Go's ANSI rendering and that a kept event entity reveals the engine's current value, and it no longer lists `EncodeEntity` under "Not applicable". The README gains an "Encoding entities as configuration" section covering:
+- the call on looked-up, event, hand-built and untyped entities, with an example;
+- the four keywords and `highlight`;
+- reveal on looked-up and event entities;
+- `encode_saved_entity`'s new keywords;
+- that only changed fields differ from Go, and that a copy encodes from its values;
+- the errors and the asyncio form.
+
+The looked-up `Sensitive` note now points at `encode_entity(..., reveal_sensitive=True)`, and the lookups list names `encode_entity`.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-python: PARITY.md`
+- `xcl-python: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-16 — Task: Record encoded text in the Go parity program
+
+**What was done**: The parity program gains an `encode` stage after `state`. For every entity that is not a variable, output, module or root, keyed by address, it records `looked_up` (`xcl.EncodeEntity` on the stored entity) and `saved` (`Config.EncodeSavedEntity` on its state record) under all 16 combinations, named `none` or the turned-on choices joined with `+` in the order computed, empty, reveal, references. Addresses listed in an optional `hand_built.json` also get `hand_built`, Go's own text for that entity. Failures are recorded as outcomes. A new `encode` fixture covers:
+- a `store "postgres"` with a sensitive password, an optional string with a default, a nullable int, a configured empty list and an unset nullable map;
+- a `service` without subtype with a reference, a sensitive bare reference and a sensitive template.
+
+Its `types.json` is the schema xcl-python derives from the classes the next task adds. The fixtures README documents `hand_built.json` and the section.
+
+**Deviations**: The fixture's unset map is declared `nullable`, because a hand-built Python instance can only spell "unset" for a map as `None`; a `default_factory=dict` map would send `{}`. The configured empty list stays `tags = []`. Go writes it even with no choices, so "an empty list" in the spec's empty-fields criterion only holds for an unset list. Every fixture's record now has an `encode` section, so the Python parity comparison fails until the Python runner writes it in the next task.
+
+**Files changed**:
+- `xcl: bindings/libxcl/cmd/parity/main.go`
+- `xcl: bindings/libxcl/cmd/parity/main_test.go`
+- `xcl: bindings/libxcl/testdata/parity/encode/types.json`
+- `xcl: bindings/libxcl/testdata/parity/encode/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/encode/hand_built.json`
+- `xcl: bindings/libxcl/testdata/parity/README.md`
+
+**Discoveries**: Go's own saved-record text differs from its live text for a configured empty list, because state omits empty lists (`omitempty`). Parity compares Python with Go section by section, so this is not a parity failure, but it qualifies the spec's "saved records give the same text as the live entity" for that case.
+
+### 2026-10-16 — Task: Record encoded text in the Python parity runner
+
+**What was done**: `tests/parity/run_python.py` writes the same `encode` section as the Go program:
+- `looked_up` from `encode_entity(find(None, address))`;
+- `saved` from `encode_saved_entity` on the state records;
+- `hand_built` from the instances `types.HAND_BUILT` builds for the addresses in `hand_built.json`.
+
+It uses the same 16 combination names, and failures are recorded through `Normaliser.outcome`. `tests/parity/types.py` gains `EncodeStore` and `EncodeService` for the `encode` fixture, plus `HAND_BUILT`. `test_types.py` checks the fixture's schema, and `test_parity.py` gains `test_parity_encode`. The parity suite passes for every fixture: Python's text equals Go's byte for byte under all 16 combinations, for looked-up, saved and hand-built entities, which meets the success metric.
+
+**Deviations**: The first run found one more divergence: a configured `tags = []` disappears from a lookup's JSON because Go leaves empty lists out, so Python could not send it back. In the spirit of the approved fix A, `EncodeEntityRecord`'s fill now also takes an empty list or map from the engine's copy where the record has none. It still never replaces a list or map the record holds. Go tests cover it, and the CHANGELOG, godoc and `design:libxcl.md` mention it.
+
+**Files changed**:
+- `xcl-python: tests/parity/run_python.py`
+- `xcl-python: tests/parity/types.py`
+- `xcl-python: tests/parity/test_types.py`
+- `xcl-python: tests/parity/test_parity.py`
+- `xcl: encode_record.go`
+- `xcl: encode_record_test.go`
+- `xcl: CHANGELOG.md`
+
+**Discoveries**: The parity program in `build/plugins` must be rebuilt (`make plugins XCL_SRC=../xcl`) after any Go parity change, or the Go side shows `<missing>` sections. `bindings/libxcl` is a nested Go module, so its tests run from inside it.
+
+### 2026-10-16 — Task: Show encode_entity in the website configuration-text guide
+
+**What was done**: The Python tabs of xcl.dev's configuration-text guide now show the working calls in place of every "not yet available from Python" note for encoding:
+- the intro names `cfg.encode_entity` and `cfg.encode_saved_entity`, and says the engine renders identical text;
+- converting an entity shows `cfg.encode_entity(db)` (and its asyncio form), on looked-up, hand-built and untyped entities, with edits shown;
+- saved data shows `encode_saved_entity` taking the same keywords;
+- an event's entity shows `cfg.encode_entity(entity)`, and that a kept event entity reveals the engine's current value;
+- each choice has its Python call: `include_computed=True`, a new "Empty attributes" section with `xcl.IncludeEmpty()` and `include_empty=True`, a new Go/Python tab for `RevealSensitive` with `reveal_sensitive=True`, `show_references=True`, and `highlight=True` on `encode_entity`.
+
+The editor-theme and renderer notes keep saying Python offers `highlight=True` only, now naming both calls. The events page mentions `cfg.encode_entity(event.entity())` and its reveal behaviour.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-website: src/pages/configuration-text.mdx`
+- `xcl-website: src/pages/events.mdx`
+
+**Discoveries**: The site's only automated checks are `npm run build` and `npx astro check`. Both pass: 0 errors, 0 warnings, and 1 hint that was already there. The worktree needed `npm ci` because `node_modules` is not tracked.

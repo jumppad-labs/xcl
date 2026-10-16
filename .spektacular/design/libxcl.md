@@ -1,6 +1,7 @@
 ---
 created_date: "2026-10-11"
 document_status: draft
+spec: 20261016064106-8931613a-python-encode-entity
 specs:
     - 20261011130709-aa3eb933-python-support
     - 20261011211634-a8895873-python-out-of-process-engine
@@ -196,7 +197,7 @@ The code list is part of the ABI contract: a code is never renamed or reused, on
 
 - At most one operation (`StartValidate`, `StartApply`, `StartDiff`, `StartDestroy`, `StartLoad`) runs at a time; starting a second returns `operation_in_progress`.
 - `Poll`, `Complete`, `Log`, `StateGet`, `StateFind` and `Cancel` are allowed while an operation runs. They are the host's side of the operation.
-- Lookups (`Find*`, `Entities`, `Outputs`, `EncodeSavedEntity`) are refused with `operation_in_progress` while an operation runs, because `Config.Apply` and `Config.Destroy` replace the entity slice when they finish and the root module does not promise concurrent reads during an operation.
+- Lookups (`Find*`, `Entities`, `Outputs`, `EncodeSavedEntity`, `EncodeEntity`) are refused with `operation_in_progress` while an operation runs, because `Config.Apply` and `Config.Destroy` replace the entity slice when they finish and the root module does not promise concurrent reads during an operation.
 
 The binding is told to release the GIL (Python) or use an asynchronous call (Node) around `xcl_call`, since `Poll` blocks for up to its wait time.
 
@@ -241,6 +242,7 @@ service CoreService {
   rpc FindOne(FindByTypeRequest) returns (EntityResponse);
   rpc Outputs(OutputsRequest) returns (OutputsResponse);
   rpc EncodeSavedEntity(EncodeSavedEntityRequest) returns (EncodeSavedEntityResponse);
+  rpc EncodeEntity(EncodeEntityRequest) returns (EncodeEntityResponse);
 
   // Types
   rpc DescribeTypes(DescribeTypesRequest) returns (DescribeTypesResponse);
@@ -470,11 +472,24 @@ message FindByTypeRequest { repeated string path = 1; }     // FindByType / Find
 message OutputsRequest  {}
 message OutputsResponse { bytes outputs_json = 1; }          // {"output.name": value, ...}
 
-message EncodeSavedEntityRequest  { bytes entity = 1; bool highlight = 2; }
+// The four choices of Go's encoder, all off by default
+message EncodeOptions {
+  bool include_computed = 1;   // xcl.IncludeComputed()
+  bool include_empty    = 2;   // xcl.IncludeEmpty()
+  bool reveal_sensitive = 3;   // xcl.RevealSensitive()
+  bool show_references  = 4;   // xcl.ShowReferences()
+}
+
+message EncodeSavedEntityRequest  { bytes entity = 1; bool highlight = 2; EncodeOptions options = 3; }
 message EncodeSavedEntityResponse { bytes text = 1; }
+
+message EncodeEntityRequest  { bytes entity = 1; bool highlight = 2; EncodeOptions options = 3; }
+message EncodeEntityResponse { bytes text = 1; }
 ```
 
 `Find[T]`, `FindByType[T]`, `FindOne[T]` and `All[T]` are Go generics; their type parameter does two things, picks the address segments (`All`) and converts the entity. Over the wire the host passes the segments and does the conversion itself, so `All[T]` becomes `FindByType` with the segments the host derived from its `@xcl.entity("database", "postgres")` registration. Entities returned by lookups are serialised through `encoding/json`, so every sensitive value is the marker `"(sensitive)"`; a host never receives a secret from a lookup, which is what `query_sensitive.go` guarantees to Go callers. Provider tasks are the exception: they carry real values through `internal/wire`, as they do for Go providers.
+
+Encoding an entity as configuration text is a lookup too, refused while an operation runs. `EncodeSavedEntity` renders a saved record, as state stores it and events carry it, through `Config.EncodeSavedEntity`. `EncodeEntity` renders an entity's record in the shape a lookup returns it, possibly edited by the host or built by hand, through `Config.EncodeEntityRecord`. Both take `EncodeOptions`, the four choices of Go's encoder, and an unset `options` is Go's default output, so a saved-record call that sends none renders as it always has. Because a lookup's record holds the marker for every sensitive field, set or not, `EncodeEntity` fills each sensitive value still holding the marker from the engine's own copy of the entity, found by `meta.id`, so the text is what Go writes for that entity: the marker for a set value, the configured value with `reveal_sensitive`, and nothing for one never set; an empty list or map, which the lookup left out of its JSON, is taken from the same copy. A value the host holds for real, such as an edit or a value in a record built by hand, is shown as it is, and a record whose id names nothing is not filled. A host builds the record from its own object; an SDK that hydrated the object from a lookup writes each field it has not changed exactly as the lookup returned it, so values the host language filled in, such as defaults, do not reach the text. Both calls go through the one rendering path Go's `EncodeEntity` uses, so the text is identical to Go's, and `highlight` applies the terminal colouring after rendering, the same for both.
 
 ### Types
 
