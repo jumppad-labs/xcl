@@ -6,8 +6,9 @@
 //	parity -fixture <dir> -plugins <dir> -out <file>
 //
 // The record covers, in order: validate, diff before the apply, apply,
-// entities and outputs after it, the state written, the diff of the changed
-// configuration when the fixture has one, entities after a load in a new
+// entities and outputs after it, the state written, the configuration text
+// of every entity under each combination of the encode choices, the diff of
+// the changed configuration when the fixture has one, entities after a load in a new
 // process, and destroy. Temporary paths are replaced by <tmp> and the fixture
 // directory by <fixture>, and nothing in the record depends on time, so two
 // runs of one fixture give the same record.
@@ -31,6 +32,7 @@ import (
 	"github.com/jumppad-labs/xcl"
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/registry"
+	"github.com/jumppad-labs/xcl/types"
 )
 
 // recordingPluginName is the file name of the recording fixture plugin
@@ -90,6 +92,10 @@ type fixtureFiles struct {
 	changed   string
 	types     [][]byte
 	variables map[string]any
+
+	// handBuilt lists the addresses of the entities a binding builds by hand
+	// for the encode stage, from hand_built.json
+	handBuilt []string
 }
 
 func readFixture(dir string) (*fixtureFiles, error) {
@@ -127,6 +133,13 @@ func readFixture(dir string) (*fixtureFiles, error) {
 	if err == nil {
 		if err := json.Unmarshal(variablesJSON, &f.variables); err != nil {
 			return nil, fmt.Errorf("fixture %s: variables.json: %w", dir, err)
+		}
+	}
+
+	handBuiltJSON, err := os.ReadFile(filepath.Join(abs, "hand_built.json"))
+	if err == nil {
+		if err := json.Unmarshal(handBuiltJSON, &f.handBuilt); err != nil {
+			return nil, fmt.Errorf("fixture %s: hand_built.json: %w", dir, err)
 		}
 	}
 
@@ -220,6 +233,7 @@ func run(fixtureDir, plugins string) (map[string]any, error) {
 	record["entities"] = n.entities(c.Entities())
 	record["outputs"] = n.value(c.Outputs())
 	record["state"] = n.state(stateDir)
+	record["encode"] = n.encode(c, stateDir, f.handBuilt)
 
 	if f.changed != "" {
 		record["diff_changed"] = n.diff(c.Diff([]string{f.changed}))
@@ -403,6 +417,156 @@ func (n *normaliser) state(stateDir string) any {
 	sortByID(rendered)
 
 	return rendered
+}
+
+// encodeChoice is one of the encode choices, named as the record names it
+type encodeChoice struct {
+	name   string
+	option xcl.EncodeOption
+}
+
+// encodeChoices are the four encode choices, in the order their names are
+// joined in a combination's name
+var encodeChoices = []encodeChoice{
+	{name: "computed", option: xcl.IncludeComputed()},
+	{name: "empty", option: xcl.IncludeEmpty()},
+	{name: "reveal", option: xcl.RevealSensitive()},
+	{name: "references", option: xcl.ShowReferences()},
+}
+
+// encodeCombination is one combination of the encode choices
+type encodeCombination struct {
+	name    string
+	options []xcl.EncodeOption
+}
+
+// encodeCombinations returns all sixteen combinations of the encode choices.
+// A combination is named by the choices it turns on, joined with + in the
+// order of encodeChoices, and none when it turns on none.
+func encodeCombinations() []encodeCombination {
+	combinations := []encodeCombination{}
+
+	for mask := 0; mask < 1<<len(encodeChoices); mask++ {
+		names := []string{}
+		options := []xcl.EncodeOption{}
+
+		for bit, choice := range encodeChoices {
+			if mask&(1<<bit) != 0 {
+				names = append(names, choice.name)
+				options = append(options, choice.option)
+			}
+		}
+
+		name := "none"
+		if len(names) > 0 {
+			name = strings.Join(names, "+")
+		}
+
+		combinations = append(combinations, encodeCombination{name: name, options: options})
+	}
+
+	return combinations
+}
+
+// isBuiltinType reports whether a block type is one of xcl's own, which the
+// encoder refuses and the encode stage leaves out
+func isBuiltinType(blockType string) bool {
+	switch blockType {
+	case "variable", "output", "module", "root":
+		return true
+	}
+
+	return false
+}
+
+// encode records, for every entity that is not a builtin, keyed by its
+// address, its configuration text under every combination of the encode
+// choices: looked_up, the entity the Config holds, as a binding's lookup
+// hands it out; saved, its record in state; and, for the addresses the
+// fixture lists in hand_built.json, hand_built, the text a binding's hand
+// built copy of it must give, which is the entity's own. A failure is
+// recorded as its outcome.
+func (n *normaliser) encode(c *xcl.Config, stateDir string, handBuilt []string) map[string]any {
+	saved := n.savedRecords(stateDir)
+
+	listed := map[string]bool{}
+	for _, address := range handBuilt {
+		listed[address] = true
+	}
+
+	encoded := map[string]any{}
+
+	for _, entity := range c.Entities() {
+		meta, err := types.GetMeta(entity)
+		if err != nil || isBuiltinType(meta.Type) {
+			continue
+		}
+
+		lookedUp := map[string]any{}
+		savedTexts := map[string]any{}
+
+		for _, combination := range encodeCombinations() {
+			lookedUp[combination.name] = n.encodedText(xcl.EncodeEntity(entity, combination.options...))
+
+			record, found := saved[meta.ID]
+			if !found {
+				savedTexts[combination.name] = map[string]any{"ok": false, "error": map[string]any{"code": "missing_saved_record"}}
+				continue
+			}
+
+			savedTexts[combination.name] = n.encodedText(c.EncodeSavedEntity(record, combination.options...))
+		}
+
+		texts := map[string]any{"looked_up": lookedUp, "saved": savedTexts}
+		if listed[meta.ID] {
+			texts["hand_built"] = lookedUp
+		}
+
+		encoded[meta.ID] = texts
+	}
+
+	return encoded
+}
+
+// savedRecords returns the records of the state directory by entity id
+func (n *normaliser) savedRecords(stateDir string) map[string][]byte {
+	records := map[string][]byte{}
+
+	data, err := os.ReadFile(filepath.Join(stateDir, "state.json"))
+	if err != nil {
+		return records
+	}
+
+	var raw []json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return records
+	}
+
+	for _, record := range raw {
+		var identity struct {
+			Meta struct {
+				ID string `json:"id"`
+			} `json:"meta"`
+		}
+
+		if err := json.Unmarshal(record, &identity); err != nil {
+			continue
+		}
+
+		records[identity.Meta.ID] = record
+	}
+
+	return records
+}
+
+// encodedText renders encoded text with the run's paths replaced, or the
+// error it failed with
+func (n *normaliser) encodedText(text []byte, err error) any {
+	if err != nil {
+		return n.outcome(err)
+	}
+
+	return n.text(string(text))
 }
 
 // value renders any value through JSON and replaces the run's paths

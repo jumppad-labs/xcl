@@ -153,6 +153,7 @@ func TestParityRecordCoversEveryStage(t *testing.T) {
 		"entities",
 		"outputs",
 		"state",
+		"encode",
 		"diff_changed",
 		"load",
 		"destroy",
@@ -219,7 +220,9 @@ func TestParityInvalidFixtureReportsEveryProblem(t *testing.T) {
 		"entities",
 		"outputs",
 		"state",
+		"encode",
 	}, keysOf(record))
+	require.Empty(t, record["encode"])
 
 	validate := record["validate"].(map[string]any)
 	require.Equal(t, false, validate["ok"])
@@ -330,4 +333,138 @@ func TestParityMissingFixtureFails(t *testing.T) {
 	require.ErrorAs(t, err, &exitErr)
 	require.NotEqual(t, 0, exitErr.ExitCode())
 	require.Contains(t, stderr.String(), "main.xcl")
+}
+
+// encodeCombinationNames are the sixteen names of the encode combinations, as
+// the record keys them
+var encodeCombinationNames = []string{
+	"none",
+	"computed",
+	"empty",
+	"computed+empty",
+	"reveal",
+	"computed+reveal",
+	"empty+reveal",
+	"computed+empty+reveal",
+	"references",
+	"computed+references",
+	"empty+references",
+	"computed+empty+references",
+	"reveal+references",
+	"computed+reveal+references",
+	"empty+reveal+references",
+	"computed+empty+reveal+references",
+}
+
+// encoded returns the encode section of a record for one entity
+func encoded(t *testing.T, record map[string]any, id string) map[string]any {
+	t.Helper()
+
+	section, ok := record["encode"].(map[string]any)
+	require.True(t, ok, "encode is %T, not an object", record["encode"])
+
+	texts, ok := section[id].(map[string]any)
+	require.True(t, ok, "no encode texts for %q in %v", id, keysOf(section))
+
+	return texts
+}
+
+func TestParityRecordsEncodeSection(t *testing.T) {
+	record := runParity(t, "annotations")
+
+	texts := encoded(t, record, "app.web")
+	require.ElementsMatch(t, []string{"looked_up", "saved"}, keysOf(texts))
+
+	lookedUp := texts["looked_up"].(map[string]any)
+	require.ElementsMatch(t, encodeCombinationNames, keysOf(lookedUp))
+
+	saved := texts["saved"].(map[string]any)
+	require.ElementsMatch(t, encodeCombinationNames, keysOf(saved))
+
+	require.True(t, strings.HasPrefix(lookedUp["none"].(string), `app "web" {`))
+	require.Contains(t, lookedUp["none"], `password = "(sensitive)"`)
+	require.Contains(t, lookedUp["reveal"], `password = "s3cret"`)
+}
+
+func TestParityEncodeLeavesOutBuiltins(t *testing.T) {
+	record := runParity(t, "outputs")
+
+	section := record["encode"].(map[string]any)
+	require.NotEmpty(t, section)
+
+	for id := range section {
+		require.False(t, strings.HasPrefix(id, "output."), "the encode section holds %s", id)
+		require.False(t, strings.HasPrefix(id, "variable."), "the encode section holds %s", id)
+		require.False(t, strings.HasPrefix(id, "module."), "the encode section holds %s", id)
+	}
+}
+
+func TestParityEncodeHandBuiltForListedAddress(t *testing.T) {
+	record := runParity(t, "encode")
+
+	store := encoded(t, record, "store.postgres.main")
+	require.ElementsMatch(t, []string{"looked_up", "saved", "hand_built"}, keysOf(store))
+	require.Equal(t, store["looked_up"], store["hand_built"])
+}
+
+func TestParityEncodeNoHandBuiltForUnlistedAddress(t *testing.T) {
+	record := runParity(t, "encode")
+
+	service := encoded(t, record, "service.api")
+	require.ElementsMatch(t, []string{"looked_up", "saved"}, keysOf(service))
+}
+
+func TestParityEncodeFixtureLeavesOutEmptyByDefault(t *testing.T) {
+	record := runParity(t, "encode")
+
+	lookedUp := encoded(t, record, "store.postgres.main")["looked_up"].(map[string]any)
+
+	require.Equal(t, `store "postgres" "main" {
+  address  = "10.0.0.1"
+  password = "(sensitive)"
+  tags     = []
+}
+`, lookedUp["none"])
+}
+
+func TestParityEncodeFixtureWritesEmptyWhenAsked(t *testing.T) {
+	record := runParity(t, "encode")
+
+	lookedUp := encoded(t, record, "store.postgres.main")["looked_up"].(map[string]any)
+
+	require.Equal(t, `store "postgres" "main" {
+  address  = "10.0.0.1"
+  password = "(sensitive)"
+  note     = ""
+  port     = 0
+  tags     = []
+  labels   = {}
+}
+`, lookedUp["empty"])
+}
+
+func TestParityEncodeFixtureShowsReferences(t *testing.T) {
+	record := runParity(t, "encode")
+
+	lookedUp := encoded(t, record, "service.api")["looked_up"].(map[string]any)
+
+	require.Equal(t, `service "api" {
+  location = store.postgres.main.address
+  secret   = store.postgres.main.password
+  token    = "(sensitive)"
+}
+`, lookedUp["references"])
+}
+
+func TestParityEncodeFixtureRevealsSensitiveTemplateWithReferences(t *testing.T) {
+	record := runParity(t, "encode")
+
+	lookedUp := encoded(t, record, "service.api")["looked_up"].(map[string]any)
+
+	require.Equal(t, `service "api" {
+  location = store.postgres.main.address
+  secret   = store.postgres.main.password
+  token    = "${store.postgres.main.password}-x"
+}
+`, lookedUp["reveal+references"])
 }

@@ -1,0 +1,11 @@
+store "postgres" "main" {
+  address  = "10.0.0.1"
+  password = "s3cret"
+  tags     = []
+}
+
+service "api" {
+  location = store.postgres.main.address
+  secret   = store.postgres.main.password
+  token    = "${store.postgres.main.password}-x"
+}

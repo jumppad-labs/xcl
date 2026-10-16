@@ -3,6 +3,7 @@ package coreservice
 import (
 	"encoding/json"
 
+	"github.com/jumppad-labs/xcl"
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
 	"github.com/jumppad-labs/xcl/highlight"
 )
@@ -118,24 +119,79 @@ func (s *Service) outputs(conf *configuration, _ *corepb.OutputsRequest) (*corep
 }
 
 // encodeSavedEntity is EncodeSavedEntity, a saved record rendered as
-// configuration text, coloured for a terminal when asked.
+// configuration text with the encoding choices asked for, coloured for a
+// terminal when asked.
 func (s *Service) encodeSavedEntity(conf *configuration, req *corepb.EncodeSavedEntityRequest) (*corepb.EncodeSavedEntityResponse, error) {
-	if err := conf.lookupAllowed("EncodeSavedEntity"); err != nil {
+	if err := encodeAllowed(conf, "EncodeSavedEntity", req.GetEntity()); err != nil {
 		return nil, err
 	}
 
-	if len(req.GetEntity()) == 0 {
-		return nil, invalidArgument("an entity is required", "argument", "entity")
-	}
-
-	text, err := conf.cfg.EncodeSavedEntity(req.GetEntity())
+	text, err := conf.cfg.EncodeSavedEntity(req.GetEntity(), encodeOptions(req.GetOptions())...)
 	if err != nil {
 		return nil, err
 	}
 
-	if req.GetHighlight() {
-		text = highlight.ANSI.Render(highlight.Pieces(text))
+	return &corepb.EncodeSavedEntityResponse{Text: colour(text, req.GetHighlight())}, nil
+}
+
+// encodeEntity is EncodeEntity, an entity's record as a lookup returns it,
+// possibly edited, rendered as configuration text. With reveal_sensitive the
+// engine fills a marker from its own copy of the entity, since a lookup only
+// ever hands out the marker.
+func (s *Service) encodeEntity(conf *configuration, req *corepb.EncodeEntityRequest) (*corepb.EncodeEntityResponse, error) {
+	if err := encodeAllowed(conf, "EncodeEntity", req.GetEntity()); err != nil {
+		return nil, err
 	}
 
-	return &corepb.EncodeSavedEntityResponse{Text: text}, nil
+	text, err := conf.cfg.EncodeEntityRecord(req.GetEntity(), encodeOptions(req.GetOptions())...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &corepb.EncodeEntityResponse{Text: colour(text, req.GetHighlight())}, nil
+}
+
+// encodeAllowed refuses an encode while an operation runs, as every lookup
+// is, and an encode of no record at all. Both encode calls share it, so they
+// refuse alike.
+func encodeAllowed(conf *configuration, what string, entity []byte) error {
+	if err := conf.lookupAllowed(what); err != nil {
+		return err
+	}
+
+	if len(entity) == 0 {
+		return invalidArgument("an entity is required", "argument", "entity")
+	}
+
+	return nil
+}
+
+// encodeOptions translates the protocol's encoding choices into Go's encode
+// options. No options, or every choice off, is Go's default output.
+func encodeOptions(options *corepb.EncodeOptions) []xcl.EncodeOption {
+	encode := []xcl.EncodeOption{}
+	if options.GetIncludeComputed() {
+		encode = append(encode, xcl.IncludeComputed())
+	}
+	if options.GetIncludeEmpty() {
+		encode = append(encode, xcl.IncludeEmpty())
+	}
+	if options.GetRevealSensitive() {
+		encode = append(encode, xcl.RevealSensitive())
+	}
+	if options.GetShowReferences() {
+		encode = append(encode, xcl.ShowReferences())
+	}
+
+	return encode
+}
+
+// colour applies the terminal highlighting both encode calls offer, after
+// rendering, so the same text is coloured the same from either call.
+func colour(text []byte, on bool) []byte {
+	if !on {
+		return text
+	}
+
+	return highlight.ANSI.Render(highlight.Pieces(text))
 }
