@@ -1,5 +1,15 @@
 # Changelog
 
+## 20261016064106-8931613a-python-encode-entity
+
+A host can turn any entity it holds into configuration text with Go's encoding choices. The core service gains `EncodeEntity`, a lookup that takes an entity's JSON record in the shape `Entities`, `Find`, `FindByType` and `FindOne` return it, possibly edited by the host or built by hand, with `highlight` and an `EncodeOptions` message carrying `include_computed`, `include_empty`, `reveal_sensitive` and `show_references`, the four choices of Go's encoder. `EncodeSavedEntity` takes the same `options`; a call that sends none renders exactly as before. Like every lookup, both are refused with `operation_in_progress` while an operation runs, and both colour the text after rendering, so the same entity gives the same coloured text from either call.
+
+Go programs get the same capability as the additive `Config.EncodeEntityRecord(data, options...)`, which renders such a record through the one path `EncodeEntity` and `EncodeSavedEntity` share, so the text is identical to `EncodeEntity` on the entity itself. A lookup's record holds the sensitive marker for every sensitive field, set or not, so each value still holding the marker is filled from the Config's own copy of the entity its `meta.id` names: the text shows the marker for a set value, the configured value with `RevealSensitive`, and nothing for a value never set, exactly as `EncodeEntity` writes it. An empty list or map, which a lookup's JSON leaves out, is taken from the same copy, so a configured `tags = []` is written as Go writes it. A sensitive value the record holds for real, such as an edit, is shown as it is, and a record with no `meta.id`, or one that names nothing, keeps the marker without failing. An event entity kept and encoded after its operation is filled the same way and so reveals the engine's current value, where Go's event data always shows the marker. It fails with the errors `EncodeSavedEntity` returns.
+
+**Breaking:**
+
+None.
+
 ## 20261011232013-da18c586-python-release-hardening
 
 A plugin release signed by a key that is not trusted now says which key signed it. The GitHub registry still refuses it with `ErrPluginVerification` and the same "signature `<name>_<version>_checksums.txt.sig` does not verify against any trusted key" wording, and now ends the message with "signed by key `<long key ID>`, which is not trusted", the 16-hex-digit ID read from the signature's issuer, so whoever installs the plugin can see which key they would need to trust. Every binding reports the engine's message as it is, so Python's `PluginVerificationError` carries it too. A tampered, unsigned or correctly signed release is handled exactly as before, and a signature that cannot be read for its issuer keeps the previous message. The shared test helper `internal/testutil.FakeGitHubRelease` gains `OtherKeyID`, the long ID of the key `SignedByOtherKey` signs with.

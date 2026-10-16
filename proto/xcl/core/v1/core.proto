@@ -44,6 +44,11 @@ service CoreService {
   rpc FindOne(FindByTypeRequest) returns (EntityResponse);
   rpc Outputs(OutputsRequest) returns (OutputsResponse);
   rpc EncodeSavedEntity(EncodeSavedEntityRequest) returns (EncodeSavedEntityResponse);
+
+  // EncodeEntity is Config.EncodeEntityRecord: it renders an entity's JSON
+  // record, as a lookup returns it and possibly edited, as configuration
+  // text. Like the other lookups it is refused while an operation runs.
+  rpc EncodeEntity(EncodeEntityRequest) returns (EncodeEntityResponse);
 }
 
 // Error is every application error, crossing as one message. code is stable
@@ -289,11 +294,36 @@ message OutputsResponse {
   bytes outputs_json = 1;                    // {"output.name": value, ...}
 }
 
+// EncodeOptions are the four choices of Go's encoder. Every field defaults to
+// false, which is Go's default output.
+message EncodeOptions {
+  bool include_computed = 1;                 // xcl.IncludeComputed()
+  bool include_empty = 2;                    // xcl.IncludeEmpty()
+  bool reveal_sensitive = 3;                 // xcl.RevealSensitive()
+  bool show_references = 4;                  // xcl.ShowReferences()
+}
+
 message EncodeSavedEntityRequest {
   bytes entity = 1;
   bool highlight = 2;
+  EncodeOptions options = 3;                 // absent renders with Go's defaults
 }
 
 message EncodeSavedEntityResponse {
+  bytes text = 1;
+}
+
+// EncodeEntityRequest carries an entity's JSON record in the shape a lookup
+// returns it, possibly edited: meta, disabled and depends_on beside it, and
+// fields under their schema names. A sensitive field holds its real value or
+// the marker; with reveal_sensitive the engine fills a marker from its own
+// copy of the entity named by meta.id.
+message EncodeEntityRequest {
+  bytes entity = 1;
+  bool highlight = 2;
+  EncodeOptions options = 3;                 // absent renders with Go's defaults
+}
+
+message EncodeEntityResponse {
   bytes text = 1;
 }

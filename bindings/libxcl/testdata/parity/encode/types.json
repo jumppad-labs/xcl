@@ -1,0 +1,15 @@
+[
+  {"schema_version": 1, "type": "store", "subtype": "postgres", "fields": [
+    {"name": "address", "type": "string"},
+    {"name": "password", "type": "string", "sensitive": true},
+    {"name": "note", "type": "string", "optional": true, "default": ""},
+    {"name": "port", "type": "number", "format": "int", "optional": true, "nullable": true},
+    {"name": "tags", "type": {"list": "string"}, "optional": true},
+    {"name": "labels", "type": {"map": "string"}, "optional": true, "nullable": true}
+  ]},
+  {"schema_version": 1, "type": "service", "fields": [
+    {"name": "location", "type": "string"},
+    {"name": "secret", "type": "string", "optional": true, "sensitive": true},
+    {"name": "token", "type": "string", "optional": true, "sensitive": true}
+  ]}
+]

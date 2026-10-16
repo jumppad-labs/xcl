@@ -749,6 +749,46 @@ func TestLookupDuringOperationRefused(t *testing.T) {
 	require.Nil(t, c.drive(f.handle, opID, nil, nil).GetError())
 }
 
+func TestEncodeEntityDuringOperationRefused(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	f := newPluginConfig(t, c)
+
+	started, release := holdCreate(f.plugin, "resource.network.first")
+
+	opID := c.start(f.handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, chainConfig)}})
+	waitStarted(t, started, release)
+
+	record := []byte(`{"meta":{"id":"resource.network.first","name":"first","type":"resource","subtype":"network"},"subnet":"10.0.0.0/16"}`)
+
+	out := c.fail(f.handle, "EncodeEntity", &corepb.EncodeEntityRequest{Entity: record})
+	require.Equal(t, CodeOperationInProgress, out.GetCode())
+
+	close(release)
+	require.Nil(t, c.drive(f.handle, opID, nil, nil).GetError())
+}
+
+func TestEncodeSavedEntityDuringOperationRefused(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	f := newPluginConfig(t, c)
+
+	started, release := holdCreate(f.plugin, "resource.network.first")
+
+	opID := c.start(f.handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, chainConfig)}})
+	waitStarted(t, started, release)
+
+	record := []byte(`{"meta":{"id":"resource.network.first","name":"first","type":"resource","subtype":"network"},"subnet":"10.0.0.0/16"}`)
+
+	out := c.fail(f.handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{Entity: record})
+	require.Equal(t, CodeOperationInProgress, out.GetCode())
+
+	close(release)
+	require.Nil(t, c.drive(f.handle, opID, nil, nil).GetError())
+}
+
 func TestLateCompleteIsInvalidArgument(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 

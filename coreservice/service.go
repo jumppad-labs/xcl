@@ -223,4 +223,5 @@ var handlers = map[string]handler{
 	"FindOne":           unary(true, (*Service).findOne),
 	"Outputs":           unary(true, (*Service).outputs),
 	"EncodeSavedEntity": unary(true, (*Service).encodeSavedEntity),
+	"EncodeEntity":      unary(true, (*Service).encodeEntity),
 }
