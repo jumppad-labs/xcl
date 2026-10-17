@@ -468,3 +468,27 @@ func TestParityEncodeFixtureRevealsSensitiveTemplateWithReferences(t *testing.T)
 }
 `, lookedUp["reveal+references"])
 }
+
+func TestNormaliserReplacesTmpEscapedInConfigurationText(t *testing.T) {
+	n := &normaliser{tmp: `C:\Temp\xcl-parity-1`, fixture: `D:\fixtures\plugin_entities`}
+
+	text := n.text(`log = "C:\\Temp\\xcl-parity-1/recording.log"`)
+
+	require.Equal(t, `log = "<tmp>/recording.log"`, text)
+}
+
+func TestNormaliserReplacesFixtureEscapedInConfigurationText(t *testing.T) {
+	n := &normaliser{tmp: `C:\Temp\xcl-parity-1`, fixture: `D:\fixtures\plugin_entities`}
+
+	text := n.text(`source = "D:\\fixtures\\plugin_entities\\main.xcl"`)
+
+	require.Equal(t, `source = "<fixture>\\main.xcl"`, text)
+}
+
+func TestNormaliserReplacesTmpAsWritten(t *testing.T) {
+	n := &normaliser{tmp: `C:\Temp\xcl-parity-1`, fixture: `D:\fixtures\plugin_entities`}
+
+	text := n.text(`C:\Temp\xcl-parity-1\state`)
+
+	require.Equal(t, `<tmp>\state`, text)
+}
