@@ -1,62 +1,32 @@
-# Working context: plan for 20261016064106-8931613a-python-encode-entity
+# Working context: epic 20261023074219-4357d314-printing-and-pretty-output
 
-## Workflow
-- Plan workflow started 2026-10-16 against spec 20261016064106-8931613a-python-encode-entity
-  (final). Spec references design `design:libxcl.md` (Lookups section to update).
-- auto_commit is off.
+## How the user wants this run
 
-## Carried from the spec session
-- User's words: "We need to be able to use the Encode entity from python with the same
-  features that we can from the go api. It should use the shared library where possible
-  and minimize any custom python code."
-- Repos: xcl (engine / core proto / libxcl), xcl-python (SDK, PARITY.md, README),
-  xcl-website (Python guide + API reference). Not other bindings.
-- Breaking changes to core-service messages are fine (xcl unreleased).
+- **Unattended.** The user: "I do not want to be asked every thirty seconds about my feelings on every individual sections of the spec process. I would like you to do it, I can do something else then I review later." Drive every step from the conversation; the user reviews all specs afterwards. (hivecommons/spektacular#94.)
+- Large documents: write and link, do not print in the terminal (hivecommons/spektacular#93).
+- Docs ship inside each spec (xcl-website, README, PARITY.md); no separate docs spec.
+- Keep process notes and user quotes out of spec text (reviewer flagged them as leaks); provenance lives here.
 
-## Presentation note
-- Over remote control, text sent alongside a dialog was not visible to the user. Present
-  drafts as plain chat text and ask for confirmation in text, not via AskUserQuestion.
+## Specs, in order
 
-## Plan progress
-- overview: spec read.
-- discovery: repos xcl, xcl-python, xcl-website. Design libxcl.md resolved and read.
-  Interview notes absent (normal). Relevant knowledge: custom-marshaljson-changes-internal-hops,
-  xcl-tags-gate-what-reaches-cty, save-state-through-encodeforstate, expression-text-lost-at-parse,
-  links-are-attribute-paths, secret-fixture-for-sensitive-tests (registered.Secret), testing conventions
-  (no table tests, no tests reading docs). Research agents launched (Go, Python, docs+prior specs).
-- discovery research.md + assumptions.md written to .spektacular/work/<plan>/.
-  Key findings: Go encoder is encode.go (options IncludeComputed/IncludeEmpty/RevealSensitive/
-  ShowReferences; highlight is a separate step). coreservice EncodeSavedEntity ignores options today.
-  Lookup JSON carries the marker; Go shows real values because it encodes the stored pointer.
-  No Python instance->record serialiser exists; write as mirror of _schema.hydrate.
-  Unmerged earlier attempt branch origin/spek/20261015072147-b41720ce-python-encoder (9c5dc1f) is
-  reference only (wrong reveal semantics, old base).
-  xcl-website has NO Python guide / API reference page; encoding docs are configuration-text.mdx tabs.
-- USER ANSWERS (discovery):
-  1. Website: treat configuration-text.mdx Python tabs (+ events.mdx mentions) as the Python guide;
-     no API reference page exists, none is created.
-  2. Event entities: engine fills by meta.id for every record, so a kept event entity with reveal
-     shows the engine's current real value; differs from Go for masked event data; document it.
-- architecture: chosen = new EncodeEntity RPC + shared EncodeOptions msg; Go public
-  (*Config).EncodeEntityRecord (decode, fill-by-meta.id on reveal, encodeEntity) in encode_record.go;
-  Python encode_entity + _schema.record_of; kwargs include_computed/include_empty/reveal_sensitive/
-  show_references/highlight; parity `encode` section (16 combos, looked_up + saved, hand_built list).
-- components drafted.
-- data_structures drafted (proto EncodeOptions/EncodeEntity*, Go EncodeEntityRecord, py encode_entity/record_of, parity encode section).
-- implementation_detail drafted.
-- dependencies drafted.
-- testing_approach drafted (metric -> parity behavioural; 4 manual doc reviews).
-- milestones drafted: M1 engine (xcl), M2 Python API (xcl-python), M3 parity (both), M4 website.
-- tasks drafted: 13 tasks (11 agent, 1 human release, ids from plan task-id). Titles avoid apostrophes/dots for anchors.
-- open_questions: one (plugin-type identity for fill).
-- out_of_scope drafted.
-- assemble: staged plan/context/research templates in .spektacular/tmp/<plan>/.
-- verification: passed (sections, 13 ids/repos, anchors ok, no commands in plan.md).
-- write_plan: plan.md committed.
-- write_context: context.md committed.
-- write_research: research.md committed; work dir removed. Next: walkthrough (read docs back via plan file read).
-- walkthrough: beat 1 (approach) accepted by user.
-- walkthrough: beat 2 (tasks) accepted.
-- walkthrough: beat 3 (out of scope) accepted.
-- walkthrough: beat 4 (assumptions) accepted; user signed off ('it looks good'). Advancing to finished.
-- FINISHED: plan approved and marked final (2026-10-16). Next: spek-implement.
+1. 20261023074223-e06f835f-event-data-level-enum (xcl-python) — done.
+2. 20261023074627-cc23fc08-encode-saved-entity-during-operation (xcl core service, pin bump in xcl-python) — no dependencies.
+3. printing-and-highlighting-core (xcl Go) — built to design/printing-and-highlighting.md.
+4. printing-and-highlighting-python (xcl-python) — depends on 3.
+5. python-prettylog (xcl-python `xcl.prettylog`) — depends on 1, 2, 4.
+TypeScript is in the design only; no package yet.
+
+## Decisions and the user's words
+
+- EventDataLevel: "an enum that is on the top level package"; "Enum only". Name after Go's xcl.EventDataLevel. Explicit None refused (reviewer raised it; kept strict, matches enum only).
+- Encode guard: user agreed to remove it from EncodeSavedEntity only, keep on EncodeEntity, after asking "I don't understand why the guard is there in the first place". Blocking in on_event deadlocks.
+- Error report regression since v0.8.0 (ParserError removed); user: "half done ... provides half the utility".
+- Highlight API: user dislikes renderer wrapping as non-idiomatic; wants renderers "a core feature for folks wanting to extend xcl"; custom colours, HTML, SVG. Design captured (final): native formatters, report tokens on every Error, chroma-style style strings, two-level kinds, HTML classes by default (from the vault-router project), HTMLInline, CSS from theme, no slog.LogValuer for now.
+- Loggers: "make sure that the adaptions is a simple as possible for the end user".
+- Pretty logger: like Go's example/prettylog, part of the xcl Python package, stdlib only.
+
+## Facts
+
+- xcl-python bundles the engine pinned in xcl-ref.txt (v0.11.1).
+- libxcl design's lookups section says every encode is refused mid-operation; needs a revision once spec 2 lands (flag to user, needs their agreement).
+- xcl-website problems page says "The report is not yet available from Python".

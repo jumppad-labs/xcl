@@ -1,0 +1,14 @@
+{
+	"folders": [
+    {
+      "path": "."
+    },
+    {
+      "path": "../xcl-website"
+    },
+    {
+      "path": "../xcl-python"
+    }
+  ],
+  "settings": {}
+}
