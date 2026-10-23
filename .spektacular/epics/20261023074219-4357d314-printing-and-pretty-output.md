@@ -5,9 +5,12 @@ specs:
     - name: 20261023074223-e06f835f-event-data-level-enum
       depends_on: []
     - name: 20261023074627-cc23fc08-encode-saved-entity-during-operation
-      depends_on: []
+      depends_on:
+        - 20261023074223-e06f835f-event-data-level-enum
     - name: 20261023074926-eaa51527-printing-and-highlighting-core
-      depends_on: []
+      depends_on:
+        - 20261023074223-e06f835f-event-data-level-enum
+        - 20261023074627-cc23fc08-encode-saved-entity-during-operation
     - name: 20261023075136-42c51a7d-printing-tokens-over-the-engine
       depends_on:
         - 20261023074926-eaa51527-printing-and-highlighting-core
