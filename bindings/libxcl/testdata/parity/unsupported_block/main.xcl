@@ -1,0 +1,10 @@
+app "web" {
+  image = "nginx"
+}
+
+app "api" {
+  image = "nginx"
+  timeout {
+    seconds = 5
+  }
+}

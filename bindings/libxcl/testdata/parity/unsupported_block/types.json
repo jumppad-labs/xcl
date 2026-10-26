@@ -1,0 +1,6 @@
+[
+  {"schema_version": 1, "type": "app", "fields": [
+    {"name": "image", "type": "string"},
+    {"name": "endpoint", "type": "string", "computed": true, "nullable": true}
+  ]}
+]

@@ -148,13 +148,19 @@ func TestParityRecordCoversEveryStage(t *testing.T) {
 
 	require.ElementsMatch(t, []string{
 		"validate",
+		"printed_validate",
 		"diff_before",
+		"printed_diff_before",
 		"apply",
+		"printed_apply",
 		"entities",
 		"outputs",
 		"state",
 		"encode",
+		"printed_entities",
 		"diff_changed",
+		"printed_diff_changed",
+		"log",
 		"load",
 		"destroy",
 		"after_destroy",
@@ -215,14 +221,20 @@ func TestParityInvalidFixtureReportsEveryProblem(t *testing.T) {
 
 	require.ElementsMatch(t, []string{
 		"validate",
+		"printed_validate",
 		"diff_before",
+		"printed_diff_before",
 		"apply",
+		"printed_apply",
 		"entities",
 		"outputs",
 		"state",
 		"encode",
+		"printed_entities",
+		"log",
 	}, keysOf(record))
 	require.Empty(t, record["encode"])
+	require.Empty(t, record["printed_entities"])
 
 	validate := record["validate"].(map[string]any)
 	require.Equal(t, false, validate["ok"])
@@ -491,4 +503,157 @@ func TestNormaliserReplacesTmpAsWritten(t *testing.T) {
 	text := n.text(`C:\Temp\xcl-parity-1\state`)
 
 	require.Equal(t, `<tmp>\state`, text)
+}
+
+func TestParityRecordIsDeterministicForUnsupportedBlock(t *testing.T) {
+	first := runParity(t, "unsupported_block")
+	second := runParity(t, "unsupported_block")
+
+	require.Equal(t, first, second)
+}
+
+func TestParityUnsupportedBlockPrintsReport(t *testing.T) {
+	record := runParity(t, "unsupported_block")
+
+	require.Equal(t, "Error: Unsupported block type\n"+
+		"\n"+
+		"  on <fixture>/main.xcl line 7, in app.api, field timeout[0]:\n"+
+		"     5 | app \"api\" {\n"+
+		"     6 |   image = \"nginx\"\n"+
+		"     7 |   timeout {\n"+
+		"     8 |     seconds = 5\n"+
+		"     9 |   }\n"+
+		"\n"+
+		"Blocks of type \"timeout\" are not expected here.\n"+
+		"\n", record["printed_apply"])
+}
+
+func TestParityUnsupportedBlockPrintsReportForValidate(t *testing.T) {
+	record := runParity(t, "unsupported_block")
+
+	require.Equal(t, record["printed_apply"], record["printed_validate"])
+	require.Contains(t, record["printed_validate"], "line 7")
+}
+
+func TestParityPrintedErrorEmptyWhenCallSucceeds(t *testing.T) {
+	record := runParity(t, "basic_types")
+
+	require.Equal(t, "", record["printed_validate"])
+	require.Equal(t, "", record["printed_apply"])
+}
+
+func TestParityPrintedEntitiesMatchPrintEntity(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	printed := record["printed_entities"].(map[string]any)
+	require.ElementsMatch(t, []string{"resource.recording.first", "resource.recording.second"}, keysOf(printed))
+	require.Equal(t, "resource \"recording\" \"first\" {\n"+
+		"  log    = \"<tmp>/recording.log\"\n"+
+		"  value  = \"one\"\n"+
+		"  output = \"first-one\" # set by the provider\n"+
+		"}\n", printed["resource.recording.first"])
+}
+
+func TestParityPrintedDiffChangedForPluginEntities(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	printed := record["printed_diff_changed"].(string)
+	require.Contains(t, printed, "  # resource.recording.first will be updated\n")
+	require.Contains(t, printed, `      ~ value = "one" -> "changed"`)
+	require.True(t, strings.HasSuffix(printed, "Diff: 0 to create, 2 to update, 0 to replace, 0 to delete, 0 unchanged.\n"), printed)
+}
+
+func TestParityPrintedDiffBeforeForPluginEntities(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	printed := record["printed_diff_before"].(string)
+	require.Contains(t, printed, "  # resource.recording.first will be created\n")
+	require.Contains(t, printed, "  + resource \"recording\" \"first\" {\n")
+	require.True(t, strings.HasSuffix(printed, "Diff: 2 to create, 0 to update, 0 to replace, 0 to delete, 0 unchanged.\n"), printed)
+}
+
+func TestParityPrintedDiffBeforeForConfigOnlyTypes(t *testing.T) {
+	record := runParity(t, "functions")
+
+	require.Equal(t, "Diff: no changes, 0 unchanged.\n", record["printed_diff_before"])
+}
+
+func TestParityPrintedDiffBeforeRecordsFailure(t *testing.T) {
+	record := runParity(t, "unsupported_block")
+
+	printed := record["printed_diff_before"].(map[string]any)
+	require.Equal(t, false, printed["ok"])
+}
+
+func TestParityNoPrintedDiffWithoutChangedConfiguration(t *testing.T) {
+	record := runParity(t, "functions")
+
+	require.NotContains(t, keysOf(record), "printed_diff_changed")
+}
+
+func TestParityLogRecordsApplyStart(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	require.Contains(t, record["log"], map[string]any{
+		"level":     "info",
+		"message":   "apply start",
+		"resource":  "",
+		"operation": "apply",
+	})
+}
+
+func TestParityLogRecordsCreateSuccessWithResource(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	require.Contains(t, record["log"], map[string]any{
+		"level":     "info",
+		"message":   "create success",
+		"resource":  "resource.recording.first",
+		"operation": "create",
+	})
+}
+
+func TestParityLogRecordsApplyErrorAtErrorLevel(t *testing.T) {
+	record := runParity(t, "unsupported_block")
+
+	require.Contains(t, record["log"], map[string]any{
+		"level":     "error",
+		"message":   "apply error",
+		"resource":  "",
+		"operation": "apply",
+	})
+}
+
+func TestParityLogIsSorted(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	keys := []string{}
+	for _, entry := range record["log"].([]any) {
+		e := entry.(map[string]any)
+		keys = append(keys, strings.Join([]string{e["operation"].(string), e["resource"].(string), e["level"].(string), e["message"].(string)}, "\x00"))
+	}
+
+	require.IsIncreasing(t, dedupe(keys))
+}
+
+func TestParityPrintedReportHasNoTempPaths(t *testing.T) {
+	raw := runParityRaw(t, "unsupported_block")
+
+	require.False(t, bytes.Contains(raw, []byte(os.TempDir())), "record leaks the temporary directory:\n%s", raw)
+	require.False(t, bytes.Contains(raw, []byte(fixtureDir(t, "unsupported_block"))), "record leaks the fixture directory:\n%s", raw)
+}
+
+// dedupe returns sorted keys with runs of equal keys collapsed, so a strictly
+// increasing check tells sorted from unsorted
+func dedupe(keys []string) []string {
+	out := []string{}
+	for _, key := range keys {
+		if len(out) > 0 && out[len(out)-1] == key {
+			continue
+		}
+
+		out = append(out, key)
+	}
+
+	return out
 }
