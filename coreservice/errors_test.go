@@ -1,15 +1,18 @@
 package coreservice
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/jumppad-labs/xcl"
+	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	hcl "github.com/jumppad-labs/xcl/internal/xcl"
 )
@@ -344,6 +347,20 @@ func TestErrorCodeOperationInProgress(t *testing.T) {
 	require.Nil(t, out.GetDetails())
 }
 
+func TestErrorCodeInvalidTheme(t *testing.T) {
+	out := toProto(&xclerrors.InvalidThemeError{Source: "theme", Reason: "r"})
+
+	require.Equal(t, CodeInvalidTheme, out.GetCode())
+	require.Equal(t, "theme", out.GetDetails()["source"])
+	require.Equal(t, "r", out.GetDetails()["reason"])
+}
+
+func TestErrorCodeInvalidThemeSentinel(t *testing.T) {
+	out := toProto(fmt.Errorf("loading: %w", xclerrors.ErrInvalidTheme))
+
+	require.Equal(t, CodeInvalidTheme, out.GetCode())
+}
+
 func TestErrorCodeInternal(t *testing.T) {
 	out := toProto(errors.New("x"))
 
@@ -377,4 +394,128 @@ func TestConfigErrorListsCausesWithFileAndLine(t *testing.T) {
 	require.NotEmpty(t, cause.GetDetails()["column"])
 	require.Equal(t, "Missing required argument", cause.GetDetails()["summary"])
 	require.Contains(t, cause.GetDetails()["detail"], "image")
+}
+
+// joinTokens is the plain text of labelled text: its texts joined in order
+func joinTokens(tokens []*corepb.Token) string {
+	var out strings.Builder
+	for _, token := range tokens {
+		out.WriteString(token.GetText())
+	}
+
+	return out.String()
+}
+
+// hasKind reports whether any token is of kind
+func hasKind(tokens []*corepb.Token, kind corepb.TokenKind) bool {
+	for _, token := range tokens {
+		if token.GetKind() == kind {
+			return true
+		}
+	}
+
+	return false
+}
+
+// plainReport is err as xcl.PrintError prints it in plain text, its detail
+// unwrapped
+func plainReport(t *testing.T, err error) string {
+	t.Helper()
+
+	var out bytes.Buffer
+	require.NoError(t, xcl.PrintError(&out, err, xcl.WithWidth(0)))
+
+	return out.String()
+}
+
+func TestErrorReportOnDiagnostic(t *testing.T) {
+	d := unsupportedDiagnostic(hcl.DiagError)
+
+	out := toProto(d)
+
+	report := out.GetReport()
+	require.NotEmpty(t, report)
+	require.Equal(t, plainReport(t, d), joinTokens(report))
+	require.Equal(t, corepb.TokenKind_TOKEN_KIND_ERROR, report[0].GetKind())
+	require.Equal(t, "Error", report[0].GetText())
+	require.True(t, hasKind(report, corepb.TokenKind_TOKEN_KIND_GUTTER), "the report numbers its source lines")
+}
+
+func TestErrorReportOnConfigErrorAndEachCause(t *testing.T) {
+	first := unsupportedDiagnostic(hcl.DiagError)
+	second := xclerrors.NewDiagnostic(&hcl.Diagnostic{
+		Severity: hcl.DiagError,
+		Summary:  "Missing required argument",
+		Detail:   `The argument "image" is required.`,
+		Subject: &hcl.Range{
+			Filename: "main.xcl",
+			Start:    hcl.Pos{Line: 1, Column: 1},
+			End:      hcl.Pos{Line: 1, Column: 6},
+		},
+	}, map[string][]byte{"main.xcl": []byte("agent \"claude\" {\n  modls = [\"opus\"]\n}\n")})
+	err := &xclerrors.ConfigError{Errors: []error{first, second}}
+
+	out := toProto(err)
+
+	require.Equal(t, plainReport(t, err), joinTokens(out.GetReport()))
+	require.Len(t, out.GetCauses(), 2)
+	require.Equal(t, plainReport(t, first), joinTokens(out.GetCauses()[0].GetReport()))
+	require.Equal(t, plainReport(t, second), joinTokens(out.GetCauses()[1].GetReport()))
+}
+
+func TestErrorReportOnProviderDiagnostic(t *testing.T) {
+	failure := &xclerrors.ProviderError{Step: "create", Address: "resource.x", Err: errors.New("boom")}
+	d := xclerrors.NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "Provider error", Detail: failure.Error()}, nil)
+	d.Entity = "resource.x"
+	d.Cause = failure
+
+	out := toProto(d)
+
+	require.Equal(t, CodeProvider, out.GetCode())
+	require.NotEmpty(t, out.GetReport())
+	require.Equal(t, plainReport(t, d), joinTokens(out.GetReport()))
+}
+
+func TestErrorReportOnWrappedDiagnostic(t *testing.T) {
+	d := unsupportedDiagnostic(hcl.DiagError)
+
+	out := toProto(fmt.Errorf("loading: %w", d))
+
+	require.NotEmpty(t, out.GetReport())
+	require.Contains(t, joinTokens(out.GetReport()), "Unsupported argument")
+}
+
+func TestErrorReportDetailIsUnwrapped(t *testing.T) {
+	detail := strings.Repeat("this detail is long enough to be wrapped by a printer ", 3)
+	require.Greater(t, len(detail), 120)
+
+	d := xclerrors.NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "Long", Detail: detail}, nil)
+
+	out := toProto(d)
+
+	found := false
+	for _, token := range out.GetReport() {
+		if token.GetKind() == corepb.TokenKind_TOKEN_KIND_DETAIL {
+			found = true
+			require.NotContains(t, token.GetText(), "\n")
+		}
+	}
+	require.True(t, found, "the report has a detail")
+}
+
+func TestNoErrorReportOnNotFound(t *testing.T) {
+	err := &xclerrors.NotFoundError{Address: "app.nope"}
+
+	out := toProto(err)
+
+	require.Equal(t, CodeNotFound, out.GetCode())
+	require.Empty(t, out.GetReport())
+	require.Equal(t, err.Error(), out.GetMessage())
+}
+
+func TestNoErrorReportOnInternal(t *testing.T) {
+	out := toProto(errors.New("x"))
+
+	require.Empty(t, out.GetReport())
+	require.Equal(t, "x", out.GetMessage())
 }

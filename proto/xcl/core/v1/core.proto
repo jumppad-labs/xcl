@@ -5,9 +5,10 @@
 // machine-readable list of methods; nothing generates a server from it.
 //
 // Field numbers, method names and error codes are part of the ABI contract:
-// they are added and never renamed or reused. Numbers reserved below belong
-// to the host-provider parts of the design, which a later release adds with
-// the numbers the design gives them.
+// they are added and never renamed or reused. A field that is retired has
+// its number and its name reserved, so neither is used again. Numbers
+// reserved below without a name belong to the host-provider parts of the
+// design, which a later release adds with the numbers the design gives them.
 syntax = "proto3";
 
 package xcl.core.v1;
@@ -22,6 +23,13 @@ service CoreService {
   // CreateConfig is xcl.NewConfig: it takes handle 0 and returns the handle
   // of the configuration it created.
   rpc CreateConfig(CreateConfigRequest) returns (CreateConfigResponse);
+
+  // ConvertTheme turns a VS Code colour theme into a style string per
+  // TokenKind, through the core's TextMate selector rules, as Go's
+  // highlight.LoadVSCodeTheme does. It takes handle 0: no configuration is
+  // needed. A theme it cannot use fails with the code invalid_theme, whose
+  // details say the source and the reason.
+  rpc ConvertTheme(ConvertThemeRequest) returns (ConvertThemeResponse);
 
   // Operations start work on the handle and return at once. The host polls
   // until it receives an OperationFinished task for the operation.
@@ -68,6 +76,84 @@ message Error {
   // causes are the wrapped errors, in order, for an error that collects
   // several, such as a configuration that fails validation in three places.
   repeated Error causes = 4;
+  // report is the error's report as Go prints it with xcl.PrintError,
+  // labelled: its severity, summary, location, numbered source lines with
+  // the fault marked, and detail. It is laid out once, when the error is
+  // converted, and sent unwrapped: each language wraps the detail when it
+  // prints. It is set when the error holds a configuration problem, on this
+  // error and on each cause that holds one, including errors carried by
+  // events while an operation runs, and is empty otherwise.
+  repeated Token report = 5;
+}
+
+// TokenKind labels a piece of text. Values are numbered in blocks of 100:
+// the value ending in 00 is a category, and a value's category is
+// kind / 100 * 100, so a value a binding does not know still falls into its
+// category. The numbers are Go's highlight.Kind and are never renumbered;
+// each name is TOKEN_KIND_ and the Go name in upper snake case.
+enum TokenKind {
+  TOKEN_KIND_TEXT = 0;                       // unlabelled text: whitespace, braces, commas
+
+  TOKEN_KIND_BLOCK = 100;
+  TOKEN_KIND_BLOCK_TYPE = 101;
+  TOKEN_KIND_NESTED_BLOCK = 102;
+
+  TOKEN_KIND_LABEL = 200;
+  TOKEN_KIND_TYPE_LABEL = 201;
+  TOKEN_KIND_NAME_LABEL = 202;
+
+  TOKEN_KIND_ATTRIBUTE = 300;
+
+  TOKEN_KIND_STRING = 400;
+  TOKEN_KIND_STRING_ESCAPE = 401;
+  TOKEN_KIND_HEREDOC = 402;
+  TOKEN_KIND_HEREDOC_MARKER = 403;
+  TOKEN_KIND_HEREDOC_OPERATOR = 404;
+
+  TOKEN_KIND_NUMBER = 500;
+
+  TOKEN_KIND_CONSTANT = 600;
+
+  TOKEN_KIND_FUNCTION = 700;
+  TOKEN_KIND_BUILTIN_FUNCTION = 701;
+
+  TOKEN_KIND_REFERENCE = 800;
+  TOKEN_KIND_MEMBER = 801;
+
+  TOKEN_KIND_OPERATOR = 900;
+
+  TOKEN_KIND_PUNCTUATION = 1000;
+  TOKEN_KIND_INTERPOLATION_BEGIN = 1001;
+  TOKEN_KIND_INTERPOLATION_END = 1002;
+  TOKEN_KIND_TEMPLATE_DIRECTIVE = 1003;
+  TOKEN_KIND_ACCESSOR = 1004;
+
+  TOKEN_KIND_COMMENT = 1100;
+  TOKEN_KIND_LINE_COMMENT = 1101;
+  TOKEN_KIND_HASH_COMMENT = 1102;
+  TOKEN_KIND_BLOCK_COMMENT = 1103;
+
+  TOKEN_KIND_DIFF = 1200;
+  TOKEN_KIND_INSERTED = 1201;
+  TOKEN_KIND_DELETED = 1202;
+  TOKEN_KIND_CHANGED = 1203;
+
+  TOKEN_KIND_PROBLEM = 1300;
+  TOKEN_KIND_ERROR = 1301;
+  TOKEN_KIND_WARNING = 1302;
+
+  TOKEN_KIND_REPORT = 1400;
+  TOKEN_KIND_SUMMARY = 1401;
+  TOKEN_KIND_LOCATION = 1402;
+  TOKEN_KIND_GUTTER = 1403;
+  TOKEN_KIND_DETAIL = 1404;
+}
+
+// Token is a piece of labelled text. The texts of a list of tokens, joined in
+// order, are the plain text.
+message Token {
+  TokenKind kind = 1;
+  string text = 2;
 }
 
 message GetVersionRequest {}
@@ -77,6 +163,19 @@ message GetVersionResponse {
   string version = 1;
   // abi_version is the C ABI version the library implements.
   uint32 abi_version = 2;
+}
+
+message ConvertThemeRequest {
+  // vscode_theme_json is the theme file's bytes, JSON with comments and
+  // trailing commas allowed
+  bytes vscode_theme_json = 1;
+}
+
+message ConvertThemeResponse {
+  // styles maps a TokenKind number to its style string, such as
+  // "bold #ff8800". Only the kinds the theme styles appear; every other kind
+  // keeps the language's default style.
+  map<int32, string> styles = 1;
 }
 
 // CreateConfigRequest is the whole of xcl.NewConfig(opts...): every option
@@ -251,6 +350,10 @@ message OperationFinished {
   uint64 operation_id = 1;
   Error error = 2;                           // unset on success
   bytes diff_json = 3;                       // StartDiff: json.Marshal of the diff.Diff
+  // diff_tokens is, for StartDiff, the change summary Go prints with
+  // xcl.PrintDiff, labelled, for the same diff as diff_json. Other
+  // operations leave it empty.
+  repeated Token diff_tokens = 4;
 }
 
 message CompleteRequest {
@@ -310,12 +413,20 @@ message EncodeOptions {
 
 message EncodeSavedEntityRequest {
   bytes entity = 1;
-  bool highlight = 2;
+  // 2 was highlight, terminal colour applied by the engine; a request that
+  // still sets it is answered with plain text
+  reserved 2;
+  reserved "highlight";
   EncodeOptions options = 3;                 // absent renders with Go's defaults
+  // tokens asks for the text labelled as well, in the response's tokens
+  bool tokens = 4;
 }
 
 message EncodeSavedEntityResponse {
   bytes text = 1;
+  // tokens is the text labelled by the core's lexer, when the request asked
+  // for it; the texts joined are text
+  repeated Token tokens = 2;
 }
 
 // EncodeEntityRequest carries an entity's JSON record in the shape a lookup
@@ -325,10 +436,18 @@ message EncodeSavedEntityResponse {
 // copy of the entity named by meta.id.
 message EncodeEntityRequest {
   bytes entity = 1;
-  bool highlight = 2;
+  // 2 was highlight, terminal colour applied by the engine; a request that
+  // still sets it is answered with plain text
+  reserved 2;
+  reserved "highlight";
   EncodeOptions options = 3;                 // absent renders with Go's defaults
+  // tokens asks for the text labelled as well, in the response's tokens
+  bool tokens = 4;
 }
 
 message EncodeEntityResponse {
   bytes text = 1;
+  // tokens is the text labelled by the core's lexer, when the request asked
+  // for it; the texts joined are text
+  repeated Token tokens = 2;
 }

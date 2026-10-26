@@ -40,6 +40,7 @@ const (
 	CodeCancelled           = "cancelled"
 	CodeOperationInProgress = "operation_in_progress"
 	CodeInvalidArgument     = "invalid_argument"
+	CodeInvalidTheme        = "invalid_theme"
 	CodeInternal            = "internal"
 )
 
@@ -81,6 +82,11 @@ func pairs(kv []string) map[string]string {
 // toProto maps an error to the Error message a binding receives: its stable
 // code, its message, the fields of its detail type, and the errors it
 // collects as causes. Anything not matched is CodeInternal.
+//
+// An error holding a configuration problem also carries its report, as
+// xcl.PrintError prints it, labelled and unwrapped. Every error the engine
+// sends passes through here, from a call, a finished operation or an event,
+// and causes are converted here too, so each of them carries its own report.
 func toProto(err error) *corepb.Error {
 	if err == nil {
 		return nil
@@ -110,6 +116,7 @@ func toProto(err error) *corepb.Error {
 	var maskNotReversible *xclerrors.MaskNotReversibleError
 	var configError *xclerrors.ConfigError
 	var diagnostic *xclerrors.Diagnostic
+	var invalidTheme *xclerrors.InvalidThemeError
 
 	switch {
 	case errors.As(err, &coded):
@@ -117,6 +124,15 @@ func toProto(err error) *corepb.Error {
 		for k, v := range coded.details {
 			out.Details[k] = v
 		}
+
+	case errors.As(err, &invalidTheme):
+		// a colour theme ConvertTheme cannot use, with what was wrong
+		out.Code = CodeInvalidTheme
+		out.Details["source"] = invalidTheme.Source
+		out.Details["reason"] = invalidTheme.Reason
+
+	case errors.Is(err, xclerrors.ErrInvalidTheme):
+		out.Code = CodeInvalidTheme
 
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		out.Code = CodeCancelled
@@ -327,5 +343,19 @@ func toProto(err error) *corepb.Error {
 		out.Details = nil
 	}
 
+	if holdsProblem(err) {
+		out.Report = tokensToProto(xcl.ErrorTokens(err))
+	}
+
 	return out
+}
+
+// holdsProblem reports whether err holds a configuration problem: a
+// diagnostic anywhere in its tree, reached through ConfigError's and
+// Diagnostics' lists of errors and through %w wrapping. A provider failure
+// the parser reports at its block is a diagnostic too, so it has a report
+// though its code is provider.
+func holdsProblem(err error) bool {
+	var diagnostic *xclerrors.Diagnostic
+	return errors.As(err, &diagnostic)
 }

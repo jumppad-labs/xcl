@@ -27,7 +27,7 @@ uint32_t xcl_abi_version(void);
 
 /* Dispatches one CoreService method.
    handle   a configuration handle from CreateConfig, or 0 for a method that
-            needs none (CreateConfig, GetVersion).
+            needs none (CreateConfig, GetVersion, ConvertTheme).
    method   the CoreService method name, NUL terminated, e.g. "StartApply".
    req      the serialised request message; read during the call only.
    resp     on return, a buffer the caller frees with xcl_free; NULL when
