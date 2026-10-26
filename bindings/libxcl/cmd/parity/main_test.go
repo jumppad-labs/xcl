@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -161,6 +162,7 @@ func TestParityRecordCoversEveryStage(t *testing.T) {
 		"diff_changed",
 		"printed_diff_changed",
 		"log",
+		"pretty_log",
 		"load",
 		"destroy",
 		"after_destroy",
@@ -232,6 +234,7 @@ func TestParityInvalidFixtureReportsEveryProblem(t *testing.T) {
 		"encode",
 		"printed_entities",
 		"log",
+		"pretty_log",
 	}, keysOf(record))
 	require.Empty(t, record["encode"])
 	require.Empty(t, record["printed_entities"])
@@ -656,4 +659,106 @@ func dedupe(keys []string) []string {
 	}
 
 	return out
+}
+
+// prettyGroups is the pretty_log of a fixture's record, as strings
+func prettyGroups(t *testing.T, record map[string]any) []string {
+	t.Helper()
+
+	raw, ok := record["pretty_log"].([]any)
+	require.True(t, ok, "pretty_log is %#v", record["pretty_log"])
+
+	groups := []string{}
+	for _, group := range raw {
+		text, ok := group.(string)
+		require.True(t, ok, "group %#v is not a string", group)
+		groups = append(groups, text)
+	}
+
+	return groups
+}
+
+func TestParityPrettyLogHasCreateSuccessWithConfiguration(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	groups := prettyGroups(t, record)
+
+	found := ""
+	for _, group := range groups {
+		if strings.HasPrefix(group, "<time> INFO create success ") && strings.Contains(group, "resource=resource.recording.first ") {
+			found = group
+		}
+	}
+
+	require.NotEmpty(t, found, "no create success group for resource.recording.first in:\n%s", strings.Join(groups, "\n"))
+	lines := strings.Split(found, "\n")
+	require.Equal(t, `  resource "recording" "first" {`, lines[1])
+	require.Contains(t, found, `output = "first-one"`)
+}
+
+func TestParityPrettyLogNullForFailingFixture(t *testing.T) {
+	record := runParity(t, "invalid")
+
+	value, ok := record["pretty_log"]
+	require.True(t, ok)
+	require.Nil(t, value)
+}
+
+func TestParityPrettyLogHasNoTimesDurationsOrColour(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	for _, group := range prettyGroups(t, record) {
+		require.NotContains(t, group, "\x1b[")
+		require.True(t, strings.HasPrefix(group, "<time> "), "group does not start with <time>: %q", group)
+		for _, field := range strings.Fields(group) {
+			if strings.HasPrefix(field, "duration=") {
+				require.Equal(t, "duration=<duration>", field)
+			}
+		}
+	}
+}
+
+func TestParityPrettyLogGroupsAreSorted(t *testing.T) {
+	record := runParity(t, "plugin_entities")
+
+	groups := prettyGroups(t, record)
+
+	require.True(t, sort.StringsAreSorted(groups), "groups are not sorted:\n%s", strings.Join(groups, "\n"))
+}
+
+func TestParityPrettyLogHasNoTempPaths(t *testing.T) {
+	raw := runParityRaw(t, "plugin_entities")
+
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(raw, &record))
+
+	joined := strings.Join(prettyGroups(t, record), "\n")
+	require.Contains(t, joined, `log    = "<tmp>/recording.log"`)
+	require.Contains(t, joined, "file=<fixture>/main.xcl")
+	require.NotContains(t, joined, os.TempDir())
+	require.NotContains(t, joined, fixtureDir(t, "plugin_entities"))
+}
+
+func TestPrettyGroupsJoinsIndentedLinesToTheirEventLine(t *testing.T) {
+	n := &normaliser{tmp: "/tmp/run", fixture: "/work/fixture"}
+
+	groups := n.prettyGroups("3:04PM INFO b second\n  block line\n12:00AM INFO a first duration=1.5ms\n")
+
+	require.Equal(t, []any{"<time> INFO a first duration=<duration>", "<time> INFO b second\n  block line"}, groups)
+}
+
+func TestPrettyGroupsStripsColour(t *testing.T) {
+	n := &normaliser{tmp: "/tmp/run", fixture: "/work/fixture"}
+
+	groups := n.prettyGroups("3:04PM \x1b[1;36mINFO\x1b[0m apply start \x1b[2msource\x1b[0m=core\n")
+
+	require.Equal(t, []any{"<time> INFO apply start source=core"}, groups)
+}
+
+func TestPrettyGroupsReplacesRunPaths(t *testing.T) {
+	n := &normaliser{tmp: "/tmp/run", fixture: "/work/fixture"}
+
+	groups := n.prettyGroups("3:04PM INFO create success file=/work/fixture/main.xcl\n  log = \"/tmp/run/recording.log\"\n")
+
+	require.Equal(t, []any{"<time> INFO create success file=<fixture>/main.xcl\n  log = \"<tmp>/recording.log\""}, groups)
 }

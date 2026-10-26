@@ -50,6 +50,16 @@ logging are compared with Go's:
   "operation"}` (`level` one of `debug`, `info`, `warn`, `error`; `resource`
   and `operation` `""` when the record has none), sorted by operation,
   resource, level and message.
+- `pretty_log`: for a fixture whose apply succeeds, what Go's example pretty
+  logger (`example/prettylog`, `prettylog.Handler` at info) writes for a fresh
+  apply, in a state directory of its own, with event data at
+  `xcl.EventDataProcessed`, into a buffer: a sorted list of groups, each an
+  event line joined by `\n` with the indented configuration written beneath
+  it. Colour codes are removed, each line's leading time is replaced by
+  `<time>` and every `duration=<value>` by `duration=<duration>`. Sorting the
+  groups keeps resources created concurrently from reordering them. It is
+  `null` for a fixture whose apply fails, because Go's example writes no
+  report beneath an error.
 
 Paths in all of them are replaced as elsewhere in the record.
 
