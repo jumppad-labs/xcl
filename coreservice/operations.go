@@ -81,6 +81,8 @@ func (c *configuration) running() bool {
 
 // lookupAllowed refuses a lookup while an operation runs on the
 // configuration, since the entity slice is replaced when an operation ends.
+// A call that reads none of the entities, such as EncodeSavedEntity, does
+// not need it.
 func (c *configuration) lookupAllowed(what string) error {
 	if c.running() {
 		return operationInProgress(what)
