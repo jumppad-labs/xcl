@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 982 226" font-family="monospace" font-size="10">
+<text x="8" y="19" xml:space="preserve"><tspan fill="#cd3131" font-weight="bold">Error</tspan><tspan font-weight="bold">: Unsupported block type</tspan></text>
+<text x="8" y="33" xml:space="preserve"></text>
+<text x="8" y="47" xml:space="preserve">  on main.xcl line 4, in variable.name, field timeout[0]:</text>
+<text x="8" y="61" xml:space="preserve"><tspan opacity="0.5">     2 | </tspan>  <tspan fill="#2472c8">default</tspan> = <tspan fill="#e5e510">&quot;a&lt;b&quot;</tspan></text>
+<text x="8" y="75" xml:space="preserve"><tspan opacity="0.5">     3 | </tspan></text>
+<text x="8" y="89" xml:space="preserve"><tspan opacity="0.5">     4 | </tspan>  <tspan fill="#cd3131" font-weight="bold">timeout</tspan> <tspan fill="#0dbc79">&quot;http&quot;</tspan> {</text>
+<text x="8" y="103" xml:space="preserve"><tspan opacity="0.5">     5 | </tspan>    <tspan fill="#2472c8">connect</tspan> = <tspan fill="#d670d6">30</tspan></text>
+<text x="8" y="117" xml:space="preserve"><tspan opacity="0.5">     6 | </tspan>  }</text>
+<text x="8" y="131" xml:space="preserve"></text>
+<text x="8" y="145" xml:space="preserve">Blocks of type &quot;timeout&quot; are not expected here. A variable takes only default, description, type and sensitive, so move the timeout to the resource that uses it.</text>
+<text x="8" y="159" xml:space="preserve"></text>
+<text x="8" y="173" xml:space="preserve"><tspan fill="#e5e510" font-weight="bold">Warning</tspan><tspan font-weight="bold">: Deprecated attribute</tspan></text>
+<text x="8" y="187" xml:space="preserve"></text>
+<text x="8" y="201" xml:space="preserve">retries is deprecated, use a retry block.</text>
+<text x="8" y="215" xml:space="preserve"></text>
+</svg>

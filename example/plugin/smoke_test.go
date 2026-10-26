@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -100,8 +101,37 @@ func TestSmokeApplyFailsForMissingPlugin(t *testing.T) {
 
 	_, stderr, err := runExample(t, binary, env, "apply", "--state", t.TempDir(), "--plugin", "/nonexistent/docker-plugin", "./config/full")
 	require.Error(t, err)
-	require.Contains(t, stderr, "error:")
-	require.Contains(t, stderr, "make build")
+	require.Contains(t, stderr, "failed to load")
+	require.True(t, strings.HasSuffix(stderr, "build it with `make build` in example/plugin\n"), "the error is its message on one line: %s", stderr)
+}
+
+// TestSmokePlanPrintsAReportForAMistake runs plan against a configuration
+// whose network has a block the Docker plugin does not take, and checks
+// stderr holds the report with the faulty lines numbered
+func TestSmokePlanPrintsAReportForAMistake(t *testing.T) {
+	// plan checks for a Docker engine before it reads the configuration
+	requireDocker(t)
+
+	binary := buildExample(t)
+
+	_, stderr, err := runExample(t, binary, nil, "plan", "--state", t.TempDir(), "./testdata/broken")
+	require.Error(t, err)
+	require.Contains(t, stderr, "Error: Unsupported block type\n")
+	require.Contains(t, stderr, " line 7, in docker.network.broken, field timeout[0]:\n")
+	require.Contains(t, stderr, "     5 |   subnet = \"10.99.0.0/24\"\n")
+	require.Contains(t, stderr, "     7 |   timeout \"http\" {\n")
+	require.Contains(t, stderr, "     9 |   }\n")
+	require.Contains(t, stderr, "\nBlocks of type \"timeout\" are not expected here.\n")
+}
+
+func TestSmokePlanDoesNotPrintAMistakeAsOneLine(t *testing.T) {
+	requireDocker(t)
+
+	binary := buildExample(t)
+
+	_, stderr, err := runExample(t, binary, nil, "plan", "--state", t.TempDir(), "./testdata/broken")
+	require.Error(t, err)
+	require.NotContains(t, stderr, "error: ")
 }
 
 func TestSmokeApplyFailsWithoutDocker(t *testing.T) {

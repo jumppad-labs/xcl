@@ -1,6 +1,9 @@
 package highlight_test
 
 import (
+	"bytes"
+	"errors"
+	"io"
 	"os"
 	"strconv"
 	"testing"
@@ -10,95 +13,171 @@ import (
 	"github.com/jumppad-labs/xcl/highlight"
 )
 
-func TestTextRendersTheSampleInputUnchanged(t *testing.T) {
+// errWriteFailed is the error every write to a failingWriter returns
+var errWriteFailed = errors.New("disk on fire")
+
+// failingWriter is an io.Writer whose every write fails with errWriteFailed
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errWriteFailed
+}
+
+// readSample reads testdata/sample.xcl
+func readSample(t *testing.T) []byte {
+	t.Helper()
+
 	input, err := os.ReadFile("testdata/sample.xcl")
 	require.NoError(t, err)
 
-	require.Equal(t, string(input), renderText(highlight.Text, input))
+	return input
 }
 
-func TestTextRendersMalformedInputUnchanged(t *testing.T) {
+// format formats tokens through formatter with theme, failing the test when
+// formatting fails
+func format(t *testing.T, formatter highlight.Formatter, theme highlight.Theme, tokens []highlight.Token) string {
+	t.Helper()
+
+	var out bytes.Buffer
+	require.NoError(t, formatter.Format(&out, theme, tokens))
+
+	return out.String()
+}
+
+func TestPlainWritesTheSampleInputUnchanged(t *testing.T) {
+	input := readSample(t)
+
+	require.Equal(t, string(input), renderText(t, highlight.Plain, input))
+}
+
+func TestPlainWritesMalformedInputUnchanged(t *testing.T) {
 	input := []byte("resource \"a\" {\n  x = \"abc\n  y = ${\n  z = <<EOF\nnever closed\n")
 
-	require.Equal(t, string(input), renderText(highlight.Text, input))
+	require.Equal(t, string(input), renderText(t, highlight.Plain, input))
 }
 
-func TestTextRendersNoPiecesAsNothing(t *testing.T) {
-	require.Empty(t, highlight.Text.Render(nil))
+func TestPlainWritesNoTokensAsNothing(t *testing.T) {
+	output := format(t, highlight.Plain, highlight.DefaultTheme, nil)
+
+	require.Empty(t, output)
 }
 
-func TestPieceFuncRendersEachPieceInOrder(t *testing.T) {
-	output := renderText(markers, []byte(`variable "cpu" {}`))
+func TestPlainIgnoresTheTheme(t *testing.T) {
+	tokens := []highlight.Token{
+		{Kind: highlight.BlockType, Text: "resource"},
+		{Kind: highlight.Text, Text: " "},
+		{Kind: highlight.NameLabel, Text: `"a"`},
+	}
+	theme := highlight.Theme{highlight.BlockType: "bold red", highlight.NameLabel: "#ff8800"}
+
+	output := format(t, highlight.Plain, theme, tokens)
+
+	require.Equal(t, `resource "a"`, output)
+}
+
+func TestPlainReturnsTheWriterError(t *testing.T) {
+	tokens := []highlight.Token{{Kind: highlight.BlockType, Text: "resource"}}
+
+	err := highlight.Plain.Format(failingWriter{}, highlight.DefaultTheme, tokens)
+
+	require.ErrorIs(t, err, errWriteFailed)
+}
+
+func TestFormatterFuncFormatsEachTokenInOrder(t *testing.T) {
+	output := renderText(t, markers, []byte(`variable "cpu" {}`))
 
 	require.Equal(t, `[storage.type.xcl]variable[/storage.type.xcl] [entity.name.tag.xcl]"cpu"[/entity.name.tag.xcl] {}`, output)
 }
 
-func TestRendererFuncSeesEveryPieceAtOnce(t *testing.T) {
-	counted := highlight.RendererFunc(func(pieces []highlight.Piece) []byte {
-		return []byte(strconv.Itoa(len(pieces)))
+func TestFormatterFuncSeesEveryTokenAtOnce(t *testing.T) {
+	counted := highlight.FormatterFunc(func(w io.Writer, _ highlight.Theme, tokens []highlight.Token) error {
+		_, err := io.WriteString(w, strconv.Itoa(len(tokens)))
+		return err
 	})
 
-	output := renderText(counted, []byte(`variable "cpu" {}`))
+	output := renderText(t, counted, []byte(`variable "cpu" {}`))
 
 	require.Equal(t, "4", output)
 }
 
-// joined is the text of pieces, in order
-func joined(pieces []highlight.Piece) string {
+func TestFormatterFuncIsGivenTheTheme(t *testing.T) {
+	var given highlight.Theme
+	capture := highlight.FormatterFunc(func(_ io.Writer, theme highlight.Theme, _ []highlight.Token) error {
+		given = theme
+		return nil
+	})
+	theme := highlight.Theme{highlight.Attribute: "#ff8800"}
+
+	require.NoError(t, capture.Format(io.Discard, theme, nil))
+
+	require.Equal(t, highlight.Theme{highlight.Attribute: "#ff8800"}, given)
+}
+
+// joined is the text of tokens, in order
+func joined(tokens []highlight.Token) string {
 	text := ""
-	for _, p := range pieces {
-		text += p.Text
+	for _, token := range tokens {
+		text += token.Text
 	}
 
 	return text
 }
 
-// requireWellFormed fails unless no piece is empty and no two neighbours
-// share a scope
-func requireWellFormed(t *testing.T, pieces []highlight.Piece) {
+// requireWellFormed fails unless no token is empty and no two neighbours
+// share a kind
+func requireWellFormed(t *testing.T, tokens []highlight.Token) {
 	t.Helper()
 
-	for i, p := range pieces {
-		require.NotEmpty(t, p.Text, "piece %d is empty", i)
+	for i, token := range tokens {
+		require.NotEmpty(t, token.Text, "token %d is empty", i)
 
 		if i > 0 {
-			require.NotEqual(t, pieces[i-1].Scope, p.Scope, "pieces %d and %d share scope %q", i-1, i, p.Scope)
+			require.NotEqual(t, tokens[i-1].Kind, token.Kind, "tokens %d and %d share kind %s", i-1, i, token.Kind)
 		}
 	}
 }
 
-func TestPiecesJoinToTheSampleInput(t *testing.T) {
-	input, err := os.ReadFile("testdata/sample.xcl")
-	require.NoError(t, err)
+func TestTokenizeJoinsToTheSampleInput(t *testing.T) {
+	input := readSample(t)
 
-	require.Equal(t, string(input), joined(highlight.Pieces(input)))
+	require.Equal(t, string(input), joined(highlight.Tokenize(input)))
 }
 
-func TestPiecesJoinToTheReferencesInput(t *testing.T) {
+func TestTokenizeJoinsToTheReferencesInput(t *testing.T) {
 	input, err := os.ReadFile("testdata/references.xcl")
 	require.NoError(t, err)
 
-	require.Equal(t, string(input), joined(highlight.Pieces(input)))
+	require.Equal(t, string(input), joined(highlight.Tokenize(input)))
 }
 
-func TestPiecesJoinToMalformedInput(t *testing.T) {
+func TestTokenizeJoinsToMalformedInput(t *testing.T) {
 	input := []byte("resource \"a\" {\n  x = \"abc\n  y = ${\n  z = <<EOF\nnever closed\n")
 
-	require.Equal(t, string(input), joined(highlight.Pieces(input)))
+	require.Equal(t, string(input), joined(highlight.Tokenize(input)))
 }
 
-func TestPiecesOfEmptyInputAreNone(t *testing.T) {
-	require.Empty(t, highlight.Pieces(nil))
+func TestTokenizeOfEmptyInputIsNoTokens(t *testing.T) {
+	require.Empty(t, highlight.Tokenize(nil))
 }
 
-func TestPiecesOfTheSampleAreWellFormed(t *testing.T) {
-	input, err := os.ReadFile("testdata/sample.xcl")
+func TestTokenizeOfTheSampleIsWellFormed(t *testing.T) {
+	requireWellFormed(t, highlight.Tokenize(readSample(t)))
+}
+
+func TestTokenizeOfTheReferencesIsWellFormed(t *testing.T) {
+	input, err := os.ReadFile("testdata/references.xcl")
 	require.NoError(t, err)
 
-	requireWellFormed(t, highlight.Pieces(input))
+	requireWellFormed(t, highlight.Tokenize(input))
 }
 
-func FuzzPiecesKeepText(f *testing.F) {
+func TestTokenizeOfMalformedInputIsWellFormed(t *testing.T) {
+	input := []byte("resource \"a\" {\n  x = \"abc\n  y = ${\n  z = <<EOF\nnever closed\n")
+
+	requireWellFormed(t, highlight.Tokenize(input))
+}
+
+func FuzzTokenizeKeepsText(f *testing.F) {
 	f.Add([]byte(`variable "cpu" { default = 2 }`))
 	f.Add([]byte(`x = "a ${var.b} c"`))
 	f.Add([]byte("x = <<EOF\nno end\n"))
@@ -107,14 +186,14 @@ func FuzzPiecesKeepText(f *testing.F) {
 	f.Add([]byte(""))
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-		pieces := highlight.Pieces(input)
+		tokens := highlight.Tokenize(input)
 
-		require.Equal(t, string(input), joined(pieces))
-		requireWellFormed(t, pieces)
+		require.Equal(t, string(input), joined(tokens))
+		requireWellFormed(t, tokens)
 	})
 }
 
-func FuzzTextKeepsText(f *testing.F) {
+func FuzzPlainKeepsText(f *testing.F) {
 	sample, err := os.ReadFile("testdata/sample.xcl")
 	require.NoError(f, err)
 
@@ -135,6 +214,6 @@ func FuzzTextKeepsText(f *testing.F) {
 	f.Add([]byte(""))
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-		require.Equal(t, string(input), renderText(highlight.Text, input))
+		require.Equal(t, string(input), renderText(t, highlight.Plain, input))
 	})
 }

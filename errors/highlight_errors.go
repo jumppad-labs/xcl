@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// ErrInvalidTheme is returned by highlight.NewANSI when the colour
+// ErrInvalidTheme is returned by highlight.LoadVSCodeTheme when the colour
 // theme it is given cannot be read or is not a valid VS Code colour theme. A
 // bad theme is reported rather than replaced with the default colours. It is
 // matched with errors.Is, and wrapped by an InvalidThemeError detail
@@ -47,4 +47,32 @@ func (e *InvalidThemeError) Unwrap() []error {
 	}
 
 	return []error{ErrInvalidTheme, e.Err}
+}
+
+// ErrInvalidStyle is reported by highlight.Theme.Validate for each word of a
+// theme's styles that a style does not understand, such as a misspelt
+// colour. It is matched with errors.Is, and wrapped by an InvalidStyleError
+// detail recovered with errors.As. Printing with such a theme still works:
+// the word is skipped.
+//
+// It is declared here, rather than in the highlight package that reports it,
+// so the public package can re-export it beside its other errors.
+var ErrInvalidStyle = errors.New("invalid style")
+
+// InvalidStyleError reports a word of a theme's style that a style does not
+// understand. Kind is the name of the kind the style is for, such as
+// Attribute, Style the whole style string and Word the word.
+type InvalidStyleError struct {
+	Kind  string
+	Style string
+	Word  string
+}
+
+func (e *InvalidStyleError) Error() string {
+	return fmt.Sprintf("style %q for %s: unknown word %q", e.Style, e.Kind, e.Word)
+}
+
+// Unwrap returns ErrInvalidStyle, so the error answers errors.Is
+func (e *InvalidStyleError) Unwrap() error {
+	return ErrInvalidStyle
 }

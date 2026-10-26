@@ -1,0 +1,17 @@
+resource "container" "web" {
+  default = "hello world"
+
+  network {
+    name             = "main"
+    ip_address       = "10.0.0.10"
+    assigned_address = "assigned-main" # set by the provider
+  }
+
+  network {
+    name             = "main"
+    ip_address       = "10.0.0.11"
+    assigned_address = "assigned-main" # set by the provider
+  }
+
+  command = ["nginx", "-g", "daemon off;"]
+}

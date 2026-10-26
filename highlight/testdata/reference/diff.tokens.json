@@ -1,0 +1,358 @@
+[
+  {
+    "kind": 0,
+    "text": "  "
+  },
+  {
+    "kind": 1102,
+    "text": "# resource.container.api will be updated"
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 1203,
+    "text": "~"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 101,
+    "text": "resource"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 201,
+    "text": "\"container\""
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 202,
+    "text": "\"api\""
+  },
+  {
+    "kind": 0,
+    "text": " {\n      "
+  },
+  {
+    "kind": 1203,
+    "text": "~"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 1203,
+    "text": "ports[0].host"
+  },
+  {
+    "kind": 0,
+    "text": "      = "
+  },
+  {
+    "kind": 500,
+    "text": "8080"
+  },
+  {
+    "kind": 0,
+    "text": " -\u003e "
+  },
+  {
+    "kind": 500,
+    "text": "9090"
+  },
+  {
+    "kind": 0,
+    "text": "\n      "
+  },
+  {
+    "kind": 1201,
+    "text": "+"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 1201,
+    "text": "ports[2]"
+  },
+  {
+    "kind": 0,
+    "text": "           = { "
+  },
+  {
+    "kind": 300,
+    "text": "host"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 500,
+    "text": "443"
+  },
+  {
+    "kind": 0,
+    "text": ", "
+  },
+  {
+    "kind": 101,
+    "text": "local"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 500,
+    "text": "8443"
+  },
+  {
+    "kind": 0,
+    "text": " }\n      "
+  },
+  {
+    "kind": 1203,
+    "text": "~"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 1203,
+    "text": "env[\"DB_PASSWORD\"]"
+  },
+  {
+    "kind": 0,
+    "text": " = (sensitive value)\n    }\n\n  "
+  },
+  {
+    "kind": 1102,
+    "text": "# resource.container.cache changed outside xcl and will be updated"
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 1203,
+    "text": "~"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 101,
+    "text": "resource"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 201,
+    "text": "\"container\""
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 202,
+    "text": "\"cache\""
+  },
+  {
+    "kind": 0,
+    "text": " {}\n\n  "
+  },
+  {
+    "kind": 1102,
+    "text": "# resource.container.web will be created"
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 1201,
+    "text": "+"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 101,
+    "text": "resource"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 201,
+    "text": "\"container\""
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 202,
+    "text": "\"web\""
+  },
+  {
+    "kind": 0,
+    "text": " {\n      "
+  },
+  {
+    "kind": 1201,
+    "text": "+"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 1201,
+    "text": "image"
+  },
+  {
+    "kind": 0,
+    "text": "   = "
+  },
+  {
+    "kind": 400,
+    "text": "\"nginx\""
+  },
+  {
+    "kind": 0,
+    "text": "\n      "
+  },
+  {
+    "kind": 1201,
+    "text": "+"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 1201,
+    "text": "db_host"
+  },
+  {
+    "kind": 0,
+    "text": " = (known after apply)\n    }\n\n  "
+  },
+  {
+    "kind": 1102,
+    "text": "# resource.network.app will be replaced, its last apply failed"
+  },
+  {
+    "kind": 0,
+    "text": "\n"
+  },
+  {
+    "kind": 1203,
+    "text": "-/+"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 101,
+    "text": "resource"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 201,
+    "text": "\"network\""
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 202,
+    "text": "\"app\""
+  },
+  {
+    "kind": 0,
+    "text": " {}\n\n  "
+  },
+  {
+    "kind": 1102,
+    "text": "# resource.postgres.old will be deleted"
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 1202,
+    "text": "-"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 101,
+    "text": "resource"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 201,
+    "text": "\"postgres\""
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 202,
+    "text": "\"old\""
+  },
+  {
+    "kind": 0,
+    "text": " {}\n\nDiff: 1 to create, 2 to update, 1 to replace, 1 to delete, 4 unchanged.\n"
+  }
+]

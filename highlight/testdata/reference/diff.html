@@ -1,0 +1,24 @@
+<pre class="xcl">  <span class="xcl-comment xcl-hash-comment"># resource.container.api will be updated</span>
+  <span class="xcl-diff xcl-changed">~</span> <span class="xcl-block xcl-block-type">resource</span> <span class="xcl-label xcl-type-label">&quot;container&quot;</span> <span class="xcl-label xcl-name-label">&quot;api&quot;</span> {
+      <span class="xcl-diff xcl-changed">~</span> <span class="xcl-diff xcl-changed">ports[0].host</span>      = <span class="xcl-number">8080</span> -&gt; <span class="xcl-number">9090</span>
+      <span class="xcl-diff xcl-inserted">+</span> <span class="xcl-diff xcl-inserted">ports[2]</span>           = { <span class="xcl-attribute">host</span> <span class="xcl-operator">=</span> <span class="xcl-number">443</span>, <span class="xcl-block xcl-block-type">local</span> <span class="xcl-operator">=</span> <span class="xcl-number">8443</span> }
+      <span class="xcl-diff xcl-changed">~</span> <span class="xcl-diff xcl-changed">env[&quot;DB_PASSWORD&quot;]</span> = (sensitive value)
+    }
+
+  <span class="xcl-comment xcl-hash-comment"># resource.container.cache changed outside xcl and will be updated</span>
+  <span class="xcl-diff xcl-changed">~</span> <span class="xcl-block xcl-block-type">resource</span> <span class="xcl-label xcl-type-label">&quot;container&quot;</span> <span class="xcl-label xcl-name-label">&quot;cache&quot;</span> {}
+
+  <span class="xcl-comment xcl-hash-comment"># resource.container.web will be created</span>
+  <span class="xcl-diff xcl-inserted">+</span> <span class="xcl-block xcl-block-type">resource</span> <span class="xcl-label xcl-type-label">&quot;container&quot;</span> <span class="xcl-label xcl-name-label">&quot;web&quot;</span> {
+      <span class="xcl-diff xcl-inserted">+</span> <span class="xcl-diff xcl-inserted">image</span>   = <span class="xcl-string">&quot;nginx&quot;</span>
+      <span class="xcl-diff xcl-inserted">+</span> <span class="xcl-diff xcl-inserted">db_host</span> = (known after apply)
+    }
+
+  <span class="xcl-comment xcl-hash-comment"># resource.network.app will be replaced, its last apply failed</span>
+<span class="xcl-diff xcl-changed">-/+</span> <span class="xcl-block xcl-block-type">resource</span> <span class="xcl-label xcl-type-label">&quot;network&quot;</span> <span class="xcl-label xcl-name-label">&quot;app&quot;</span> {}
+
+  <span class="xcl-comment xcl-hash-comment"># resource.postgres.old will be deleted</span>
+  <span class="xcl-diff xcl-deleted">-</span> <span class="xcl-block xcl-block-type">resource</span> <span class="xcl-label xcl-type-label">&quot;postgres&quot;</span> <span class="xcl-label xcl-name-label">&quot;old&quot;</span> {}
+
+Diff: 1 to create, 2 to update, 1 to replace, 1 to delete, 4 unchanged.
+</pre>

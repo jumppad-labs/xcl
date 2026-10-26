@@ -1,0 +1,19 @@
+  # resource.container.api will be updated
+  ~ resource "container" "api" {
+      ~ image              = "nginx:1" -> "nginx:2"
+      - ports[1]           = { host = 80 }
+      + ports[2]           = { host = 443, local = 8443 }
+      ~ address            = "10.0.0.1" -> (known after apply)
+      ~ env["API_TOKEN"]   = (sensitive value)
+      ~ env["DB_PASSWORD"] = "hunter2-old-secret" -> "correct-horse-new-secret"
+      ~ enabled            = false -> true
+    }
+
+  # resource.secret.login will be created
+  + resource "secret" "login" {
+      + username = "admin"
+      + password = (sensitive value)
+      + tags     = ["web", "prod"]
+    }
+
+Diff: 1 to create, 1 to update, 0 to replace, 0 to delete, 0 unchanged.

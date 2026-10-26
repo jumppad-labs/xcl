@@ -110,7 +110,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if err != nil {
-		fmt.Fprintf(stderr, "error: %s\n", err)
+		// a configuration problem is printed as a report with the lines at
+		// fault, anything else as its message, coloured as the rest of the
+		// example's output is
+		xcl.PrintError(stderr, err, xcl.WithFormatter(formatterFor(stderr)))
 		return 1
 	}
 

@@ -1,0 +1,16 @@
+<pre><span style="color: #cd3131; font-weight: bold">Error</span><span style="font-weight: bold">: Unsupported block type</span>
+
+  on main.xcl line 4, in variable.name, field timeout[0]:
+<span style="opacity: 0.5">     2 | </span>  <span style="color: #2472c8">default</span> = <span style="color: #e5e510">&quot;a&lt;b&quot;</span>
+<span style="opacity: 0.5">     3 | </span>
+<span style="opacity: 0.5">     4 | </span>  <span style="color: #cd3131; font-weight: bold">timeout</span> <span style="color: #0dbc79">&quot;http&quot;</span> {
+<span style="opacity: 0.5">     5 | </span>    <span style="color: #2472c8">connect</span> = <span style="color: #d670d6">30</span>
+<span style="opacity: 0.5">     6 | </span>  }
+
+Blocks of type &quot;timeout&quot; are not expected here. A variable takes only default, description, type and sensitive, so move the timeout to the resource that uses it.
+
+<span style="color: #e5e510; font-weight: bold">Warning</span><span style="font-weight: bold">: Deprecated attribute</span>
+
+retries is deprecated, use a retry block.
+
+</pre>

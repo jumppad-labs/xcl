@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 442 338" font-family="monospace" font-size="10">
+<text x="8" y="19" xml:space="preserve">  <tspan fill="#666666" font-style="italic"># resource.container.api will be updated</tspan></text>
+<text x="8" y="33" xml:space="preserve">  <tspan fill="#e5e510">~</tspan> <tspan fill="#bc3fbc" font-weight="bold">resource</tspan> <tspan fill="#11a8cd">&quot;container&quot;</tspan> <tspan fill="#0dbc79">&quot;api&quot;</tspan> {</text>
+<text x="8" y="47" xml:space="preserve">      <tspan fill="#e5e510">~</tspan> <tspan fill="#e5e510">ports[0].host</tspan>      = <tspan fill="#d670d6">8080</tspan> -&gt; <tspan fill="#d670d6">9090</tspan></text>
+<text x="8" y="61" xml:space="preserve">      <tspan fill="#0dbc79">+</tspan> <tspan fill="#0dbc79">ports[2]</tspan>           = { <tspan fill="#2472c8">host</tspan> = <tspan fill="#d670d6">443</tspan>, <tspan fill="#bc3fbc" font-weight="bold">local</tspan> = <tspan fill="#d670d6">8443</tspan> }</text>
+<text x="8" y="75" xml:space="preserve">      <tspan fill="#e5e510">~</tspan> <tspan fill="#e5e510">env[&quot;DB_PASSWORD&quot;]</tspan> = (sensitive value)</text>
+<text x="8" y="89" xml:space="preserve">    }</text>
+<text x="8" y="103" xml:space="preserve"></text>
+<text x="8" y="117" xml:space="preserve">  <tspan fill="#666666" font-style="italic"># resource.container.cache changed outside xcl and will be updated</tspan></text>
+<text x="8" y="131" xml:space="preserve">  <tspan fill="#e5e510">~</tspan> <tspan fill="#bc3fbc" font-weight="bold">resource</tspan> <tspan fill="#11a8cd">&quot;container&quot;</tspan> <tspan fill="#0dbc79">&quot;cache&quot;</tspan> {}</text>
+<text x="8" y="145" xml:space="preserve"></text>
+<text x="8" y="159" xml:space="preserve">  <tspan fill="#666666" font-style="italic"># resource.container.web will be created</tspan></text>
+<text x="8" y="173" xml:space="preserve">  <tspan fill="#0dbc79">+</tspan> <tspan fill="#bc3fbc" font-weight="bold">resource</tspan> <tspan fill="#11a8cd">&quot;container&quot;</tspan> <tspan fill="#0dbc79">&quot;web&quot;</tspan> {</text>
+<text x="8" y="187" xml:space="preserve">      <tspan fill="#0dbc79">+</tspan> <tspan fill="#0dbc79">image</tspan>   = <tspan fill="#e5e510">&quot;nginx&quot;</tspan></text>
+<text x="8" y="201" xml:space="preserve">      <tspan fill="#0dbc79">+</tspan> <tspan fill="#0dbc79">db_host</tspan> = (known after apply)</text>
+<text x="8" y="215" xml:space="preserve">    }</text>
+<text x="8" y="229" xml:space="preserve"></text>
+<text x="8" y="243" xml:space="preserve">  <tspan fill="#666666" font-style="italic"># resource.network.app will be replaced, its last apply failed</tspan></text>
+<text x="8" y="257" xml:space="preserve"><tspan fill="#e5e510">-/+</tspan> <tspan fill="#bc3fbc" font-weight="bold">resource</tspan> <tspan fill="#11a8cd">&quot;network&quot;</tspan> <tspan fill="#0dbc79">&quot;app&quot;</tspan> {}</text>
+<text x="8" y="271" xml:space="preserve"></text>
+<text x="8" y="285" xml:space="preserve">  <tspan fill="#666666" font-style="italic"># resource.postgres.old will be deleted</tspan></text>
+<text x="8" y="299" xml:space="preserve">  <tspan fill="#cd3131">-</tspan> <tspan fill="#bc3fbc" font-weight="bold">resource</tspan> <tspan fill="#11a8cd">&quot;postgres&quot;</tspan> <tspan fill="#0dbc79">&quot;old&quot;</tspan> {}</text>
+<text x="8" y="313" xml:space="preserve"></text>
+<text x="8" y="327" xml:space="preserve">Diff: 1 to create, 2 to update, 1 to replace, 1 to delete, 4 unchanged.</text>
+</svg>

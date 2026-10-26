@@ -1,0 +1,23 @@
+  [3;90m# resource.container.api will be updated[0m
+  [33m~[0m [1;35mresource[0m [36m"container"[0m [32m"api"[0m {
+      [33m~[0m [33mports[0].host[0m      = [95m8080[0m -> [95m9090[0m
+      [32m+[0m [32mports[2][0m           = { [34mhost[0m = [95m443[0m, [1;35mlocal[0m = [95m8443[0m }
+      [33m~[0m [33menv["DB_PASSWORD"][0m = (sensitive value)
+    }
+
+  [3;90m# resource.container.cache changed outside xcl and will be updated[0m
+  [33m~[0m [1;35mresource[0m [36m"container"[0m [32m"cache"[0m {}
+
+  [3;90m# resource.container.web will be created[0m
+  [32m+[0m [1;35mresource[0m [36m"container"[0m [32m"web"[0m {
+      [32m+[0m [32mimage[0m   = [33m"nginx"[0m
+      [32m+[0m [32mdb_host[0m = (known after apply)
+    }
+
+  [3;90m# resource.network.app will be replaced, its last apply failed[0m
+[33m-/+[0m [1;35mresource[0m [36m"network"[0m [32m"app"[0m {}
+
+  [3;90m# resource.postgres.old will be deleted[0m
+  [31m-[0m [1;35mresource[0m [36m"postgres"[0m [32m"old"[0m {}
+
+Diff: 1 to create, 2 to update, 1 to replace, 1 to delete, 4 unchanged.

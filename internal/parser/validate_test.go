@@ -756,8 +756,8 @@ func TestValidateRejectsUnknownAttributeWithItsBlockAndSource(t *testing.T) {
 	require.NotNil(t, d.EntityPos)
 	require.Less(t, d.EntityPos.Start.Line, d.Subject.Start.Line, "the block starts before the attribute in it")
 	require.NotNil(t, d.Source)
-	require.Equal(t, 5, d.Source.Start)
-	require.Contains(t, d.Source.Lines[0], "colour")
+	require.Equal(t, 3, d.Source.Start)
+	require.Contains(t, d.Source.Lines[5-d.Source.Start], "colour")
 }
 
 func TestValidateRejectsUnknownAttributeOnPluginType(t *testing.T) {

@@ -1,6 +1,8 @@
 package diff_test
 
 import (
+	"bytes"
+	"io"
 	"regexp"
 	"strings"
 	"testing"
@@ -11,14 +13,26 @@ import (
 	"github.com/jumppad-labs/xcl/highlight"
 )
 
-// render renders d's pieces through renderer, as plain text when none is
-// given
-func render(d *diff.Diff, renderer ...highlight.Renderer) []byte {
-	if len(renderer) == 0 {
-		return highlight.Text.Render(d.Pieces())
+// render formats d's tokens through formatter with the default theme, as
+// plain text when none is given
+func render(d *diff.Diff, formatter ...highlight.Formatter) []byte {
+	return renderWithTheme(d, highlight.DefaultTheme, formatter...)
+}
+
+// renderWithTheme formats d's tokens through formatter with theme, as plain
+// text when none is given
+func renderWithTheme(d *diff.Diff, theme highlight.Theme, formatter ...highlight.Formatter) []byte {
+	chosen := highlight.Plain
+	if len(formatter) > 0 {
+		chosen = formatter[0]
 	}
 
-	return renderer[0].Render(d.Pieces())
+	var out bytes.Buffer
+	if err := chosen.Format(&out, theme, d.Tokens()); err != nil {
+		panic(err)
+	}
+
+	return out.Bytes()
 }
 
 // renderOne renders a diff holding only resource, with summary
@@ -407,29 +421,36 @@ func designExampleDiff() *diff.Diff {
 	}
 }
 
-// sgrCodes matches the SGR escape codes the ANSI renderer writes
+// sgrCodes matches the SGR escape codes the Terminal formatter writes
 var sgrCodes = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
-// renderMarkerRenderer wraps each labelled piece as [scope]text[/scope] and
-// passes unlabelled text through unchanged, so a test can read which scope
-// each piece was given
-func renderMarkerRenderer() highlight.Renderer {
-	return highlight.PieceFunc(func(p highlight.Piece) string {
-		if p.Scope == "" {
-			return p.Text
+// renderMarkerFormatter wraps each labelled token as [scope]text[/scope],
+// the scope being its kind's TextMate scope, and passes Text through
+// unchanged, so a test can read which kind each token was given
+func renderMarkerFormatter() highlight.Formatter {
+	return highlight.FormatterFunc(func(w io.Writer, _ highlight.Theme, tokens []highlight.Token) error {
+		for _, token := range tokens {
+			text := token.Text
+			if token.Kind != highlight.Text {
+				text = "[" + token.Kind.Scope() + "]" + token.Text + "[/" + token.Kind.Scope() + "]"
+			}
+
+			if _, err := io.WriteString(w, text); err != nil {
+				return err
+			}
 		}
 
-		return "[" + p.Scope + "]" + p.Text + "[/" + p.Scope + "]"
+		return nil
 	})
 }
 
 // renderOneHighlighted renders a diff holding only resource through the
-// marker renderer
+// marker formatter
 func renderOneHighlighted(resource diff.Resource, summary diff.Summary) string {
 	return string(render(&diff.Diff{
 		Summary:   summary,
 		Resources: []diff.Resource{resource},
-	}, renderMarkerRenderer()))
+	}, renderMarkerFormatter()))
 }
 
 // createdImageResource is a created resource with one added string value
@@ -545,30 +566,22 @@ func TestRenderHighlightPassesPlaceholdersAndSummaryUnlabelled(t *testing.T) {
 	require.True(t, strings.HasSuffix(output, "\nDiff: 1 to create, 0 to update, 0 to replace, 0 to delete, 0 unchanged.\n"))
 }
 
-func TestRenderHighlightWithANSIRendererWritesEscapeCodes(t *testing.T) {
-	renderer, err := highlight.NewANSI()
-	require.NoError(t, err)
-
-	output := string(render(designExampleDiff(), renderer))
+func TestRenderHighlightWithTerminalWritesEscapeCodes(t *testing.T) {
+	output := string(render(designExampleDiff(), highlight.Terminal))
 
 	require.Contains(t, output, "\x1b[")
 }
 
-func TestRenderHighlightWithANSIRendererStripsBackToPlainOutput(t *testing.T) {
-	renderer, err := highlight.NewANSI()
-	require.NoError(t, err)
-
-	output := string(render(designExampleDiff(), renderer))
+func TestRenderHighlightWithTerminalStripsBackToPlainOutput(t *testing.T) {
+	output := string(render(designExampleDiff(), highlight.Terminal))
 
 	require.Equal(t, string(render(designExampleDiff())), sgrCodes.ReplaceAllString(output, ""))
 }
 
-func TestRenderHighlightWithThemeWithoutMarkupRulesLeavesMarkersUncoloured(t *testing.T) {
-	theme := `{"tokenColors": [{"scope": "comment", "settings": {"fontStyle": "italic"}}]}`
-	renderer, err := highlight.NewANSI(highlight.WithTheme(strings.NewReader(theme)))
-	require.NoError(t, err)
+func TestRenderHighlightWithThemeWithoutDiffStylesLeavesMarkersUncoloured(t *testing.T) {
+	theme := highlight.Theme{highlight.Comment: "italic"}
 
-	output := string(render(designExampleDiff(), renderer))
+	output := string(renderWithTheme(designExampleDiff(), theme, highlight.Terminal))
 
 	require.Contains(t, output, "\n      + image   = ")
 	require.Contains(t, output, "\n  ~ resource ")
@@ -576,9 +589,6 @@ func TestRenderHighlightWithThemeWithoutMarkupRulesLeavesMarkersUncoloured(t *te
 }
 
 func TestRenderHighlightWritesMaskedSensitiveValueAsPlaceholder(t *testing.T) {
-	renderer, err := highlight.NewANSI()
-	require.NoError(t, err)
-
 	output := string(render(&diff.Diff{
 		Summary: diff.Summary{Update: 1},
 		Resources: []diff.Resource{
@@ -590,7 +600,7 @@ func TestRenderHighlightWritesMaskedSensitiveValueAsPlaceholder(t *testing.T) {
 				},
 			},
 		},
-	}, renderer))
+	}, highlight.Terminal))
 
 	require.Contains(t, output, " = (sensitive value)\n")
 }

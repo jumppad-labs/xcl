@@ -1,0 +1,450 @@
+[
+  {
+    "kind": 1101,
+    "text": "// the reference resource: every kind of configuration text"
+  },
+  {
+    "kind": 0,
+    "text": "\n"
+  },
+  {
+    "kind": 1102,
+    "text": "# a hash comment"
+  },
+  {
+    "kind": 0,
+    "text": "\n"
+  },
+  {
+    "kind": 1103,
+    "text": "/* a block\n   comment */"
+  },
+  {
+    "kind": 0,
+    "text": "\n"
+  },
+  {
+    "kind": 101,
+    "text": "resource"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 201,
+    "text": "\"container\""
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 202,
+    "text": "\"web\""
+  },
+  {
+    "kind": 0,
+    "text": " {\n  "
+  },
+  {
+    "kind": 300,
+    "text": "image"
+  },
+  {
+    "kind": 0,
+    "text": "    "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 400,
+    "text": "\"nginx:1.27\""
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 300,
+    "text": "replicas"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 500,
+    "text": "3"
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 300,
+    "text": "enabled"
+  },
+  {
+    "kind": 0,
+    "text": "  "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 600,
+    "text": "true"
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 300,
+    "text": "owner"
+  },
+  {
+    "kind": 0,
+    "text": "    "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 600,
+    "text": "null"
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 300,
+    "text": "message"
+  },
+  {
+    "kind": 0,
+    "text": "  "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 400,
+    "text": "\"line one"
+  },
+  {
+    "kind": 401,
+    "text": "\\n"
+  },
+  {
+    "kind": 400,
+    "text": "port \u003c 1024 \u0026 "
+  },
+  {
+    "kind": 401,
+    "text": "\\\""
+  },
+  {
+    "kind": 400,
+    "text": "quoted"
+  },
+  {
+    "kind": 401,
+    "text": "\\\""
+  },
+  {
+    "kind": 400,
+    "text": "\""
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 300,
+    "text": "network"
+  },
+  {
+    "kind": 0,
+    "text": "  "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 800,
+    "text": "resource"
+  },
+  {
+    "kind": 1004,
+    "text": "."
+  },
+  {
+    "kind": 801,
+    "text": "network"
+  },
+  {
+    "kind": 1004,
+    "text": "."
+  },
+  {
+    "kind": 801,
+    "text": "main"
+  },
+  {
+    "kind": 1004,
+    "text": "."
+  },
+  {
+    "kind": 801,
+    "text": "meta"
+  },
+  {
+    "kind": 1004,
+    "text": "."
+  },
+  {
+    "kind": 801,
+    "text": "name"
+  },
+  {
+    "kind": 0,
+    "text": "\n  "
+  },
+  {
+    "kind": 300,
+    "text": "port"
+  },
+  {
+    "kind": 0,
+    "text": "     "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 701,
+    "text": "max"
+  },
+  {
+    "kind": 0,
+    "text": "("
+  },
+  {
+    "kind": 500,
+    "text": "8080"
+  },
+  {
+    "kind": 0,
+    "text": ", "
+  },
+  {
+    "kind": 500,
+    "text": "8443"
+  },
+  {
+    "kind": 0,
+    "text": ")\n  "
+  },
+  {
+    "kind": 300,
+    "text": "greeting"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 400,
+    "text": "\"hello "
+  },
+  {
+    "kind": 1001,
+    "text": "${"
+  },
+  {
+    "kind": 800,
+    "text": "variable"
+  },
+  {
+    "kind": 1004,
+    "text": "."
+  },
+  {
+    "kind": 801,
+    "text": "name"
+  },
+  {
+    "kind": 1002,
+    "text": "}"
+  },
+  {
+    "kind": 400,
+    "text": "!\""
+  },
+  {
+    "kind": 0,
+    "text": "\n\n  "
+  },
+  {
+    "kind": 300,
+    "text": "script"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 404,
+    "text": "\u003c\u003c-"
+  },
+  {
+    "kind": 403,
+    "text": "EOF"
+  },
+  {
+    "kind": 0,
+    "text": "\n"
+  },
+  {
+    "kind": 402,
+    "text": "    echo \""
+  },
+  {
+    "kind": 1001,
+    "text": "#{{"
+  },
+  {
+    "kind": 1003,
+    "text": " "
+  },
+  {
+    "kind": 1004,
+    "text": "."
+  },
+  {
+    "kind": 801,
+    "text": "Vars"
+  },
+  {
+    "kind": 1004,
+    "text": "."
+  },
+  {
+    "kind": 801,
+    "text": "greeting"
+  },
+  {
+    "kind": 1003,
+    "text": " "
+  },
+  {
+    "kind": 1002,
+    "text": "}}"
+  },
+  {
+    "kind": 402,
+    "text": "\"\n"
+  },
+  {
+    "kind": 0,
+    "text": "  "
+  },
+  {
+    "kind": 403,
+    "text": "EOF"
+  },
+  {
+    "kind": 0,
+    "text": "\n\n  "
+  },
+  {
+    "kind": 102,
+    "text": "volume"
+  },
+  {
+    "kind": 0,
+    "text": " {\n    "
+  },
+  {
+    "kind": 300,
+    "text": "source"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 400,
+    "text": "\"/data\""
+  },
+  {
+    "kind": 0,
+    "text": "\n  }\n}\n"
+  }
+]

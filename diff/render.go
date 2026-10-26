@@ -25,7 +25,7 @@ const (
 )
 
 // markKind says which kind of change a marker stands for, and so which diff
-// colour it is given when the output is highlighted
+// kind it is labelled with
 type markKind int
 
 const (
@@ -34,9 +34,10 @@ const (
 	markChanged
 )
 
-// Pieces lays d out as text in the style of a git diff, as labelled pieces
-// for a renderer: highlight.Text for plain text, ready to print or log,
-// highlight.ANSI for a terminal, or any other highlight.Renderer.
+// Tokens lays d out as text in the style of a git diff, as labelled tokens
+// for a highlight.Formatter. To print a change summary, as plain text ready
+// to print or log, in terminal colour, as HTML or in any other format, use
+// xcl.PrintDiff; Tokens is for extenders formatting it themselves.
 //
 // Each resource in d.Resources is written in the result's order as a comment
 // line saying what an apply would do with it, a block header marked with the
@@ -70,7 +71,7 @@ const (
 //
 // A changed sensitive value is written as (sensitive value). Its values are
 // written only when the result carries them, which it does only when the
-// diff ran with RevealSensitive, so the pieces never hold a value the result
+// diff ran with RevealSensitive, so the tokens never hold a value the result
 // does not.
 //
 // The text ends with one summary line giving the number of resources an
@@ -78,15 +79,13 @@ const (
 // leave unchanged; when nothing would change it is the only line. A nil d is
 // laid out as a diff with nothing to change.
 //
-// Markers and paths are labelled highlight.ScopeInserted,
-// highlight.ScopeDeleted or highlight.ScopeChanged, by the kind of change; a
-// replaced resource uses the changed scope, so a theme's markup.inserted,
-// markup.deleted and markup.changed colours apply, the colours VS Code themes
-// give diffs. Comment lines are labelled as comments, and block headers and
-// values as configuration, exactly as highlight.Pieces labels them.
-// Indentation, line breaks, placeholders, the = and -> signs and the summary
-// line have the empty scope, so the pieces hold every byte of the text.
-func (d *Diff) Pieces() []highlight.Piece {
+// Markers and paths are labelled highlight.Inserted, highlight.Deleted or
+// highlight.Changed, by the kind of change; a replaced resource is labelled
+// changed. Comment lines are labelled highlight.HashComment, and block
+// headers and values as configuration, exactly as highlight.Tokenize labels
+// them. Indentation, line breaks, placeholders, the = and -> signs and the
+// summary line are highlight.Text, so the tokens hold every byte of the text.
+func (d *Diff) Tokens() []highlight.Token {
 	if d == nil {
 		d = &Diff{}
 	}
@@ -99,51 +98,51 @@ func (d *Diff) Pieces() []highlight.Piece {
 
 	l.summary(d)
 
-	return l.pieces
+	return l.tokens
 }
 
-// layout builds the pieces of a diff in order
+// layout builds the tokens of a diff in order
 type layout struct {
-	pieces []highlight.Piece
+	tokens []highlight.Token
 }
 
-// add appends text with scope, joining it to the previous piece when both
-// have the same scope, as highlight.Pieces does
-func (l *layout) add(scope, text string) {
+// add appends text of kind, joining it to the previous token when both are of
+// the same kind, as highlight.Tokenize does
+func (l *layout) add(kind highlight.Kind, text string) {
 	if text == "" {
 		return
 	}
 
-	if n := len(l.pieces); n > 0 && l.pieces[n-1].Scope == scope {
-		l.pieces[n-1].Text += text
+	if n := len(l.tokens); n > 0 && l.tokens[n-1].Kind == kind {
+		l.tokens[n-1].Text += text
 		return
 	}
 
-	l.pieces = append(l.pieces, highlight.Piece{Scope: scope, Text: text})
+	l.tokens = append(l.tokens, highlight.Token{Kind: kind, Text: text})
 }
 
 // plain appends text that has no label of its own
 func (l *layout) plain(text string) {
-	l.add("", text)
+	l.add(highlight.Text, text)
 }
 
 // marker appends an action or change marker, or a path, of kind
 func (l *layout) marker(kind markKind, text string) {
-	l.add(scopeFor(kind), text)
+	l.add(kindFor(kind), text)
 }
 
 // hcl appends configuration text, a block header or a value, labelled as
 // configuration
 func (l *layout) hcl(text string) {
-	for _, p := range highlight.Pieces([]byte(text)) {
-		l.add(p.Scope, p.Text)
+	for _, token := range highlight.Tokenize([]byte(text)) {
+		l.add(token.Kind, token.Text)
 	}
 }
 
 // resource lays out one resource's block followed by a blank line
 func (l *layout) resource(resource Resource) {
 	l.plain("  ")
-	l.add(highlight.ScopeHashComment, "# "+resource.Address+" "+actionPhrase(resource))
+	l.add(highlight.HashComment, "# "+resource.Address+" "+actionPhrase(resource))
 	l.plain("\n")
 
 	marker, kind := headerMarker(resource.Action)
@@ -348,14 +347,14 @@ func markerFor(kind markKind) string {
 	return "~"
 }
 
-// scopeFor returns the highlight scope of a change of kind
-func scopeFor(kind markKind) string {
+// kindFor returns the highlight kind of a change of kind
+func kindFor(kind markKind) highlight.Kind {
 	switch kind {
 	case markInserted:
-		return highlight.ScopeInserted
+		return highlight.Inserted
 	case markDeleted:
-		return highlight.ScopeDeleted
+		return highlight.Deleted
 	}
 
-	return highlight.ScopeChanged
+	return highlight.Changed
 }

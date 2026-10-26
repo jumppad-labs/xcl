@@ -8,7 +8,6 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	xclerrors "github.com/jumppad-labs/xcl/errors"
-	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
@@ -144,7 +143,9 @@ func TestReportsASingletonGivenALabelAtTheSingleton(t *testing.T) {
 	var d *xclerrors.Diagnostic
 	require.ErrorAs(t, err, &d)
 
-	report := string(highlight.Text.Render(xcl.DiagnosticPieces(xclerrors.Diagnostics{d}, 0)))
+	var printed strings.Builder
+	require.NoError(t, xcl.PrintError(&printed, d, xcl.WithWidth(0)))
+	report := printed.String()
 	require.Contains(t, report, "Error: Unexpected label")
 	require.Contains(t, report, "line 1, in runner:")
 	require.Contains(t, report, `runner takes no labels, there is one of it: write it as runner { … }, without "nas".`)

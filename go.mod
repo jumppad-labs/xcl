@@ -20,6 +20,7 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
+	go.uber.org/zap v1.27.0 // test only: errors/format_zap_test.go proves zap.Error logs the report in errorVerbose
 	golang.org/x/text v0.28.0
 	golang.org/x/tools v0.35.0
 	google.golang.org/grpc v1.73.0
@@ -75,6 +76,7 @@ require (
 	go.opentelemetry.io/otel v1.35.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/mod v0.26.0 // indirect

@@ -1,0 +1,24 @@
+<pre>  <span style="color: #666666; font-style: italic"># resource.container.api will be updated</span>
+  <span style="color: #e5e510">~</span> <span style="color: #bc3fbc; font-weight: bold">resource</span> <span style="color: #11a8cd">&quot;container&quot;</span> <span style="color: #0dbc79">&quot;api&quot;</span> {
+      <span style="color: #e5e510">~</span> <span style="color: #e5e510">ports[0].host</span>      = <span style="color: #d670d6">8080</span> -&gt; <span style="color: #d670d6">9090</span>
+      <span style="color: #0dbc79">+</span> <span style="color: #0dbc79">ports[2]</span>           = { <span style="color: #2472c8">host</span> = <span style="color: #d670d6">443</span>, <span style="color: #bc3fbc; font-weight: bold">local</span> = <span style="color: #d670d6">8443</span> }
+      <span style="color: #e5e510">~</span> <span style="color: #e5e510">env[&quot;DB_PASSWORD&quot;]</span> = (sensitive value)
+    }
+
+  <span style="color: #666666; font-style: italic"># resource.container.cache changed outside xcl and will be updated</span>
+  <span style="color: #e5e510">~</span> <span style="color: #bc3fbc; font-weight: bold">resource</span> <span style="color: #11a8cd">&quot;container&quot;</span> <span style="color: #0dbc79">&quot;cache&quot;</span> {}
+
+  <span style="color: #666666; font-style: italic"># resource.container.web will be created</span>
+  <span style="color: #0dbc79">+</span> <span style="color: #bc3fbc; font-weight: bold">resource</span> <span style="color: #11a8cd">&quot;container&quot;</span> <span style="color: #0dbc79">&quot;web&quot;</span> {
+      <span style="color: #0dbc79">+</span> <span style="color: #0dbc79">image</span>   = <span style="color: #e5e510">&quot;nginx&quot;</span>
+      <span style="color: #0dbc79">+</span> <span style="color: #0dbc79">db_host</span> = (known after apply)
+    }
+
+  <span style="color: #666666; font-style: italic"># resource.network.app will be replaced, its last apply failed</span>
+<span style="color: #e5e510">-/+</span> <span style="color: #bc3fbc; font-weight: bold">resource</span> <span style="color: #11a8cd">&quot;network&quot;</span> <span style="color: #0dbc79">&quot;app&quot;</span> {}
+
+  <span style="color: #666666; font-style: italic"># resource.postgres.old will be deleted</span>
+  <span style="color: #cd3131">-</span> <span style="color: #bc3fbc; font-weight: bold">resource</span> <span style="color: #11a8cd">&quot;postgres&quot;</span> <span style="color: #0dbc79">&quot;old&quot;</span> {}
+
+Diff: 1 to create, 2 to update, 1 to replace, 1 to delete, 4 unchanged.
+</pre>

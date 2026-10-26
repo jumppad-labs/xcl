@@ -111,10 +111,16 @@ var (
 	// or module, or it holds a value that has no configuration form.
 	ErrNotEncodable = xclerrors.ErrNotEncodable
 
-	// ErrInvalidTheme means a colour theme given to highlight.NewANSI
+	// ErrInvalidTheme means a colour theme given to highlight.LoadVSCodeTheme
 	// cannot be read or is not a valid VS Code colour theme. The
 	// InvalidThemeError detail names the theme and what was wrong with it.
 	ErrInvalidTheme = xclerrors.ErrInvalidTheme
+
+	// ErrInvalidStyle means a word of a theme's style is not one a style
+	// understands, as highlight.Theme.Validate reports. The InvalidStyleError
+	// detail names the kind, the style and the word. Printing with such a
+	// theme still works: the word is skipped.
+	ErrInvalidStyle = xclerrors.ErrInvalidStyle
 )
 
 // The errors below name the ways masking a sensitive value can fail. Check
@@ -182,6 +188,7 @@ type (
 	InvalidSavedDataError = xclerrors.InvalidSavedDataError
 	NotEncodableError     = xclerrors.NotEncodableError
 	InvalidThemeError     = xclerrors.InvalidThemeError
+	InvalidStyleError     = xclerrors.InvalidStyleError
 
 	UnrecoverableError     = xclerrors.UnrecoverableError
 	MaskNotReversibleError = xclerrors.MaskNotReversibleError
