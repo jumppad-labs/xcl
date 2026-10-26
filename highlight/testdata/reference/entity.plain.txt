@@ -1,0 +1,22 @@
+// the reference resource: every kind of configuration text
+# a hash comment
+/* a block
+   comment */
+resource "container" "web" {
+  image    = "nginx:1.27"
+  replicas = 3
+  enabled  = true
+  owner    = null
+  message  = "line one\nport < 1024 & \"quoted\""
+  network  = resource.network.main.meta.name
+  port     = max(8080, 8443)
+  greeting = "hello ${variable.name}!"
+
+  script = <<-EOF
+    echo "#{{ .Vars.greeting }}"
+  EOF
+
+  volume {
+    source = "/data"
+  }
+}

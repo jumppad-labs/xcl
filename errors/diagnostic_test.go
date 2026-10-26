@@ -2,6 +2,8 @@ package errors
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -73,7 +75,7 @@ func TestDiagnosticErrorHoldsNoSource(t *testing.T) {
 func TestNewDiagnosticTakesTheLinesOfItsSubject(t *testing.T) {
 	d := NewDiagnostic(unsupported(), sources())
 
-	require.Equal(t, &SourceLines{File: "main.xcl", Start: 2, Lines: []string{`  modls = ["opus"]`}}, d.Source)
+	require.Equal(t, &SourceLines{File: "main.xcl", Start: 1, Lines: []string{`agent "claude" {`, `  modls = ["opus"]`, `}`}}, d.Source)
 }
 
 func TestNewDiagnosticTakesTheLinesOfItsContextToo(t *testing.T) {
@@ -98,15 +100,16 @@ func TestNewDiagnosticEndingAtTheStartOfALineLeavesThatLineOut(t *testing.T) {
 		End:      hcl.Pos{Line: 3, Column: 1},
 	}
 
-	d := NewDiagnostic(diagnostic, sources())
+	d := NewDiagnostic(diagnostic, map[string][]byte{"main.xcl": []byte(longSource)})
 
-	require.Equal(t, []string{`  modls = ["opus"]`}, d.Source.Lines)
+	require.Equal(t, 1, d.Source.Start)
+	require.Equal(t, []string{`agent "claude" {`, `  modls = ["opus"]`, `  effort = "high"`, `  tools = []`}, d.Source.Lines)
 }
 
 func TestNewDiagnosticTakesLinesWithoutTheirCarriageReturns(t *testing.T) {
 	d := NewDiagnostic(unsupported(), map[string][]byte{"main.xcl": []byte("agent \"claude\" {\r\n  modls = [\"opus\"]\r\n}\r\n")})
 
-	require.Equal(t, []string{`  modls = ["opus"]`}, d.Source.Lines)
+	require.Equal(t, []string{`agent "claude" {`, `  modls = ["opus"]`, `}`}, d.Source.Lines)
 }
 
 func TestNewDiagnosticWithoutTheFileHasNoSource(t *testing.T) {
@@ -215,4 +218,97 @@ func TestConfigErrorDiagnosticsLeavesOutOtherErrors(t *testing.T) {
 	ce.AppendError(diagnostic)
 
 	require.Equal(t, Diagnostics{diagnostic}, ce.Diagnostics())
+}
+
+// longSource is nine lines of configuration
+const longSource = "agent \"claude\" {\n" +
+	"  modls = [\"opus\"]\n" +
+	"  effort = \"high\"\n" +
+	"  tools = []\n" +
+	"  timeout = 30\n" +
+	"  retries = 2\n" +
+	"  name = \"claude\"\n" +
+	"  enabled = true\n" +
+	"}\n"
+
+// lineRange is the range of columns 3 to 8 on line
+func lineRange(line int) *hcl.Range {
+	return &hcl.Range{
+		Filename: "main.xcl",
+		Start:    hcl.Pos{Line: line, Column: 3},
+		End:      hcl.Pos{Line: line, Column: 8},
+	}
+}
+
+func diagnosticAt(subject *hcl.Range, src string) *Diagnostic {
+	diagnostic := unsupported()
+	diagnostic.Subject = subject
+
+	return NewDiagnostic(diagnostic, map[string][]byte{"main.xcl": []byte(src)})
+}
+
+func TestNewDiagnosticInTheMiddleOfAFileTakesTwoLinesEitherSide(t *testing.T) {
+	d := diagnosticAt(lineRange(5), longSource)
+
+	require.Equal(t, 3, d.Source.Start)
+	require.Equal(t, []string{`  effort = "high"`, `  tools = []`, `  timeout = 30`, `  retries = 2`, `  name = "claude"`}, d.Source.Lines)
+}
+
+func TestNewDiagnosticOnTheFirstLineOfAThreeLineFileTakesLinesOneToThree(t *testing.T) {
+	d := diagnosticAt(lineRange(1), source)
+
+	require.Equal(t, 1, d.Source.Start)
+	require.Equal(t, []string{`agent "claude" {`, `  modls = ["opus"]`, `}`}, d.Source.Lines)
+}
+
+func TestNewDiagnosticOnTheLastLineTakesThatLineAndTheTwoBefore(t *testing.T) {
+	d := diagnosticAt(lineRange(9), longSource)
+
+	require.Equal(t, 7, d.Source.Start)
+	require.Equal(t, []string{`  name = "claude"`, `  enabled = true`, `}`}, d.Source.Lines)
+}
+
+func TestNewDiagnosticInAFileEndingWithALineBreakTakesNoEmptyLineAfterIt(t *testing.T) {
+	d := diagnosticAt(lineRange(3), source)
+
+	require.Equal(t, []string{`agent "claude" {`, `  modls = ["opus"]`, `}`}, d.Source.Lines)
+}
+
+func TestNewDiagnosticInAFileEndingWithoutALineBreakTakesItsLastLine(t *testing.T) {
+	d := diagnosticAt(lineRange(2), "agent \"claude\" {\n  modls = [\"opus\"]\n}")
+
+	require.Equal(t, 1, d.Source.Start)
+	require.Equal(t, []string{`agent "claude" {`, `  modls = ["opus"]`, `}`}, d.Source.Lines)
+}
+
+func TestNewDiagnosticAtTheEndOfAFileKeepsTheLineItCovers(t *testing.T) {
+	// the end of a file ending with a line break is on the empty line after it
+	d := diagnosticAt(&hcl.Range{Filename: "main.xcl", Start: hcl.Pos{Line: 4, Column: 1}, End: hcl.Pos{Line: 4, Column: 1}}, source)
+
+	require.Equal(t, 2, d.Source.Start)
+	require.Equal(t, []string{`  modls = ["opus"]`, `}`, ``}, d.Source.Lines)
+}
+
+func TestNewDiagnosticAcrossLinesTakesTwoLinesEitherSideOfTheSpan(t *testing.T) {
+	d := diagnosticAt(&hcl.Range{
+		Filename: "main.xcl",
+		Start:    hcl.Pos{Line: 4, Column: 3},
+		End:      hcl.Pos{Line: 6, Column: 5},
+	}, longSource)
+
+	require.Equal(t, 2, d.Source.Start)
+	require.Len(t, d.Source.Lines, 7)
+	require.Equal(t, `  modls = ["opus"]`, d.Source.Lines[0])
+	require.Equal(t, `  enabled = true`, d.Source.Lines[6])
+}
+
+func TestNewDiagnosticNeverReadsTheFileForContext(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "main.xcl")
+	require.NoError(t, os.WriteFile(path, []byte(longSource), 0o600))
+
+	subject := lineRange(5)
+	subject.Filename = path
+	d := NewDiagnostic(&hcl.Diagnostic{Severity: hcl.DiagError, Summary: "Unsupported argument", Subject: subject}, map[string][]byte{path: []byte("one\ntwo\nthree\nfour\nfive\n")})
+
+	require.Equal(t, []string{"three", "four", "five"}, d.Source.Lines)
 }

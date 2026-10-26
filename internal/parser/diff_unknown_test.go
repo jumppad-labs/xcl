@@ -8,7 +8,6 @@ import (
 
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/entity"
-	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 	"github.com/jumppad-labs/xcl/types"
@@ -580,7 +579,7 @@ func TestDiffRendersComputedValuesOfReplacedDependencyAsKnownAfterApply(t *testi
 
 	result := h.runDiff(t, lifecycleComputedRefConfig)
 
-	output := string(highlight.Text.Render(result.Pieces()))
+	output := plainDiff(result)
 	require.Contains(t, output, "      ~ network[0].name = \"id-one\" -> (known after apply)\n")
 }
 
@@ -606,6 +605,6 @@ func TestDiffRendersComputedValuesOfUpdatedDependencyAsKnownAfterApply(t *testin
 
 	result := h.runDiff(t, lifecycleComputedRefConfig)
 
-	output := string(highlight.Text.Render(result.Pieces()))
+	output := plainDiff(result)
 	require.Contains(t, output, "      ~ network[0].name = \"id-one\" -> (known after apply)\n")
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -90,4 +91,38 @@ func TestFetchKeyReadsNoMoreThanOneMebibyte(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, key, 1<<20)
+}
+
+// applyBroken applies the configuration in testdata/broken, whose network has
+// a block the Docker plugin does not take, with the plugin installed from the
+// fake release, and returns the exit code and stderr
+func applyBroken(t *testing.T) (int, string) {
+	t.Helper()
+
+	broken, err := filepath.Abs("./testdata/broken")
+	require.NoError(t, err)
+
+	useFakeRelease(t)
+	inTempDir(t)
+
+	code, _, stderr := runCommand("apply", "--state", t.TempDir(), broken)
+
+	return code, stderr
+}
+
+func TestApplyOfAMistakePrintsAReport(t *testing.T) {
+	code, stderr := applyBroken(t)
+
+	require.Equal(t, 1, code)
+	require.Contains(t, stderr, "Error: Unsupported block type\n")
+	require.Contains(t, stderr, " line 7, in docker.network.xcl_plugin_broken, field timeout[0]:\n")
+	require.Contains(t, stderr, "     5 |   subnet = \"10.74.0.0/24\"\n")
+	require.Contains(t, stderr, "     7 |   timeout \"http\" {\n")
+	require.Contains(t, stderr, "\nBlocks of type \"timeout\" are not expected here.\n")
+}
+
+func TestApplyOfAMistakeDoesNotPrintItAsOneLine(t *testing.T) {
+	_, stderr := applyBroken(t)
+
+	require.NotContains(t, stderr, "error: ")
 }

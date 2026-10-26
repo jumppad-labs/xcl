@@ -63,3 +63,44 @@ func TestInvalidThemeErrorIsRecoveredWithAs(t *testing.T) {
 	require.Equal(t, "theme is not valid JSON", detail.Reason)
 	require.Same(t, themeErrCause, detail.Err)
 }
+
+// InvalidStyleError. A theme word a style does not understand is reported by
+// validation, so the error has to match the condition and name the kind, the
+// style and the word.
+
+func TestInvalidStyleErrorMessageNamesStyleKindAndWord(t *testing.T) {
+	err := &InvalidStyleError{Kind: "Attribute", Style: "bold purple", Word: "purple"}
+
+	require.Equal(t, `style "bold purple" for Attribute: unknown word "purple"`, err.Error())
+}
+
+func TestInvalidStyleErrorMatchesSentinel(t *testing.T) {
+	err := &InvalidStyleError{Kind: "Attribute", Style: "bold purple", Word: "purple"}
+
+	require.ErrorIs(t, err, ErrInvalidStyle)
+}
+
+func TestInvalidStyleErrorDoesNotMatchInvalidTheme(t *testing.T) {
+	err := &InvalidStyleError{Kind: "Attribute", Style: "bold purple", Word: "purple"}
+
+	require.NotErrorIs(t, err, ErrInvalidTheme)
+}
+
+func TestInvalidStyleErrorMatchesSentinelWhenWrapped(t *testing.T) {
+	wrapped := fmt.Errorf("validating theme: %w", &InvalidStyleError{Kind: "Attribute", Style: "bold purple", Word: "purple"})
+
+	require.ErrorIs(t, wrapped, ErrInvalidStyle)
+}
+
+func TestInvalidStyleErrorIsRecoveredWithAs(t *testing.T) {
+	joined := errors.Join(
+		&InvalidStyleError{Kind: "Attribute", Style: "bold purple", Word: "purple"},
+		&InvalidStyleError{Kind: "Comment", Style: "wavy", Word: "wavy"},
+	)
+
+	var detail *InvalidStyleError
+	require.True(t, errors.As(joined, &detail))
+	require.Equal(t, "Attribute", detail.Kind)
+	require.Equal(t, "bold purple", detail.Style)
+	require.Equal(t, "purple", detail.Word)
+}

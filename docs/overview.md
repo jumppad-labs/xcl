@@ -120,14 +120,22 @@ undefined, a `.vars` file that is not well formed, and a provider that failed
 during apply or destroy alike. It embeds the `hcl.Diagnostic` it was made from
 and adds the block it is in (`Entity`, such as `agent.claude`), the field
 within it (`Field`, such as `workspace[0].directory`), where the block starts
-(`EntityPos`), the lines of source around the fault (`Source`), read when the
-problem was found, and the error it was found through (`Cause`), which
-`errors.Is` and `errors.As` reach. A provider failure's cause is an
-`*errors.ProviderError` naming the step and the address.
+(`EntityPos`), the lines of source around the fault (`Source`): the lines it
+covers and up to two either side, clipped at the file's ends, taken from the
+source read when the problem was found, and the error it was found through
+(`Cause`), which `errors.Is` and `errors.As` reach. A provider failure's cause
+is an `*errors.ProviderError` naming the step and the address.
 `ConfigError.Diagnostics()` returns them in order. A diagnostic's `Error` is
-one line; `xcl.DiagnosticPieces` ([`diagnostics.go`](../diagnostics.go)) lays
-diagnostics out as a report with their source, as labelled pieces for any
-`highlight.Renderer`.
+one line, and so is `%v`; `%+v` on a `Diagnostic` or a `ConfigError`
+([`errors/format.go`](../errors/format.go)) gives the plain report, which is
+what zap's `errorVerbose` records. `xcl.PrintError` ([`print.go`](../print.go))
+prints the report of every diagnostic inside any error, however it was
+wrapped, in any `highlight.Formatter`, and `xcl.ErrorTokens`
+([`diagnostics.go`](../diagnostics.go)) gives it as labelled tokens. The
+report's wording is decided once, in the private `internal/report` package,
+which lays a diagnostic out as token-free segments and walks an error tree;
+the errors package uses it for `%+v` and the root package labels the same
+segments, so the two always agree.
 
 Validation runs three stages in order — structure, then references, then
 properties — and each gathers all of its own findings before the next is

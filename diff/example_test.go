@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"github.com/jumppad-labs/xcl/diff"
-	"github.com/jumppad-labs/xcl/highlight"
 )
 
-func ExampleDiff_Pieces() {
+func ExampleDiff_Tokens() {
 	d := &diff.Diff{
 		Summary: diff.Summary{Create: 1, Update: 2, Replace: 1, Delete: 1, Unchanged: 4},
 		Resources: []diff.Resource{
@@ -34,7 +33,9 @@ func ExampleDiff_Pieces() {
 		},
 	}
 
-	fmt.Print(string(highlight.Text.Render(d.Pieces())))
+	for _, token := range d.Tokens() {
+		fmt.Print(token.Text)
+	}
 	// Output:
 	//   # resource.container.api will be updated
 	//   ~ resource "container" "api" {

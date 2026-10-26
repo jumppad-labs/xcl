@@ -1,0 +1,4 @@
+resource "secret" "login" {
+  username = "admin"
+  password = "(sensitive)"
+}

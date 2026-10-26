@@ -7,7 +7,6 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	xclerrors "github.com/jumppad-labs/xcl/errors"
-	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/types"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
@@ -151,7 +150,9 @@ func TestShowsTheSourceInTheReportOfAnError(t *testing.T) {
 	var d *xclerrors.Diagnostic
 	require.ErrorAs(t, err, &d)
 
-	report := string(highlight.Text.Render(xcl.DiagnosticPieces(xclerrors.Diagnostics{d}, 0)))
+	var printed strings.Builder
+	require.NoError(t, xcl.PrintError(&printed, d, xcl.WithWidth(0)))
+	report := printed.String()
 	require.Contains(t, report, `modls = ["opus"]`)
 }
 

@@ -46,6 +46,7 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/prettylog"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/registry"
 )
 
@@ -91,7 +92,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if err != nil {
-		fmt.Fprintf(stderr, "error: %s\n", err)
+		// a configuration problem is printed as a report with the lines at
+		// fault, anything else as its message, in colour only when stderr is
+		// a terminal and NO_COLOR is not set
+		xcl.PrintError(stderr, err, xcl.WithFormatter(highlight.For(stderr)))
 		return 1
 	}
 

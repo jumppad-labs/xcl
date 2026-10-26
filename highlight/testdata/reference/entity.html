@@ -1,0 +1,23 @@
+<pre class="xcl"><span class="xcl-comment xcl-line-comment">// the reference resource: every kind of configuration text</span>
+<span class="xcl-comment xcl-hash-comment"># a hash comment</span>
+<span class="xcl-comment xcl-block-comment">/* a block
+   comment */</span>
+<span class="xcl-block xcl-block-type">resource</span> <span class="xcl-label xcl-type-label">&quot;container&quot;</span> <span class="xcl-label xcl-name-label">&quot;web&quot;</span> {
+  <span class="xcl-attribute">image</span>    <span class="xcl-operator">=</span> <span class="xcl-string">&quot;nginx:1.27&quot;</span>
+  <span class="xcl-attribute">replicas</span> <span class="xcl-operator">=</span> <span class="xcl-number">3</span>
+  <span class="xcl-attribute">enabled</span>  <span class="xcl-operator">=</span> <span class="xcl-constant">true</span>
+  <span class="xcl-attribute">owner</span>    <span class="xcl-operator">=</span> <span class="xcl-constant">null</span>
+  <span class="xcl-attribute">message</span>  <span class="xcl-operator">=</span> <span class="xcl-string">&quot;line one</span><span class="xcl-string xcl-string-escape">\n</span><span class="xcl-string">port &lt; 1024 &amp; </span><span class="xcl-string xcl-string-escape">\&quot;</span><span class="xcl-string">quoted</span><span class="xcl-string xcl-string-escape">\&quot;</span><span class="xcl-string">&quot;</span>
+  <span class="xcl-attribute">network</span>  <span class="xcl-operator">=</span> <span class="xcl-reference">resource</span><span class="xcl-punctuation xcl-accessor">.</span><span class="xcl-reference xcl-member">network</span><span class="xcl-punctuation xcl-accessor">.</span><span class="xcl-reference xcl-member">main</span><span class="xcl-punctuation xcl-accessor">.</span><span class="xcl-reference xcl-member">meta</span><span class="xcl-punctuation xcl-accessor">.</span><span class="xcl-reference xcl-member">name</span>
+  <span class="xcl-attribute">port</span>     <span class="xcl-operator">=</span> <span class="xcl-function xcl-builtin-function">max</span>(<span class="xcl-number">8080</span>, <span class="xcl-number">8443</span>)
+  <span class="xcl-attribute">greeting</span> <span class="xcl-operator">=</span> <span class="xcl-string">&quot;hello </span><span class="xcl-punctuation xcl-interpolation-begin">${</span><span class="xcl-reference">variable</span><span class="xcl-punctuation xcl-accessor">.</span><span class="xcl-reference xcl-member">name</span><span class="xcl-punctuation xcl-interpolation-end">}</span><span class="xcl-string">!&quot;</span>
+
+  <span class="xcl-attribute">script</span> <span class="xcl-operator">=</span> <span class="xcl-string xcl-heredoc-operator">&lt;&lt;-</span><span class="xcl-string xcl-heredoc-marker">EOF</span>
+<span class="xcl-string xcl-heredoc">    echo &quot;</span><span class="xcl-punctuation xcl-interpolation-begin">#{{</span><span class="xcl-punctuation xcl-template-directive"> </span><span class="xcl-punctuation xcl-accessor">.</span><span class="xcl-reference xcl-member">Vars</span><span class="xcl-punctuation xcl-accessor">.</span><span class="xcl-reference xcl-member">greeting</span><span class="xcl-punctuation xcl-template-directive"> </span><span class="xcl-punctuation xcl-interpolation-end">}}</span><span class="xcl-string xcl-heredoc">&quot;
+</span>  <span class="xcl-string xcl-heredoc-marker">EOF</span>
+
+  <span class="xcl-block xcl-nested-block">volume</span> {
+    <span class="xcl-attribute">source</span> <span class="xcl-operator">=</span> <span class="xcl-string">&quot;/data&quot;</span>
+  }
+}
+</pre>

@@ -268,8 +268,8 @@ func TestErrorCodeDiagnosticSendsItsRange(t *testing.T) {
 func TestErrorCodeDiagnosticSendsItsSource(t *testing.T) {
 	out := toProto(unsupportedDiagnostic(hcl.DiagError))
 
-	require.Equal(t, "2", out.GetDetails()["source_start"])
-	require.Equal(t, `  modls = ["opus"]`, out.GetDetails()["source"])
+	require.Equal(t, "1", out.GetDetails()["source_start"])
+	require.Equal(t, "agent \"claude\" {\n  modls = [\"opus\"]\n}", out.GetDetails()["source"])
 }
 
 func TestErrorCodeDiagnosticWarning(t *testing.T) {

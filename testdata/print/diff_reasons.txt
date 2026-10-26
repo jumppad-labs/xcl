@@ -1,0 +1,19 @@
+  # resource.container.web will be replaced because resource.network.app is replaced
+-/+ resource "container" "web" {}
+
+  # resource.container.worker will be replaced because a dependency is replaced
+-/+ resource "container" "worker" {}
+
+  # resource.container.proxy will be replaced, it cannot be updated in place
+-/+ resource "container" "proxy" {}
+
+  # resource.container.batch will be replaced
+-/+ resource "container" "batch" {}
+
+  # resource.container.front will be updated because resource.network.a, resource.network.b are replaced and resource.volume.data is updated
+  ~ resource "container" "front" {}
+
+  # resource.container.back will be updated because resource.volume.data is updated
+  ~ resource "container" "back" {}
+
+Diff: 0 to create, 2 to update, 4 to replace, 0 to delete, 0 unchanged.

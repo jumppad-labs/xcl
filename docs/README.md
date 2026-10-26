@@ -45,13 +45,15 @@ not at end users writing `.xcl` config.
 | Path | Purpose |
 |---|---|
 | `config.go`, `options.go`, `events.go` | Public facade: `Config`, functional options, the `Event`/`EventHandler` aliases, and the runner that delivers each operation's events |
+| `print.go`, `diagnostics.go` | One-call printing: `PrintError`, `PrintEntity` and `PrintDiff` with the `WithFormatter`, `WithTheme` and `WithWidth` options, and `ErrorTokens`, the labelled report of every diagnostic in an error |
 | `entity/` | `entity.Change`, `entity.DependencyChange` and `entity.PropertyChange`: the answer a provider's `Changed` gives, the dependency list and the changed settings `Changed` and `Update` are given; `entity.Path`, the location of a setting (`diff.Path` is an alias of it) |
 | `types/` | Shared entity metadata: `types.Meta`, `types.ResourceBase`, reflection helpers |
 | `plugins/` | Provider contract (`ProviderAdapter`) and hosting (in-process / gRPC) |
 | `registry/` | Public plugin sources: the `Registry` and `Plugin` interfaces, `InProcess`/`Executable` starters, and the local registry `NewLocal` (declared Go types, application functions, in-process plugins, plugin binaries, plugin directories) |
+| `internal/report/` | The one layout of an error report: a diagnostic as token-free segments, detail wrapping, and the walk that finds every problem in an error tree, shared by `errors` (`%+v`) and the root package's `PrintError` and `ErrorTokens` |
 | `internal/plaintype/` | Builds the type a plain struct block type is stored as, embedding `types.ResourceBase`, and turns stored entities back into the plain struct |
-| `highlight/` | Output in two steps: `Pieces` labels xcl text with TextMate scopes, and a `Renderer` (`Text`, `ANSI`, `NewANSI`, or the application's own) turns labelled pieces into bytes |
-| `diff/` | The changes an apply would make (`Diff`), laid out as labelled pieces by `(*Diff).Pieces` |
+| `highlight/` | Labelled text and its output: `Kind` and `Token`, `Tokenize` labelling xcl text, `Theme` (style strings, `DefaultTheme`, `With`, `Validate`, `LoadVSCodeTheme`), the `Formatter` interface with `Plain`, `Terminal`, `HTML`, `HTMLInline` and `SVG`, `WriteCSS` and `For`; `testdata/reference/` holds the reference outputs every language's formatters are checked against |
+| `diff/` | The changes an apply would make (`Diff`), laid out as labelled tokens by `(*Diff).Tokens` |
 | `viper/` | A Viper that reads `.xcl` files into the application's plain block types |
 | `internal/catalog/` | `Catalog` — the `Config`'s private set of declared types, functions and registries; loads plugins on the first operation, checks type and function name clashes, builds the callable for each plugin function, aggregates plugin hosts, resolves types to adapters |
 | `events/` | The one event shape (`events.Event`), the `Handler`/`Emit` types, the operation, phase and level constants, and `SlogHandler`, the adapter to `log/slog` |

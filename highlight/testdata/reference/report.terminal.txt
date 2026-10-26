@@ -1,0 +1,15 @@
+[1;31mError[0m[1m: Unsupported block type[0m
+
+  on main.xcl line 4, in variable.name, field timeout[0]:
+[2m     2 | [0m  [34mdefault[0m = [33m"a<b"[0m
+[2m     3 | [0m
+[2m     4 | [0m  [1;31mtimeout[0m [32m"http"[0m {
+[2m     5 | [0m    [34mconnect[0m = [95m30[0m
+[2m     6 | [0m  }
+
+Blocks of type "timeout" are not expected here. A variable takes only default, description, type and sensitive, so move the timeout to the resource that uses it.
+
+[1;33mWarning[0m[1m: Deprecated attribute[0m
+
+retries is deprecated, use a retry block.
+

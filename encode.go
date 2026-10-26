@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	xclerrors "github.com/jumppad-labs/xcl/errors"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/cty"
 	"github.com/jumppad-labs/xcl/internal/plaintype"
 	"github.com/jumppad-labs/xcl/internal/resources"
@@ -117,8 +118,8 @@ func ShowReferences() EncodeOption {
 // IncludeEmpty is given. Values are written as the
 // literals they resolved to, not as the expressions the original configuration
 // used, unless ShowReferences is given. The text is plain, with no colour or
-// markup; to colour it, render its pieces, such as
-// highlight.ANSI.Render(highlight.Pieces(text)).
+// markup; to print it coloured, or as HTML or SVG, use PrintEntity, and for
+// its labelled tokens, EntityTokens.
 //
 // It fails with ErrNotEncodable when entity is not an entity, when it is a
 // builtin such as a variable, output or module, or when it holds a value that
@@ -130,6 +131,20 @@ func EncodeEntity(entity any, options ...EncodeOption) ([]byte, error) {
 	}
 
 	return encodeEntity(entity, opts)
+}
+
+// EntityTokens returns the configuration text EncodeEntity writes for
+// entity, labelled as highlight.Tokenize labels it, for a formatter of your
+// own. Joined, the tokens' text is exactly the text EncodeEntity returns.
+// PrintEntity prints the same text in one call. It fails as EncodeEntity
+// does, returning no tokens.
+func EntityTokens(entity any, options ...EncodeOption) ([]highlight.Token, error) {
+	text, err := EncodeEntity(entity, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return highlight.Tokenize(text), nil
 }
 
 // EncodeSavedEntity returns the configuration text for one entity's saved

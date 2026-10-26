@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 370 324" font-family="monospace" font-size="10">
+<text x="8" y="19" xml:space="preserve"><tspan fill="#666666" font-style="italic">// the reference resource: every kind of configuration text</tspan></text>
+<text x="8" y="33" xml:space="preserve"><tspan fill="#666666" font-style="italic"># a hash comment</tspan></text>
+<text x="8" y="47" xml:space="preserve"><tspan fill="#666666" font-style="italic">/* a block</tspan></text>
+<text x="8" y="61" xml:space="preserve"><tspan fill="#666666" font-style="italic">   comment */</tspan></text>
+<text x="8" y="75" xml:space="preserve"><tspan fill="#bc3fbc" font-weight="bold">resource</tspan> <tspan fill="#11a8cd">&quot;container&quot;</tspan> <tspan fill="#0dbc79">&quot;web&quot;</tspan> {</text>
+<text x="8" y="89" xml:space="preserve">  <tspan fill="#2472c8">image</tspan>    = <tspan fill="#e5e510">&quot;nginx:1.27&quot;</tspan></text>
+<text x="8" y="103" xml:space="preserve">  <tspan fill="#2472c8">replicas</tspan> = <tspan fill="#d670d6">3</tspan></text>
+<text x="8" y="117" xml:space="preserve">  <tspan fill="#2472c8">enabled</tspan>  = <tspan fill="#d670d6">true</tspan></text>
+<text x="8" y="131" xml:space="preserve">  <tspan fill="#2472c8">owner</tspan>    = <tspan fill="#d670d6">null</tspan></text>
+<text x="8" y="145" xml:space="preserve">  <tspan fill="#2472c8">message</tspan>  = <tspan fill="#e5e510">&quot;line one</tspan><tspan fill="#d670d6">\n</tspan><tspan fill="#e5e510">port &lt; 1024 &amp; </tspan><tspan fill="#d670d6">\&quot;</tspan><tspan fill="#e5e510">quoted</tspan><tspan fill="#d670d6">\&quot;</tspan><tspan fill="#e5e510">&quot;</tspan></text>
+<text x="8" y="159" xml:space="preserve">  <tspan fill="#2472c8">network</tspan>  = <tspan fill="#11a8cd">resource</tspan>.<tspan fill="#11a8cd">network</tspan>.<tspan fill="#11a8cd">main</tspan>.<tspan fill="#11a8cd">meta</tspan>.<tspan fill="#11a8cd">name</tspan></text>
+<text x="8" y="173" xml:space="preserve">  <tspan fill="#2472c8">port</tspan>     = max(<tspan fill="#d670d6">8080</tspan>, <tspan fill="#d670d6">8443</tspan>)</text>
+<text x="8" y="187" xml:space="preserve">  <tspan fill="#2472c8">greeting</tspan> = <tspan fill="#e5e510">&quot;hello </tspan>${<tspan fill="#11a8cd">variable</tspan>.<tspan fill="#11a8cd">name</tspan>}<tspan fill="#e5e510">!&quot;</tspan></text>
+<text x="8" y="201" xml:space="preserve"></text>
+<text x="8" y="215" xml:space="preserve">  <tspan fill="#2472c8">script</tspan> = <tspan fill="#e5e510">&lt;&lt;-</tspan><tspan fill="#e5e510">EOF</tspan></text>
+<text x="8" y="229" xml:space="preserve"><tspan fill="#e5e510">    echo &quot;</tspan>#{{ .<tspan fill="#11a8cd">Vars</tspan>.<tspan fill="#11a8cd">greeting</tspan> }}<tspan fill="#e5e510">&quot;</tspan></text>
+<text x="8" y="243" xml:space="preserve">  <tspan fill="#e5e510">EOF</tspan></text>
+<text x="8" y="257" xml:space="preserve"></text>
+<text x="8" y="271" xml:space="preserve">  <tspan fill="#bc3fbc" font-weight="bold">volume</tspan> {</text>
+<text x="8" y="285" xml:space="preserve">    <tspan fill="#2472c8">source</tspan> = <tspan fill="#e5e510">&quot;/data&quot;</tspan></text>
+<text x="8" y="299" xml:space="preserve">  }</text>
+<text x="8" y="313" xml:space="preserve">}</text>
+</svg>

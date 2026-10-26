@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	stderrors "errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,6 @@ import (
 	"github.com/jumppad-labs/xcl/diff"
 	"github.com/jumppad-labs/xcl/entity"
 	"github.com/jumppad-labs/xcl/events"
-	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plugin/structs"
 )
 
@@ -373,7 +373,7 @@ func TestDiffRendersReplacedDependencyAsReason(t *testing.T) {
 
 	result := h.runDiff(t, twoDependenciesConfig)
 
-	output := string(highlight.Text.Render(result.Pieces()))
+	output := plainDiff(result)
 	require.Contains(t, output, "  # "+twoDependenciesUserID+" will be replaced because "+twoDependenciesReplacedID+" is replaced\n-/+ resource \"container\" \"user\" {")
 }
 
@@ -470,4 +470,14 @@ func TestDecideTellsPluginTheSamePathsThePlanShows(t *testing.T) {
 	app := diffResourceAt(t, result, diffUpdateRefAppID)
 	require.Equal(t, []string{"subnet"}, diffChangePaths(app.Changes))
 	require.Equal(t, diffChangePaths(app.Changes), changePaths(h.plugin.GetChangedChanges(diffUpdateRefAppID)))
+}
+
+// plainDiff joins the text of d's tokens, the change summary as plain text
+func plainDiff(d *diff.Diff) string {
+	var text strings.Builder
+	for _, token := range d.Tokens() {
+		text.WriteString(token.Text)
+	}
+
+	return text.String()
 }

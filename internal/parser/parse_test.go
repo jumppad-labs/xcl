@@ -964,7 +964,7 @@ func TestParseDirectoryKeepsTheSourceOfAMalformedFile(t *testing.T) {
 
 	d := ce.Errors[0].(*errors.Diagnostic)
 	require.NotNil(t, d.Source)
-	require.Equal(t, 7, d.Source.Start)
+	require.Equal(t, 5, d.Source.Start)
 	require.NotEmpty(t, d.Source.Lines)
 }
 
@@ -1852,7 +1852,8 @@ func TestParseReportsAnInvalidDependencyAtDependsOn(t *testing.T) {
 	require.Equal(t, "depends_on", d.Field)
 	require.Equal(t, 3, d.Subject.Start.Line)
 	require.Equal(t, 1, d.EntityPos.Start.Line)
-	require.Equal(t, []string{`  depends_on = ["not an address"]`}, d.Source.Lines)
+	require.Equal(t, 1, d.Source.Start)
+	require.Equal(t, `  depends_on = ["not an address"]`, d.Source.Lines[d.Subject.Start.Line-d.Source.Start])
 }
 
 func TestParseReportsAModuleSourceThatIsNotALiteralAtTheSource(t *testing.T) {

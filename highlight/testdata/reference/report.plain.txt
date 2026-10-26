@@ -1,0 +1,15 @@
+Error: Unsupported block type
+
+  on main.xcl line 4, in variable.name, field timeout[0]:
+     2 |   default = "a<b"
+     3 | 
+     4 |   timeout "http" {
+     5 |     connect = 30
+     6 |   }
+
+Blocks of type "timeout" are not expected here. A variable takes only default, description, type and sensitive, so move the timeout to the resource that uses it.
+
+Warning: Deprecated attribute
+
+retries is deprecated, use a retry block.
+

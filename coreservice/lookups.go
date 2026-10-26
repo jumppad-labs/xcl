@@ -1,6 +1,7 @@
 package coreservice
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"github.com/jumppad-labs/xcl"
@@ -197,11 +198,18 @@ func encodeOptions(options *corepb.EncodeOptions) []xcl.EncodeOption {
 }
 
 // colour applies the terminal highlighting both encode calls offer, after
-// rendering, so the same text is coloured the same from either call.
+// rendering, so the same text is coloured the same from either call. The
+// highlight field asking for it is legacy: it formats the text with the
+// Terminal formatter and the default theme.
 func colour(text []byte, on bool) []byte {
 	if !on {
 		return text
 	}
 
-	return highlight.ANSI.Render(highlight.Pieces(text))
+	var coloured bytes.Buffer
+	if err := highlight.Terminal.Format(&coloured, highlight.DefaultTheme, highlight.Tokenize(text)); err != nil {
+		return text
+	}
+
+	return coloured.Bytes()
 }

@@ -1,0 +1,154 @@
+[
+  {
+    "kind": 1301,
+    "text": "Error"
+  },
+  {
+    "kind": 1401,
+    "text": ": Unsupported block type"
+  },
+  {
+    "kind": 0,
+    "text": "\n\n"
+  },
+  {
+    "kind": 1402,
+    "text": "  on main.xcl line 4, in variable.name, field timeout[0]:"
+  },
+  {
+    "kind": 0,
+    "text": "\n"
+  },
+  {
+    "kind": 1403,
+    "text": "     2 | "
+  },
+  {
+    "kind": 0,
+    "text": "  "
+  },
+  {
+    "kind": 300,
+    "text": "default"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 400,
+    "text": "\"a\u003cb\""
+  },
+  {
+    "kind": 0,
+    "text": "\n"
+  },
+  {
+    "kind": 1403,
+    "text": "     3 | "
+  },
+  {
+    "kind": 0,
+    "text": "\n"
+  },
+  {
+    "kind": 1403,
+    "text": "     4 | "
+  },
+  {
+    "kind": 0,
+    "text": "  "
+  },
+  {
+    "kind": 1301,
+    "text": "timeout"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 202,
+    "text": "\"http\""
+  },
+  {
+    "kind": 0,
+    "text": " {\n"
+  },
+  {
+    "kind": 1403,
+    "text": "     5 | "
+  },
+  {
+    "kind": 0,
+    "text": "    "
+  },
+  {
+    "kind": 300,
+    "text": "connect"
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 900,
+    "text": "="
+  },
+  {
+    "kind": 0,
+    "text": " "
+  },
+  {
+    "kind": 500,
+    "text": "30"
+  },
+  {
+    "kind": 0,
+    "text": "\n"
+  },
+  {
+    "kind": 1403,
+    "text": "     6 | "
+  },
+  {
+    "kind": 0,
+    "text": "  }\n\n"
+  },
+  {
+    "kind": 1404,
+    "text": "Blocks of type \"timeout\" are not expected here. A variable takes only default, description, type and sensitive, so move the timeout to the resource that uses it."
+  },
+  {
+    "kind": 0,
+    "text": "\n\n"
+  },
+  {
+    "kind": 1302,
+    "text": "Warning"
+  },
+  {
+    "kind": 1401,
+    "text": ": Deprecated attribute"
+  },
+  {
+    "kind": 0,
+    "text": "\n\n"
+  },
+  {
+    "kind": 1404,
+    "text": "retries is deprecated, use a retry block."
+  },
+  {
+    "kind": 0,
+    "text": "\n\n"
+  }
+]

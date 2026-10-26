@@ -1,0 +1,11 @@
+# A configuration with a mistake: the deployment sets an attribute its Go
+# type does not have, so the configuration cannot be read.
+deployment "web" {
+  replicas = 2
+  replica_count = 3
+
+  container {
+    name  = "web"
+    image = "ghcr.io/example/web:2.0.0"
+  }
+}

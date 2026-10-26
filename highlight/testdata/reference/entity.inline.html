@@ -1,0 +1,23 @@
+<pre><span style="color: #666666; font-style: italic">// the reference resource: every kind of configuration text</span>
+<span style="color: #666666; font-style: italic"># a hash comment</span>
+<span style="color: #666666; font-style: italic">/* a block
+   comment */</span>
+<span style="color: #bc3fbc; font-weight: bold">resource</span> <span style="color: #11a8cd">&quot;container&quot;</span> <span style="color: #0dbc79">&quot;web&quot;</span> {
+  <span style="color: #2472c8">image</span>    = <span style="color: #e5e510">&quot;nginx:1.27&quot;</span>
+  <span style="color: #2472c8">replicas</span> = <span style="color: #d670d6">3</span>
+  <span style="color: #2472c8">enabled</span>  = <span style="color: #d670d6">true</span>
+  <span style="color: #2472c8">owner</span>    = <span style="color: #d670d6">null</span>
+  <span style="color: #2472c8">message</span>  = <span style="color: #e5e510">&quot;line one</span><span style="color: #d670d6">\n</span><span style="color: #e5e510">port &lt; 1024 &amp; </span><span style="color: #d670d6">\&quot;</span><span style="color: #e5e510">quoted</span><span style="color: #d670d6">\&quot;</span><span style="color: #e5e510">&quot;</span>
+  <span style="color: #2472c8">network</span>  = <span style="color: #11a8cd">resource</span>.<span style="color: #11a8cd">network</span>.<span style="color: #11a8cd">main</span>.<span style="color: #11a8cd">meta</span>.<span style="color: #11a8cd">name</span>
+  <span style="color: #2472c8">port</span>     = max(<span style="color: #d670d6">8080</span>, <span style="color: #d670d6">8443</span>)
+  <span style="color: #2472c8">greeting</span> = <span style="color: #e5e510">&quot;hello </span>${<span style="color: #11a8cd">variable</span>.<span style="color: #11a8cd">name</span>}<span style="color: #e5e510">!&quot;</span>
+
+  <span style="color: #2472c8">script</span> = <span style="color: #e5e510">&lt;&lt;-</span><span style="color: #e5e510">EOF</span>
+<span style="color: #e5e510">    echo &quot;</span>#{{ .<span style="color: #11a8cd">Vars</span>.<span style="color: #11a8cd">greeting</span> }}<span style="color: #e5e510">&quot;
+</span>  <span style="color: #e5e510">EOF</span>
+
+  <span style="color: #bc3fbc; font-weight: bold">volume</span> {
+    <span style="color: #2472c8">source</span> = <span style="color: #e5e510">&quot;/data&quot;</span>
+  }
+}
+</pre>

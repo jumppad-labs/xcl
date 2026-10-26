@@ -1,13 +1,13 @@
 package xcl
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/jumppad-labs/xcl/diff"
-	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/test_fixtures/plain"
 	"github.com/jumppad-labs/xcl/state"
 	"github.com/jumppad-labs/xcl/types"
@@ -66,7 +66,9 @@ func TestPlanRendersAPluginSingletonWithoutLabels(t *testing.T) {
 	changes, err := f.config.Diff([]string{f.configFile})
 	require.NoError(t, err)
 
-	text := string(highlight.Text.Render(changes.Pieces()))
+	var out bytes.Buffer
+	require.NoError(t, PrintDiff(&out, changes))
+	text := out.String()
 	require.Contains(t, text, "hub {")
 	require.NotContains(t, text, `hub ""`)
 }

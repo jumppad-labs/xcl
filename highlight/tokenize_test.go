@@ -1,6 +1,8 @@
 package highlight_test
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"testing"
 
@@ -9,15 +11,36 @@ import (
 	"github.com/jumppad-labs/xcl/highlight"
 )
 
-// markers wraps every labelled piece as [scope]text[/scope] and passes
-// unlabelled text through unchanged
-var markers = highlight.PieceFunc(func(p highlight.Piece) string {
-	if p.Scope == "" {
-		return p.Text
+// markers is a formatter wrapping every labelled token as [scope]text[/scope],
+// the scope being the name the xcl-vscode grammar gives the same text. Text,
+// and a kind with no scope, is written unchanged.
+var markers = highlight.FormatterFunc(func(w io.Writer, _ highlight.Theme, tokens []highlight.Token) error {
+	for _, token := range tokens {
+		scope := token.Kind.Scope()
+
+		text := token.Text
+		if token.Kind != highlight.Text && scope != "" {
+			text = "[" + scope + "]" + token.Text + "[/" + scope + "]"
+		}
+
+		if _, err := io.WriteString(w, text); err != nil {
+			return err
+		}
 	}
 
-	return "[" + p.Scope + "]" + p.Text + "[/" + p.Scope + "]"
+	return nil
 })
+
+// renderText formats xcl text through formatter with the default theme, as
+// labelled by Tokenize
+func renderText(t *testing.T, formatter highlight.Formatter, text []byte) string {
+	t.Helper()
+
+	var out bytes.Buffer
+	require.NoError(t, formatter.Format(&out, highlight.DefaultTheme, highlight.Tokenize(text)))
+
+	return out.String()
+}
 
 func markedFile(t *testing.T, path string) string {
 	t.Helper()
@@ -25,7 +48,7 @@ func markedFile(t *testing.T, path string) string {
 	input, err := os.ReadFile(path)
 	require.NoError(t, err)
 
-	return renderText(markers, input)
+	return renderText(t, markers, input)
 }
 
 func markedSample(t *testing.T) string {
@@ -359,32 +382,32 @@ func TestTextLabelsReferenceRootInsideInterpolationInShownReferences(t *testing.
 	require.Contains(t, output, `${[/punctuation.section.interpolation.begin.xcl][support.class.reference.xcl]variable[/support.class.reference.xcl][punctuation.accessor.xcl].`)
 }
 
-func TestPiecesMergesLabelQuotesIntoOnePiece(t *testing.T) {
-	pieces := highlight.Pieces([]byte(`variable "cpu" {}`))
+func TestTokenizeMergesLabelQuotesIntoOneToken(t *testing.T) {
+	tokens := highlight.Tokenize([]byte(`variable "cpu" {}`))
 
-	require.Contains(t, pieces, highlight.Piece{Scope: "entity.name.tag.xcl", Text: `"cpu"`})
+	require.Contains(t, tokens, highlight.Token{Kind: highlight.NameLabel, Text: `"cpu"`})
 }
 
-func TestPiecesLeavesBracesAndNewlinesWithEmptyScope(t *testing.T) {
-	pieces := highlight.Pieces([]byte("variable \"cpu\" {\n}\n"))
+func TestTokenizeLeavesBracesAndNewlinesAsText(t *testing.T) {
+	tokens := highlight.Tokenize([]byte("variable \"cpu\" {\n}\n"))
 
-	require.Equal(t, highlight.Piece{Scope: "", Text: " {\n}\n"}, pieces[len(pieces)-1])
+	require.Equal(t, highlight.Token{Kind: highlight.Text, Text: " {\n}\n"}, tokens[len(tokens)-1])
 }
 
-func TestPiecesLeavesWhitespaceWithEmptyScope(t *testing.T) {
-	pieces := highlight.Pieces([]byte("variable \"cpu\" {\n}\n"))
+func TestTokenizeLeavesWhitespaceAsText(t *testing.T) {
+	tokens := highlight.Tokenize([]byte("variable \"cpu\" {\n}\n"))
 
-	require.Equal(t, highlight.Piece{Scope: "", Text: " "}, pieces[1])
+	require.Equal(t, highlight.Token{Kind: highlight.Text, Text: " "}, tokens[1])
 }
 
-func TestPiecesLeavesUnlabelledTextWithEmptyScope(t *testing.T) {
-	pieces := highlight.Pieces([]byte("variable \"cpu\" {\n}\n"))
+func TestTokenizeLeavesUnlabelledTextAsText(t *testing.T) {
+	tokens := highlight.Tokenize([]byte("variable \"cpu\" {\n}\n"))
 
-	expected := []highlight.Piece{
-		{Scope: "storage.type.xcl", Text: "variable"},
-		{Scope: "", Text: " "},
-		{Scope: "entity.name.tag.xcl", Text: `"cpu"`},
-		{Scope: "", Text: " {\n}\n"},
+	expected := []highlight.Token{
+		{Kind: highlight.BlockType, Text: "variable"},
+		{Kind: highlight.Text, Text: " "},
+		{Kind: highlight.NameLabel, Text: `"cpu"`},
+		{Kind: highlight.Text, Text: " {\n}\n"},
 	}
-	require.Equal(t, expected, pieces)
+	require.Equal(t, expected, tokens)
 }

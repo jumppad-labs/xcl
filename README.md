@@ -106,6 +106,10 @@ var cfg appConfig
 err = c.Decode(&cfg)
 ```
 
+When a configuration has a mistake, `xcl.PrintError(os.Stderr, err, xcl.WithFormatter(highlight.For(os.Stderr)))`
+prints the report a person reads: what is wrong, where, and the numbered lines
+of source around it, in colour on a terminal.
+
 A field tagged as a label is filled from the block's labels and can be read
 in expressions like an attribute (`database.postgres.main.name`), and a field
 called `Meta`, a `types.Meta`, receives the block's metadata, its disabled
