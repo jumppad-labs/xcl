@@ -1,6 +1,7 @@
 package coreservice
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/jumppad-labs/xcl"
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/internal/parser"
 	"github.com/jumppad-labs/xcl/registry"
 	"github.com/jumppad-labs/xcl/state"
@@ -655,6 +657,100 @@ func TestDiffMatchesGoDiff(t *testing.T) {
 	require.JSONEq(t, string(want), string(finished.GetDiffJson()))
 }
 
+func TestDiffFinishedCarriesDiffTokens(t *testing.T) {
+	finished := applyThenDiffNetwork(t)
+
+	require.Nil(t, finished.GetError())
+	require.NotEmpty(t, finished.GetDiffTokens())
+	require.True(t, hasKind(finished.GetDiffTokens(), corepb.TokenKind_TOKEN_KIND_CHANGED), "the updated network is labelled changed")
+}
+
+func TestDiffTokensMatchGoChangeSummary(t *testing.T) {
+	finished := applyThenDiffNetwork(t)
+	require.Nil(t, finished.GetError())
+
+	// the same apply and diff directly through xcl.Config
+	local := registry.NewLocal()
+	local.RegisterPlugin(&parser.TestPlugin{})
+
+	cfg, err := xcl.NewConfig(xcl.WithRegistry(local), xcl.WithStatePath(t.TempDir()))
+	require.NoError(t, err)
+	require.NoError(t, cfg.Apply(writeConfig(t, networkConfig)))
+
+	direct, err := cfg.Diff([]string{writeConfig(t, networkChangedConfig)})
+	require.NoError(t, err)
+
+	var want bytes.Buffer
+	require.NoError(t, xcl.PrintDiff(&want, direct))
+
+	require.Contains(t, want.String(), "resource.network.one")
+	require.Equal(t, want.String(), joinTokens(finished.GetDiffTokens()))
+}
+
+func TestApplyFinishedCarriesNoDiffTokens(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+
+	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+	finished := c.drive(handle, opID, &fakeStore{}, nil)
+
+	require.Nil(t, finished.GetError())
+	require.Empty(t, finished.GetDiffJson())
+	require.Empty(t, finished.GetDiffTokens())
+}
+
+func TestValidateFinishedCarriesNoDiffTokens(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(appRequest(t))
+
+	opID := c.start(handle, "StartValidate", &corepb.StartValidateRequest{Paths: []string{writeConfig(t, appConfig)}})
+	finished := c.drive(handle, opID, nil, nil)
+
+	require.Nil(t, finished.GetError())
+	require.Empty(t, finished.GetDiffJson())
+	require.Empty(t, finished.GetDiffTokens())
+}
+
+func TestDestroyFinishedCarriesNoDiffTokens(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+	store := &fakeStore{}
+
+	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+	require.Nil(t, c.drive(handle, opID, store, nil).GetError())
+
+	opID = c.start(handle, "StartDestroy", &corepb.StartDestroyRequest{})
+	finished := c.drive(handle, opID, store, nil)
+
+	require.Nil(t, finished.GetError())
+	require.Empty(t, finished.GetDiffJson())
+	require.Empty(t, finished.GetDiffTokens())
+}
+
+func TestLoadFinishedCarriesNoDiffTokens(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+	store := &fakeStore{}
+
+	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+	require.Nil(t, c.drive(handle, opID, store, nil).GetError())
+
+	opID = c.start(handle, "StartLoad", &corepb.StartLoadRequest{})
+	finished := c.drive(handle, opID, store, nil)
+
+	require.Nil(t, finished.GetError())
+	require.Empty(t, finished.GetDiffJson())
+	require.Empty(t, finished.GetDiffTokens())
+}
+
 func TestCancelRunningApplyReturnsCancelledAndSaves(t *testing.T) {
 	_, f, finished := cancelDuringFirstCreate(t)
 
@@ -1230,4 +1326,163 @@ func TestValidateInvalidConfigFinishedHasConfigError(t *testing.T) {
 	require.NotNil(t, finished.GetError())
 	require.Equal(t, CodeConfig, finished.GetError().GetCode())
 	require.Contains(t, finished.GetError().GetMessage(), "bogus")
+}
+
+// unsupportedBlockConfig declares an app holding a block of a type the app
+// does not have, on line 7, with two lines either side of it so its report
+// shows two lines of context each way
+const unsupportedBlockConfig = "# web serves the site\napp \"web\" {\n  # the image to run\n  image = \"nginx\"\n\n  # a block app does not have\n  bogus {\n  }\n  # nothing else\n}\n"
+
+// failedApply applies unsupportedBlockConfig through the service with
+// events, returning the file it wrote, the finished task and every event
+// delivered before it
+func failedApply(t *testing.T) (string, *corepb.OperationFinished, []*corepb.Event) {
+	t.Helper()
+
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+
+	file := writeConfig(t, unsupportedBlockConfig)
+
+	delivered := []*corepb.Event{}
+	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{file}})
+	finished := c.drive(handle, opID, &fakeStore{}, func(e *corepb.Event) {
+		delivered = append(delivered, e)
+	})
+
+	return file, finished, delivered
+}
+
+// goApplyError applies file directly through xcl.Config, with the app type
+// the service declares, and returns the error Apply returns
+func goApplyError(t *testing.T, file string) error {
+	t.Helper()
+
+	declared, err := registry.TypeFromSchema([]byte(appSchema))
+	require.NoError(t, err)
+
+	local := registry.NewLocal()
+	local.RegisterType(declared.Prototype, declared.Type)
+
+	cfg, err := xcl.NewConfig(xcl.WithRegistry(local), xcl.WithStatePath(t.TempDir()))
+	require.NoError(t, err)
+
+	applyErr := cfg.Apply(file)
+	require.Error(t, applyErr)
+
+	return applyErr
+}
+
+func TestApplyErrorCarriesGoReport(t *testing.T) {
+	file, finished, _ := failedApply(t)
+
+	var want bytes.Buffer
+	require.NoError(t, xcl.PrintError(&want, goApplyError(t, file), xcl.WithWidth(0)))
+
+	require.Equal(t, CodeConfig, finished.GetError().GetCode())
+	require.NotEmpty(t, finished.GetError().GetReport())
+	require.Equal(t, want.String(), joinTokens(finished.GetError().GetReport()))
+}
+
+func TestApplyErrorEventCarriesTheSameReport(t *testing.T) {
+	_, finished, delivered := failedApply(t)
+
+	var applyError *corepb.Event
+	for _, e := range delivered {
+		if eventName(e) == "apply/error" {
+			applyError = e
+		}
+	}
+	require.NotNil(t, applyError, "the apply delivers an error event")
+
+	require.NotEmpty(t, applyError.GetError().GetReport())
+	require.Equal(t, joinTokens(finished.GetError().GetReport()), joinTokens(applyError.GetError().GetReport()))
+}
+
+func TestApplyErrorEachCauseCarriesItsReport(t *testing.T) {
+	_, finished, _ := failedApply(t)
+
+	causes := finished.GetError().GetCauses()
+	require.NotEmpty(t, causes)
+
+	for _, cause := range causes {
+		require.NotEmpty(t, cause.GetReport())
+		require.Contains(t, joinTokens(cause.GetReport()), cause.GetDetails()["summary"])
+		require.Contains(t, joinTokens(finished.GetError().GetReport()), joinTokens(cause.GetReport()))
+	}
+}
+
+func TestValidateErrorEventsCarryEachProblemsReport(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+
+	problems := []*corepb.Event{}
+	opID := c.start(handle, "StartValidate", &corepb.StartValidateRequest{Paths: []string{writeConfig(t, unsupportedBlockConfig)}})
+	c.drive(handle, opID, &fakeStore{}, func(e *corepb.Event) {
+		if e.GetError().GetDetails()["summary"] != "" {
+			problems = append(problems, e)
+		}
+	})
+	require.NotEmpty(t, problems, "validate delivers an event for the problem")
+
+	for _, e := range problems {
+		require.NotEmpty(t, e.GetError().GetReport())
+		require.Contains(t, joinTokens(e.GetError().GetReport()), e.GetError().GetDetails()["summary"])
+	}
+}
+
+func TestFailedProviderCauseCarriesAReport(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	f := newPluginConfig(t, c)
+
+	f.plugin.SetCreateError("resource.network.one", errors.New("boom"))
+
+	opID := c.start(f.handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, networkConfig)}})
+	finished := c.drive(f.handle, opID, nil, nil)
+
+	require.Len(t, finished.GetError().GetCauses(), 1)
+
+	cause := finished.GetError().GetCauses()[0]
+	require.Equal(t, CodeProvider, cause.GetCode())
+	require.NotEmpty(t, cause.GetReport())
+	require.Contains(t, joinTokens(cause.GetReport()), "create failed for resource.network.one: boom")
+}
+
+// A host prints a configuration problem with its source from the error it
+// received alone: the engine is closed before the report is printed, so no
+// further call could have been made.
+func TestHostPrintsReportWithoutAnotherCall(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+
+	file := writeConfig(t, unsupportedBlockConfig)
+	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{file}})
+	finished := c.drive(handle, opID, &fakeStore{}, nil)
+
+	c.s.Close()
+
+	received := []highlight.Token{}
+	for _, token := range finished.GetError().GetReport() {
+		received = append(received, highlight.Token{Kind: highlight.Kind(token.GetKind()), Text: token.GetText()})
+	}
+
+	var printed bytes.Buffer
+	require.NoError(t, highlight.Plain.Format(&printed, highlight.DefaultTheme, received))
+
+	out := printed.String()
+	require.Contains(t, out, "Error: Unsupported block type")
+	require.Contains(t, out, "on "+file+" line 7")
+	for _, line := range []string{"     5 | ", "     6 | ", "     7 | ", "     8 | ", "     9 | "} {
+		require.Contains(t, out, line)
+	}
+	require.NotContains(t, out, "     4 | ")
+	require.NotContains(t, out, "    10 | ")
 }

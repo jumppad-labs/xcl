@@ -2,12 +2,14 @@ package coreservice
 
 import (
 	"encoding/json"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
 
+	"github.com/jumppad-labs/xcl"
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
 	"github.com/jumppad-labs/xcl/state"
 )
@@ -80,6 +82,16 @@ func TestFindUnknownAddressIsNotFound(t *testing.T) {
 
 	require.Equal(t, CodeNotFound, out.GetCode())
 	require.Equal(t, "app.nope", out.GetDetails()["address"])
+}
+
+func TestFindUnknownAddressHasNoReport(t *testing.T) {
+	c, handle := appliedApp(t)
+
+	out := c.fail(handle, "Find", &corepb.FindRequest{Address: "app.nope"})
+
+	require.Equal(t, CodeNotFound, out.GetCode())
+	require.Empty(t, out.GetReport())
+	require.Equal(t, (&xcl.NotFoundError{Address: "app.nope"}).Error(), out.GetMessage())
 }
 
 func TestFindEmptyAddressIsInvalidArgument(t *testing.T) {
@@ -164,16 +176,6 @@ func TestEncodeSavedEntityRendersText(t *testing.T) {
 	require.NotContains(t, string(resp.GetText()), "\x1b[")
 }
 
-func TestEncodeSavedEntityHighlightAddsColour(t *testing.T) {
-	c, handle := appliedApp(t)
-
-	resp := &corepb.EncodeSavedEntityResponse{}
-	c.ok(handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{Entity: c.appRecord(handle), Highlight: true}, resp)
-
-	require.Contains(t, string(resp.GetText()), "\x1b[")
-	require.Contains(t, string(resp.GetText()), "web")
-}
-
 func TestEncodeSavedEntityEmptyIsInvalidArgument(t *testing.T) {
 	c, handle := appliedApp(t)
 
@@ -181,15 +183,6 @@ func TestEncodeSavedEntityEmptyIsInvalidArgument(t *testing.T) {
 
 	require.Equal(t, CodeInvalidArgument, out.GetCode())
 	require.Equal(t, "entity", out.GetDetails()["argument"])
-}
-
-// ansiEscape matches one ANSI colour code, as the terminal highlighting
-// writes them
-var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;]*m")
-
-// stripColour removes every ANSI colour code from text
-func stripColour(text string) string {
-	return ansiEscape.ReplaceAllString(text, "")
 }
 
 // encodeEntity is EncodeEntity, returning the text
@@ -421,42 +414,6 @@ func TestEncodeEntityWithoutOptionsUnchanged(t *testing.T) {
 	require.Equal(t, withEmptyOptions, withoutOptions)
 }
 
-func TestEncodeEntityHighlightAddsColour(t *testing.T) {
-	c, handle := appliedApp(t)
-
-	record := c.find(handle, "app.web")
-
-	plain := c.encodeEntity(handle, &corepb.EncodeEntityRequest{Entity: record})
-	coloured := c.encodeEntity(handle, &corepb.EncodeEntityRequest{Entity: record, Highlight: true})
-
-	require.Contains(t, coloured, "\x1b[")
-	require.Equal(t, plain, stripColour(coloured))
-}
-
-func TestEncodeSavedEntityHighlightStripsToPlainText(t *testing.T) {
-	c, handle := appliedApp(t)
-
-	record := c.appRecord(handle)
-
-	plain := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record})
-	coloured := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record, Highlight: true})
-
-	require.Contains(t, coloured, "\x1b[")
-	require.Equal(t, plain, stripColour(coloured))
-}
-
-func TestEncodeEntityHighlightMatchesSavedRecord(t *testing.T) {
-	c, handle := appliedApp(t)
-
-	record := c.appRecord(handle)
-
-	fromEntity := c.encodeEntity(handle, &corepb.EncodeEntityRequest{Entity: record, Highlight: true})
-	fromSaved := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record, Highlight: true})
-
-	require.Contains(t, fromEntity, "\x1b[")
-	require.Equal(t, fromSaved, fromEntity)
-}
-
 func TestEncodeEntityEmptyIsInvalidArgument(t *testing.T) {
 	c, handle := appliedApp(t)
 
@@ -638,4 +595,135 @@ func TestEncodeSavedEntityWithoutOptionsUnchanged(t *testing.T) {
 `
 	require.Equal(t, expected, withoutOptions)
 	require.Equal(t, withEmptyOptions, withoutOptions)
+}
+
+func TestEncodeSavedEntityReturnsTokensJoiningToText(t *testing.T) {
+	c, handle := appliedApp(t)
+
+	resp := &corepb.EncodeSavedEntityResponse{}
+	c.ok(handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{Entity: c.appRecord(handle), Tokens: true}, resp)
+
+	require.NotEmpty(t, resp.GetTokens())
+	require.Equal(t, string(resp.GetText()), joinTokens(resp.GetTokens()))
+	require.True(t, hasToken(resp.GetTokens(), corepb.TokenKind_TOKEN_KIND_BLOCK_TYPE, "app"), "app is labelled a block type")
+}
+
+func TestEncodeEntityReturnsTokensForLookedUpRecord(t *testing.T) {
+	c, handle := appliedApp(t)
+
+	resp := &corepb.EncodeEntityResponse{}
+	c.ok(handle, "EncodeEntity", &corepb.EncodeEntityRequest{Entity: c.find(handle, "app.web"), Tokens: true}, resp)
+
+	require.NotEmpty(t, resp.GetTokens())
+	require.Equal(t, string(resp.GetText()), joinTokens(resp.GetTokens()))
+	require.True(t, hasToken(resp.GetTokens(), corepb.TokenKind_TOKEN_KIND_BLOCK_TYPE, "app"), "app is labelled a block type")
+}
+
+func TestEncodeEntityReturnsTokensForEditedRecord(t *testing.T) {
+	c, handle := appliedApp(t)
+
+	record := map[string]any{}
+	require.NoError(t, json.Unmarshal(c.find(handle, "app.web"), &record))
+	record["image"] = "caddy"
+
+	edited, err := json.Marshal(record)
+	require.NoError(t, err)
+
+	resp := &corepb.EncodeEntityResponse{}
+	c.ok(handle, "EncodeEntity", &corepb.EncodeEntityRequest{Entity: edited, Tokens: true}, resp)
+
+	require.Contains(t, string(resp.GetText()), `"caddy"`)
+	require.NotEmpty(t, resp.GetTokens())
+	require.Equal(t, string(resp.GetText()), joinTokens(resp.GetTokens()))
+	require.True(t, hasToken(resp.GetTokens(), corepb.TokenKind_TOKEN_KIND_STRING, `"caddy"`), "the edited value is labelled a string")
+}
+
+func TestEncodeSavedEntityWithoutTokensReturnsNone(t *testing.T) {
+	c, handle := appliedApp(t)
+
+	record := c.appRecord(handle)
+
+	plain := &corepb.EncodeSavedEntityResponse{}
+	c.ok(handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{Entity: record}, plain)
+
+	labelled := &corepb.EncodeSavedEntityResponse{}
+	c.ok(handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{Entity: record, Tokens: true}, labelled)
+
+	require.Empty(t, plain.GetTokens())
+	require.Equal(t, string(labelled.GetText()), string(plain.GetText()))
+}
+
+func TestEncodeEntityWithoutTokensReturnsNone(t *testing.T) {
+	c, handle := appliedApp(t)
+
+	record := c.find(handle, "app.web")
+
+	plain := &corepb.EncodeEntityResponse{}
+	c.ok(handle, "EncodeEntity", &corepb.EncodeEntityRequest{Entity: record}, plain)
+
+	labelled := &corepb.EncodeEntityResponse{}
+	c.ok(handle, "EncodeEntity", &corepb.EncodeEntityRequest{Entity: record, Tokens: true}, labelled)
+
+	require.Empty(t, plain.GetTokens())
+	require.Equal(t, string(labelled.GetText()), string(plain.GetText()))
+}
+
+// hasToken reports whether a token has kind and text
+func hasToken(tokens []*corepb.Token, kind corepb.TokenKind, text string) bool {
+	for _, token := range tokens {
+		if token.GetKind() == kind && token.GetText() == text {
+			return true
+		}
+	}
+
+	return false
+}
+
+// withOldColourField is a marshalled request with field 2, the retired
+// highlight, set to true, as a caller built against the previous protocol
+// sends it to ask for terminal colour
+func withOldColourField(t *testing.T, req proto.Message) []byte {
+	t.Helper()
+
+	body, err := proto.Marshal(req)
+	require.NoError(t, err)
+
+	body = protowire.AppendTag(body, 2, protowire.VarintType)
+	body = protowire.AppendVarint(body, 1)
+
+	return body
+}
+
+func TestEncodeSavedEntityOldColourRequestReturnsPlainText(t *testing.T) {
+	c, handle := appliedApp(t)
+
+	record := c.appRecord(handle)
+	plain := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record})
+
+	body, status := c.s.Call(handle, "EncodeSavedEntity", withOldColourField(t, &corepb.EncodeSavedEntityRequest{Entity: record}))
+	require.Equal(t, StatusOK, status, errorMessage(body))
+
+	resp := &corepb.EncodeSavedEntityResponse{}
+	require.NoError(t, proto.Unmarshal(body, resp))
+
+	require.Equal(t, plain, string(resp.GetText()))
+	require.NotContains(t, string(resp.GetText()), "\x1b[")
+	require.Empty(t, resp.GetTokens())
+}
+
+func TestEncodeEntityOldColourRequestReturnsPlainText(t *testing.T) {
+	c, handle := appliedApp(t)
+
+	record := c.find(handle, "app.web")
+	plain := c.encodeEntity(handle, &corepb.EncodeEntityRequest{Entity: record})
+
+	body, status := c.s.Call(handle, "EncodeEntity", withOldColourField(t, &corepb.EncodeEntityRequest{Entity: record}))
+	require.Equal(t, StatusOK, status, errorMessage(body))
+
+	resp := &corepb.EncodeEntityResponse{}
+	require.NoError(t, proto.Unmarshal(body, resp))
+
+	require.Equal(t, plain, string(resp.GetText()))
+	require.NotContains(t, string(resp.GetText()), "\x1b[")
+	require.Empty(t, resp.GetTokens())
 }

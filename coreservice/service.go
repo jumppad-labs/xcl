@@ -207,6 +207,7 @@ var handlers = map[string]handler{
 		return &corepb.GetVersionResponse{Version: Version, AbiVersion: ABIVersion}, nil
 	}),
 	"CreateConfig": unary(false, (*Service).createConfig),
+	"ConvertTheme": unary(false, (*Service).convertTheme),
 
 	"StartValidate": unary(true, (*Service).startValidate),
 	"StartApply":    unary(true, (*Service).startApply),

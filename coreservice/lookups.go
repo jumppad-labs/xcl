@@ -1,7 +1,6 @@
 package coreservice
 
 import (
-	"bytes"
 	"encoding/json"
 
 	"github.com/jumppad-labs/xcl"
@@ -120,8 +119,8 @@ func (s *Service) outputs(conf *configuration, _ *corepb.OutputsRequest) (*corep
 }
 
 // encodeSavedEntity is EncodeSavedEntity, a saved record rendered as
-// configuration text with the encoding choices asked for, coloured for a
-// terminal when asked.
+// configuration text with the encoding choices asked for, and labelled by
+// the core's lexer as well when asked.
 //
 // Unlike every other lookup it does not call lookupAllowed. Lookups are
 // refused while an operation runs because the entity slice is replaced when
@@ -139,13 +138,19 @@ func (s *Service) encodeSavedEntity(conf *configuration, req *corepb.EncodeSaved
 		return nil, err
 	}
 
-	return &corepb.EncodeSavedEntityResponse{Text: colour(text, req.GetHighlight())}, nil
+	resp := &corepb.EncodeSavedEntityResponse{Text: text}
+	if req.GetTokens() {
+		resp.Tokens = tokensToProto(highlight.Tokenize(text))
+	}
+
+	return resp, nil
 }
 
 // encodeEntity is EncodeEntity, an entity's record as a lookup returns it,
-// possibly edited, rendered as configuration text. With reveal_sensitive the
-// engine fills a marker from its own copy of the entity, since a lookup only
-// ever hands out the marker.
+// possibly edited, rendered as configuration text, and labelled by the core's
+// lexer as well when asked. With reveal_sensitive the engine fills a marker
+// from its own copy of the entity, since a lookup only ever hands out the
+// marker.
 //
 // It reads the live entity by meta.id through Config.EncodeEntityRecord, so
 // like every other lookup it is refused while an operation runs.
@@ -163,7 +168,12 @@ func (s *Service) encodeEntity(conf *configuration, req *corepb.EncodeEntityRequ
 		return nil, err
 	}
 
-	return &corepb.EncodeEntityResponse{Text: colour(text, req.GetHighlight())}, nil
+	resp := &corepb.EncodeEntityResponse{Text: text}
+	if req.GetTokens() {
+		resp.Tokens = tokensToProto(highlight.Tokenize(text))
+	}
+
+	return resp, nil
 }
 
 // requireEntity refuses an encode of no record at all. Both encode calls
@@ -195,21 +205,4 @@ func encodeOptions(options *corepb.EncodeOptions) []xcl.EncodeOption {
 	}
 
 	return encode
-}
-
-// colour applies the terminal highlighting both encode calls offer, after
-// rendering, so the same text is coloured the same from either call. The
-// highlight field asking for it is legacy: it formats the text with the
-// Terminal formatter and the default theme.
-func colour(text []byte, on bool) []byte {
-	if !on {
-		return text
-	}
-
-	var coloured bytes.Buffer
-	if err := highlight.Terminal.Format(&coloured, highlight.DefaultTheme, highlight.Tokenize(text)); err != nil {
-		return text
-	}
-
-	return coloured.Bytes()
 }

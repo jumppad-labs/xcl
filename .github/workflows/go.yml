@@ -32,7 +32,8 @@ jobs:
 
     # The CoreService protocol in proto/ is part of the ABI contract of the
     # shared library: names are kept consistent by buf lint, and buf breaking
-    # refuses any change that renumbers, retypes or removes a field or method.
+    # refuses any change that renumbers or retypes a field, removes a field
+    # without reserving its number and name, or removes a method.
     - name: Set up buf
       uses: bufbuild/buf-setup-action@v1.50.0
       with:
