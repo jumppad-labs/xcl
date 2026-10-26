@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/jumppad-labs/xcl"
 	corepb "github.com/jumppad-labs/xcl/coreservice/proto"
@@ -769,24 +771,323 @@ func TestEncodeEntityDuringOperationRefused(t *testing.T) {
 	require.Nil(t, c.drive(f.handle, opID, nil, nil).GetError())
 }
 
-func TestEncodeSavedEntityDuringOperationRefused(t *testing.T) {
+// holdAtFirstStateTask starts the operation method on the configuration
+// behind handle, whose state store the host implements, and returns its id
+// and the first state task it asks the host for. The operation waits for
+// that task's Complete, so it is provably still running until the test
+// answers it.
+func holdAtFirstStateTask(t *testing.T, c *testClient, handle uint64, method string, req proto.Message) (uint64, *corepb.StateTask) {
+	t.Helper()
+
+	opID := c.start(handle, method, req)
+	task := nextStateTask(t, c, handle)
+	require.Equal(t, opID, task.GetOperationId())
+	require.True(t, c.s.lookup(handle).running(), "the operation is not running while its state task is held")
+
+	return opID, task
+}
+
+// completeHeld answers the held state task from store and drives the
+// operation to its end, requiring that it finished without error
+func completeHeld(t *testing.T, c *testClient, handle, opID uint64, store *fakeStore, task *corepb.StateTask) {
+	t.Helper()
+
+	c.ok(handle, "Complete", &corepb.CompleteRequest{
+		TaskId: task.GetTaskId(),
+		Result: &corepb.CompleteRequest_State{State: store.answer(task)},
+	}, &corepb.CompleteResponse{})
+
+	require.Nil(t, c.drive(handle, opID, store, nil).GetError())
+}
+
+func TestEncodeSavedEntityDuringValidate(t *testing.T) {
+	c, handle, store := appliedHostApp(t)
+	record := recordFor(t, store.saved, "app.web")
+
+	opID, task := holdAtFirstStateTask(t, c, handle, "StartValidate", &corepb.StartValidateRequest{Paths: []string{writeConfig(t, appConfig)}})
+
+	text := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record})
+	require.Contains(t, text, `app "web"`)
+	require.Contains(t, text, `"nginx"`)
+
+	completeHeld(t, c, handle, opID, store, task)
+}
+
+func TestEncodeSavedEntityDuringApply(t *testing.T) {
+	c, handle, store := appliedHostApp(t)
+	record := recordFor(t, store.saved, "app.web")
+
+	opID, task := holdAtFirstStateTask(t, c, handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+
+	text := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record})
+	require.Contains(t, text, `app "web"`)
+	require.Contains(t, text, `"nginx"`)
+
+	completeHeld(t, c, handle, opID, store, task)
+}
+
+func TestEncodeSavedEntityDuringDiff(t *testing.T) {
+	c, handle, store := appliedHostApp(t)
+	record := recordFor(t, store.saved, "app.web")
+
+	opID, task := holdAtFirstStateTask(t, c, handle, "StartDiff", &corepb.StartDiffRequest{Paths: []string{writeConfig(t, appConfig)}})
+
+	text := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record})
+	require.Contains(t, text, `app "web"`)
+	require.Contains(t, text, `"nginx"`)
+
+	completeHeld(t, c, handle, opID, store, task)
+}
+
+func TestEncodeSavedEntityDuringDestroy(t *testing.T) {
+	c, handle, store := appliedHostApp(t)
+	record := recordFor(t, store.saved, "app.web")
+
+	opID, task := holdAtFirstStateTask(t, c, handle, "StartDestroy", &corepb.StartDestroyRequest{})
+
+	text := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record})
+	require.Contains(t, text, `app "web"`)
+	require.Contains(t, text, `"nginx"`)
+
+	completeHeld(t, c, handle, opID, store, task)
+}
+
+func TestEncodeSavedEntityDuringLoad(t *testing.T) {
+	c, _, store := appliedHostApp(t)
+	record := recordFor(t, store.saved, "app.web")
+
+	// a second configuration loads what the first one's apply saved
+	handle := c.createConfig(hostRequest(t))
+	opID, task := holdAtFirstStateTask(t, c, handle, "StartLoad", &corepb.StartLoadRequest{})
+
+	text := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record})
+	require.Contains(t, text, `app "web"`)
+	require.Contains(t, text, `"nginx"`)
+
+	completeHeld(t, c, handle, opID, store, task)
+}
+
+func TestEncodeSavedEntityInvalidJSONDuringOperation(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	c := newTestClient(t)
-	f := newPluginConfig(t, c)
+	handle := c.createConfig(hostRequest(t))
+	store := &fakeStore{}
 
-	started, release := holdCreate(f.plugin, "resource.network.first")
+	opID, task := holdAtFirstStateTask(t, c, handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
 
-	opID := c.start(f.handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, chainConfig)}})
-	waitStarted(t, started, release)
+	out := c.fail(handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{Entity: []byte("this is not json")})
+	require.Equal(t, CodeInvalidSavedData, out.GetCode())
 
-	record := []byte(`{"meta":{"id":"resource.network.first","name":"first","type":"resource","subtype":"network"},"subnet":"10.0.0.0/16"}`)
+	completeHeld(t, c, handle, opID, store, task)
+}
 
-	out := c.fail(f.handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{Entity: record})
-	require.Equal(t, CodeOperationInProgress, out.GetCode())
+func TestEncodeSavedEntityUnregisteredTypeDuringOperation(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 
-	close(release)
-	require.Nil(t, c.drive(f.handle, opID, nil, nil).GetError())
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+	store := &fakeStore{}
+
+	record := []byte(`{"meta":{"id":"bogus.x","name":"x","type":"bogus"},"image":"nginx"}`)
+
+	opID, task := holdAtFirstStateTask(t, c, handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+
+	during := c.fail(handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{Entity: record})
+	require.Equal(t, CodeUnregisteredType, during.GetCode())
+	require.Equal(t, "bogus", during.GetDetails()["type"])
+
+	completeHeld(t, c, handle, opID, store, task)
+
+	// the same record gives the same error once the operation has ended
+	after := c.fail(handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{Entity: record})
+	require.Equal(t, during.GetCode(), after.GetCode())
+	require.Equal(t, during.GetDetails(), after.GetDetails())
+}
+
+func TestEncodeSavedEntityEmptyDuringOperation(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+	store := &fakeStore{}
+
+	opID, task := holdAtFirstStateTask(t, c, handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+
+	out := c.fail(handle, "EncodeSavedEntity", &corepb.EncodeSavedEntityRequest{})
+	require.Equal(t, CodeInvalidArgument, out.GetCode())
+	require.Equal(t, "entity", out.GetDetails()["argument"])
+
+	completeHeld(t, c, handle, opID, store, task)
+}
+
+// isWebCreated reports whether e is the create/success event of app.web
+func isWebCreated(e *corepb.Event) bool {
+	return e.GetOperation() == "create" && e.GetPhase() == "success" && e.GetResourceId() == "app.web"
+}
+
+func TestEncodeSavedEntityDuringApplyMatchesAfter(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+	store := &fakeStore{}
+
+	computed := &corepb.EncodeOptions{IncludeComputed: true}
+
+	var record []byte
+	var duringComputed, duringDefault string
+
+	// the SAVE task that follows the create success event waits for the
+	// host, which answers it only after this handler returns, so the
+	// operation is still running here
+	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+	finished := c.drive(handle, opID, store, func(e *corepb.Event) {
+		if !isWebCreated(e) {
+			return
+		}
+
+		require.True(t, c.s.lookup(handle).running(), "the operation is not running in the create success handler")
+
+		record = e.GetData()
+		duringComputed = c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record, Options: computed})
+		duringDefault = c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record})
+	})
+
+	require.Nil(t, finished.GetError())
+	require.NotEmpty(t, record, "no create/success event for app.web carried data")
+
+	afterComputed := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record, Options: computed})
+	afterDefault := c.encodeSavedEntity(handle, &corepb.EncodeSavedEntityRequest{Entity: record})
+
+	require.Contains(t, duringComputed, `app "web"`)
+	require.Equal(t, afterComputed, duringComputed)
+
+	require.Contains(t, duringDefault, `app "web"`)
+	require.Equal(t, afterDefault, duringDefault)
+}
+
+// handlerApply is what one apply of appConfig through a host store left
+// behind: the finished task, the name of every event in the order it
+// arrived, and the records the store holds
+type handlerApply struct {
+	finished *corepb.OperationFinished
+	events   []string
+	saved    [][]byte
+}
+
+// applyWithHandler applies appConfig to a fresh configuration with a host
+// store, calling render on every create success event before recording its
+// name
+func applyWithHandler(t *testing.T, render func(c *testClient, handle uint64, e *corepb.Event)) handlerApply {
+	t.Helper()
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+	store := &fakeStore{}
+
+	events := []string{}
+
+	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+	finished := c.drive(handle, opID, store, func(e *corepb.Event) {
+		if e.GetOperation() == "create" && e.GetPhase() == "success" {
+			render(c, handle, e)
+		}
+
+		events = append(events, eventName(e))
+	})
+
+	return handlerApply{finished: finished, events: events, saved: store.saved}
+}
+
+func TestApplyUnchangedByRenderingInHandler(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	rendered := 0
+	rendering := applyWithHandler(t, func(c *testClient, handle uint64, e *corepb.Event) {
+		req := &corepb.EncodeSavedEntityRequest{
+			Entity:  e.GetData(),
+			Options: &corepb.EncodeOptions{IncludeComputed: true},
+		}
+
+		// every create success record is rendered; the variable and the
+		// output are builtins, which are not written as configuration and
+		// say so, and everything else renders to text
+		if strings.HasPrefix(e.GetResourceId(), "variable.") || strings.HasPrefix(e.GetResourceId(), "output.") {
+			out := c.fail(handle, "EncodeSavedEntity", req)
+			require.Equal(t, CodeNotEncodable, out.GetCode())
+		} else {
+			require.NotEmpty(t, c.encodeSavedEntity(handle, req))
+		}
+
+		rendered++
+	})
+
+	silent := applyWithHandler(t, func(c *testClient, handle uint64, e *corepb.Event) {})
+
+	// the variable, the app and the output were each created and rendered
+	require.Equal(t, 3, rendered)
+
+	require.Nil(t, rendering.finished.GetError())
+	require.Nil(t, silent.finished.GetError())
+
+	require.Equal(t, silent.events, rendering.events)
+	require.Equal(t, decodeEntities(t, silent.saved), decodeEntities(t, rendering.saved))
+}
+
+func TestEncodeEntityFromHandlerDuringApplyRefused(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+	store := &fakeStore{}
+
+	var refused *corepb.Error
+
+	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+	finished := c.drive(handle, opID, store, func(e *corepb.Event) {
+		if !isWebCreated(e) {
+			return
+		}
+
+		refused = c.fail(handle, "EncodeEntity", &corepb.EncodeEntityRequest{Entity: e.GetData()})
+	})
+
+	require.NotNil(t, refused, "no create/success event for app.web was delivered")
+	require.Equal(t, CodeOperationInProgress, refused.GetCode())
+
+	require.Nil(t, finished.GetError())
+}
+
+func TestEncodeEditedEntityFromHandlerDuringApplyRefused(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(hostRequest(t))
+	store := &fakeStore{}
+
+	var refused *corepb.Error
+
+	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
+	finished := c.drive(handle, opID, store, func(e *corepb.Event) {
+		if !isWebCreated(e) {
+			return
+		}
+
+		entity := map[string]any{}
+		require.NoError(t, json.Unmarshal(e.GetData(), &entity))
+		entity["image"] = "edited"
+
+		edited, err := json.Marshal(entity)
+		require.NoError(t, err)
+
+		refused = c.fail(handle, "EncodeEntity", &corepb.EncodeEntityRequest{Entity: edited})
+	})
+
+	require.NotNil(t, refused, "no create/success event for app.web was delivered")
+	require.Equal(t, CodeOperationInProgress, refused.GetCode())
+
+	require.Nil(t, finished.GetError())
 }
 
 func TestLateCompleteIsInvalidArgument(t *testing.T) {

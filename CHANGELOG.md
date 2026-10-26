@@ -1,5 +1,15 @@
 # Changelog
 
+## 20261023074627-cc23fc08-encode-saved-entity-during-operation
+
+A host can render a resource's saved record as configuration text while an operation is still running. The core service's `EncodeSavedEntity` is now accepted while a `StartValidate`, `StartApply`, `StartDiff`, `StartDestroy` or `StartLoad` operation runs on the handle, including from the host's handling of that operation's events, so a host can render each resource's saved record as its create success event arrives instead of waiting for the operation to finish. The text is the same as the same render gives after the operation, and the operation runs exactly as before, with the same result, events and saved state. The call reads none of the configuration's entities: it types the record through the plugin catalog, whose use counting keeps the operation's external plugins running while it renders.
+
+`EncodeEntity`, `Entities`, `Find`, `FindByType`, `FindOne` and `Outputs` are still refused with `operation_in_progress` while an operation runs, because they read entities the operation replaces when it ends. An empty, invalid or unrecognised record reports the same error during an operation as outside one: `invalid_argument`, `invalid_saved_data` or `unregistered_type`, never `operation_in_progress`. Go programs are unaffected, since `Config.EncodeSavedEntity` already allowed this, and the protocol's messages are unchanged; the protocol now documents the call as allowed during an operation.
+
+**Breaking:**
+
+None.
+
 ## 20261016064106-8931613a-python-encode-entity
 
 A host can turn any entity it holds into configuration text with Go's encoding choices. The core service gains `EncodeEntity`, a lookup that takes an entity's JSON record in the shape `Entities`, `Find`, `FindByType` and `FindOne` return it, possibly edited by the host or built by hand, with `highlight` and an `EncodeOptions` message carrying `include_computed`, `include_empty`, `reveal_sensitive` and `show_references`, the four choices of Go's encoder. `EncodeSavedEntity` takes the same `options`; a call that sends none renders exactly as before. Like every lookup, both are refused with `operation_in_progress` while an operation runs, and both colour the text after rendering, so the same entity gives the same coloured text from either call.

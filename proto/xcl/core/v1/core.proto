@@ -43,6 +43,11 @@ service CoreService {
   rpc FindByType(FindByTypeRequest) returns (EntitiesResponse);
   rpc FindOne(FindByTypeRequest) returns (EntityResponse);
   rpc Outputs(OutputsRequest) returns (OutputsResponse);
+
+  // EncodeSavedEntity is Config.EncodeSavedEntity: it renders a saved record,
+  // as state stores it and events carry it, as configuration text. It reads
+  // none of the configuration's entities, so unlike the other lookups it is
+  // allowed while an operation runs, including from an event handler.
   rpc EncodeSavedEntity(EncodeSavedEntityRequest) returns (EncodeSavedEntityResponse);
 
   // EncodeEntity is Config.EncodeEntityRecord: it renders an entity's JSON
