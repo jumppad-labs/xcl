@@ -1,0 +1,1246 @@
+{
+  "plan": "20261023075302-bad71237-printing-and-highlighting-python",
+  "items": [
+    {
+      "item": "e8d33eb5-0d7a-400c-83fe-2377c14a2ed5",
+      "title": "Regenerate the protocol stubs and remove the colour keyword",
+      "checks": [
+        {
+          "at": "2026-10-26T12:15:32Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "e8d33eb5-0d7a-400c-83fe-2377c14a2ed5",
+            "title": "Regenerate the protocol stubs and remove the colour keyword",
+            "criteria": [
+              "The package's protocol messages include the token kinds, labelled text, the report on errors, labelled diff text and theme conversion, and no longer have a colour field on the encode requests",
+              "Passing `highlight=` to `encode_entity` or `encode_saved_entity`, on `xcl.Config` or `xcl.aio.Config`, fails as an unexpected keyword argument",
+              "No code, test or docstring in the package still passes or describes the removed keyword, and the existing unit and integration suites pass against an engine built from the xcl branch"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "/home/nicj/code/github.com/jumppad-labs/xcl-python"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl-ref.txt"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/workflows/test.yml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_core/core_pb2.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_core/core_pb2.pyi"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".pyi"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "Error.report"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "EncodeEntityRequest.tokens"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "EncodeSavedEntityRequest.tokens"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "EncodeEntityResponse.tokens"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "EncodeSavedEntityResponse.tokens"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "ConvertThemeResponse.styles"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_sync.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "PARITY.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Generated stubs carry the new messages and drop the colour field. core_pb2.pyi defines enum TokenKind (lines 532-575), class Token (645-651), Error.report (628, 642), ConvertThemeRequest/ConvertThemeResponse with styles map (659-676), OperationFinished.diff_tokens (686, 695-696), and EncodeEntityRequest/EncodeSavedEntityRequest with tokens and no highlight field (703-739). core_pb2.py's serialized descriptor matches (line 316 shows Error field 5 report, Token, TokenKind, ConvertTheme*, diff_tokens, and tokens=4 with no highlight). The source proto at xcl/proto/xcl/core/v1/core.proto lines 79-86 (report), 94 (TokenKind), 154 (Token), 168-178 (ConvertTheme), 353-356 (diff_tokens), 416-452 (encode requests with tokens=4, reserved 2 and reserved \"highlight\") agrees with the stubs."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "The highlight parameter is removed from the signatures: xcl/config.py encode_entity (lines ~233-236) and encode_saved_entity (~278-282) have no highlight argument, and xcl/aio.py encode_entity (~262-265) and encode_saved_entity (~281-284) likewise. The requests no longer set highlight (config.py ~265, ~305; aio.py ~266, ~283). Unit tests assert the TypeError with match=\"unexpected keyword argument 'highlight'\" for all four entry points: tests/unit/test_config.py lines 496-501, 602-607, 711-721, 727-737."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Grep over xcl-python (excluding .venv and .spektacular) for highlight, colour, ANSI, strip_colour, terminal finds no leftover code, docstring or doc text for the removed keyword. README.md:255-289 and PARITY.md:31-46 were updated, and xcl-ref.txt has no encode/highlight mention. The only remaining 'highlight' hits are the new refusal tests in tests/unit/test_config.py (lines 496-501, 602-607, 711-737), which pass highlight= solely to assert it is refused, as criterion 2 requires. test_sync.py:838 asserts the plain text has no ANSI escape, which does not reference the keyword. The suite result (538 passed, 1 skipped, exit 0) is taken from the supplied verification summary; I did not run it, since I am read-only."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "62592911-467b-4495-afe3-a989b32d809e",
+      "title": "Add token kinds and themes",
+      "checks": [
+        {
+          "at": "2026-10-26T12:21:56Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "62592911-467b-4495-afe3-a989b32d809e",
+            "title": "Add token kinds and themes",
+            "criteria": [
+              "Every kind matches the protocol's kind with the same number and name, and the protocol has no kind the package lacks",
+              "A theme made from the default plus a comment style styles line, hash and block comments with it, and adding a line-comment style changes line comments only",
+              "Validating a theme with an unknown style word reports that word, and validating the default theme reports nothing",
+              "The default theme cannot be changed in place, and extending it gives a new theme",
+              "An unknown kind number resolves to its category's style and class"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_kinds.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "highlight/kind.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_style.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "highlight/style.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_theme.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_errors.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "self.words"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_docstrings.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_kinds.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "core_pb2.TokenKind.DESCRIPTOR.values"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_style.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_theme.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/highlight/_kinds.py:11-90 defines Kind with 41 members, and the names and numbers match proto/xcl/core/v1/core.proto:94-149 (TOKEN_KIND_TEXT=0 through TOKEN_KIND_DETAIL=1404, also 41 values). Both sides count 41 with identical names and numbers, so the protocol has no kind the package lacks. xcl-python/tests/unit/test_highlight_kinds.py:8-16 checks both directions against core_pb2.TokenKind, and xcl-python/xcl/_core/core_pb2.pyi has 41 TOKEN_KIND_ entries. I did not run the tests."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-python/tests/unit/test_highlight_theme.py:37-42 builds DEFAULT_THEME | {Kind.COMMENT: \"#6a9955\"} and asserts LINE_COMMENT, HASH_COMMENT and BLOCK_COMMENT all resolve to it. Lines 45-50 add LINE_COMMENT: \"bold #ff0000\" and assert only line comments change while hash and block comments keep the category style. The resolution logic is in xcl-python/xcl/highlight/_theme.py:50-62 (style_for: own style, then parent_of(kind), then TEXT)."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl-python/tests/unit/test_highlight_theme.py:103-111 validates DEFAULT_THEME | {ATTRIBUTE: \"bold sparkly\"} and asserts InvalidStyleError.words == ((Kind.ATTRIBUTE, \"bold sparkly\", \"sparkly\"),). Lines 99-100 assert validate(DEFAULT_THEME) is None. validate() in xcl-python/xcl/highlight/_theme.py:65-82 collects unknown words via _unknown_words and raises InvalidStyleError (xcl-python/xcl/_errors.py:396-414) naming each word."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/highlight/_theme.py:20-40 defines DEFAULT_THEME as types.MappingProxyType, which rejects item assignment. Test xcl-python/tests/unit/test_highlight_theme.py:83-87 asserts TypeError on assignment and that the value is unchanged. Lines 90-96 assert that DEFAULT_THEME | {...} is a new dict, with the override applied and the default left as it was."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/highlight/_kinds.py:116-124 css_class_of and xcl-python/xcl/highlight/_theme.py:59-62 style_for both fall back to parent_of(kind) = kind // 100 * 100 for an unknown number. Test xcl-python/tests/unit/test_highlight_kinds.py:51-52 asserts css_class_of(1199) == \"xcl-comment\". Test xcl-python/tests/unit/test_highlight_theme.py:33-34 asserts style_for(DEFAULT_THEME, 1199) == Style(italic=True, foreground=\"bright-black\"), the COMMENT style. Both match the Go reference at xcl/highlight/kind.go:211-228."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "4f94762e-6184-473d-aaf5-7cf9976dd5bb",
+      "title": "Add the built-in formats and the stylesheet",
+      "checks": [
+        {
+          "at": "2026-10-26T12:29:54Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "4f94762e-6184-473d-aaf5-7cf9976dd5bb",
+            "title": "Add the built-in formats and the stylesheet",
+            "criteria": [
+              "Every built-in format applied to each published reference input writes the published output byte for byte",
+              "The stylesheet generated from the default theme equals the published stylesheet, and the HTML class names equal the published list",
+              "Formatting with a theme that contains an unknown style word succeeds and ignores the word",
+              "Asking for a format chosen from a terminal stream gives terminal colour; from a file, or with `NO_COLOR` set, it gives plain text",
+              "A format written by a user against the formatter protocol is accepted where a built-in one is"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "highlight/formatter.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "terminal.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "html.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "svg.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "css.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "for.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_formatters.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "out.write"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "html.escape"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_css.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_stream.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_reference.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_formatters.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_css.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".xcl"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_stream.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "monkeypatch.delenv"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "os.fdopen"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "tests/unit/test_highlight_reference.py:35-167 formats the report, entity and diff token streams (loaded from the published *.tokens.json in xcl/highlight/testdata/reference) with PLAIN, TERMINAL, HTML, HTML_INLINE and SVG under DEFAULT_THEME and asserts equality with the published *.plain.txt, *.terminal.txt, *.html, *.inline.html and *.svg files, byte for byte (read as bytes, no newline translation). The verify summary reports the suite passing (643 passed, exit 0). I did not re-run the tests; the verdict rests on the test code and the suite result."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "tests/unit/test_highlight_reference.py:170-171 asserts css(DEFAULT_THEME) == default.css; xcl/highlight/_css.py:11-43 generates the rules. I compared default.css to the generator by hand: the rules for block (bold), label, type-label, attribute, string, string-escape, number, constant, reference, comment (italic), inserted, deleted, changed, error (bold), warning (bold), summary (bold) and gutter (opacity 0.5) line up with the DEFAULT_THEME colours in xcl/highlight/_theme.py:21-41 and the palette in xcl/highlight/_style.py:11-28. tests/unit/test_highlight_reference.py:174-181 asserts the class list equals classes.txt: 'xcl' then Kind.css_class for every non-TEXT Kind in xcl/highlight/_kinds.py:11-90. I checked the 41 Kind members against classes.txt lines 2-41 and they match in order."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "tests/unit/test_highlight_formatters.py:157-168 renders with theme DEFAULT_THEME | {Kind.ATTRIBUTE: 'bold sparkly'} through TERMINAL (expects '\\x1b[1mname\\x1b[0m') and HTML_INLINE (expects bold only), so the unknown word 'sparkly' is skipped without error. The skipping is in xcl/highlight/_style.py:82-96 (parse_style ignores words that _apply_word rejects). validate() in xcl/highlight/_theme.py:67-85 is a separate check, not called by the formatters, so formatting does not fail."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "xcl/highlight/_stream.py:10-31 for_stream returns TERMINAL only when stream.isatty() is true and NO_COLOR is unset or empty, and PLAIN otherwise (no isatty, isatty raising, file, StringIO, or NO_COLOR set). tests/unit/test_highlight_stream.py covers a tty returning TERMINAL (line 33-36), StringIO and a regular file returning PLAIN (39-49), a tty with NO_COLOR=1 returning PLAIN (52-55), an empty NO_COLOR returning TERMINAL (58-61), a closed stream and an object without isatty returning PLAIN (64-73), and a real pty returning TERMINAL (76-86)."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "xcl/highlight/_formatters.py:13-25 defines Formatter as a structural Protocol with format(out, theme, tokens), so any object with that method is accepted. tests/unit/test_highlight_formatters.py:21-26 defines a user class Bracketed with only a format method, and test_user_format_is_accepted_as_a_formatter (lines 177-180) passes it to render(), which is typed as Formatter, and asserts '[name][ = ][1]'. Caveat: this package has no print function in this worktree that takes a formatter parameter (grep of xcl/ finds only docstring mentions), so the 'where a built-in one is' acceptance point is exercised only through render() here."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "48f95336-5609-483b-b6b5-61630b7417c9",
+      "title": "Keep reports on errors and print them in one call",
+      "checks": [
+        {
+          "at": "2026-10-26T12:40:30Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "48f95336-5609-483b-b6b5-61630b7417c9",
+            "title": "Keep reports on errors and print them in one call",
+            "criteria": [
+              "Applying a configuration with an unsupported block on line 7 and printing the raised error writes the full report: summary, location naming line 7, numbered source lines with the fault, and detail",
+              "Getting that error's report as a string returns the same text the print writes",
+              "Running a script whose apply raises that error, uncaught, prints a traceback followed by the plain report",
+              "Logging the caught error with its traceback through standard logging writes the plain report after the traceback",
+              "Converting the error to a string gives a single line",
+              "A detail longer than 80 characters prints with no detail line over 80 columns by default, none over 40 at width 40, and on one line with wrapping off",
+              "The error's labelled text joins to its plain report, and each piece carries a kind"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_wrap.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_render.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_errors.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_print.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "sys.stderr"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_wrap.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_errors.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "error.tokens"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_print.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_sync.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_aio.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/_print.py:15-51 print_error writes formatter.format(out, theme, wrapped(tokens, width)) for an xcl.Error carrying tokens. xcl-python/tests/integration/test_sync.py:813-837 (test_unsupported_block_report_printed) applies UNSUPPORTED_BLOCK, whose nested timeout block is on line 7, prints the caught ConfigError and asserts the summary line, a location line containing 'line 7' and 'sync_app.api', numbered source lines 5-9 with line 7 as '     7 |   timeout {', and the detail line. The fault is marked by its token kind (xcl/_render.py token rendering), not a glyph; the plain text carries the source line itself."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/_print.py:54-69 format_error renders the same tokens through the same render/wrapped path as print_error. xcl-python/tests/integration/test_sync.py:840-847 (test_unsupported_block_report_as_string) asserts xcl.format_error(err) == the text print_error wrote for the line-7 error; tests/unit/test_print.py:63-69 covers the same equality with a hand-built report."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl-python/tests/integration/test_sync.py:898-913 runs an uncaught apply in a subprocess and asserts stderr starts with 'Traceback' and ends with format_error(err) text. The note that carries the plain report is set in xcl-python/xcl/_errors.py:64-70 via self.add_note(plain_report(self.tokens)), and Python 3.11+ prints notes after the exception line (pyproject.toml requires-python \u003e=3.11). Test was not run by me; the verify summary reports the suite passing."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "xcl-python/tests/integration/test_sync.py:862-895 (test_unsupported_block_logged_with_traceback) uses log.exception through a StreamHandler and asserts the traceback comes before 'Error: Unsupported block type' and the logged text ends with the plain report at 80 columns. The report appears because logging's traceback formatting includes __notes__ set in xcl/_errors.py:70."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "xcl-python/tests/integration/test_sync.py:850-859 asserts '\\n' not in str(err) and that str(err) is the single engine message line for the line-7 error. xcl-python/xcl/_errors.py:72-73 __str__ returns self.message. Note: a multi-problem engine message is deliberately kept multi-line (tests/unit/test_errors.py:364-380, recorded decision); that is outside this criterion, which concerns the line-7 error."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "xcl-python/tests/unit/test_print.py:72-113: default width gives every detail line \u003c= 80 (lines asserted and length-checked), width=40 gives every line \u003c= 40, and width=0 and width=None keep LONG_DETAIL on one line. Wrapping logic is in xcl-python/xcl/_wrap.py:23-78 (a port of go-wordwrap WrapString) and applied to DETAIL tokens only in xcl-python/xcl/_render.py:14-22. Caveat: a single word over the width is left whole, as Go does, so 'no line over N' holds for detail with spaces, which is the case tested."
+            },
+            {
+              "criterion": 7,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/_errors.py:64 stores tokens as Token objects; xcl-python/xcl/_render.py:32-34 plain_report is the plain text of those tokens. xcl-python/tests/integration/test_sync.py:916-923 (test_error_tokens_join_to_plain_report) asserts ''.join(token.text) == format_error(err, width=0) and that every token.kind is an int, and tests/unit/test_errors.py:252-265 asserts each token.kind is a Kind. The join is checked against width=0 text; for this error the detail is under 80 columns, so it equals the default-width report."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "340791f4-6541-43b8-8a71-24acd8fbfb32",
+      "title": "Print resources and change summaries in one call",
+      "checks": [
+        {
+          "at": "2026-10-26T12:46:01Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "340791f4-6541-43b8-8a71-24acd8fbfb32",
+            "title": "Print resources and change summaries in one call",
+            "criteria": [
+              "Printing a created resource with computed values, from a lookup and from its saved record, writes its configuration text, on both configuration flavours",
+              "Printing a diff writes its change summary",
+              "The labelled text of a resource and of a change summary each joins to the matching plain output, and each piece carries a kind",
+              "A user-written format passed to error, resource and change-summary printing receives the whole labelled text in one call each time and writes to the given stream",
+              "Printing a diff that carries no labelled text fails with a message saying where printable diffs come from"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "sys.stdout"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/diff.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_poll.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "Operation.finish"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_print.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_print.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_events.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_poll.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_sync.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_aio.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Sync: xcl/config.py print_entity (~line 2322) and print_saved_entity (~line 2417) write the text; tests/integration/test_sync.py:2005 test_print_entity_with_computed_from_lookup and :2017 test_print_saved_entity_with_computed assert the output equals recording_text(log, computed=True) with include_computed=True. Aio: xcl/aio.py print_entity and print_saved_entity (~lines 2151 and 2213 of the diff) write the text; tests/integration/test_aio.py:1156 test_async_print_entity_with_computed and :1171 test_async_print_saved_entity_with_computed assert the computed text."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl/_print.py:73-95 print_diff writes diff.tokens to the file (sys.stdout by default). tests/integration/test_sync.py:2070 test_print_diff_writes_change_summary and tests/integration/test_aio.py:1202 test_async_print_diff_writes_change_summary assert the real git-style summary text ending 'Diff: 1 to create, ...'. tests/unit/test_print.py:243 test_print_diff_writes_tokens covers the unit case."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Resource: tests/integration/test_sync.py:2043 test_entity_tokens_join_to_text and tests/integration/test_aio.py:1187 test_async_entity_tokens_join_to_text assert ''.join(token.text) equals the printed/encoded text, and that every kind is an int. Change summary: tests/integration/test_sync.py:2092 test_diff_tokens_join_to_change_summary and test_aio.py:1225 assert the joined diff.tokens text equals the printed summary. Kind per piece: xcl/highlight/_kinds.py:136-144 Token has a kind field, and _tokens_from_proto (line 154) builds one Token per protocol token. Config.entity_tokens/saved_entity_tokens in xcl/config.py return these tokens from the engine's tokens field."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "A RecordingFormatter (tests/integration/test_sync.py:1993) records each call. test_custom_formatter_receives_whole_text_for_error (:2106) asserts one call with the whole err.tokens and out is the given stream. test_custom_formatter_receives_whole_text_for_entity (:2119) asserts one call with tokens equal to entity_tokens and the given stream. test_custom_formatter_receives_whole_text_for_diff (:2137) asserts one call with list(diff.tokens) and the given stream. Unit equivalents are in tests/unit/test_print.py:167 and :267 and tests/unit/test_config.py:864 and :922. The implementation calls formatter.format(out, theme, tokens) once in xcl/_print.py:52, :70 (render) and :95, and in xcl/config.py and xcl/aio.py print_entity/print_saved_entity."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "xcl/_print.py:93-94 raises ValueError('this diff has no labelled text to print: only a diff returned by Config.diff carries it') when diff.tokens is empty. The message names Config.diff as the source of printable diffs. tests/unit/test_print.py:281 test_print_diff_without_tokens_raises asserts that exact message and that nothing is written. xcl/diff.py Diff.tokens (default ()) documents that it is empty for a hand-built Diff."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "d072bb20-0524-4ea4-b342-01e8b2af6ced",
+      "title": "Load VS Code themes through the engine",
+      "checks": [
+        {
+          "at": "2026-10-26T12:49:06Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "d072bb20-0524-4ea4-b342-01e8b2af6ced",
+            "title": "Load VS Code themes through the engine",
+            "criteria": [
+              "Loading a VS Code theme that colours properties orange and printing a resource with it in terminal colour colours attribute names orange",
+              "Loading works with no configuration created",
+              "An unusable theme raises the theme error with the engine's reason"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_vscode.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_errors.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_vscode.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_errors.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_sync.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-python/tests/integration/test_sync.py:2164-2175 loads a theme colouring variable.other.property #ff8800, prints the sync_app.web entity with xcl.highlight.TERMINAL and the merged theme, and asserts the attribute name 'image' is wrapped in \\x1b[38;2;255;136;0m. The engine side is xcl/coreservice/theme.go:15-31 (ConvertTheme calls highlight.LoadVSCodeTheme and returns styles per kind), and xcl/highlight/vscode_test.go:115-130 checks the Attribute kind and terminal colouring. xcl-python/xcl/highlight/_vscode.py:10-41 sends the bytes to ConvertTheme and maps kind numbers back to Kind. I did not run the tests; the verify summary reports them passing."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/highlight/_vscode.py:27-36 calls default_client() and CoreService ConvertTheme on handle 0, with no CreateConfig call. tests/unit/test_highlight_vscode.py:37-43 asserts 'CreateConfig' is not called. tests/integration/test_sync.py:2187-2199 runs load_vscode_theme in a fresh subprocess with no Config and asserts the returned dict. The docstring at _vscode.py:20-23 states that it needs no configuration."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/_errors.py:202-211 defines InvalidThemeError with code 'invalid_theme', and _errors.py:502 registers it in the code-to-class map. xcl-python/xcl/__init__.py:28 and :120 export it. The engine's reason is carried through: xcl/coreservice/theme.go:20-23 returns the LoadVSCodeTheme error, and xcl/highlight/vscode.go:394-395 builds InvalidThemeError with Reason. tests/unit/test_highlight_vscode.py:88-106 and tests/unit/test_errors.py:436-447 check that details['reason'] is passed through. tests/integration/test_sync.py:2202-2211 checks that an invalid colour '#zz0000' raises xcl.InvalidThemeError with the engine's reason text."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "58c66252-582e-4816-9771-df57b1534a87",
+      "title": "Send events to standard logging",
+      "checks": [
+        {
+          "at": "2026-10-26T12:51:57Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "58c66252-582e-4816-9771-df57b1534a87",
+            "title": "Send events to standard logging",
+            "criteria": [
+              "Log events are written at their own level with their own message, lifecycle events at info as \"operation phase\", error events at error and blocked events at warn",
+              "Each record carries the event's resource, operation and other fields, and the event itself",
+              "Nothing is written for an event below the logger's level",
+              "Applying a configuration with the bridge as the event handler writes records for the apply's events"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_logbridge.py"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "events/slog.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_logbridge.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "record.xcl_event.meta"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_sync.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_aio.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl/_logbridge.py:64-81 maps log events to their own level (debug/warn/error via _LOG_LEVELS, unknown falls back to info) and message (meta 'message'); phase error maps to ERROR, blocked to WARNING, other lifecycle phases to INFO with message f\"{operation} {phase}\". tests/unit/test_logbridge.py:49-126 cover each case (debug, info, warn, error, unknown level, start, success, error phase, blocked)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl/_logbridge.py:84-108 adds source, operation, phase, resource (resource_id), type, file, duration, error and the sorted meta details as record attributes, then extra['xcl_event'] = event (line 107). Tests: tests/unit/test_logbridge.py:145-168 (resource, operation, fields), 197-236 (meta details, reserved names), 239-245 (xcl_event is the event); tests/integration/test_sync.py:2246-2248 checks record.resource, operation and xcl_event.resource_id on a real apply."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl/_logbridge.py:54-56 calls target.isEnabledFor(level) and returns before makeRecord/handle when disabled. tests/unit/test_logbridge.py:129-134 asserts a debug log event is not written to an INFO logger."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "tests/integration/test_sync.py:2228-2248 applies a config via xcl.Config(on_event=xcl.logging_handler(logger)) and asserts 'apply start', 'apply success' and one 'create success' record at INFO. tests/integration/test_aio.py:1232-1263 does the same for xcl.aio.Config with a recording plugin. xcl/__init__.py:54 imports logging_handler and :126 exports it in __all__."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "99b65f1b-6fea-407f-b820-095d71b47da5",
+      "title": "Render logged errors in a chosen format",
+      "checks": [
+        {
+          "at": "2026-10-26T12:56:37Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "99b65f1b-6fea-407f-b820-095d71b47da5",
+            "title": "Render logged errors in a chosen format",
+            "criteria": [
+              "A logging handler given the formatter with terminal colour, logging a caught xcl error with its traceback, writes the report with terminal colour codes",
+              "The report appears once, not also as the plain note",
+              "A logged exception that is not an xcl error is written exactly as the standard formatter writes it"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_logging.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_logging.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_sync.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl/highlight/_logging.py:54-72 (LogFormatter.formatException) takes the xcl.Error branch, calls xcl._print.format_error(err, formatter=self.formatter, theme=self.theme, width=self.width), and appends that to the traceback. The default formatter is set by the caller, so passing formatter=TERMINAL yields ANSI output. tests/unit/test_highlight_logging.py:45-49 asserts the '\\x1b[1;31mError\\x1b[0m' sequence in the written text, and tests/integration/test_sync.py:2254-2277 checks colour codes on a real config error. I did not run these tests; the supplied verification run (774 passed, exit 0) covers them."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl/_errors.py:65-70 adds plain_report(tokens) as an exception note on construction. xcl/highlight/_logging.py:64-69 builds a fresh traceback.TracebackException, removes any __notes__ equal to plain_report(err.tokens), and only then formats the traceback. The report is therefore written once, through format_error. tests/unit/test_highlight_logging.py:52-56 asserts the 'Blocks of type' line and 'Error: Unsupported block type' each occur once in the plain output. tests/unit/test_highlight_logging.py:76-83 checks a user-added note is kept while the report still appears once. tests/integration/test_sync.py:2278 asserts the detail line appears once."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl/highlight/_logging.py:60-62 returns super().formatException(ei), the standard logging.Formatter output, whenever the exception is not an xcl Error or carries no tokens. tests/unit/test_highlight_logging.py:86-92 logs ValueError('boom') through LogFormatter(formatter=TERMINAL) and through logging.Formatter(), and asserts the two outputs are equal after removing the logger names. tests/unit/test_highlight_logging.py:95-101 covers an xcl Error without a report."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "e542e38c-a05b-4fc2-be18-28f631966e21",
+      "title": "Record printing and logging in the Go parity program",
+      "checks": [
+        {
+          "at": "2026-10-26T12:59:39Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "e542e38c-a05b-4fc2-be18-28f631966e21",
+            "title": "Record printing and logging in the Go parity program",
+            "criteria": [
+              "The record of every fixture holds the printed report, entities, change summary and event log, with run paths replaced",
+              "The new fixture's printed report shows the unsupported block on line 7 with its numbered source lines",
+              "The record is still the same on every run of the same fixture"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "/home/nicj/code/github.com/jumppad-labs/xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/cmd/parity/main.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "n.text"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/testdata/parity/unsupported_block/main.xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/testdata/parity/unsupported_block/types.json"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "invalid/types.json"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/testdata/parity/README.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/cmd/parity/main_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/go.mod"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "log/slog"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "Only the printed_validate, printed_apply, printed_entities and log keys are recorded for every fixture (xcl.diff, cmd/parity/main.go hunk at run(), the record[\"printed_*\"] and record[\"log\"] assignments). The change summary is recorded only inside `if f.changed != \"\" { ... record[\"printed_diff_changed\"] = ... }`, so fixtures with no changed/main.xcl (for example functions, which main_test.go TestParityNoPrintedDiffWithoutChangedConfiguration asserts has no printed_diff_changed key, and unsupported_block, which has no changed/ directory) hold no change summary. The criterion says every fixture holds one. A printed change summary for the unchanged case (for example from diff_before) is not recorded anywhere in the diff."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "testdata/parity/unsupported_block/main.xcl line 7 is `  timeout {` inside `app \"api\"`, and lines 5 to 9 are the numbered source lines. main_test.go in the diff (TestParityUnsupportedBlockPrintsReport) expects the printed_apply text to contain `line 7, in app.api, field timeout[0]:` followed by numbered lines 5 through 9. TestParityUnsupportedBlockPrintsReportForValidate also checks that printed_validate contains \"line 7\". The go test ./... run reported ok, which covers these tests."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "The record is built deterministically: printed_entities is a map keyed by address and JSON marshalling sorts keys; the log is sorted by operation, resource, level and message in normaliser.log (main.go diff hunk ~line 190), so the arrival order of events from the Config goroutine does not matter; paths are replaced via n.text. main_test.go TestParityRecordIsDeterministicForUnsupportedBlock compares two runs of unsupported_block, and the verification run `go test -count=5 -run Deterministic ./cmd/parity/` passed. No time-dependent values were found in the added code."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-10-26T13:01:46Z",
+          "round": 1,
+          "attempt": 2,
+          "goal": {
+            "item": "e542e38c-a05b-4fc2-be18-28f631966e21",
+            "title": "Record printing and logging in the Go parity program",
+            "criteria": [
+              "The record of every fixture holds the printed report, entities, change summary and event log, with run paths replaced",
+              "The new fixture's printed report shows the unsupported block on line 7 with its numbered source lines",
+              "The record is still the same on every run of the same fixture"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "/home/nicj/code/github.com/jumppad-labs/xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/cmd/parity/main.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "n.text"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/testdata/parity/unsupported_block/main.xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/testdata/parity/unsupported_block/types.json"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "invalid/types.json"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/testdata/parity/README.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/cmd/parity/main_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/go.mod"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "log/slog"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "bindings/libxcl/cmd/parity/main.go run() (diff hunk @@ -220,25 +238,39 @@) now sets record[\"printed_validate\"], [\"printed_apply\"], [\"printed_diff_before\"], [\"printed_diff_changed\"] (when f.changed != \"\"), [\"printed_entities\"] and [\"log\"] alongside the existing validate/diff/apply/entities/outputs/state/encode keys. Every printed text goes through n.text (printedError, printedEntities, printedDiff, log message), so run paths are replaced. Entities/outputs were already normalised. main_test.go TestParityRecordCoversEveryStage (diff ~line 148-165) asserts the full key set. README.md (diff lines 516-536) documents each key. The only fixture-conditional key is printed_diff_changed, which mirrors the existing diff_changed key and so is the designed behaviour."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "bindings/libxcl/testdata/parity/unsupported_block/main.xcl line 7 is `  timeout {`, with `app \"api\" {` at line 5 and the block closing at line 9. main_test.go TestParityUnsupportedBlockPrintsReport (diff lines 363-377) expects the report to show `  on \u003cfixture\u003e/main.xcl line 7, in app.api, field timeout[0]:` followed by numbered lines 5 to 9 with line 7 `timeout {` and the message `Blocks of type \"timeout\" are not expected here.`. The source lines match main.xcl exactly. I did not run the test; the verification summary reports cmd/parity ok, which covers it."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "main.go log() sorts entries by operation, resource, level and message before rendering; printedEntities iterates a map but JSON marshalling sorts keys; n.text replaces the run's temp and fixture paths. main_test.go TestParityRecordIsDeterministicForUnsupportedBlock (diff lines 356-361) runs the fixture twice and requires equal records, and TestParityLogIsSorted (lines 475-485) checks the log order. The verification summary's go test -count=5 -run Deterministic run is also reported ok."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 2,
+      "state": "accepted"
+    },
+    {
+      "item": "589b2736-a0cc-4e6b-874d-eded19ac61d4",
+      "title": "Compare printing and logging with Go in the Python parity suite",
+      "checks": [
+        {
+          "at": "2026-10-26T13:05:31Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "589b2736-a0cc-4e6b-874d-eded19ac61d4",
+            "title": "Compare printing and logging with Go in the Python parity suite",
+            "criteria": [
+              "A Python program that applies the configuration with an unsupported block on line 7 and prints the raised error as plain text writes the same report Go writes, byte for byte",
+              "Printing every created resource with computed values, and every change summary, writes the same text as Go for every fixture",
+              "The logging bridge writes records whose levels and messages match Go's logging bridge for the same apply, with the resource and operation on each"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/parity/run_python.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "n.text"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/parity/test_parity.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "tests/parity/run_python.py (diff hunk at ~line 911-918) records printed_apply as n.printed_error(apply_err), which calls xcl.format_error. The Go program records printed_apply via xcl.PrintError in bindings/libxcl/cmd/parity/main.go:259 and :607-618. The fixture bindings/libxcl/testdata/parity/unsupported_block/main.xcl has the unsupported block `timeout {` on line 7. tests/parity/test_parity.py:116-120 asserts python['printed_apply'] == go['printed_apply'] and that the report contains the line-7 location."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "run_python.py adds record['printed_entities'] (printed_entities_section, print_entity with include_computed=True, ~line 923) and record['printed_diff_before'], record['printed_diff_changed'] (via xcl.print_diff). The Go program records the same keys at main.go:255, 264, 269. Every fixture's test in test_parity.py calls assert_same_record on the whole record, so these keys are compared for every fixture. test_parity.py:123-129 also compares them explicitly for plugin_entities."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "run_python.py (LogRecorder, ~lines 958-985) wires xcl.logging_handler to a recorder keeping level, message, resource and operation, and record['log'] is sorted by operation, resource, level and message (n.log). The Go side writes the same key at main.go:272 via events.SlogHandler and logRecorder, with the same sort at main.go:662-674. Since record['log'] is in every record, assert_same_record compares it for every fixture. test_parity.py:130 also asserts a create-success entry with resource resource.recording.first and operation create."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "fa37b310-5b2c-4cdb-9047-190aaf302d66",
+      "title": "Document Python printing in the README and parity list",
+      "checks": [
+        {
+          "at": "2026-10-26T13:07:34Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "fa37b310-5b2c-4cdb-9047-190aaf302d66",
+            "title": "Document Python printing in the README and parity list",
+            "criteria": [
+              "The README shows Python examples of error printing, reports on unhandled and logged errors, output formats, themes, stylesheet generation, custom formats and logging",
+              "The README has a migration note naming the replacement for the removed `highlight=` keyword",
+              "The parity list pairs Go's printing, theme, format and logging functions with their Python forms, and no longer lists `highlight=`"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "err.tokens"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "diff.tokens"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "PARITY.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "highlight.Plain/Terminal/HTML/HTMLInline/SVG"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "PLAIN/TERMINAL/HTML/HTML_INLINE/SVG"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "conventions/testing-and-mocking.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "README.md:360-366 is a Python error-printing example (print_error with for_stream(sys.stderr)); README.md:386-393 covers reports on unhandled errors and logging.exception/exc_info=True (inline Python, prose only, no block); README.md:398-400 gives Python print examples using formatter=xcl.highlight.TERMINAL and for_stream, covering output formats (bullet list 417-424); README.md:437-453 themes code with DEFAULT_THEME and load_vscode_theme; README.md:467-469 stylesheet generation with xcl.highlight.css and Path.write_text; README.md:482-487 custom Markdown format class; README.md:495-515 logging_handler and LogFormatter examples."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "README.md:557-566 '## Migrating from highlight=' states highlight= was removed from encode_entity and encode_saved_entity, that passing it raises TypeError, and names the replacement cfg.print_entity(entity, formatter=xcl.highlight.TERMINAL) (or print_saved_entity, or formatter=xcl.highlight.for_stream(sys.stdout)) and entity_tokens for labelled text."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "PARITY.md:66-84 pairs Go PrintError/PrintDiff/WithFormatter/WithTheme/WithWidth/ErrorTokens/Diff.Tokens with print_error, format_error, print_diff, formatter=/theme=/width= keywords, err.tokens and diff.tokens; PARITY.md:74 maps highlight.Plain, Terminal, HTML, HTMLInline, SVG to xcl.highlight.PLAIN, TERMINAL, HTML, HTML_INLINE, SVG; PARITY.md:75-84 pairs Formatter, Kind/Token, Theme, DefaultTheme, Style/ParseStyle, Validate, WriteCSS, For and LoadVSCodeTheme; PARITY.md:86-91 pairs events.SlogHandler with xcl.logging_handler and LogFormatter. A search of PARITY.md for 'highlight=' finds no match; the only highlight= text is in README.md:557-566 and not in the parity list."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "3ecb953b-80ea-414f-b7bc-fd2c57fc47d5",
+      "title": "Document Python printing on the website",
+      "checks": [
+        {
+          "at": "2026-10-26T13:14:35Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "3ecb953b-80ea-414f-b7bc-fd2c57fc47d5",
+            "title": "Document Python printing on the website",
+            "criteria": [
+              "The problems and configuration-text pages show Python examples of error printing, reports on unhandled and logged errors, output formats, themes, stylesheet generation, custom formats and logging",
+              "No page says the report, rendered diffs, editor themes or custom formats are unavailable from Python",
+              "Every existing page URL still works and the site builds"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "/home/nicj/code/github.com/jumppad-labs/xcl-website"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/problems.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/configuration-text.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/diff.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "diff.tokens"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/events.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/examples/plugins.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/examples/configuration-only.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/components/Nav.astro"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "gotchas/no-redirects-on-page-removal.md"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "gotchas/guides-dropdown-label-opens-first-child.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "problems.mdx has Python examples of error printing (xcl.print_error in the 'Showing problems to a person' section, format_error), unhandled errors ('In a traceback' section, showing the exception note), logged errors ('In logs' section, logging.exception example and the xcl.highlight.LogFormatter example) and themes (theme= in the 'In colour' section). configuration-text.mdx has Python examples for output formats (formatter=xcl.highlight.HTML/SVG/TERMINAL, and the BBCode custom format class), themes (DEFAULT_THEME | {...} and validate), stylesheet generation (xcl.highlight.css), and HTML output. Both pages are under xcl-website src/pages."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Grepped src/pages for 'not yet available', 'is coming', 'Richer printing', 'parity list', 'Themes are not', 'unavailable from Python', 'Go only' and 'for now'. The six in-scope pages have no hits about printing, reports, diffs, themes or custom formats. Remaining hits are unrelated: registries.mdx and state-masking.mdx (custom registries and maskers), plugins.mdx:1164 (in-process plugins), viper.mdx:273 (viper package), and 'Plugins are written in Go for now' in replacement, plugin-template, plugin-logging and plugins. configuration-text.mdx:975 says only that Python has no highlight.Tokenize, which is not an unavailability claim about the listed features."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl-website.status lists only the six in-scope pages as modified (configuration-text.mdx, diff.mdx, events.mdx, examples/configuration-only.mdx, examples/plugins.mdx, problems.mdx). No file is added, removed or renamed in xcl-website.diff, and src/components/Nav.astro is not in the diff. The only removed import is pythonParityURL in diff.mdx and problems.mdx, and neither page references it any more. The build result (23 pages, exit 0) is taken from the verify summary; I did not re-run the build, so this verdict rests on the diff showing no route change."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    }
+  ]
+}

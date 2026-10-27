@@ -192,7 +192,7 @@ Testing follows the repo's conventions: testify `require`, one behaviour per tes
 
 **Validation point**: The core service's tests pass with the race detector on. That includes a failed apply whose finished error and error event both carry a report equal to Go's plain report, a not-found lookup with no report, the kind numbers and names matching Go's in both directions, an unrecognised kind keeping its category, and the host-shaped test that prints a report with no further engine call. `buf lint` passes.
 
-#### - [ ] Task: Add token kinds, labelled text and the error report to the protocol
+#### - [x] Task: Add token kinds, labelled text and the error report to the protocol
 **Id:** 33d2f2d9-106b-4995-a686-242ded6baea3
 **Repo:** xcl
 **Depends on:** none
@@ -203,12 +203,12 @@ Add the kind enum, numbered exactly as Go's kinds, and the labelled-text message
 *Technical detail:* [context.md#task-add-token-kinds-labelled-text-and-the-error-report-to-the-protocol](./context.md#task-add-token-kinds-labelled-text-and-the-error-report-to-the-protocol)
 
 **Acceptance criteria**:
-- [ ] Every Go kind has a protocol kind with the same number and matching name, and the protocol has no kind Go lacks
-- [ ] Labelled text crosses the wire with each piece's kind number and text unchanged
-- [ ] A kind number the receiver does not recognise keeps its number on the wire and falls into its category, printing in that category's style
-- [ ] The protocol only gains fields and passes its lint and breaking-change checks
+- [x] Every Go kind has a protocol kind with the same number and matching name, and the protocol has no kind Go lacks
+- [x] Labelled text crosses the wire with each piece's kind number and text unchanged
+- [x] A kind number the receiver does not recognise keeps its number on the wire and falls into its category, printing in that category's style
+- [x] The protocol only gains fields and passes its lint and breaking-change checks
 
-#### - [ ] Task: Attach the full report to every error that holds a configuration problem
+#### - [x] Task: Attach the full report to every error that holds a configuration problem
 **Id:** 425934f7-6c4d-4fc3-9b80-589d2565b498
 **Repo:** xcl
 **Depends on:**
@@ -220,12 +220,12 @@ Make the engine attach the labelled report Go prints to every error it sends tha
 *Technical detail:* [context.md#task-attach-the-full-report-to-every-error-that-holds-a-configuration-problem](./context.md#task-attach-the-full-report-to-every-error-that-holds-a-configuration-problem)
 
 **Acceptance criteria**:
-- [ ] Applying a configuration with an unsupported block through the engine finishes with an error whose report, as plain text, equals Go's plain report for the same configuration
-- [ ] The error event delivered while that apply runs carries the same report
-- [ ] Each collected problem in the error carries its own report
-- [ ] A provider failure reported at its block carries a report
-- [ ] Looking up an address that does not exist returns a not-found error with no report and the same message as before
-- [ ] A host can print the report from the error it received, with no further engine call
+- [x] Applying a configuration with an unsupported block through the engine finishes with an error whose report, as plain text, equals Go's plain report for the same configuration
+- [x] The error event delivered while that apply runs carries the same report
+- [x] Each collected problem in the error carries its own report
+- [x] A provider failure reported at its block carries a report
+- [x] Looking up an address that does not exist returns a not-found error with no report and the same message as before
+- [x] A host can print the report from the error it received, with no further engine call
 
 ### Milestone 2: Labelled resource text, labelled change summaries and editor themes over the engine
 
@@ -233,7 +233,7 @@ Make the engine attach the labelled report Go prints to every error it sends tha
 
 **Validation point**: The core service's tests pass with the race detector on. That includes labelled encode text joining to the plain text for saved, looked-up and edited records, a diff's labelled text equal to Go's plain change summary, the orange-properties theme giving an orange attribute style with no configuration, and an old caller's colour request returning plain text. `buf lint` passes and `buf breaking` against the main branch reports no breaking change.
 
-#### - [ ] Task: Return labelled resource text and retire the colour request
+#### - [x] Task: Return labelled resource text and retire the colour request
 **Id:** ed5f53d3-49e6-4552-8e67-fbb89f704972
 **Repo:** xcl
 **Depends on:**
@@ -245,12 +245,12 @@ Let both rendering calls, the one for saved records and the one for looked-up or
 *Technical detail:* [context.md#task-return-labelled-resource-text-and-retire-the-colour-request](./context.md#task-return-labelled-resource-text-and-retire-the-colour-request)
 
 **Acceptance criteria**:
-- [ ] Rendering a created resource from its saved record, from its looked-up record and from an edited record, with labelled text requested, returns labelled text that joins to the plain text returned beside it
-- [ ] Without the request, no labelled text is returned and the text is unchanged
-- [ ] A request built as an older caller sends it, asking for colour, succeeds and returns plain text with no colour codes
-- [ ] The breaking-change check against the main branch reports nothing, and still refuses a field removed without reserving its number or name
+- [x] Rendering a created resource from its saved record, from its looked-up record and from an edited record, with labelled text requested, returns labelled text that joins to the plain text returned beside it
+- [x] Without the request, no labelled text is returned and the text is unchanged
+- [x] A request built as an older caller sends it, asking for colour, succeeds and returns plain text with no colour codes
+- [x] The breaking-change check against the main branch reports nothing, and still refuses a field removed without reserving its number or name
 
-#### - [ ] Task: Send labelled change summaries with a finished diff
+#### - [x] Task: Send labelled change summaries with a finished diff
 **Id:** 77761c9d-d20a-409e-a788-112f74787197
 **Repo:** xcl
 **Depends on:**
@@ -263,11 +263,11 @@ Give a finished diff its change summary as labelled text, beside the structured 
 *Technical detail:* [context.md#task-send-labelled-change-summaries-with-a-finished-diff](./context.md#task-send-labelled-change-summaries-with-a-finished-diff)
 
 **Acceptance criteria**:
-- [ ] A diff through the engine returns labelled text whose plain rendering equals Go's plain change summary for the same diff
-- [ ] The structured diff is unchanged and still equals Go's diff
-- [ ] Apply, validate, destroy and load finish with no labelled diff text
+- [x] A diff through the engine returns labelled text whose plain rendering equals Go's plain change summary for the same diff
+- [x] The structured diff is unchanged and still equals Go's diff
+- [x] Apply, validate, destroy and load finish with no labelled diff text
 
-#### - [ ] Task: Convert editor themes without a configuration
+#### - [x] Task: Convert editor themes without a configuration
 **Id:** 5eb6e9df-52f9-4339-87ab-66988b2844e9
 **Repo:** xcl
 **Depends on:**
@@ -279,10 +279,10 @@ Add a call that converts a VS Code colour theme into styles keyed by kind number
 *Technical detail:* [context.md#task-convert-editor-themes-without-a-configuration](./context.md#task-convert-editor-themes-without-a-configuration)
 
 **Acceptance criteria**:
-- [ ] Converting a theme that colours properties orange, with no configuration created, returns a style for the attribute kind containing that orange
-- [ ] An unusable theme fails with the theme error code and says what was wrong
-- [ ] An empty request fails as an invalid argument
-- [ ] The call refuses a configuration handle, as the other configuration-free calls do
+- [x] Converting a theme that colours properties orange, with no configuration created, returns a style for the attribute kind containing that orange
+- [x] An unusable theme fails with the theme error code and says what was wrong
+- [x] An empty request fails as an invalid argument
+- [x] The call refuses a configuration handle, as the other configuration-free calls do
 
 ### Milestone 3: The protocol, the other-language design and the release notes describe the new output
 
@@ -290,7 +290,7 @@ Add a call that converts a VS Code colour theme into styles keyed by kind number
 
 **Validation point**: The manual reviews of the protocol comments, the revised design and the changelog pass.
 
-#### - [ ] Task: Describe reports, labelled text and theme conversion in the other-language design
+#### - [x] Task: Describe reports, labelled text and theme conversion in the other-language design
 **Id:** dcb90fc8-a2f8-4f29-ad0b-0127d8b39781
 **Repo:** xcl
 **Depends on:**
@@ -305,12 +305,12 @@ Revise the other-language design document, through the design CLI, so its error 
 *Technical detail:* [context.md#task-describe-reports-labelled-text-and-theme-conversion-in-the-other-language-design](./context.md#task-describe-reports-labelled-text-and-theme-conversion-in-the-other-language-design)
 
 **Acceptance criteria**:
-- [ ] The design's error model shows the report and says when it is present and that it is unwrapped
-- [ ] The design shows labelled text on both rendering calls and on a finished diff, with the kinds and their categories explained
-- [ ] The design lists theme conversion as a configuration-free call and describes its result and its error
-- [ ] The design no longer describes terminal colouring by the engine
+- [x] The design's error model shows the report and says when it is present and that it is unwrapped
+- [x] The design shows labelled text on both rendering calls and on a finished diff, with the kinds and their categories explained
+- [x] The design lists theme conversion as a configuration-free call and describes its result and its error
+- [x] The design no longer describes terminal colouring by the engine
 
-#### - [ ] Task: Write the changelog entry for labelled output over the engine
+#### - [x] Task: Write the changelog entry for labelled output over the engine
 **Id:** 4d27c6ce-3ffb-456b-ae8d-826fb46ea8dd
 **Repo:** xcl
 **Depends on:**
@@ -325,8 +325,8 @@ Add this change's section to the changelog. It describes the report on every err
 *Technical detail:* [context.md#task-write-the-changelog-entry-for-labelled-output-over-the-engine](./context.md#task-write-the-changelog-entry-for-labelled-output-over-the-engine)
 
 **Acceptance criteria**:
-- [ ] The changelog has a section for this change describing what other languages now receive
-- [ ] Its Breaking list names the reserved field, the removed generated accessors and the plain-text answer to old colour requests
+- [x] The changelog has a section for this change describing what other languages now receive
+- [x] Its Breaking list names the reserved field, the removed generated accessors and the plain-text answer to old colour requests
 
 ## Open Questions
 
@@ -342,3 +342,103 @@ None. The one uncertainty found in research, whether `buf breaking` accepts a re
 - **The host-provider and type-description parts of the other-language design** (`Log`, `StateGet`, `StateFind`, `DescribeTypes`, provider tasks). They remain as the design describes, for later releases.
 - **Website pages.** xcl.dev does not document the core protocol. Python's pages are rewritten by the Python spec.
 - **Cutting a release.** Tagging the version that carries the reserved field follows the repo's release process.
+
+## Changelog
+
+### 2026-10-26 — Task: Add token kinds, labelled text and the error report to the protocol
+
+**What was done**: The protocol gained the `TokenKind` enum (one value per `highlight.Kind`, same number, `TOKEN_KIND_` plus the upper-snake Go name), the `Token` message and the empty-for-now `Error.report = 5` field, documented in place; the Go types were regenerated with `make core-protos`. A `tokensToProto` helper turns Go tokens into protocol tokens with kind numbers unchanged, and tests hold the enum to `highlight.Kinds()` in both directions, by number, name, count and category, and show an unknown kind (1199) surviving the wire and printing in the Comment style through Go's Terminal formatter.
+
+**Deviations**: Drift found at read_plan was line numbers only, plus `encodeAllowed` (named in the encode task's notes) no longer existing because the merged sibling spec cc23fc08 replaced it; both dependency plans had already landed, so no rebase was needed. Added two tests beyond the plan's list: `TestTokenKindCountMatchesGoKinds` and `TestTokensToProtoKeepsAnUnknownKindNumber`; `TestUnknownTokenKindFallsIntoItsCategory` splits the category check from the printing check.
+
+**Files changed**:
+- `proto/xcl/core/v1/core.proto`
+- `coreservice/proto/core.pb.go`
+- `coreservice/tokens.go`
+- `coreservice/tokens_test.go`
+
+**Discoveries**: `buf breaking --against '.git#branch=main'` (`make buf-breaking`) works from a git worktree, whose `.git` is a file, and does compare: a deliberate retype of field 2 failed with exit 100. Local buf is 1.27.2; CI pins 1.50.0.
+
+### 2026-10-26 — Task: Attach the full report to every error that holds a configuration problem
+
+**What was done**: `toProto` now sets `Error.report` from `xcl.ErrorTokens(err)` whenever the error tree holds a `*errors.Diagnostic` (new `holdsProblem`), after the code switch, so call results, finished operations, event errors and every collected cause carry Go's labelled report, unwrapped. Errors with no diagnostic get no report and keep their message. Unit tests cover a diagnostic, a ConfigError and each cause, a provider diagnostic, a wrapped diagnostic, the unwrapped detail, and no report on not-found and internal errors; integration tests cover a failed apply's finished error equal to Go's `PrintError` at width 0, the `apply/error` event's same report, each cause's report, validate's per-problem events, a failed provider cause, a not-found `Find`, and the host-shaped success-metric test.
+
+**Deviations**: The success-metric test proves "no further engine call" by closing the service (`c.s.Close()`) after the finished task arrives and printing from the received tokens alone, instead of counting calls through a wrapped client: it is a stronger proof and needs no change to the shared test client. Added `TestErrorReportOnWrappedDiagnostic`, `TestApplyErrorEachCauseCarriesItsReport` and `TestFailedProviderCauseCarriesAReport` beyond the plan's list. The proto comment on `report` was written in the previous task and matches the behaviour, so `core.proto` is unchanged here.
+
+**Files changed**:
+- `coreservice/errors.go`
+- `coreservice/errors_test.go`
+- `coreservice/operations_test.go`
+- `coreservice/lookups_test.go`
+
+**Discoveries**: None beyond the plan: `ErrorTokens` already lays the report out unwrapped, so joining the tokens equals `PrintError(..., WithWidth(0))` by construction, and `ApplyContext` returns the same `*ConfigError` tree Go's direct `Apply` does (the report includes the file path, so both sides must apply the same file).
+
+### 2026-10-26 — Task: Return labelled resource text and retire the colour request
+
+**What was done**: `highlight = 2` on `EncodeSavedEntityRequest` and `EncodeEntityRequest` is now `reserved 2; reserved "highlight";`, both requests gained `bool tokens = 4` and both responses `repeated Token tokens = 2`, and the Go types were regenerated. Both encode handlers return plain text and, when `tokens` is set, `highlight.Tokenize(text)` through `tokensToProto`; the legacy `colour` function is deleted. `proto/buf.yaml` keeps FILE but excepts `FIELD_NO_DELETE` and adds `FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED` and `FIELD_NO_DELETE_UNLESS_NAME_RESERVED`; its header comment, the CI workflow comment and the proto header contract comment say a field is removed only by reserving its number and name. The four colour tests and the `ansiEscape`/`stripColour` helpers are replaced by tests for tokens on saved, looked-up and edited records, no tokens unless asked, and raw old-caller bytes with field 2 set getting plain text on both calls.
+
+**Deviations**: None in behaviour. `encodeAllowed`, which the plan said to leave alone, no longer exists (the merged sibling spec cc23fc08 removed it); the guards in place were left untouched. The unused `bytes` import in `lookups.go` went with `colour`. Old-caller tests also assert no tokens come back.
+
+**Files changed**:
+- `proto/xcl/core/v1/core.proto`
+- `proto/buf.yaml`
+- `.github/workflows/go.yml`
+- `coreservice/proto/core.pb.go`
+- `coreservice/lookups.go`
+- `coreservice/lookups_test.go`
+
+**Discoveries**: With the new rules, `buf breaking --against '.git#branch=main'` passes, and dropping either `reserved 2;` or `reserved "highlight";` fails with exit 100 ("deleted without reserving the name/number"), as the plan's probe predicted, on buf 1.27.2 locally. CI's buf 1.50.0 is still to be confirmed on the pull request (manual check in the test plan).
+
+### 2026-10-26 — Task: Send labelled change summaries with a finished diff
+
+**What was done**: `OperationFinished` gained `repeated Token diff_tokens = 4`, documented as the change summary `xcl.PrintDiff` prints for the same diff as `diff_json`. The operation runner's work now returns the `*diff.Diff` (nil for every operation but a diff) instead of its JSON, and the runner builds both `diff_json` and `diff_tokens` from that one value when it posts the finished task; `startDiff` returns `DiffContext`'s result directly. Tests show the finished diff carrying a Changed token, its joined tokens equal to Go's `PrintDiff` for the same apply and diff, and no diff JSON or tokens on a finished apply, validate, destroy or load.
+
+**Deviations**: Added validate, destroy and load "no diff tokens" tests beside the plan's apply test, to cover the criterion naming all four. A marshal failure only overrides the work's error when the work succeeded, as the plan says, written as a `switch`.
+
+**Files changed**:
+- `proto/xcl/core/v1/core.proto`
+- `coreservice/proto/core.pb.go`
+- `coreservice/operations.go`
+- `coreservice/operations_test.go`
+
+**Discoveries**: `(*diff.Diff).Tokens()` treats a nil diff as an empty one, but the runner only derives tokens for a non-nil diff, so a failed diff (nil diff, error) still finishes with neither `diff_json` nor `diff_tokens`, as before.
+
+### 2026-10-26 — Task: Convert editor themes without a configuration
+
+**What was done**: The protocol gained the handle-0 `ConvertTheme` rpc with `ConvertThemeRequest { bytes vscode_theme_json = 1; }` and `ConvertThemeResponse { map<int32, string> styles = 1; }`, documented in place. `coreservice/theme.go` implements it over `highlight.LoadVSCodeTheme` (an empty request is `invalid_argument` with `argument=vscode_theme_json`), and the handler table registers it as configuration-free. `toProto` maps `*errors.InvalidThemeError` to the new stable code `invalid_theme` with `source` and `reason` details, and a bare `ErrInvalidTheme` to the same code. Tests cover the orange-properties theme giving an orange Attribute style with no configuration, only styled kinds returned, comments and trailing commas, a bad colour and non-JSON as `invalid_theme` with a reason, an empty request, a configuration handle refused as a handle mismatch, and both error mappings.
+
+**Deviations**: `bindings/libxcl/xcl.h`'s comment listing the methods that take handle 0 now names `ConvertTheme`, a one-line doc fix outside the task's file list that the new method made necessary. Added `TestConvertThemeReturnsOnlyStyledKinds` and `TestErrorCodeInvalidThemeSentinel` beyond the plan's list. The goal block handed to the reviewer accidentally left out the `coreservice/service.go` line of the file scope; the verdicts are per criterion and cite `service.go` as changed, so the check stands.
+
+**Files changed**:
+- `proto/xcl/core/v1/core.proto`
+- `coreservice/proto/core.pb.go`
+- `coreservice/errors.go`
+- `coreservice/errors_test.go`
+- `coreservice/theme.go`
+- `coreservice/theme_test.go`
+- `coreservice/service.go`
+- `bindings/libxcl/xcl.h`
+
+**Discoveries**: `LoadVSCodeTheme` names a reader's theme `"theme"` as its source, so every `invalid_theme` from ConvertTheme carries `source=theme`.
+
+### 2026-10-26 — Task: Describe reports, labelled text and theme conversion in the other-language design
+
+**What was done**: `design:libxcl.md` was revised, built on the version the sibling spec cc23fc08 had already revised. The error model now shows `Error.report` and a paragraph on when it is present, that it is unwrapped and that printing needs no engine call; the code table gains `invalid_theme`; the method list has `ConvertTheme` under Library (handle 0); `OperationFinished` shows `diff_tokens`; the encode messages show the reserved `highlight` field and `tokens`, and the encode paragraph no longer describes engine colouring. A new "Labelled text" subsection gives `TokenKind`, `Token` and the ConvertTheme messages, explains categories, open enums and the Go parity test, and points to `printing-and-highlighting.md`. The protocol's comments were checked against it and agree (the TokenKind values in both are identical).
+
+**Deviations**: Under the orchestrated run the revised document was staged by this run and stored by the orchestrator with `spektacular design author ... --spec 20261023075136-42c51a7d-printing-tokens-over-the-engine` (pre-approved planned revision), not written by this run. One edit beyond the plan's list: the "Keeping the contract stable" bullet now states the reserved-removal buf rule, to match `proto/buf.yaml`.
+
+**Files changed**:
+- `design:libxcl.md` (source `design`, through the design CLI)
+
+**Discoveries**: None.
+
+### 2026-10-26 — Task: Write the changelog entry for labelled output over the engine
+
+**What was done**: `CHANGELOG.md` has a new top section, `## 20261023075136-42c51a7d-printing-tokens-over-the-engine`, above the printing-core and encode-saved-entity sections. Its prose covers the report on every error that holds a configuration problem (on causes, provider failures and event errors too, unwrapped), `Token` and `TokenKind` with Go's numbering and arithmetic categories, `tokens` on both encode calls, `diff_tokens` on a finished diff, the handle-0 `ConvertTheme` call, the new `invalid_theme` code, and the exact buf breaking rule. Its `**Breaking:**` list names the reserved `highlight` field with the plain text old colour requests now get, and the removed generated `Highlight`/`GetHighlight` accessors.
+
+**Deviations**: The prose also says that xcl-python's colour tests fail against an engine built from this change until the Python printing spec lands, so a maintainer bumping the engine knows why.
+
+**Files changed**:
+- `CHANGELOG.md`
+
+**Discoveries**: None.

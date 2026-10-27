@@ -1,0 +1,775 @@
+{
+  "plan": "20261023075328-741138ee-python-prettylog",
+  "items": [
+    {
+      "item": "319db6ce-633f-4b6d-a454-4c292d0493e8",
+      "title": "Deliver asyncio events in order",
+      "checks": [
+        {
+          "at": "2026-10-26T13:22:02Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "319db6ce-633f-4b6d-a454-4c292d0493e8",
+            "title": "Deliver asyncio events in order",
+            "criteria": [
+              "A plain handler that is slow for the first event still receives every event of an asyncio operation in the order they were sent, one at a time",
+              "An `async def` handler that awaits between events receives them in order, one at a time",
+              "An asyncio operation returns only after its last event has been handled",
+              "Cancelling an asyncio operation while events are being handled still stops it and lets the cancellation through",
+              "A handler that raises does not stop later events or fail the operation"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "/home/nicj/code/github.com/jumppad-labs/xcl-python"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_aio_events.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "asyncio.sleep"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_events.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_aio.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl/aio.py:142-170 routes every event through one queue to a single consumer task (_deliver_events, aio.py:197-209), so events reach on_event in order and one at a time. A plain handler goes through run_in_executor (aio.py:418-419). tests/unit/test_aio_events.py:78-88 (slow first event, sleep 0.05, asserts received == RESOURCES) and :91-110 (max concurrency 1) cover this."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "aio.py:416-417 awaits a coroutine-function handler inside the same serial consumer loop (aio.py:200-209). tests/unit/test_aio_events.py:113-139 uses decreasing awaits per event (0.05 down to 0.01) and asserts the order, and checks that at most one handler runs at a time."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "aio.py:161-164 puts the None sentinel only after the poll loop ends, then gather()s the pending set, which includes the consumer (aio.py:147-151), so _drive does not return until the queue is drained. tests/unit/test_aio_events.py:142-152 makes the last event slow (0.1s) and asserts all five were handled when apply returns."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "aio.py:165-169 catches CancelledError, runs self._stop under asyncio.shield (which cancels pending tasks including the consumer, calls op.cancel and polls until done), then re-raises. tests/unit/test_aio_events.py:181-210 blocks the handler on an Event that is never set, cancels the apply task, and asserts CancelledError is raised, 'Cancel' was called on the transport, and only app.one was received."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "aio.py:204-209 catches Exception around each handler call in the consumer and continues the loop. tests/unit/test_aio_events.py:155-178 raises on app.two, for both a plain and an async handler, and asserts all five events are received. apply_with only fails if the operation itself fails, and the test does not expect that."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "82bca570-5792-419f-95dc-7f49a6a3882b",
+      "title": "Let a handler reach the configuration that delivered its event",
+      "checks": [
+        {
+          "at": "2026-10-26T13:26:08Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "82bca570-5792-419f-95dc-7f49a6a3882b",
+            "title": "Let a handler reach the configuration that delivered its event",
+            "criteria": [
+              "An event delivered by a synchronous or an asyncio configuration refers to that configuration, and an event built by hand refers to none",
+              "Two events with the same fields are equal and print the same whichever configuration delivered them",
+              "Each configuration flavour can render a saved record's labelled text with a blocking call from any thread, asking the engine for labelled text with the chosen encode choices",
+              "Each configuration reports the event data level it was created with",
+              "The logging bridge writes exactly the records it wrote before"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/events.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_poll.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_logbridge.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_events.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_logbridge.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl/_poll.py:204 passes handlers.config (set to self at xcl/config.py:93-94 via Handlers(..., config=self)) into Event._from_proto; xcl/aio.py:198 passes self into Event._from_proto in Config._dispatch. Event._from_proto sets event._config = config (xcl/events.py:101). Hand-built Event has class default _config = None (xcl/events.py:77). Tests: tests/unit/test_events.py test_sync_config_attaches_itself_to_events, test_asyncio_config_attaches_itself_to_events, test_event_built_by_hand_has_no_config, test_event_from_proto_without_config_has_none assert these."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "_config is a class-level attribute set on the instance after construction (xcl/events.py:77, 101), not a dataclass field (xcl/events.py:52-62 lists the fields; test_event_config_is_not_a_field checks dataclasses.fields). Dataclass __eq__ and __repr__ therefore ignore it. Tests tests/unit/test_events.py test_events_delivered_by_different_configs_are_equal and test_event_repr_does_not_show_config cover equality and repr with different/None configs."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Sync: xcl/config.py:493-515 _saved_entity_tokens_now calls the module-level _saved_entity_tokens (xcl/config.py:525-529) which does a blocking client.call(handle, 'EncodeSavedEntity', request) with tokens=True and _encode_options(include_computed, include_empty, reveal_sensitive, show_references). Async: xcl/aio.py _saved_entity_tokens_now (diff hunk at aio.py ~line 424-449) does the same blocking call directly through self._client, refusing with RuntimeError when not open. Tests in tests/unit/test_config.py (test_saved_entity_tokens_now_asks_for_tokens, test_saved_entity_tokens_now_runs_on_calling_thread, test_aio_saved_entity_tokens_now_asks_for_tokens, test_aio_saved_entity_tokens_now_calls_on_calling_thread, test_aio_saved_entity_tokens_now_refuses_before_open) check the request fields and calling thread."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "xcl/config.py:82-85 and xcl/aio.py (diff hunk ~line 75-77) store self._event_data = event_data; the default is EventDataLevel.NONE (xcl/config.py:76). Tests test_config_remembers_event_data_level, test_config_remembers_default_event_data_level, test_aio_config_remembers_event_data_level, test_aio_config_remembers_default_event_data_level in tests/unit/test_config.py assert the stored value for PROCESSED, RAW and the default."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "xcl/_logbridge.py:53-57: handle() still checks event_level then target.isEnabledFor before writing, then target.handle(event_record(target, event, level, event_message(event))). event_record (lines 66-70) is the old makeRecord(target.name, level, '(xcl)', 0, message, (), None, extra=...) followed by _set_time, with identical arguments. event_level, event_message and event_extra (lines 73-117) are the old _level, _message and _extra with only renamed identifiers and unchanged bodies. tests/unit/test_logbridge.py is not in the staged diff, and the existing bridge tests pass in the 802-passed run."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "4d9d42b7-48c0-4d0f-822d-8bb39ae3638e",
+      "title": "Lay out event lines as Go's example writes them",
+      "checks": [
+        {
+          "at": "2026-10-26T13:30:42Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "4d9d42b7-48c0-4d0f-822d-8bb39ae3638e",
+            "title": "Lay out event lines as Go's example writes them",
+            "criteria": [
+              "For the same event, level and message, the plain line equals the line Go's example writes, apart from the time zone of the timestamp",
+              "Attributes appear in Go's order, unset ones are left out, and details are sorted with a log event's level and message left out",
+              "Numbers, booleans, missing values, lists, maps and durations are written as Go writes them",
+              "Values with spaces, `=`, quotes or control characters are quoted and escaped, empty values are `\"\"`, and multi-line values use charmbracelet's indented form",
+              "Each level, key, separator and value is styled with the style the plan gives it, and the source, operation and resource keys and values with theirs"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_prettyline.py"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "events/slog.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".0"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "100.0"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "123456.0"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "1234567.0"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "1.5"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "0.0001"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "1.5ms"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "text.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_prettyline.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "monkeypatch.setenv"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/_prettyline.py:103-137 (format_line/format_record) follows charmbracelet text.go textFormatter: Kitchen time, level label, message only when non-empty (matches charmbracelet handle() at logger.go:107-111, which drops empty messages), then key=value pairs with single spaces. The example's Handler (xcl/example/prettylog/prettylog.go:63-68) uses ReportTimestamp and time.Kitchen, and events.SlogHandler's message is operation+phase for non-log events (events/slog.go:65-72), which attributes() and format_line mirror. Time zone is the only excluded difference (kitchen() uses astimezone, _prettyline.py:62-65). The expected lines in tests/unit/test_prettyline.py:67-190 were pasted from Go output per its docstring; I did not re-run Go to confirm them."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "_prettyline.py:79-100 attributes(): source, operation, phase, resource, type, file, duration, error, then sorted meta, in the order of events/slog.go:84-111. Unset strings are skipped (`if value:`), zero duration is skipped (`!= timedelta(0)`), and for phase==log the level and message keys are skipped (_prettyline.py:97-98, slog.go:101). Tests test_attribute_order, test_unset_attributes_left_out, test_details_sorted and test_log_event_level_and_message_not_repeated cover these."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "_prettyline.py:163-181 go_value: bools as true/false, ints as str, None as \u003cnil\u003e, lists as [a b], maps as map[k:v] with sorted keys, matching fmt %+v. go_float (184-212) implements strconv 'g' -1 with the exponent threshold below -4 or at least 6 (1234567.0 -\u003e 1.234567e+06, 100.0 -\u003e 100, 0.0001 -\u003e 0.0001, 1e-05 -\u003e 1e-05). go_duration (215-241) follows time.Duration.String (1.5ms, 1m1s, 2h0m0s, 999µs). Tests lines 214-285 and 169-203 cover these."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "_prettyline.py:267-272 _needs_quoting quotes on space, =, \", non-printable or U+FFFD (matching needsQuoting, text.go:128-145). _escape (278-300) writes \\\" when quoted, \\t/\\n/etc., \\xNN for other control characters and \\uNNNN for non-printables such as U+00A0, as escapeStringForOutput does (text.go:70-126). Empty values become \"\" via `raw` (lines 124-125, 132-135). Multi-line values use the \"\\n  key=\\n  │ line\" indented form (129-131, 140-157), including the trailing-newline case. Tests at lines 291-355 cover these."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "_prettyline.py:37-56 STYLES: DEBU bold blue, INFO bold cyan, WARN bold yellow, ERRO bold red; key and separator dim; key.source magenta / value.source bold magenta; key.resource cyan / value.resource bold cyan; key.operation yellow / value.operation bold yellow. These match the plan's styles as given in the goal. Lines 117-137 apply them: the level label, '=' (separator), key and value. The multi-line gutter is styled dim (line 131, Go writeIndent uses the separator style). Values without a special key are unstyled (value_style \"\"). Tests lines 369-429 check the styles through a recording styler. Time and message are unstyled, as the plan's list does not style them."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "11f281eb-15c4-4d3c-9ae5-b331a3072311",
+      "title": "Add the pretty logger",
+      "checks": [
+        {
+          "at": "2026-10-26T13:40:58Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "11f281eb-15c4-4d3c-9ae5-b331a3072311",
+            "title": "Add the pretty logger",
+            "criteria": [
+              "`XCL_LOG_LEVEL` set to \"debug\", \"warn\", \"error\", \"INFO\", unset and \"loud\" gives debug, warn, error, info, info and info",
+              "Events below the chosen level write nothing, and above info only event lines and configuration-mistake reports are written, with no configuration, warnings or guidance",
+              "At warn, an unsupported block's report still appears beneath its error line",
+              "A creation event delivered by a configuration is followed by that resource's configuration, indented, before anything else is written",
+              "Variables, outputs and modules show nothing and warn nothing, and each resource that cannot be shown writes one warning while later events still appear",
+              "With resource data off, two created resources produce exactly one line explaining how to turn it on",
+              "An unsupported block's report appears once, beneath the error line about it",
+              "Routed through a logger, each event becomes one record whose message is the same text, at the event's level and time, with its fields attached",
+              "A non-integer level, or a stream and a logger together, is refused"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/prettylog.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "example/prettylog"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/prettylog/prettylog.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "event.data"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "prettylog_test.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "prettylog.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_prettylog.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "Config.apply"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_docstrings.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "py.typed"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl/prettylog.py:56-60 maps debug, warn and error; prettylog.py:71-78 level_from_env lowercases XCL_LOG_LEVEL and falls back to logging.INFO for INFO, unset and 'loud'. tests/unit/test_prettylog.py:281-314 cover each value."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "prettylog.py:167-168 drops any event below the level before anything is written. prettylog.py:181 renders configuration and guidance only when self._level \u003c= logging.INFO, so above info only the event line (prettylog.py:174-193) and the report (prettylog.py:183-186, written at every level) are written. Tests: test_warn_handler_writes_no_configuration (line 422), test_warn_handler_writes_no_info_line (395), test_no_guidance_above_info (638)."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "prettylog.py:221 _report returns a report for any phase=error event carrying a Error with tokens, and prettylog.py:234 always writes the report for parse and resource errors, independent of level. Test test_warn_handler_writes_report_beneath_parse_error (tests/unit/test_prettylog.py:845-851) asserts PARSE_ERROR + REPORT at WARNING."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "prettylog.py:181-193: the indented configuration from _configuration (prettylog.py:216, via _indent at line 281) is concatenated onto the event line and written in one self._write call. Only after that can a warning or guidance be written. Test test_configuration_follows_create_success (tests/unit/test_prettylog.py:438-450) asserts WEB_CREATE_SUCCESS + WEB_BLOCK + APPLY_SUCCESS."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "prettylog.py:209-215: _errors.NotEncodableError returns no block and no warning (silent for variables, outputs and modules). Any other exception returns one warning string, which is written after the event line at prettylog.py:191-193 and does not stop later events. The NotEncodableError class with code 'not_encodable' is at xcl/_errors.py:184-187. Tests: test_not_encodable_skipped_silently (test_prettylog.py:530), test_two_render_failures_warn_twice_and_apply_completes (560), test_not_encodable_resource_does_not_stop_later_configuration (542). I did not trace the engine's code-to-class mapping at _errors.py:499 in full, but the test uses the same code string."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "prettylog.py:204-205 sets guidance only when the event has no data and config._event_data is EventDataLevel.NONE. prettylog.py:188-189 toggles self._guided so the guidance is written once per handler. Test test_guidance_written_once_when_data_off (tests/unit/test_prettylog.py:589-600) asserts WEB_CREATE_SUCCESS + GUIDANCE + API_CREATE_SUCCESS, which is one guidance line for two created resources."
+            },
+            {
+              "criterion": 7,
+              "verdict": "met",
+              "evidence": "A block's own error is always reported (prettylog.py:234-236). The closing error is reported only for problems not yet shown (prettylog.py:238-239, using the per-configuration counter from prettylog.py:166 and 236). Test test_report_not_repeated_beneath_closing_error (test_prettylog.py:703-715) and test_unsupported_block_report_appears_once_through_configuration (868-893) both assert the report appears exactly once."
+            },
+            {
+              "criterion": 8,
+              "verdict": "met",
+              "evidence": "prettylog.py:257-259: _write calls self._logger.handle with one record from _logbridge.event_record (xcl/_logbridge.py:293-297), whose message is the event's line plus what is beneath it, at the event's level, with time set by _set_time and fields from event_extra. The record carries the event's fields and xcl_event. Tests: test_logger_record_message_matches_stream_text (test_prettylog.py:1009-1021), test_logger_record_level_and_time_are_events (1024), test_logger_record_carries_bridge_fields (1036). The warning and guidance records are separate records, which criterion 5 requires."
+            },
+            {
+              "criterion": 9,
+              "verdict": "met",
+              "evidence": "prettylog.py:123-124 raises TypeError for a non-int level and for bool. prettylog.py:125-126 raises ValueError('give file or logger, not both') when both file and logger are given. Tests: test_handler_refuses_string_level (test_prettylog.py:320), test_handler_refuses_bool_level (325), test_handler_refuses_file_and_logger (330)."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "7caa2aa7-1371-4f66-8a4b-fa5b0ca29442",
+      "title": "Prove the pretty logger's behaviour against the real engine",
+      "checks": [
+        {
+          "at": "2026-10-26T13:44:28Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "7caa2aa7-1371-4f66-8a4b-fa5b0ca29442",
+            "title": "Prove the pretty logger's behaviour against the real engine",
+            "criteria": [
+              "Applying a configuration that creates one resource, with the pretty logger set up in one line on a captured stream and no level chosen, writes one line per event at info or above, each with a time, level, message, source, operation, phase and resource",
+              "The lines directly after the creation line hold that resource's configuration, indented, including the value the provider filled in, before the next event's line",
+              "The same run on the asyncio client gives the same lines apart from timestamps and durations",
+              "The same run through an application's own logger writes the same lines through that logger's handlers",
+              "At warn the run writes no configuration and no info lines, and at debug it adds debug events",
+              "At warn, a configuration with an unsupported block still writes the report beneath the error line",
+              "A configuration with an unsupported block writes the error line followed by the report with its summary, file and line, and faulty source lines",
+              "A pseudo-terminal gets colour codes, with the source, operation and resource values in their colours, while a file, or a pseudo-terminal with `NO_COLOR` set, gets none",
+              "With resource data off and two created resources, the run writes exactly one guidance line and no configuration, and a configuration with a variable, an output and a module writes no warning for them"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_prettylog.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "test_aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "monkeypatch.delenv"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "resource.recording.one"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "tests/integration/test_prettylog_engine.py:146-162 (test_prettylog_setup_writes_one_line_per_event) applies one_resource_config with xcl.prettylog.handler(out) at its default INFO level, asserts every non-indented line matches EVENT_LINE (time and level, lines 23 and 154), and asserts the create success line carries source=core, operation=create, phase=success and resource=resource.recording.one. xcl/_prettyline.py:79-100 writes source, operation, phase, resource, type and file whenever they are set. Caveat: the test checks the seven fields only on the create success line, and apply start/success events carry no resource, so 'each with ... resource' is read as the line layout, not as a resource on every line."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "tests/integration/test_prettylog_engine.py:173-190 (test_prettylog_configuration_follows_creation) asserts the line after the create success line is '  resource \"recording\" \"one\" {' (indented), that the block contains output = \"one-a\" (the provider-filled value), that it ends with '  }', and that the next line matches EVENT_LINE. xcl/prettylog.py:198-216 and _indent (line 278) produce this block from the saved record when event data is PROCESSED."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "tests/integration/test_aio.py:1264-1340 (appended, the diff at lines 9-84) adds test_async_prettylog_same_lines_as_sync, which runs the same config through xcl.Config and xcl.aio.Config with xcl.prettylog.handler, asserts 'create success' appears, and asserts prettylog_normalised(async) == prettylog_normalised(sync), where normalisation replaces the time prefix and duration= values (test_aio.py helper, lines 27-30). test_async_prettylog_configuration_follows_creation also checks the asyncio block layout."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "tests/integration/test_prettylog_engine.py:196-208 (test_prettylog_through_application_logger) builds logging.Logger('app') with propagate=False and a StreamHandler using '%(message)s', runs xcl.prettylog.handler(logger=logger), and asserts normalised(through_logger) == normalised(stream output). xcl/prettylog.py:257-259 writes each group as one record through logger.handle with event_record, so the logger's handlers carry it."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "test_prettylog_engine.py:214-221 (test_prettylog_warn_level_is_terse) uses handler(out, logging.WARNING) and asserts no indented lines and no ' INFO ' text. test_prettylog_engine.py:238-245 (test_prettylog_debug_level_adds_debug_events) uses logging.DEBUG and asserts ' DEBU decided every entity ' and the create success INFO line are present. xcl/prettylog.py:181 gates configuration output on self._level \u003c= logging.INFO."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "test_prettylog_engine.py:224-235 (test_prettylog_warn_level_still_shows_report) uses unsupported_block_config at WARNING, expects ConfigError, and asserts the ' ERRO ' line is followed by '  Error: Unsupported block type' and the '       7 | ' source line, with no ' INFO '. xcl/prettylog.py:186-187 writes the report at every level via _report, not gated by level."
+            },
+            {
+              "criterion": 7,
+              "verdict": "met",
+              "evidence": "test_prettylog_engine.py:251-267 (test_prettylog_configuration_mistake_shows_report) asserts the ' ERRO ' line, then the report whose first line is '  Error: Unsupported block type', a line containing 'on \u003cconfig path\u003e line 7', and '       7 |   nope {' (faulty source). test_prettylog_engine.py:270-276 checks the report is written once. Summary, file and line, and source lines are all asserted."
+            },
+            {
+              "criterion": 8,
+              "verdict": "met",
+              "evidence": "test_prettylog_engine.py:282-318 runs the handler on a real pty (os.openpty, stream isatty true) and asserts '\\x1b[1;35mcore\\x1b[0m', '\\x1b[1;33mcreate\\x1b[0m' and '\\x1b[1;36mresource.recording.one\\x1b[0m' with NO_COLOR deleted. test_prettylog_engine.py:321-327 sets NO_COLOR=1 on a pty and asserts no ESC byte; test_prettylog_engine.py:330-339 asserts a regular file has no ESC byte. xcl/highlight/_stream.py:22-31 returns PLAIN unless isatty() and NO_COLOR is unset or empty. xcl/prettylog.py:40-54 STYLES map source, operation and resource to magenta, yellow and cyan, bold for values."
+            },
+            {
+              "criterion": 9,
+              "verdict": "met",
+              "evidence": "test_prettylog_engine.py:345-360 (test_prettylog_guidance_once_without_data) applies two_resources_config with event_data=EventDataLevel.NONE and asserts 'configuration not shown' appears exactly once, the hint line is present, no indented lines (no configuration), and two create success lines. test_prettylog_engine.py:363-374 (test_prettylog_builtins_silent) applies a variable, an output and a module beside one resource and asserts 'unable to show configuration' is absent and only the recording resource has a block. xcl/prettylog.py:205 (guidance only when the configuration is NONE) and 219-223 (NotEncodableError gives no warning and no report) support this."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "327664ad-088a-4e77-b581-968677276eb1",
+      "title": "Record the pretty log in the Go parity program",
+      "checks": [
+        {
+          "at": "2026-10-26T13:47:17Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "327664ad-088a-4e77-b581-968677276eb1",
+            "title": "Record the pretty log in the Go parity program",
+            "criteria": [
+              "The record of every fixture whose apply succeeds holds its pretty log, with times, durations, colour and run paths normalised and each line grouped with the configuration beneath it",
+              "A fixture whose apply fails records no pretty log",
+              "The record is still the same on every run of the same fixture"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "/home/nicj/code/github.com/jumppad-labs/xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/go.mod"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/prettylog/go.mod"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/cmd/parity/main.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "n.text"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/testdata/parity/README.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/cmd/parity/main_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "CHANGELOG.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "bindings/libxcl/cmd/parity/main.go:281-286 sets record[\"pretty_log\"] to n.prettyLog(...) when applyErr == nil. prettyLog (main.go:310-324) applies the fixture again in a fresh pretty-state dir with prettylog.Handler(\u0026buf, slog.LevelInfo) and xcl.WithEventData(xcl.EventDataProcessed). prettyGroups (main.go:341-378) strips SGR colour codes (ansiCode, line 99/342), groups each unindented event line with the indented lines beneath it, replaces the kitchen time prefix with \u003ctime\u003e (kitchenTime, matches time.Kitchen used at example/prettylog/prettylog.go:67), replaces duration=\\S+ with duration=\u003cduration\u003e (line 360), and runs n.text for fixture and tmp path replacement (line 348). Groups are sorted (line 370). The README (testdata/parity/README.md:53-65) documents this. Unit tests in main_test.go:664-764 cover grouping, colour, and path replacement."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "bindings/libxcl/cmd/parity/main.go:281-286: record[\"pretty_log\"] is initialised to nil and only assigned when applyErr == nil, so a failing apply records null. main_test.go:699-705 TestParityPrettyLogNullForFailingFixture checks the invalid fixture yields a present nil value, and main_test.go:236 lists pretty_log among the keys of the invalid-fixture record."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Times are replaced by \u003ctime\u003e (main.go:359), durations by \u003cduration\u003e (main.go:360), colour is stripped, paths are normalised, and the groups are sorted (main.go:370) so concurrent resources cannot reorder them. The pretty log is produced by a fresh apply in its own state directory. The whole-record determinism tests TestParityRecordIsDeterministic and TestParityRecordIsDeterministicForPluginEntities (main_test.go:133-145) now cover pretty_log, and the verification run reported go test passing. I did not run the tests myself, so this rests on the code and the reported run."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "b031762f-27d9-4464-9095-9f0ac310e976",
+      "title": "Compare the pretty log with Go in the Python parity suite",
+      "checks": [
+        {
+          "at": "2026-10-26T13:49:59Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "b031762f-27d9-4464-9095-9f0ac310e976",
+            "title": "Compare the pretty log with Go in the Python parity suite",
+            "criteria": [
+              "For every shared fixture whose apply succeeds, the Python pretty logger writes the same event lines and configuration as Go's example, apart from timestamps and durations",
+              "For a fixture whose apply fails, both sides record no pretty log"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/parity/run_python.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "n.text"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/parity/test_parity.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "tests/parity/run_python.py:199-201 sets record[\"pretty_log\"] to pretty_log(...) only when apply_err is None, and pretty_log (lines 219-241) applies the fixture at info with event_data=PROCESSED into a buffer through xcl.prettylog.handler, mirroring Go's prettyLog in bindings/libxcl/cmd/parity/main.go (diff hunk @@ -289 adds prettyLog with prettylog.Handler(\u0026buf, slog.LevelInfo) and xcl.WithEventData(xcl.EventDataProcessed)). Normaliser.pretty_groups (run_python.py:564-590) strips colour, replaces the leading kitchen time with \u003ctime\u003e and duration values with duration=\u003cduration\u003e, and sorts the groups, the same steps as Go's prettyGroups. Every one of the 10 fixtures in tests/parity/types.py FIXTURES (basic_types, annotations, functions, variables, outputs, plugin_entities, invalid, singletons, encode, unsupported_block) has a whole-record comparison in tests/parity/test_parity.py:56-113 through assert_same_record, which includes the pretty_log key, and the verification run reports 25 passed. The record comparison is the only check that pretty_log matches; test_parity.py itself is unchanged in the diff, so the comparison is implicit rather than an explicit pretty_log assertion."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "run_python.py:199 sets record[\"pretty_log\"] = None before the conditional, and pretty_log is only called when apply_err is None (lines 199-201). The Go side in bindings/libxcl/cmd/parity/main.go sets record[\"pretty_log\"] = nil and only calls n.prettyLog when applyErr == nil (xcl.diff hunk @@ -271). The unsupported_block fixture, whose apply fails, is compared as a whole record in tests/parity/test_parity.py:110-113, and the verification spot check found pretty_log null on both sides for it. No file in the diffs writes a pretty log for a failed apply."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "276623de-9820-4e70-93a2-a126ed229564",
+      "title": "Document the pretty logger in the README and parity list",
+      "checks": [
+        {
+          "at": "2026-10-26T13:51:39Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "276623de-9820-4e70-93a2-a126ed229564",
+            "title": "Document the pretty logger in the README and parity list",
+            "criteria": [
+              "The README shows the one-line setup for both clients, the level and its environment variable, the event data needed, the logger route and a sample of the output",
+              "The README says that asyncio event handlers receive events one at a time, in order",
+              "The parity list pairs Go's example pretty logger and its level helper with their Python forms"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "PARITY.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "example/prettylog"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "README.md (xcl-python worktree) '### Pretty logging' under '## Logging': the sync setup is `on_event=xcl.prettylog.handler(sys.stderr, xcl.prettylog.level_from_env())` on one line (line 528), and the asyncio setup is a single line, `cfg = xcl.aio.Config(registries=[local], on_event=xcl.prettylog.handler(sys.stderr), event_data=xcl.EventDataLevel.PROCESSED)` (line 580). The level and variable are documented at lines 553-557 (`logging.INFO` default, `XCL_LOG_LEVEL` / `xcl.prettylog.LEVEL_ENV`, values debug/info/warn/error, info when unset). The event data need is at line 529 and lines 558-561 (`event_data=xcl.EventDataLevel.PROCESSED` is required for created-resource output). The logger route is at lines 570-573 (`handler(logger=logging.getLogger(\"app\"))`). Sample output is at lines 533-543. Caveat: the sync Config call in the example spans several lines, but the handler setup inside it is one line, which the section states as 'set up in one line'."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "README.md '## Asyncio' section, lines 618-626: 'Events reach `on_event` one at a time, in the order the engine sent them, as they do with `xcl.Config` and in Go: a plain handler runs in the default executor and an `async def` one on the loop, and the next event waits until the handler has finished with the last'. The matching diff hunk is the README.md @@ -548 hunk in the goal-check diff."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "PARITY.md lines 98-103, a new table after the '## Logging' table: `| Go (`example/prettylog`) | Python (`xcl.prettylog`) |` pairs `prettylog.Handler(w, level)` with `xcl.prettylog.handler(file=None, level=logging.INFO, *, logger=None, formatter=None)`, `prettylog.LevelFromEnv()` with `xcl.prettylog.level_from_env()`, and `prettylog.LevelEnv` with `xcl.prettylog.LEVEL_ENV` (`\"XCL_LOG_LEVEL\"`). The same diff also adds `slog.Level` with a standard logging level int."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "c1d31990-9eb3-4df1-868c-c46723e9d83c",
+      "title": "Document the pretty logger on the website's events page",
+      "checks": [
+        {
+          "at": "2026-10-26T13:53:22Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "c1d31990-9eb3-4df1-868c-c46723e9d83c",
+            "title": "Document the pretty logger on the website's events page",
+            "criteria": [
+              "The events page's pretty-receiver Python tabs show `xcl.prettylog`'s one-line setup and a sample of its output",
+              "No hand-written Python receiver or escape-code table remains on the page",
+              "Every existing page URL still works and the site builds"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "/home/nicj/code/github.com/jumppad-labs/xcl-website"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/events.mdx"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/pages/events.mdx:448-466 is the pretty-receiver Python tab: it shows xcl.prettylog.handler(sys.stderr, xcl.prettylog.level_from_env()) in an xcl.Config(...) setup, followed by a text block with a sample output line and the rendered resource block. The one-line setup is also shown in the Python tab at lines 518-519 (`cfg = xcl.Config(on_event=xcl.prettylog.handler(sys.stderr, xcl.prettylog.level_from_env()))`). The staged diff (xcl-website.diff, hunks at @@ -442 and @@ -514) confirms these replaced the old hand-written code."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "The old pretty-receiver Python code is gone: the diff removes the RANK/COLOUR/RESET tables, the ANSI escape strings (\\033), level_from_env and the handle() function. A grep of events.mdx finds no \\033 escape codes and no RANK or COLOUR. The only remaining Python 'def handler' is at events.mdx:212, in the separate 'To handle events yourself' section, not the pretty receiver. The 'def on_event' error-report example (around lines 137-156) belongs to the 'Errors in logs' section, not the pretty-receiver tabs. Reading this criterion as covering the pretty-receiver tabs only, it holds."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl-website.status lists only ' M src/pages/events.mdx', with no added, renamed or removed files, so no route changes. The diff touches only prose and code-block content in events.mdx. The supplied verification shows the site builds (23 pages, exit 0) and the internal links on the built events page resolve. I did not re-run the build; this verdict rests on the status file, the diff and the supplied build results."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    }
+  ]
+}

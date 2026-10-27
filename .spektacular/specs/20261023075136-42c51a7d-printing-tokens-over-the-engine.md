@@ -36,23 +36,23 @@ Programs written in languages other than Go cannot show xcl's errors with their 
 
 ## Requirements
 
-- [ ] **Every error carries its report**
+- [x] **Every error carries its report**
   The system must attach the labelled report (the report split into parts, each labelled with its kind, such as an attribute name or a line comment) to every error it returns to another language that holds a configuration problem, including errors delivered to an event handler during an operation, so the language can print it without asking the engine again.
-- [ ] **Reports match Go's**
+- [x] **Reports match Go's**
   The labelled report another language receives must render, as plain text, exactly the report Go prints for the same problem, before any wrapping of the detail.
-- [ ] **Errors without a configuration problem**
+- [x] **Errors without a configuration problem**
   The system must return errors that hold no configuration problem with no report, and their message unchanged.
-- [ ] **Rendered resources come as labelled text**
+- [x] **Rendered resources come as labelled text**
   Users of another language can ask for a rendered resource, from a saved record or from a looked-up or edited entity, as labelled text as well as plain text.
-- [ ] **Change summaries come as labelled text**
+- [x] **Change summaries come as labelled text**
   The system must deliver a change summary to another language with its labelled text alongside the structured summary it delivers today.
-- [ ] **Editor themes convert without a configuration**
+- [x] **Editor themes convert without a configuration**
   Users of another language can convert a VS Code colour theme into styles keyed by kind of text, without creating a configuration.
-- [ ] **Kinds agree across languages**
+- [x] **Kinds agree across languages**
   The kinds of labelled text the engine sends must have the same identities and categories as Go's, and an unknown kind from a newer engine must still fall into its category.
-- [ ] **Existing callers keep working**
+- [x] **Existing callers keep working**
   Messages from a caller built against the previous protocol must still be accepted, and a request for the previous terminal-colour output must be treated as a request for plain text rather than failing.
-- [ ] **Protocol documentation**
+- [x] **Protocol documentation**
   The protocol's own documentation, and the project's design for other-language support, must describe the report on errors, labelled text, and theme conversion.
 
 <!--
@@ -85,27 +85,27 @@ Programs written in languages other than Go cannot show xcl's errors with their 
 
 ## Acceptance Criteria
 
-- [ ] **Report on an apply error**
+- [x] **Report on an apply error**
   Applying a configuration with an unsupported block through the engine returns an error carrying labelled report text whose plain rendering equals Go's plain report for the same configuration.
-- [ ] **Report during an operation**
+- [x] **Report during an operation**
   The error delivered to an event handler for the same failure, while the apply runs, carries the same labelled report.
-- [ ] **No report for other errors**
+- [x] **No report for other errors**
   Looking up an address that does not exist through the engine returns a not-found error with no report and the same message as today.
-- [ ] **Labelled resource text**
+- [x] **Labelled resource text**
   Rendering a created resource through the engine, from its saved record, from its looked-up entity and from an edited entity, with labelled text requested, returns labelled text whose plain rendering equals the plain text returned alongside it.
-- [ ] **Labelled change summary**
+- [x] **Labelled change summary**
   A diff through the engine returns labelled text whose plain rendering equals Go's plain change summary for the same diff, alongside the structured diff.
-- [ ] **Theme conversion**
+- [x] **Theme conversion**
   Converting a VS Code theme that colours properties orange, with no configuration created, returns a style for the attribute kind containing that orange.
-- [ ] **Kind identities**
+- [x] **Kind identities**
   For every kind in the published kind list, the number and category another language receives equal those Go reports.
-- [ ] **Unknown kinds fall into their category**
+- [x] **Unknown kinds fall into their category**
   A kind number a language does not recognise, within a known category's range, is placed in that category and printed in that category's style.
-- [ ] **Previous callers**
+- [x] **Previous callers**
   A rendering request from a caller built against the previous protocol, asking for terminal colour, succeeds and returns plain text.
-- [ ] **Compatibility check passes**
+- [x] **Compatibility check passes**
   The protocol's breaking-change check against the main branch reports no breaking change.
-- [ ] **Docs**
+- [x] **Docs**
   The protocol documentation and the other-language design describe the report on errors, labelled text and theme conversion.
 
 <!--

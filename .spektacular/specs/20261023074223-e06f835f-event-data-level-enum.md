@@ -33,21 +33,21 @@ A Python program that asks xcl to attach resource data to events chooses how muc
 
 ## Requirements
 
-- [ ] **A named set of event data levels in the main package**
+- [x] **A named set of event data levels in the main package**
   Users can refer to each event data level (none, raw and processed) as a named value importable from the package's top level, without importing a submodule.
-- [ ] **Both configuration flavours take the named levels**
+- [x] **Both configuration flavours take the named levels**
   Users can pass a named level when creating either the synchronous or the asynchronous configuration, and the configuration attaches exactly the event data that level means today.
-- [ ] **Leaving the option out means none**
+- [x] **Leaving the option out means none**
   The system must attach no resource data to events when the user leaves the event data option out, as it does today.
-- [ ] **Bare words are refused**
+- [x] **Bare words are refused**
   The system must refuse an event data level given as a plain string, including one spelled exactly like a valid level, with an error that names the named set of levels so the user knows what to pass instead.
-- [ ] **Anything else is refused**
+- [x] **Anything else is refused**
   The system must refuse any value that is not one of the named levels, including an explicit None, with the same error, before any configuration is created.
-- [ ] **Type checkers understand the option**
+- [x] **Type checkers understand the option**
   A static type checker run over a user's program must flag a plain string passed as the event data level, and accept a named level.
-- [ ] **Documentation shows the named levels**
+- [x] **Documentation shows the named levels**
   Every documented example and description of the event data option, in the package's own documentation and on the xcl website, must use the named levels.
-- [ ] **The parity record pairs the levels**
+- [x] **The parity record pairs the levels**
   The Python-to-Go parity record must pair Go's event data level type with its Python counterpart.
 - [ ] **Release notes explain the break**
   The release notes for the version that ships this change must say that plain string levels are no longer accepted and show the one-line change from the string form to the named form.
@@ -81,23 +81,23 @@ A Python program that asks xcl to attach resource data to events chooses how muc
 
 ## Acceptance Criteria
 
-- [ ] **Levels import from the top level**
+- [x] **Levels import from the top level**
   The event data level enum can be imported from the package's top level, and it has exactly three members, for none, raw and processed.
-- [ ] **Processed data reaches events, synchronously and asynchronously**
+- [x] **Processed data reaches events, synchronously and asynchronously**
   Applying a configuration that creates one resource, with the processed level chosen, delivers a create success event whose entity is the created resource, for both the synchronous and the asynchronous configuration.
-- [ ] **Raw data reaches events**
+- [x] **Raw data reaches events**
   The same apply with the raw level chosen delivers events carrying the resource's raw data, matching what the string "raw" delivered before this change.
-- [ ] **Left out and none carry nothing**
+- [x] **Left out and none carry nothing**
   The same apply with the option left out, and again with the none level, delivers events that carry no resource data.
-- [ ] **A correctly spelled string is refused**
+- [x] **A correctly spelled string is refused**
   Creating either configuration with the event data level given as the string "processed" fails with an error whose message names the event data level enum, and no configuration is created.
-- [ ] **Other values are refused**
+- [x] **Other values are refused**
   Creating either configuration with the event data level given as an integer, as an explicit None, or as the string "verbose" fails with the same error, and no configuration is created.
-- [ ] **A type checker flags a string**
+- [x] **A type checker flags a string**
   Running mypy or pyright over a snippet that passes "processed" as the event data level reports an error on that line, and reports none for the same snippet passing the processed member.
-- [ ] **Docs updated**
+- [x] **Docs updated**
   A search of the package README and the xcl website for the event data option finds no example passing a bare string level.
-- [ ] **Parity record updated**
+- [x] **Parity record updated**
   The parity record's event data row names Go's event data level type and the Python enum.
 - [ ] **Release notes**
   The release notes for the shipping version contain a line stating that string levels are refused, with the string-to-enum migration example.

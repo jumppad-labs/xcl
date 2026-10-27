@@ -1,0 +1,525 @@
+{
+  "plan": "20261023075136-42c51a7d-printing-tokens-over-the-engine",
+  "items": [
+    {
+      "item": "33d2f2d9-106b-4995-a686-242ded6baea3",
+      "title": "Add token kinds, labelled text and the error report to the protocol",
+      "checks": [
+        {
+          "at": "2026-10-26T11:52:47Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "33d2f2d9-106b-4995-a686-242ded6baea3",
+            "title": "Add token kinds, labelled text and the error report to the protocol",
+            "criteria": [
+              "Every Go kind has a protocol kind with the same number and matching name, and the protocol has no kind Go lacks",
+              "Labelled text crosses the wire with each piece's kind number and text unchanged",
+              "A kind number the receiver does not recognise keeps its number on the wire and falls into its category, printing in that category's style",
+              "The protocol only gains fields and passes its lint and breaking-change checks"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "proto/xcl/core/v1/core.proto"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/proto/core.pb.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/tokens.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/tokens_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "highlight/kind.go:18-122 defines 44 Kind constants (Text through Detail). proto/xcl/core/v1/core.proto:86-142 defines enum TokenKind with 44 values, and each value is the Go number with TOKEN_KIND_ plus the upper-snake name (e.g. BlockType 101 is TOKEN_KIND_BLOCK_TYPE, Detail 1404 is TOKEN_KIND_DETAIL). The generated coreservice/proto/core.pb.go enum (diff hunk at line 14-58) mirrors these 44 values. The proto has no kind Go lacks. coreservice/tokens_test.go:41-74 checks the names, the count, and that each kind's category matches its Parent()."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "coreservice/tokens.go:11-22 copies each highlight.Token to corepb.Token with Kind: corepb.TokenKind(token.Kind) and Text unchanged, and keeps order. coreservice/tokens_test.go:76-92 checks kinds and texts for Attribute, Text and String tokens, including a space-only text. The wire field is proto/xcl/core/v1/core.proto:146-149 (Token: kind = 1, text = 2), and Error.report = 5 at core.proto:78 carries the list."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "tokens_test.go:94-99 checks that kind 1199 keeps its number through tokensToProto. tokens_test.go:106-115 checks that the number survives proto.Marshal and Unmarshal. tokens_test.go:117-122 checks that 1199 falls into TOKEN_KIND_COMMENT (1100) and has Parent Comment. tokens_test.go:126-137 checks that highlight.Terminal prints kind 1199 with the same bytes as Comment under the default theme. The verification run shows go test ./coreservice/... passing. The printing check is exercised on the Go side only; no other language binding is in this scope."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "The proto diff only adds: core.proto:71-78 adds the Error.report field as number 5 and leaves fields 1-4 unchanged. core.proto:81-149 adds the TokenKind enum and the Token message. No existing field, number or message is removed or retyped in the diff. The pb.go changes are generator reindexing for the new enum and message (NumEnums 3, NumMessages 45). Verification shows buf lint passing and buf breaking against '.git#branch=main' passing (exit 0), with a deliberate retype failing as expected."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "425934f7-6c4d-4fc3-9b80-589d2565b498",
+      "title": "Attach the full report to every error that holds a configuration problem",
+      "checks": [
+        {
+          "at": "2026-10-26T11:55:54Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "425934f7-6c4d-4fc3-9b80-589d2565b498",
+            "title": "Attach the full report to every error that holds a configuration problem",
+            "criteria": [
+              "Applying a configuration with an unsupported block through the engine finishes with an error whose report, as plain text, equals Go's plain report for the same configuration",
+              "The error event delivered while that apply runs carries the same report",
+              "Each collected problem in the error carries its own report",
+              "A provider failure reported at its block carries a report",
+              "Looking up an address that does not exist returns a not-found error with no report and the same message as before",
+              "A host can print the report from the error it received, with no further engine call"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/errors.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "errors.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/events.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/operations.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/service.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/errors_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/operations_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "apply/error"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "config.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/lookups_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "proto/xcl/core/v1/core.proto"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "coreservice/errors.go:335-337 sets out.Report = tokensToProto(xcl.ErrorTokens(err)) when holdsProblem(err) is true, and coreservice/operations.go:61 sends the finished error through toProto. coreservice/operations_test.go TestApplyErrorCarriesGoReport compares joinTokens(finished.GetError().GetReport()) with xcl.PrintError(..., WithWidth(0)) output from a direct xcl.Config.Apply on the same file, and the verification run reports go test ./coreservice/... passing."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "coreservice/events.go:30 sets Error: toProto(e.Error), so the apply/error event goes through the same report path (errors.go:335-337). operations_test.go TestApplyErrorEventCarriesTheSameReport finds the event named apply/error and compares its report text with the finished error's report."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "coreservice/errors.go:132-136: the ConfigError case calls toProto(cause) for each collected cause, and each cause then reaches the holdsProblem check at line 335 on its own. errors_test.go TestErrorReportOnConfigErrorAndEachCause asserts that Causes[0] and Causes[1] each carry their own report, and operations_test.go TestApplyErrorEachCauseCarriesItsReport checks the same for an applied config."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "coreservice/errors.go:138-171 maps a Diagnostic whose Cause is a ProviderError to CodeProvider; holdsProblem (errors.go:347-350) is true for any Diagnostic in the tree, so the report is set at line 335-337. errors_test.go TestErrorReportOnProviderDiagnostic asserts CodeProvider with a report equal to PrintError output, and operations_test.go TestFailedProviderCauseCarriesAReport asserts a provider cause from an apply carries a report containing 'create failed for resource.network.one: boom'."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "coreservice/errors.go:174-176 maps NotFoundError to CodeNotFound with the address detail, and Message is still err.Error() (errors.go:94). holdsProblem is false for a NotFoundError with no diagnostic, so no report is set. errors_test.go TestNoErrorReportOnNotFound and lookups_test.go TestFindUnknownAddressHasNoReport assert an empty report and an unchanged message."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "The report is carried in the Error message itself as unwrapped Token list (proto/xcl/core/v1/core.proto Error.report, coreservice/proto/core.pb.go GetReport). operations_test.go TestHostPrintsReportWithoutAnotherCall calls c.s.Close() before rebuilding highlight.Token values from finished.GetError().GetReport() and printing them with highlight.Plain.Format, with no further engine call, and asserts the 'Error: Unsupported block type' line and the numbered source lines are present."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "ed5f53d3-49e6-4552-8e67-fbb89f704972",
+      "title": "Return labelled resource text and retire the colour request",
+      "checks": [
+        {
+          "at": "2026-10-26T11:59:01Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "ed5f53d3-49e6-4552-8e67-fbb89f704972",
+            "title": "Return labelled resource text and retire the colour request",
+            "criteria": [
+              "Rendering a created resource from its saved record, from its looked-up record and from an edited record, with labelled text requested, returns labelled text that joins to the plain text returned beside it",
+              "Without the request, no labelled text is returned and the text is unchanged",
+              "A request built as an older caller sends it, asking for colour, succeeds and returns plain text with no colour codes",
+              "The breaking-change check against the main branch reports nothing, and still refuses a field removed without reserving its number or name"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "proto/xcl/core/v1/core.proto"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "proto/buf.yaml"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".github/workflows/go.yml"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/proto/core.pb.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/lookups.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/lookups_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "coreservice/lookups_test.go:600-609 (TestEncodeSavedEntityReturnsTokensJoiningToText) checks the saved-record tokens join to the text beside them and that 'app' is a BLOCK_TYPE token; lines 611-620 (TestEncodeEntityReturnsTokensForLookedUpRecord) do the same for a looked-up record; lines 622-639 (TestEncodeEntityReturnsTokensForEditedRecord) edits image to caddy and checks the join plus a STRING token for \"caddy\". The code path is coreservice/lookups.go:141-146 and 171-174, which set Tokens from highlight.Tokenize(text) when req.GetTokens() is true. Verification: go test ./... -race passed."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "coreservice/lookups_test.go:641-654 (TestEncodeSavedEntityWithoutTokensReturnsNone) asserts plain.GetTokens() is empty and the text equals the labelled call's text; lines 656-669 (TestEncodeEntityWithoutTokensReturnsNone) does the same for EncodeEntity. lookups.go:142 and 172 only populate Tokens when the request sets Tokens, so the default response carries no labelled text."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "coreservice/lookups_test.go:682-695 (withOldColourField) appends field 2 as a varint with value 1, the retired highlight field. Lines 697-712 (TestEncodeSavedEntityOldColourRequestReturnsPlainText) and 714-729 (TestEncodeEntityOldColourRequestReturnsPlainText) assert StatusOK, text equal to the plain encoding, no \"\\x1b[\" in the text and no tokens. proto/xcl/core/v1/core.proto diff hunks show 'reserved 2;' and 'reserved \"highlight\";' in EncodeSavedEntityRequest and EncodeEntityRequest, so the field is ignored on decode. go test ./... passed."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "Verification: buf breaking --against '.git#branch=main' exits 0. Temporary removal of reserved \"highlight\" fails with exit 100 (name not reserved), and removal of reserved 2 fails with exit 100 (number not reserved). proto/buf.yaml diff (lines 2702-2711) replaces FIELD_NO_DELETE with FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED and FIELD_NO_DELETE_UNLESS_NAME_RESERVED, so a removal is allowed only when both number and name are reserved. The check still refuses unreserved removals. .github/workflows/go.yml diff (lines 7-11) updates the comment to match."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "77761c9d-d20a-409e-a788-112f74787197",
+      "title": "Send labelled change summaries with a finished diff",
+      "checks": [
+        {
+          "at": "2026-10-26T12:01:08Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "77761c9d-d20a-409e-a788-112f74787197",
+            "title": "Send labelled change summaries with a finished diff",
+            "criteria": [
+              "A diff through the engine returns labelled text whose plain rendering equals Go's plain change summary for the same diff",
+              "The structured diff is unchanged and still equals Go's diff",
+              "Apply, validate, destroy and load finish with no labelled diff text"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "proto/xcl/core/v1/core.proto"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/proto/core.pb.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/operations.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/operations_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "coreservice/operations.go start(): for a non-nil diff, finished.DiffTokens = tokensToProto(found.Tokens()) (diff hunk around line 558-568). diff/render.go:88 Tokens() lays out the change summary, and print.go:161-164 PrintDiff formats the same d.Tokens() with the chosen formatter, so the plain rendering is the same text. coreservice/operations_test.go TestDiffTokensMatchGoChangeSummary compares joinTokens(finished.GetDiffTokens()) with xcl.PrintDiff output for the same apply and diff, and the gate run reports go test ./coreservice/... passing. Caveat: the test only exercises the one network scenario; the wording is judged from code, not re-run."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "coreservice/operations.go start(): DiffJson is still diffJSON, produced by json.Marshal(found) on the same *diff.Diff returned by conf.cfg.DiffContext (startDiff, operations.go around lines 157-162); the diff is not altered by Tokens(), which only reads it. coreservice/operations_test.go TestDiffMatchesGoDiff (around line 655) checks JSONEq of GetDiffJson against Go's json.Marshal of the diff, and the diff does not change that path."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "startValidate, startApply, startDestroy and startLoad pass work returning a nil *diff.Diff (operations.go around lines 132-150 and 621-633), so found is nil and no DiffTokens is set (the `if found != nil` guard in start()). Tests coreservice/operations_test.go TestApplyFinishedCarriesNoDiffTokens, TestValidateFinishedCarriesNoDiffTokens, TestDestroyFinishedCarriesNoDiffTokens and TestLoadFinishedCarriesNoDiffTokens (around lines 688-750) assert GetDiffTokens is empty for each of those operations."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "5eb6e9df-52f9-4339-87ab-66988b2844e9",
+      "title": "Convert editor themes without a configuration",
+      "checks": [
+        {
+          "at": "2026-10-26T12:04:00Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "5eb6e9df-52f9-4339-87ab-66988b2844e9",
+            "title": "Convert editor themes without a configuration",
+            "criteria": [
+              "Converting a theme that colours properties orange, with no configuration created, returns a style for the attribute kind containing that orange",
+              "An unusable theme fails with the theme error code and says what was wrong",
+              "An empty request fails as an invalid argument",
+              "The call refuses a configuration handle, as the other configuration-free calls do"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "proto/xcl/core/v1/core.proto"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/proto/core.pb.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/errors.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/theme.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/service.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "service_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/theme_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/errors_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "coreservice/theme_test.go:16 defines an orange-properties theme (variable.other.property, #ff8800) and TestConvertThemeColoursAttributeOrange (lines 30-37) asserts styles[TOKEN_KIND_ATTRIBUTE] contains \"#ff8800\". coreservice/theme.go:20-30 calls highlight.LoadVSCodeTheme and returns the kind-keyed styles. Attribute's scope is variable.other.property.xcl (highlight/kind.go:141), which the TextMate rules match by prefix. The verification run reports go test ./... passing."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "coreservice/errors.go:128-135 maps *xclerrors.InvalidThemeError and xclerrors.ErrInvalidTheme to CodeInvalidTheme (\"invalid_theme\", errors.go:43). The InvalidThemeError case sets details source and reason. errors/highlight_errors.go:29-37 builds a message of the form 'theme X is invalid: \u003creason\u003e', and toProto sets Message from err.Error(). Tests at coreservice/errors_test.go:351-362 and coreservice/theme_test.go:60-82 cover the code and the details, including a bad hex colour and non-JSON input."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "coreservice/theme.go:16-18 returns invalidArgument(\"a theme is required\", \"argument\", \"vscode_theme_json\") when the request's VscodeThemeJson is empty, and invalidArgument yields CodeInvalidArgument. TestConvertThemeEmptyIsInvalidArgument (coreservice/theme_test.go:84-91) checks the code and the argument detail."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "coreservice/service.go:210 registers \"ConvertTheme\": unary(false, ...), so takesHandle is false. service.go:78-79 returns StatusHandleMismatch when h.takesHandle != (handle != 0), which refuses any non-zero handle. TestConvertThemeWithConfigHandleIsMismatch (coreservice/theme_test.go:93-103) asserts StatusHandleMismatch with a nil body. The xcl.h comment at line 30 lists ConvertTheme among the handle-0 methods."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "dcb90fc8-a2f8-4f29-ad0b-0127d8b39781",
+      "title": "Describe reports, labelled text and theme conversion in the other-language design",
+      "checks": [
+        {
+          "at": "2026-10-26T12:06:41Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "dcb90fc8-a2f8-4f29-ad0b-0127d8b39781",
+            "title": "Describe reports, labelled text and theme conversion in the other-language design",
+            "criteria": [
+              "The design's error model shows the report and says when it is present and that it is unwrapped",
+              "The design shows labelled text on both rendering calls and on a finished diff, with the kinds and their categories explained",
+              "The design lists theme conversion as a configuration-free call and describes its result and its error",
+              "The design no longer describes terminal colouring by the engine"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": ".spektacular/design/libxcl.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "printing-and-highlighting.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "proto/xcl/core/v1/core.proto"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "libxcl-current.md:160-166 (\"### Error model\") adds `repeated Token report = 5` to the Error message and says it carries the report Go's xcl.PrintError prints, \"set only when the error holds a configuration problem\"; it says the report is \"sent unwrapped: the detail is one line, and each language wraps it to its own width when it prints\". Lines 166-167 also say an error with no configuration problem, such as not_found, has an empty report. The matching proto comment is in proto/xcl/core/v1/core.proto (Error.report, lines 79-86 of the diff hunk) and the generated core.pb.go mirrors it."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "libxcl-current.md:505 (Lookups, \"Encoding an entity as configuration text...\") says `tokens` on both EncodeSavedEntity and EncodeEntity returns the text labelled, with the texts joined equal to text. The EncodeSavedEntityRequest/EncodeEntityRequest/Response messages at lines 496-500 carry `tokens`. Finished diff: OperationFinished.diff_tokens is described at line 408 (\"the change summary xcl.PrintDiff prints, labelled\") and at line 541 (\"OperationFinished.diff_tokens for a finished diff, which describes the same diff as diff_json\"). Kinds and categories: \"### Labelled text\" at lines 507-541 gives the TokenKind enum with its blocks of 100, explains that a value's category is kind / 100 * 100, that numbers are Go's highlight.Kind, and that unknown kinds fall into their category."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "The CoreService block at libxcl-current.md:224-225 lists `rpc ConvertTheme(ConvertThemeRequest) returns (ConvertThemeResponse)` under \"Library (handle 0: no configuration is needed)\". Line 543 (\"### Labelled text\") says ConvertTheme \"takes handle 0, so a host converts a theme without creating a configuration\" and describes the result: `styles` maps each TokenKind to a style string, with only the styled kinds present. The error is described there too: an unusable theme fails with `invalid_theme` carrying `source` and `reason`, and an empty request fails with `invalid_argument`. The error code is also in the table at line 195. Lines 537-538 give the ConvertThemeRequest/Response messages."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "Grep for colour, color, ANSI, terminal, highlight and escape in libxcl-current.md finds no description of the engine applying terminal colour. Line 505 says \"The engine applies no colour itself: the `highlight` field older callers set to ask for terminal colour is reserved, and such a request ... is answered with plain text.\" Lines 494-496 and 499 reserve field 2 and name \"highlight\" with the comment that it was terminal colour applied by the engine. The remaining hits (lines 509, 512, 520, 543, 1128) are about labelled text, the Kind enum, string escapes or a terminal's Ctrl-C, not engine colouring. The code diff agrees: coreservice/lookups.go removes the colour() function and its highlight use."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "4d27c6ce-3ffb-456b-ae8d-826fb46ea8dd",
+      "title": "Write the changelog entry for labelled output over the engine",
+      "checks": [
+        {
+          "at": "2026-10-26T12:07:40Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "4d27c6ce-3ffb-456b-ae8d-826fb46ea8dd",
+            "title": "Write the changelog entry for labelled output over the engine",
+            "criteria": [
+              "The changelog has a section for this change describing what other languages now receive",
+              "Its Breaking list names the reserved field, the removed generated accessors and the plain-text answer to old colour requests"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "CHANGELOG.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "CHANGELOG.md:3 opens the section `## 20261023075136-42c51a7d-printing-tokens-over-the-engine`. Line 5 says what other languages now get: the new `report` on each configuration-problem `Error`, Go's full report as labelled tokens, unwrapped so each language wraps the detail. Line 7 adds the `Token { kind, text }` message, the `TokenKind` enum, `tokens = 4` on EncodeSavedEntity and EncodeEntity, `OperationFinished.diff_tokens`, and `ConvertTheme`. Line 9 says the engine no longer colours text."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "CHANGELOG.md:11 begins the `**Breaking:**` list. Line 13 names the reserved `highlight` field (field 2) on EncodeSavedEntityRequest and EncodeEntityRequest, and says a request that still sets it gets plain text instead of terminal colour (the plain-text answer to old colour requests). Line 14 names the removed generated Go `corepb` `Highlight` fields and their `GetHighlight` methods on both requests."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    }
+  ]
+}

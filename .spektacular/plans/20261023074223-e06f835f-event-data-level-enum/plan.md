@@ -144,7 +144,7 @@ Three kinds of test cover the change. Each follows the xcl-python suite's existi
 
 **Validation point**: xcl-python's unit tests pass. They cover the enum's members, each member's wire value for both flavours, the default, and each refused value for both flavours with no configuration created. The mypy test flags the string snippet and passes the member snippet. The sync and asyncio integration suites pass against the pinned engine, with the processed, raw, none and left-out event tests.
 
-#### - [ ] Task: Add the EventDataLevel enum and accept only its members
+#### - [x] Task: Add the EventDataLevel enum and accept only its members
 **Id:** a437ae0f-6f47-452c-be33-5b43f0e4985a
 **Repo:** xcl-python
 **Depends on:** none
@@ -155,13 +155,13 @@ Adds the public `xcl.EventDataLevel` enum, with `NONE`, `RAW` and `PROCESSED` wh
 *Technical detail:* [context.md#task-add-the-eventdatalevel-enum-and-accept-only-its-members](./context.md#task-add-the-eventdatalevel-enum-and-accept-only-its-members)
 
 **Acceptance criteria**:
-- [ ] `from xcl import EventDataLevel` works, and the enum has exactly three members, `NONE`, `RAW` and `PROCESSED`, with values `"none"`, `"raw"` and `"processed"`.
-- [ ] Each member, given to either configuration, sends the engine the same protocol level the matching string sent before, and leaving the option out sends none.
-- [ ] Giving either configuration the string `"processed"`, the string `"verbose"`, an integer or an explicit `None` raises a `TypeError` whose message names `xcl.EventDataLevel`, and no configuration is created in the engine.
-- [ ] The `xcl.Config` docstring describes the option in terms of the enum, and the enum's docstring describes each level as Go's documentation does.
-- [ ] No test or library code in the package still passes a bare string as the event data level, and the existing processed-level integration tests pass using the member.
+- [x] `from xcl import EventDataLevel` works, and the enum has exactly three members, `NONE`, `RAW` and `PROCESSED`, with values `"none"`, `"raw"` and `"processed"`.
+- [x] Each member, given to either configuration, sends the engine the same protocol level the matching string sent before, and leaving the option out sends none.
+- [x] Giving either configuration the string `"processed"`, the string `"verbose"`, an integer or an explicit `None` raises a `TypeError` whose message names `xcl.EventDataLevel`, and no configuration is created in the engine.
+- [x] The `xcl.Config` docstring describes the option in terms of the enum, and the enum's docstring describes each level as Go's documentation does.
+- [x] No test or library code in the package still passes a bare string as the event data level, and the existing processed-level integration tests pass using the member.
 
-#### - [ ] Task: Prove each level against the engine
+#### - [x] Task: Prove each level against the engine
 **Id:** bec34d15-ac04-481c-a27b-35029e2897a8
 **Repo:** xcl-python
 **Depends on:**
@@ -173,12 +173,12 @@ Adds integration tests that apply a one-resource configuration against the real 
 *Technical detail:* [context.md#task-prove-each-level-against-the-engine](./context.md#task-prove-each-level-against-the-engine)
 
 **Acceptance criteria**:
-- [ ] With `EventDataLevel.RAW`, the create events for the applied resource carry that resource's data.
-- [ ] With the option left out, no delivered event carries any resource data.
-- [ ] With `EventDataLevel.NONE`, no delivered event carries any resource data.
-- [ ] With `EventDataLevel.PROCESSED`, the create success event's entity is the created resource, for both `xcl.Config` and `xcl.aio.Config`.
+- [x] With `EventDataLevel.RAW`, the create events for the applied resource carry that resource's data.
+- [x] With the option left out, no delivered event carries any resource data.
+- [x] With `EventDataLevel.NONE`, no delivered event carries any resource data.
+- [x] With `EventDataLevel.PROCESSED`, the create success event's entity is the created resource, for both `xcl.Config` and `xcl.aio.Config`.
 
-#### - [ ] Task: Declare the package typed and check the option with mypy
+#### - [x] Task: Declare the package typed and check the option with mypy
 **Id:** 0ecb27ac-960f-401c-9d68-60f3f6284ca1
 **Repo:** xcl-python
 **Depends on:**
@@ -190,10 +190,10 @@ Ships the PEP 561 marker that tells type checkers to read the package's own anno
 *Technical detail:* [context.md#task-declare-the-package-typed-and-check-the-option-with-mypy](./context.md#task-declare-the-package-typed-and-check-the-option-with-mypy)
 
 **Acceptance criteria**:
-- [ ] The built wheel and sdist contain the typed-package marker.
-- [ ] mypy run over a program passing `"processed"` as `event_data` to `xcl.Config` and to `xcl.aio.Config` reports an error on each of those lines that names `EventDataLevel`.
-- [ ] mypy run over the same program passing `xcl.EventDataLevel.PROCESSED` reports no errors.
-- [ ] The test dependencies include mypy, with a comment explaining it is used only to check the package's typing as users see it.
+- [x] The built wheel and sdist contain the typed-package marker.
+- [x] mypy run over a program passing `"processed"` as `event_data` to `xcl.Config` and to `xcl.aio.Config` reports an error on each of those lines that names `EventDataLevel`.
+- [x] mypy run over the same program passing `xcl.EventDataLevel.PROCESSED` reports no errors.
+- [x] The test dependencies include mypy, with a comment explaining it is used only to check the package's typing as users see it.
 
 ### Milestone 2: Documentation, parity list and release notes show the enum
 
@@ -201,7 +201,7 @@ Ships the PEP 561 marker that tells type checkers to read the package's own anno
 
 **Validation point**: A search of the README, the parity list and the website sources for the event data option finds no bare string level. The website builds. The published GitHub release of the shipping xcl-python version carries the breaking-change line with the migration example.
 
-#### - [ ] Task: Show the enum in the package README and parity list
+#### - [x] Task: Show the enum in the package README and parity list
 **Id:** 1f94d121-4e53-4194-9bab-a2b29f16a79c
 **Repo:** xcl-python
 **Depends on:**
@@ -213,11 +213,11 @@ Updates the README's events example to pass `xcl.EventDataLevel.PROCESSED`. Adds
 *Technical detail:* [context.md#task-show-the-enum-in-the-package-readme-and-parity-list](./context.md#task-show-the-enum-in-the-package-readme-and-parity-list)
 
 **Acceptance criteria**:
-- [ ] The README shows no bare string event data level, and its events example uses an `xcl.EventDataLevel` member.
-- [ ] The README has a migration note stating that string levels are refused and that the member of the same name is passed instead, with no bare-string example.
-- [ ] The parity list's event data row names Go's `xcl.EventDataLevel` and `WithEventData`, and the Python `xcl.EventDataLevel` with its three members.
+- [x] The README shows no bare string event data level, and its events example uses an `xcl.EventDataLevel` member.
+- [x] The README has a migration note stating that string levels are refused and that the member of the same name is passed instead, with no bare-string example.
+- [x] The parity list's event data row names Go's `xcl.EventDataLevel` and `WithEventData`, and the Python `xcl.EventDataLevel` with its three members.
 
-#### - [ ] Task: Show the enum on the xcl website pages
+#### - [x] Task: Show the enum on the xcl website pages
 **Id:** a5c9e273-cc56-4cd5-a241-ee35aadadda8
 **Repo:** xcl-website
 **Depends on:**
@@ -229,27 +229,12 @@ Changes every Python snippet and every description of the event data option on x
 *Technical detail:* [context.md#task-show-the-enum-on-the-xcl-website-pages](./context.md#task-show-the-enum-on-the-xcl-website-pages)
 
 **Acceptance criteria**:
-- [ ] No page on the site shows or describes a bare string event data level.
-- [ ] The events page names the three members of `xcl.EventDataLevel` where it lists the Python options.
-- [ ] The site builds with the changed pages.
+- [x] No page on the site shows or describes a bare string event data level.
+- [x] The events page names the three members of `xcl.EventDataLevel` where it lists the Python options.
+- [x] The site builds with the changed pages.
 
-#### - [ ] Task: Release xcl-python with the breaking change in its notes
-**Id:** 324e4716-bbe5-4874-86b2-563067aa3c4f
-**Repo:** xcl-python
-**Depends on:**
-- a437ae0f-6f47-452c-be33-5b43f0e4985a — Add the EventDataLevel enum and accept only its members
-- bec34d15-ac04-481c-a27b-35029e2897a8 — Prove each level against the engine
-- 0ecb27ac-960f-401c-9d68-60f3f6284ca1 — Declare the package typed and check the option with mypy
-- 1f94d121-4e53-4194-9bab-a2b29f16a79c — Show the enum in the package README and parity list
-**Execution:** human — releasing the package and editing its published GitHub release are actions outside the repo
-
-Merges the xcl-python pull request with the `minor` release label, the pre-1.0 bump for a breaking change, so the tag workflow publishes the next minor version. Once the release exists, adds a line to its generated notes. The line says plain string event data levels are no longer accepted and shows the one-line change from `event_data="processed"` to `event_data=xcl.EventDataLevel.PROCESSED`.
-
-*Technical detail:* [context.md#task-release-xcl-python-with-the-breaking-change-in-its-notes](./context.md#task-release-xcl-python-with-the-breaking-change-in-its-notes)
-
-**Acceptance criteria**:
-- [ ] The xcl-python pull request merged with the `minor` label, and the next minor version is published.
-- [ ] That version's GitHub release notes contain a line stating that string event data levels are refused, with the string-to-enum migration example.
+**Descoped requirements**:
+- Release notes explain the break (task 324e4716-bbe5-4874-86b2-563067aa3c4f, "Release xcl-python with the breaking change in its notes") — descoped: done by a person after the merge, outside this run. The person merges the xcl-python pull request with the `minor` release label so the next minor version is published, then adds to that version's generated GitHub release notes a line saying string event data levels are refused, with the migration example `event_data="processed"` → `event_data=xcl.EventDataLevel.PROCESSED`. The release-notes check stays in the Testing Approach's manual checks, so the test plan carries it. Technical detail: [context.md#task-release-xcl-python-with-the-breaking-change-in-its-notes](./context.md#task-release-xcl-python-with-the-breaking-change-in-its-notes).
 
 ## Open Questions
 
@@ -266,3 +251,86 @@ There are no open questions left for implementation time. The one uncertainty fo
 - **An entry in xcl's CHANGELOG.** Nothing in xcl changes, and xcl-python keeps no changelog file. The README migration note and the release notes carry the break.
 - **Fixing type errors the new typed-package marker may surface elsewhere in users' programs or in the package's own annotations.** Only the `event_data` option's typing is checked. Any other annotation problem a user's type checker reports would be a separate fix.
 - **Moving the configuration's other argument checks** (such as `state_path` with `state_store`) ahead of client setup, or changing their exception types.
+
+## Changelog
+
+### 2026-10-26 — Task: Add the EventDataLevel enum and accept only its members
+
+**What was done**: Added `xcl.EventDataLevel` (an `enum.StrEnum` with `NONE`, `RAW`, `PROCESSED`) in `xcl/events.py`, exported from the package top level, with a docstring that follows Go's constants. Replaced the public `EVENT_DATA_LEVELS` map with a private `_EVENT_DATA_WIRE` map and `_event_data_level` check in `xcl/config.py`, which both `xcl.Config` and `xcl.aio.Config` call as their first statement; it refuses any non-member with a `TypeError` naming `xcl.EventDataLevel`. Existing integration tests switched to the member, and unit tests cover the members, each member's wire value and the default for both flavours, and the four refused values for both flavours.
+
+**Deviations**: `_request` and the check are typed with the protocol's `core_pb2.EventDataLevel` rather than `int` (the context said `int`), so the call into `CreateConfigRequest` type-checks against the generated stub without an ignore. The asyncio refusal tests assert `transport.calls == []` (no call at all, not even `GetVersion`), which is stronger than "no CreateConfig". The refused-value tests carry `# type: ignore[arg-type]` on the deliberately wrong call.
+
+**Files changed**:
+- `xcl-python: xcl/events.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: xcl/config.py`
+- `xcl-python: xcl/aio.py`
+- `xcl-python: tests/unit/test_config.py`
+- `xcl-python: tests/unit/test_events.py`
+- `xcl-python: tests/integration/test_sync.py`
+- `xcl-python: tests/integration/test_aio.py`
+- `xcl-python: tests/integration/test_test_plugin.py`
+
+**Discoveries**: The spec worktree holds no venv or engine. A worktree-local `.venv` (editable install of the worktree) plus `make engine plugins XCL_SRC=<git archive of the xcl-ref.txt tag>` gives a green full suite (526 passed, 1 inprocess-only skip) without touching the xcl worktree or the main checkouts. The default `EventDataLevel.NONE` serialises as an empty request, so `test_config_creates_and_keeps_handle`'s empty-request assertion still holds.
+
+### 2026-10-26 — Task: Prove each level against the engine
+
+**What was done**: Added three engine-backed tests in `tests/integration/test_sync.py` next to `test_event_entity_hydrates`: raw level (every `sync_app.web` create event carries data whose parsed JSON has `meta.id == "sync_app.web"` and `image == "nginx"`), option left out, and `EventDataLevel.NONE` (events delivered, none carrying data). The processed level for both flavours stays carried by the existing entity tests switched to the member in the previous task.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-python: tests/integration/test_sync.py`
+
+**Discoveries**: For a config-only type the engine emits only `parse/success` and `create/success` for the resource, and with raw or processed only the `create/success` event carries data, so "the create events" is a single event in these tests. `test_event_entity_hydrates` picks the first create event without a phase filter; it works because that event is the success one, and the success-phase guarantee is also asserted by `test_event_entity_is_emitting_configs_class` and the aio entity test.
+
+### 2026-10-26 — Task: Declare the package typed and check the option with mypy
+
+**What was done**: Shipped an empty `xcl/py.typed` (PEP 561) and added `mypy>=1.11` to the `test` extra with a comment saying it is used only by the typing test. Added `tests/unit/test_typing.py`, which writes a user-style program to a temp directory and runs `python -m mypy` over it in a subprocess against the installed package: the string snippet is flagged with an error naming `EventDataLevel` on both the `xcl.Config` and `xcl.aio.Config` lines, and the member snippet is clean.
+
+**Deviations**: None. The wheel and sdist were built with `uv build` into the session scratchpad and both list `xcl/py.typed`; no build change was needed.
+
+**Files changed**:
+- `xcl-python: xcl/py.typed`
+- `xcl-python: pyproject.toml`
+- `xcl-python: tests/unit/test_typing.py`
+
+**Discoveries**: mypy (2.4 installed here) resolves the path-based editable install from a temp directory with no `MYPYPATH`, as planning found, and the package's own annotations type-check cleanly enough that the member snippet reports nothing, so shipping `py.typed` surfaced no other annotation error at those call sites. Each mypy run takes under a second with the compiled build.
+
+### 2026-10-26 — Task: Show the enum in the package README and parity list
+
+**What was done**: The README's "Variables, state and events" example now passes `event_data=xcl.EventDataLevel.PROCESSED`, and the prose after it names `xcl.EventDataLevel` with `NONE` (the default), `RAW` and `PROCESSED`. A new section, "Migrating from string event data levels", placed before "Migrating from xcl.Resource and @xcl.entity", says a string (even a correctly spelled one) or any non-member is refused with `TypeError` and that code passes the upper-cased member of the same name; it has no bare-string example. The `PARITY.md` event data row pairs `WithEventData(level)` and Go's `xcl.EventDataLevel` constants with `event_data=xcl.EventDataLevel.NONE`, `.RAW` or `.PROCESSED`.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-python: README.md`
+- `xcl-python: PARITY.md`
+
+**Discoveries**: None.
+
+### 2026-10-26 — Task: Show the enum on the xcl website pages
+
+**What was done**: Changed every Python snippet and description of the event data option on xcl.dev to the enum: the events page's Python tab (`event_data=xcl.EventDataLevel.PROCESSED`) and its prose list of Python options (now `event_data=` with an `xcl.EventDataLevel`, `NONE`, `RAW` or `PROCESSED`), the configuration-text page's prose, and the Python code of the configuration-only and plugins examples. The site builds (`npm ci` then `npm run build`: 23 pages, exit 0).
+
+**Deviations**: None. The reviewer pointed at `xcl.EventDataProcessed` in `events.mdx:406` and `examples/configuration-only.mdx:663`; both sit in Go-tab prose, where that is Go's constant, so they were left as they are.
+
+**Files changed**:
+- `xcl-website: src/pages/events.mdx`
+- `xcl-website: src/pages/configuration-text.mdx`
+- `xcl-website: src/pages/examples/configuration-only.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+
+**Discoveries**: The website worktree has no `node_modules`; `npm ci` inside the worktree is enough to build it, and `dist/` and `node_modules/` are gitignored.
+
+### 2026-10-26 — Plan change: release task moved to descoped requirements
+
+**What was done**: Took the human task "Release xcl-python with the breaking change in its notes" (324e4716) out of the `## Milestones & Tasks` checklist and recorded it under `**Descoped requirements**:` as work a person does after the merge: a `minor`-labelled xcl-python PR, then the breaking-change line with `event_data="processed"` → `event_data=xcl.EventDataLevel.PROCESSED` added to the generated GitHub release notes. The release-notes check stays among the manual checks for the test plan.
+
+**Deviations**: The plan as approved had the release as its last task. The implement workflow has no way to finish a human task inside a run, and the release needs this run's branch merged first, so the user chose (option A, relayed by the epic orchestrator) to descope it from the run rather than leave the run paused.
+
+**Files changed**:
+- None (plan change only).
+
+**Discoveries**: A human task that depends on the run's own merge cannot be completed inside an implement run; such work fits better as a post-merge follow-up than as a plan task.
+

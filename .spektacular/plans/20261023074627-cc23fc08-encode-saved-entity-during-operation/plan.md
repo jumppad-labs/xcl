@@ -115,6 +115,8 @@ Rendering during the operation is made provable rather than lucky. The host answ
 - *"A Python program can print each created resource's configuration beneath its success event during an apply, with no buffering until the apply ends."* — **Behavioural test.** This is the synchronous Python integration test. Its handler renders the create success record while the engine is provably still running, and receives the text in the handler, not after the apply. The asyncio twin covers the other client.
 
 **Manual checks — each captured in the implementation test plan.**
+- **Manual — captured in the implementation test plan.** *xcl is released (descoped task, done by a person after the merge):* merge the xcl pull request with a release-size label, before `20261023075136-42c51a7d-printing-tokens-over-the-engine` merges to xcl main; confirm the new `v*` tag contains the core-service change and that xcl-python's engine pin bump for it has merged.
+- **Manual — captured in the implementation test plan.** *Python suites against the released engine (descoped task, done by a person after the release):* with `xcl-ref.txt` naming the released tag, build the engine and plugins from it and run the new sync and asyncio rendering tests.
 - **Manual — captured in the implementation test plan.** *Installed package has it:* after the xcl release and the automated engine bump, install the released package from PyPI into a fresh environment with no local engine build. Run the synchronous render-from-handler program, and confirm that `xcl.engine_version()` reports the released xcl version containing the change.
 - **Manual — captured in the implementation test plan.** Review the xcl changelog entry for this spec.
 - **Manual — captured in the implementation test plan.** Review the revised `libxcl.md` design: its Threading rule, error table and encode paragraph no longer say every render is refused, and they say the saved-record render is allowed during an operation and the entity-record render is not.
@@ -133,7 +135,7 @@ Rendering during the operation is made provable rather than lucky. The host answ
 
 **Validation point**: xcl's core-service and root-package test suites pass with the race detector on. That includes the five per-operation render tests, the during/after text equality test, the unchanged-apply comparison, both refusal tests, the three error tests and the external-plugin concurrency test. The design and changelog read correctly.
 
-#### - [ ] Task: Allow the saved-record render while an operation runs
+#### - [x] Task: Allow the saved-record render while an operation runs
 **Id:** 64338e68-32e3-4675-95cf-c4c7b34bb30f
 **Repo:** xcl
 **Depends on:** none
@@ -144,12 +146,12 @@ The engine's saved-record render stops checking whether an operation is running,
 *Technical detail:* [context.md#task-allow-the-saved-record-render-while-an-operation-runs](./context.md#task-allow-the-saved-record-render-while-an-operation-runs)
 
 **Acceptance criteria**:
-- [ ] A saved record renders to configuration text while each of apply, validate, diff, destroy and load is running, and each operation still finishes without error.
-- [ ] Rendering an entity record (a looked-up or edited entity) while an operation runs is still refused with the operation-in-progress error, as are the other lookups.
-- [ ] During an operation, a record that is not valid JSON fails with the invalid saved data error, a record of an unknown type fails with the same unregistered-type error it gives after the operation, and an empty request fails as an invalid argument. None of them fails with the operation-in-progress error.
-- [ ] The protocol definition documents that the saved-record call is allowed during an operation, and the generated Go code carries that comment.
+- [x] A saved record renders to configuration text while each of apply, validate, diff, destroy and load is running, and each operation still finishes without error.
+- [x] Rendering an entity record (a looked-up or edited entity) while an operation runs is still refused with the operation-in-progress error, as are the other lookups.
+- [x] During an operation, a record that is not valid JSON fails with the invalid saved data error, a record of an unknown type fails with the same unregistered-type error it gives after the operation, and an empty request fails as an invalid argument. None of them fails with the operation-in-progress error.
+- [x] The protocol definition documents that the saved-record call is allowed during an operation, and regenerating the Go code (`make core-protos`) leaves it in step with the protocol. (Plan change: buf generates only the protocol's messages, so an rpc comment never reaches the generated Go code; regeneration produces no diff, and `make buf-lint` and `make buf-breaking` pass.)
 
-#### - [ ] Task: Prove rendering from an event handler leaves the apply unchanged
+#### - [x] Task: Prove rendering from an event handler leaves the apply unchanged
 **Id:** 61e00152-2c93-4d99-918c-d9ceec78662c
 **Repo:** xcl
 **Depends on:**
@@ -161,12 +163,12 @@ Adds core-service tests that render from a host's handling of the create success
 *Technical detail:* [context.md#task-prove-rendering-from-an-event-handler-leaves-the-apply-unchanged](./context.md#task-prove-rendering-from-an-event-handler-leaves-the-apply-unchanged)
 
 **Acceptance criteria**:
-- [ ] A record rendered from the create success event during an apply, with computed values included, is identical to the same render after the apply. The same holds with default options.
-- [ ] An apply whose event handling renders every create success record ends with the same result, the same sequence of event operations and phases, and the same saved state as an apply that renders nothing.
-- [ ] From the same event handling, rendering the event's entity as a looked-up record fails with the operation-in-progress error, and the apply still completes.
-- [ ] From the same event handling, rendering an edited entity record fails with the operation-in-progress error.
+- [x] A record rendered from the create success event during an apply, with computed values included, is identical to the same render after the apply. The same holds with default options.
+- [x] An apply whose event handling renders every create success record ends with the same result, the same sequence of event operations and phases, and the same saved state as an apply that renders nothing.
+- [x] From the same event handling, rendering the event's entity as a looked-up record fails with the operation-in-progress error, and the apply still completes.
+- [x] From the same event handling, rendering an edited entity record fails with the operation-in-progress error.
 
-#### - [ ] Task: Verify plugins keep running when a handler renders during an apply
+#### - [x] Task: Verify plugins keep running when a handler renders during an apply
 **Id:** 705b4073-6a29-4ba3-a6a2-122d91d664ed
 **Repo:** xcl
 **Depends on:** none
@@ -177,10 +179,10 @@ The spec flags a risk: the saved-record render briefly uses the plugin catalog, 
 *Technical detail:* [context.md#task-verify-plugins-keep-running-when-a-handler-renders-during-an-apply](./context.md#task-verify-plugins-keep-running-when-a-handler-renders-during-an-apply)
 
 **Acceptance criteria**:
-- [ ] A saved record rendered from an event handler during an apply that uses an external plugin returns text, and the external plugin process is still running when the render returns.
-- [ ] That apply completes successfully, and the external plugin process is stopped after it, exactly as without the render.
+- [x] A saved record rendered from an event handler during an apply that uses an external plugin returns text, and the external plugin process is still running when the render returns.
+- [x] That apply completes successfully, and the external plugin process is stopped after it, exactly as without the render.
 
-#### - [ ] Task: Describe the change in the xcl changelog and the other-language design
+#### - [x] Task: Describe the change in the xcl changelog and the other-language design
 **Id:** c045b2c9-b98e-49a5-a062-9240033f243d
 **Repo:** xcl
 **Depends on:**
@@ -192,8 +194,8 @@ Adds this spec's section to xcl's changelog: saved records can now be rendered t
 *Technical detail:* [context.md#task-describe-the-change-in-the-xcl-changelog-and-the-other-language-design](./context.md#task-describe-the-change-in-the-xcl-changelog-and-the-other-language-design)
 
 **Acceptance criteria**:
-- [ ] The changelog has a section for this spec describing the newly allowed render, what stays refused and why, and a Breaking list saying none.
-- [ ] The other-language design says the saved-record render is allowed while an operation runs, including from an event handler, and that the entity-record render and the other lookups are refused. No sentence in it still says every render is refused during an operation.
+- [x] The changelog has a section for this spec describing the newly allowed render, what stays refused and why, and a Breaking list saying none.
+- [x] The other-language design says the saved-record render is allowed while an operation runs, including from an event handler, and that the entity-record render and the other lookups are refused. No sentence in it still says every render is refused during an operation.
 
 ### Milestone 2: Python programs show each resource as it is created
 
@@ -201,7 +203,7 @@ Adds this spec's section to xcl's changelog: saved records can now be rendered t
 
 **Validation point**: xcl-python's sync and asyncio integration suites pass, first against an engine built from the Milestone 1 xcl branch and then against the released xcl tag the package pins. These cover rendering from the create success handler, during/after equality, the unchanged apply, both refusals and both error cases. The installed-package check in the implementation test plan passes after the package release.
 
-#### - [ ] Task: Test rendering from Python event handlers during an apply
+#### - [x] Task: Test rendering from Python event handlers during an apply
 **Id:** aa6a42dc-b5bc-4f41-83d5-693dd89e37d3
 **Repo:** xcl-python
 **Depends on:**
@@ -213,13 +215,13 @@ Adds integration tests to the synchronous and asyncio suites that apply a config
 *Technical detail:* [context.md#task-test-rendering-from-python-event-handlers-during-an-apply](./context.md#task-test-rendering-from-python-event-handlers-during-an-apply)
 
 **Acceptance criteria**:
-- [ ] Using the synchronous client, an event handler renders the create success record with computed values included. The render returns text, the apply succeeds, and the text equals the same render after the apply.
-- [ ] Using the asyncio client, an awaiting event handler gets the same result, and the apply completes.
-- [ ] An apply whose handler renders every create success record produces the same events and saved state as one whose handler renders nothing.
-- [ ] From the handler, encoding the event's entity, or an entity the handler edited, raises the operation-in-progress error, and the apply still completes.
-- [ ] From the handler, a record that is not valid JSON raises the invalid saved data error, and a record of an unknown type raises the same error class the render gives after the apply.
+- [x] Using the synchronous client, an event handler renders the create success record with computed values included. The render returns text, the apply succeeds, and the text equals the same render after the apply.
+- [x] Using the asyncio client, an awaiting event handler gets the same result, and the apply completes.
+- [x] An apply whose handler renders every create success record produces the same events and saved state as one whose handler renders nothing.
+- [x] From the handler, encoding the event's entity, or an entity the handler edited, raises the operation-in-progress error, and the apply still completes.
+- [x] From the handler, a record that is not valid JSON raises the invalid saved data error, and a record of an unknown type raises the same error class the render gives after the apply.
 
-#### - [ ] Task: Document when Python programs can render configuration text
+#### - [x] Task: Document when Python programs can render configuration text
 **Id:** 27c95072-5647-41dc-8ca8-d9808f0dba5a
 **Repo:** xcl-python
 **Depends on:**
@@ -231,48 +233,9 @@ Updates the package's docstrings for both encoders on both clients, and the READ
 *Technical detail:* [context.md#task-document-when-python-programs-can-render-configuration-text](./context.md#task-document-when-python-programs-can-render-configuration-text)
 
 **Acceptance criteria**:
-- [ ] The saved-record encoder's documentation, on both clients, says it works at any time, including from an event handler during an operation.
-- [ ] The entity encoder's documentation still says it is refused while an operation runs, and points readers at the saved-record encoder for rendering from an event handler.
-- [ ] The README's encoding section states both rules, with an example that renders each created resource from the event handler.
-
-#### - [ ] Task: Release xcl with the saved-record render allowed during operations
-**Id:** 486a7a20-71de-43d4-bf09-dc56033240fd
-**Repo:** xcl
-**Depends on:**
-- 64338e68-32e3-4675-95cf-c4c7b34bb30f — Allow the saved-record render while an operation runs
-- 61e00152-2c93-4d99-918c-d9ceec78662c — Prove rendering from an event handler leaves the apply unchanged
-- 705b4073-6a29-4ba3-a6a2-122d91d664ed — Verify plugins keep running when a handler renders during an apply
-- c045b2c9-b98e-49a5-a062-9240033f243d — Describe the change in the xcl changelog and the other-language design
-- aa6a42dc-b5bc-4f41-83d5-693dd89e37d3 — Test rendering from Python event handlers during an apply
-**Execution:** human — merging the xcl pull request with its release label publishes a release, an action outside the repo
-
-Once the Python tests have proven the xcl branch, a maintainer merges the xcl pull request with a release-size label. Auto-tag then cuts the release, and the release workflow dispatches the engine pin bump to xcl-python, which merges and publishes a package bundling the new engine.
-
-This xcl release must be cut before `20261023075136-42c51a7d-printing-tokens-over-the-engine` merges to xcl main (decided during epic planning). That change reserves the protocol's `highlight` field, and xcl-python's CI regenerates its stubs from the pinned xcl, so an automatic engine bump to a release containing it fails until the Python printing work lands with it. If the ordering is missed, do not force the automatic bump: this plan's Python tests and docs ship with the release of `20261023075302-bad71237-printing-and-highlighting-python` instead.
-
-*Technical detail:* [context.md#task-release-xcl-with-the-saved-record-render-allowed-during-operations](./context.md#task-release-xcl-with-the-saved-record-render-allowed-during-operations)
-
-**Acceptance criteria**:
-- [ ] An xcl release tag exists that contains the saved-record render change.
-- [ ] That release tag was cut before the printing-tokens-over-the-engine change merged to xcl main, or the Python work is recorded as shipping with the Python printing release.
-- [ ] xcl-python's engine pin bump for that tag has merged.
-
-#### - [ ] Task: Run the Python suites against the released engine
-**Id:** 58b80ef0-b046-4937-ad8e-8e0be6d5742a
-**Repo:** xcl-python
-**Depends on:**
-- 486a7a20-71de-43d4-bf09-dc56033240fd — Release xcl with the saved-record render allowed during operations
-- aa6a42dc-b5bc-4f41-83d5-693dd89e37d3 — Test rendering from Python event handlers during an apply
-- 27c95072-5647-41dc-8ca8-d9808f0dba5a — Document when Python programs can render configuration text
-**Execution:** agent
-
-Brings the xcl-python branch onto the main line, where the engine pin now names the released xcl tag. It drops any development pin that pointed at the xcl branch, and runs the new tests against an engine built from the released tag, so the package's main line only ever builds against a released engine.
-
-*Technical detail:* [context.md#task-run-the-python-suites-against-the-released-engine](./context.md#task-run-the-python-suites-against-the-released-engine)
-
-**Acceptance criteria**:
-- [ ] The xcl-python branch's engine pin names the released xcl tag that contains the change, not a development branch.
-- [ ] The synchronous and asyncio rendering tests pass against an engine built from that tag.
+- [x] The saved-record encoder's documentation, on both clients, says it works at any time, including from an event handler during an operation.
+- [x] The entity encoder's documentation still says it is refused while an operation runs, and points readers at the saved-record encoder for rendering from an event handler.
+- [x] The README's encoding section states both rules, with an example that renders each created resource from the event handler.
 
 ### Milestone 3: xcl.dev says when rendering is allowed
 
@@ -280,7 +243,7 @@ Brings the xcl-python branch onto the main line, where the engine pin now names 
 
 **Validation point**: The site builds, and a review of both pages finds the two statements.
 
-#### - [ ] Task: Say on the xcl website when configuration text can be rendered
+#### - [x] Task: Say on the xcl website when configuration text can be rendered
 **Id:** ec6c7a60-9480-4041-bdcb-0ec3ea68870a
 **Repo:** xcl-website
 **Depends on:**
@@ -292,9 +255,13 @@ Updates the configuration-text page's saved-data section to say that a saved rec
 *Technical detail:* [context.md#task-say-on-the-xcl-website-when-configuration-text-can-be-rendered](./context.md#task-say-on-the-xcl-website-when-configuration-text-can-be-rendered)
 
 **Acceptance criteria**:
-- [ ] The configuration-text page states that saved records render during an operation and from an event handler, and that looked-up entities do not.
-- [ ] The events page no longer implies that a looked-up event entity can be encoded from inside the handler during an operation.
-- [ ] The site builds without errors.
+- [x] The configuration-text page states that saved records render during an operation and from an event handler, and that looked-up entities do not.
+- [x] The events page no longer implies that a looked-up event entity can be encoded from inside the handler during an operation.
+- [x] The site builds without errors.
+
+**Descoped requirements**:
+- Release xcl with the saved-record render allowed during operations (task 486a7a20-71de-43d4-bf09-dc56033240fd) — descoped: done by a person after the merge. Publishing a release is outside the repo and can only happen once the spec's branch is merged to xcl main. What the person must do: merge the xcl pull request with a release-size label (`minor` recommended) so auto-tag cuts the next `v*` tag and the release workflow dispatches xcl-python's engine pin bump; confirm the tag exists and contains the core-service change, and that xcl-python's engine bump pull request for it has merged. Release-order constraint (decided during epic planning): this xcl release must be cut before `20261023075136-42c51a7d-printing-tokens-over-the-engine` merges to xcl main, because that change reserves the protocol's `highlight` field and xcl-python's CI regenerates its stubs from the pinned xcl. If the ordering is missed, do not force the automatic bump: this plan's Python tests and docs ship with the release of `20261023075302-bad71237-printing-and-highlighting-python` instead.
+- Run the Python suites against the released engine (task 58b80ef0-b046-4937-ad8e-8e0be6d5742a) — descoped: done by a person after the merge and the xcl release above, since it depends on the released tag. What the person must do: bring the xcl-python branch onto the main line whose `xcl-ref.txt` names the released xcl tag (not a development branch), build the engine and plugins from that tag (`make engine plugins`), and run the new synchronous and asyncio rendering tests (`pytest tests/integration -k "handler_during_apply or unchanged_by_rendering"`). Until the pin names that release, the new xcl-python tests fail against the `v0.11.1` engine, so xcl-python's CI is expected to fail on them until the engine bump lands.
 
 ## Open Questions
 
@@ -311,3 +278,102 @@ Updates the configuration-text page's saved-data section to say that a saved rec
 - **Labelled or token output from the encode calls, and changes to how `highlight` behaves.** These are tracked as `20261023075136-42c51a7d-printing-tokens-over-the-engine` in the same epic.
 - **Making the render avoid briefly starting and stopping external plugins** when it runs while no operation holds the catalog, at the very start or end of an operation. That is today's behaviour outside an operation too, and it is left as is.
 - **Bumping the version badge on xcl.dev's home page.** It follows the release that ships this, as other site releases do.
+
+## Changelog
+
+### Plan change — 2026-10-26: release tasks descoped to follow-up work
+
+**Change**: Took the human task "Release xcl with the saved-record render allowed during operations" (486a7a20) and its dependent agent task "Run the Python suites against the released engine" (58b80ef0) out of the `## Milestones & Tasks` checklist, and listed both under **Descoped requirements** as done by a person after the merge. Added both to the manual checks in `## Testing Approach` so the implementation test plan carries them.
+**Why**: The user decided for this epic that human release tasks are follow-up work: the workflow has no step to finish a human task, and the release can only happen after the spec's branch is merged. The released-engine rerun depends on that release, so it cannot run in this implementation either.
+**Effect**: The spec's "Installed package has it" acceptance criterion and the released-engine pin are met by the person's follow-up, not by this run. The epic's release-order constraint (cut this xcl release before printing-tokens-over-the-engine merges to xcl main) is kept in the descoped entry.
+
+### Plan change — 2026-10-26: protocol comment does not reach generated Go code
+
+**Change**: Reworded the fourth acceptance criterion of "Allow the saved-record render while an operation runs". It said the generated Go code carries the new `rpc EncodeSavedEntity` comment; it now says the protocol documents the call and regenerating leaves the Go code in step with it.
+**Why**: `buf.gen.yaml` generates only the protocol's messages (the service is dispatched by name in `coreservice`), so no rpc comment, including the existing one on `EncodeEntity`, appears in `coreservice/proto/core.pb.go`. `make core-protos` ran and produced no diff; `make buf-lint` and `make buf-breaking` pass.
+**Effect**: None on behaviour. The comment lives in `proto/xcl/core/v1/core.proto`, where protocol readers and the Python stubs' source look.
+
+### 2026-10-26 — Task: Allow the saved-record render while an operation runs
+
+**What was done**: The core service's `EncodeSavedEntity` handler no longer consults the configuration's lookup guard; it only checks a record was sent (`requireEntity`, which replaced `encodeAllowed`). `EncodeEntity` still calls `lookupAllowed` before the same check. The protocol gained a comment on `rpc EncodeSavedEntity`. The old refusal test was replaced by five per-operation render tests held at the first host state task, and three error tests during an operation.
+
+**Deviations**: The fourth acceptance criterion was reworded (plan change entry above): `make core-protos` regenerates only messages, so the rpc comment cannot reach `coreservice/proto/core.pb.go`; regeneration produced no diff.
+
+**Files changed**:
+- `xcl: coreservice/lookups.go`
+- `xcl: coreservice/operations.go`
+- `xcl: coreservice/operations_test.go`
+- `xcl: proto/xcl/core/v1/core.proto`
+
+**Discoveries**: `appliedHostApp` (lookups_test.go) already gives a host-store config with a real apply's records; the new `holdAtFirstStateTask` and `completeHeld` helpers in operations_test.go hold any operation at its first host state task (also asserting `running()`), and are reusable by the next task.
+
+### 2026-10-26 — Task: Prove rendering from an event handler leaves the apply unchanged
+
+**What was done**: Added four core-service tests that render from `drive`'s `onEvent` on create success during an apply through a host store: during/after text equality (with computed values and with default options), an unchanged-apply comparison against a handler that renders nothing (event operation/phase sequence, finished error, decoded saved records), and refusals of `EncodeEntity` for the event's entity and for an edited copy.
+
+**Deviations**: The unchanged-apply test renders every create success record, including the variable and the output, which are builtins: their render is asserted to fail with `not_encodable` (as it does outside an operation), while the app renders to text. The first goal check judged skipping them as not rendering every record; the retry passed.
+
+**Files changed**:
+- `xcl: coreservice/operations_test.go`
+
+**Discoveries**: Variables and outputs get create/success events too, and `EncodeSavedEntity` refuses them with `not_encodable`, so a handler that renders "every created resource" must skip or tolerate builtins. The Python logger consumer (`python-prettylog`) will need the same care.
+
+### 2026-10-26 — Task: Verify plugins keep running when a handler renders during an apply
+
+**What was done**: Added `TestRenderFromHandlerDuringApplyKeepsTheExternalPluginRunning` to the root package's plugin-lifecycle tests. It applies two widgets through the external subtypeless fixture plugin with a one-event buffer and processed event data, renders `widget.main`'s create success record from the handler with `Config.EncodeSavedEntity`, and asserts the text, that the plugin process is still running when the render returns, that the apply succeeds, and that the plugin is stopped afterwards. The spec's flagged risk did not materialise; no library code changed.
+
+**Deviations**: The test writes its own two-widget configuration (`twoWidgets`, the second depending on the first through `widget.main.size`) instead of the one-widget `subtypeless` fixture. A debug run showed that with one widget no event follows the create success that the apply must still deliver, so the work finished and released the catalog during the render and the plugin was observed stopped (the render then started and stopped it itself), exactly the "start or end of an operation" case the plan accepts.
+
+**Files changed**:
+- `xcl: config_plugin_lifecycle_test.go`
+
+**Discoveries**: A render from the handler holds the external plugin only while the operation still holds the catalog. On the last event of an apply the operation may already have released it, so the render briefly restarts and stops the plugin process. In the one-widget debug run this completed without a deadlock even with a one-event buffer, and the render returned correct text.
+
+### 2026-10-26 — Task: Describe the change in the xcl changelog and the other-language design
+
+**What was done**: Added this spec's section at the top of xcl's `CHANGELOG.md`: `EncodeSavedEntity` is accepted during every operation kind, including from event handling, with the same text as after; `EncodeEntity` and the other lookups stay refused because they read entities an operation replaces; bad records keep their specific errors; Go and the protocol's messages are unchanged; Breaking: none. Revised `design:libxcl.md`: the `operation_in_progress` error row, the Threading rules (split into refused lookups and the allowed saved-record render), a comment in the service block, and the encode paragraph.
+
+**Deviations**: Under the orchestrated run's rule that the implementer never writes a design document, the revision was staged by the implementer and stored by the orchestrator with `spektacular design author ... --spec 20261023074627-cc23fc08-encode-saved-entity-during-operation`, after the user approved it. It was read back and checked with `spektacular design read`.
+
+**Files changed**:
+- `xcl: CHANGELOG.md`
+- `design:libxcl.md` (design source `design`, through the design CLI)
+
+**Discoveries**: None.
+
+### 2026-10-26 — Task: Test rendering from Python event handlers during an apply
+
+**What was done**: Added six synchronous integration tests (`test_sync.py`) and three asyncio twins (`test_aio.py`) that apply one `slow` resource with a Python state store and render from the create success handler: during/after text equality with computed values, an unchanged-apply comparison (events and decoded saved records), `encode_entity` refusals for the event's entity and an edited `xcl.Entity`, and `InvalidSavedDataError` / `UnregisteredTypeError` for bad records (the latter matching the post-apply error class). The asyncio tests use a `GatedStore` whose save of the created record waits until the handler has finished. They pass on the subprocess and inprocess routes, against an engine, library and plugins built from the xcl worktree, and the full suite passes (540 passed, 1 skipped).
+
+**Deviations**: `xcl-ref.txt` was left at `v0.11.1`. The plan's development pin to the xcl feature branch only serves CI, and this run never pushes, so the tests ran locally against the worktree engine (`make protos engine plugins libxcl XCL_SRC=<xcl worktree>`). Until the engine pin names the xcl release containing the change (the descoped follow-up), these new tests fail against the pinned `v0.11.1` engine. The asyncio suite carries the during/after test and both refusals; the unchanged-apply and error twins stay sync-only, as the plan allowed.
+
+**Files changed**:
+- `xcl-python: tests/integration/test_sync.py`
+- `xcl-python: tests/integration/test_aio.py`
+
+**Discoveries**: The asyncio client handles events and state tasks as concurrent asyncio tasks (`xcl/aio.py` `_drive`), unlike the synchronous driver, which calls the handler between polls. So an async test that needs "the engine is still waiting" must gate the store, and only on the save that follows the event (here, a save holding a record with `done` set), or an earlier save would deadlock until the timeout. A zero-valued attribute such as `delay_ms = 0` is left out of rendered text.
+
+### 2026-10-26 — Task: Document when Python programs can render configuration text
+
+**What was done**: The synchronous `encode_saved_entity` docstring now says it can be called at any time, including from an `on_event` handler during an operation, and names the errors it raises. The `encode_entity` docstring says it is refused during an operation, including from a handler, and points at `encode_saved_entity(event.data)`. The asyncio one-line docstrings say the same. The README's encoding section gains a paragraph and an example that prints each created resource beneath its create success event, and states that `encode_entity` raises `xcl.OperationInProgressError` while an operation runs.
+
+**Deviations**: None. PARITY.md needed no change.
+
+**Files changed**:
+- `xcl-python: xcl/config.py`
+- `xcl-python: xcl/aio.py`
+- `xcl-python: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-26 — Task: Say on the xcl website when configuration text can be rendered
+
+**What was done**: The configuration-text page's "Converting saved data" section now says a saved record can be rendered at any time, including from an event handler while an operation runs. It shows Go and Python handlers that print each created resource on its create success event, says that `cfg.encode_entity` on a looked-up or edited entity is refused with `xcl.OperationInProgressError` during an operation, and notes that variables and outputs are not encodable. The `event.entity()` example's Python tab says `encode_entity` works once the operation has finished and points at `encode_saved_entity(event.data)` for use inside the handler. The events page's sentence was reworded the same way. The site builds (`npm run build`, 23 pages).
+
+**Deviations**: Added a Go handler example alongside the Python one, so both tabs of the new block have content. The plan named only the Python tab.
+
+**Files changed**:
+- `xcl-website: src/pages/configuration-text.mdx`
+- `xcl-website: src/pages/events.mdx`
+
+**Discoveries**: In a fresh worktree, `npm ci` warns that `sharp`'s install script was not run. The site still builds without it.

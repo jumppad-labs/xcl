@@ -36,45 +36,45 @@ When xcl finds a mistake in a configuration, it used to show the lines in questi
 
 ## Requirements
 
-- [ ] **One-call error printing with context**
+- [x] **One-call error printing with context**
   Users can print any error returned by xcl to a destination of their choice in one call, and a configuration problem is shown as a report: its severity and summary, where it is (file, line, block and field), the numbered source lines around it with the fault marked, and its detail.
-- [ ] **Surrounding lines are restored**
+- [x] **Surrounding lines are restored**
   The report must show up to two lines before and after the lines at fault, clipped at the start and end of the file.
-- [ ] **Every problem in a wrapped error is printed**
+- [x] **Every problem in a wrapped error is printed**
   The system must print every configuration problem inside an error, including one the application has wrapped with its own context, and print an error that holds no configuration problem as its ordinary message.
-- [ ] **Ordinary messages stay one line**
+- [x] **Ordinary messages stay one line**
   The system must keep an error's ordinary message to one line, and print the full report when the caller asks for the error's detailed formatting.
-- [ ] **Detail wraps to a width**
+- [x] **Detail wraps to a width**
   The system must wrap a report's detail text at 80 columns by default, and users can choose another width or no wrapping.
-- [ ] **One-call printing of resources and change summaries**
+- [x] **One-call printing of resources and change summaries**
   Users can print a resource as configuration text, and a change summary, in one call each, with the same formatting choices as errors, and with the existing choices about which values to include.
-- [ ] **Choice of output format**
+- [x] **Choice of output format**
   Users can choose plain text, terminal colour, HTML marked up with classes, HTML with inline styles, or SVG, for any printed output.
-- [ ] **Websites restyle HTML output**
+- [x] **Websites restyle HTML output**
   The system must mark every coloured part of HTML output with stable, documented class names for its kind and its kind's category (each piece of output is labelled with a kind, such as an attribute name or a line comment, and kinds are grouped into categories, such as comments), so a website's own stylesheet controls the colours.
-- [ ] **Stylesheets from themes**
+- [x] **Stylesheets from themes**
   Users can generate a stylesheet from any theme, as a starting point for a website's own styles.
-- [ ] **Themes extend the default**
+- [x] **Themes extend the default**
   Users can change the style of any kind of text by giving only the kinds they want to change, written as short style strings, and styling a category styles every kind in it unless a kind is styled itself.
-- [ ] **Themes can be checked**
+- [x] **Themes can be checked**
   Users can validate a theme and are told about any style word that is not recognised; printing with such a theme ignores the unknown word rather than failing.
-- [ ] **Editor themes can be imported**
+- [x] **Editor themes can be imported**
   Users can load a VS Code colour theme and use it as a theme.
-- [ ] **Custom output formats**
+- [x] **Custom output formats**
   Users can write their own output format that receives the whole labelled text at once and writes to any destination, and use it anywhere a built-in format is accepted.
-- [ ] **Labelled text for extenders**
+- [x] **Labelled text for extenders**
   Users can obtain the labelled text (the output split into parts, each labelled with its kind) of an error report, a resource's configuration text, a change summary, or any configuration text they hold.
-- [ ] **Colour chosen from the destination on request**
+- [x] **Colour chosen from the destination on request**
   Users can ask for a format chosen from their destination, which picks terminal colour for a terminal unless the NO_COLOR convention is set, and plain text otherwise.
-- [ ] **Reports in structured logs**
+- [x] **Reports in structured logs**
   A configuration error logged through a structured logger that records an error's detailed formatting must carry the full report.
-- [ ] **Reference outputs for every language**
+- [x] **Reference outputs for every language**
   The system must publish reference outputs for every built-in format, and for the class names HTML output uses, over a fixed set of inputs, and the Go formats must match them; other languages are checked against the same outputs in their own work.
-- [ ] **Replacements for the previous API are documented**
+- [x] **Replacements for the previous API are documented**
   The release notes must give a one-line replacement for each removed highlighting, report and change-summary rendering function.
-- [ ] **Examples use the new printing**
+- [x] **Examples use the new printing**
   Every example program that prints errors, resources or change summaries must use the new printing, and the examples that print errors must show reports.
-- [ ] **Documentation describes the new printing**
+- [x] **Documentation describes the new printing**
   The xcl website must document printing errors, resources and change summaries, output formats, themes, class names and stylesheet generation, custom formats, and logging integration, with Go examples.
 
 <!--
@@ -110,51 +110,51 @@ When xcl finds a mistake in a configuration, it used to show the lines in questi
 
 ## Acceptance Criteria
 
-- [ ] **A bad configuration prints as a report**
+- [x] **A bad configuration prints as a report**
   Applying a configuration with an unsupported block on line 7 and printing the returned error as plain text writes a report whose first line is "Error: Unsupported block type", whose location line names the file, line 7, the block and the field, which shows numbered lines 5 to 9 of the file, and which ends with the detail.
-- [ ] **Context clipped at the file's edges**
+- [x] **Context clipped at the file's edges**
   A fault on line 1 of a three-line file prints lines 1 to 3, and a fault on the last line of a file prints that line and the two before it.
-- [ ] **Wrapped error with several problems**
+- [x] **Wrapped error with several problems**
   A configuration with two problems, whose error the application wraps with its own message, prints both reports, in order.
-- [ ] **Non-configuration error**
+- [x] **Non-configuration error**
   Printing an error that holds no configuration problem writes exactly its message followed by a newline.
-- [ ] **One line versus detailed formatting**
+- [x] **One line versus detailed formatting**
   Formatting the configuration error in its ordinary form produces a single line, and asking for its detailed formatting produces the same text as printing it as plain text.
-- [ ] **Detail wrapping**
+- [x] **Detail wrapping**
   A problem whose detail is longer than 80 characters prints with no detail line over 80 columns by default, with no detail line over 40 columns when the width is 40, and on a single line when wrapping is off.
-- [ ] **Resource and change summary**
+- [x] **Resource and change summary**
   Printing a fixed set of resources with computed values included, and a fixed set of change summaries, as plain text, matches output captured from the current release's encoder and change-summary renderer for the same inputs.
-- [ ] **Terminal colour**
+- [x] **Terminal colour**
   Printing the bad configuration's error with terminal colour writes colour codes, ends every coloured line with a reset before its newline, and with the colour codes removed is identical to the plain output.
-- [ ] **HTML with classes**
+- [x] **HTML with classes**
   Printing the error as HTML writes a single preformatted block carrying the documented container class, in which the fault is marked with the error class and its category class, every other coloured part carries its kind's documented class, no inline styles appear, and text from the configuration is escaped.
-- [ ] **HTML with inline styles**
+- [x] **HTML with inline styles**
   Printing the same error as inline-styled HTML writes the same structure with style attributes and no classes.
-- [ ] **SVG**
+- [x] **SVG**
   Printing a resource as SVG writes a well-formed SVG document that an SVG parser accepts, with one text line per source line and a view box wide enough for the longest line.
-- [ ] **Stylesheet from a theme**
+- [x] **Stylesheet from a theme**
   Generating a stylesheet from the default theme produces CSS that a CSS parser accepts, in which every rule is scoped to the documented container class, and generating it from a theme that changes only attributes changes only the attribute rule.
-- [ ] **Theme extension and category fallback**
+- [x] **Theme extension and category fallback**
   A theme that styles only comments colours line, hash and block comments with that style, and a theme that also styles line comments colours line comments with their own style; every kind not mentioned keeps the default style.
-- [ ] **Invalid style words**
+- [x] **Invalid style words**
   A theme containing an unknown style word reports that word when validated, and printing with it still succeeds, ignoring the word.
-- [ ] **VS Code theme**
+- [x] **VS Code theme**
   Loading a VS Code theme that colours properties orange and printing a resource with it colours attribute names orange.
-- [ ] **Custom format**
+- [x] **Custom format**
   A user-written format that wraps each labelled part in brackets, passed to the error printing, receives the whole report at once and writes its output to the given destination.
-- [ ] **Labelled text**
+- [x] **Labelled text**
   Obtaining the labelled text of a resource returns parts that, joined together, equal its plain output, each labelled with a kind; the same holds for an error report and a change summary.
-- [ ] **Colour chosen from the destination**
+- [x] **Colour chosen from the destination**
   Asking for a format chosen from a terminal destination gives terminal colour; from a file, or from a terminal with NO_COLOR set, gives plain text.
-- [ ] **Report in a structured log**
+- [x] **Report in a structured log**
   Logging the bad configuration's error through zap writes a log entry whose detailed error field contains the full plain report.
-- [ ] **Reference outputs published**
+- [x] **Reference outputs published**
   The repository holds reference outputs for every built-in format applied to a fixed set of inputs (an error report, a resource, a change summary) and a list of every HTML class name, and the Go formats' output matches them byte for byte in the test suite.
-- [ ] **Release notes**
+- [x] **Release notes**
   The release notes list a one-line replacement for each removed highlighting, report and change-summary rendering function.
-- [ ] **Examples print reports**
+- [x] **Examples print reports**
   Running each example program against a configuration with a mistake prints a report with the faulty source lines.
-- [ ] **Website documents it**
+- [x] **Website documents it**
   The xcl website has pages or sections covering printing errors, resources and change summaries, output formats, themes, the class names, stylesheet generation, custom formats and logging integration, each with a Go example, and no page still documents a removed function.
 
 <!--

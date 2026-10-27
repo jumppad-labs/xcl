@@ -257,6 +257,7 @@ The Go program's own tests check that the new stages are present and normalised.
 - **Manual — captured in the implementation test plan**: the README and PARITY.md describe error printing, how reports appear on unhandled and logged errors, output formats, themes, stylesheet generation, custom formats and logging integration with Python examples, and the README's migration note names the replacement for `highlight=` ("Docs").
 - **Manual — captured in the implementation test plan**: the website's configuration-text, problems, diff and events pages and the plugins and configuration-only examples show Python examples of the same topics, no page says the report, rendered diffs, editor themes or custom formats are unavailable from Python, and the site builds ("Docs").
 - **Manual — captured in the implementation test plan**: the GitHub release notes of the shipping xcl-python version contain a line naming the replacement for the removed `highlight=` option ("Old option gone, notes present").
+- **Manual — captured in the implementation test plan (descoped release task, done by a person after the merge)**: the xcl release pinned by xcl-python contains the printing core, the engine labelled text and the parity program's new stages; xcl-python's main branch pins that release, its checks pass, and the next minor version is published with the release-notes line above; the website change goes out after it.
 - **Manual — captured in the implementation test plan**: a report printed with `for_stream(sys.stderr)` looks right in a real terminal, and plain with `NO_COLOR` set. The HTML (with `css(DEFAULT_THEME)`), inline HTML and SVG of a report look right in a browser.
 - **Manual — captured in the implementation test plan**: an uncaught configuration error shows its report in a rich traceback (`rich.traceback.install()`) and through loguru's `logger.exception`, and `logging_handler` records reach structlog through `ProcessorFormatter` with their attributes. These libraries are not dependencies, so this is checked by hand.
 
@@ -270,7 +271,7 @@ The Go program's own tests check that the new stages are present and normalised.
 
 **Validation point**: The unit tests pass against regenerated stubs: kinds match the protocol both ways, every built-in format, the stylesheet and the class names match xcl's reference files byte for byte, theme fallback and validation behave as specified, and the removed keyword is refused for both flavours. The integration suites pass against an engine built from the xcl branch carrying the core and engine plans.
 
-#### - [ ] Task: Regenerate the protocol stubs and remove the colour keyword
+#### - [x] Task: Regenerate the protocol stubs and remove the colour keyword
 **Id:** e8d33eb5-0d7a-400c-83fe-2377c14a2ed5
 **Repo:** xcl-python
 **Depends on:** none
@@ -281,11 +282,11 @@ Point the package at an xcl checkout that carries the core and engine printing p
 *Technical detail:* [context.md#task-regenerate-the-protocol-stubs-and-remove-the-colour-keyword](./context.md#task-regenerate-the-protocol-stubs-and-remove-the-colour-keyword)
 
 **Acceptance criteria**:
-- [ ] The package's protocol messages include the token kinds, labelled text, the report on errors, labelled diff text and theme conversion, and no longer have a colour field on the encode requests
-- [ ] Passing `highlight=` to `encode_entity` or `encode_saved_entity`, on `xcl.Config` or `xcl.aio.Config`, fails as an unexpected keyword argument
-- [ ] No code, test or docstring in the package still passes or describes the removed keyword, and the existing unit and integration suites pass against an engine built from the xcl branch
+- [x] The package's protocol messages include the token kinds, labelled text, the report on errors, labelled diff text and theme conversion, and no longer have a colour field on the encode requests
+- [x] Passing `highlight=` to `encode_entity` or `encode_saved_entity`, on `xcl.Config` or `xcl.aio.Config`, fails as an unexpected keyword argument
+- [x] No code, test or docstring in the package still passes or describes the removed keyword, and the existing unit and integration suites pass against an engine built from the xcl branch
 
-#### - [ ] Task: Add token kinds and themes
+#### - [x] Task: Add token kinds and themes
 **Id:** 62592911-467b-4495-afe3-a989b32d809e
 **Repo:** xcl-python
 **Depends on:**
@@ -297,13 +298,13 @@ Create the public `xcl.highlight` package with the labelled-text vocabulary: the
 *Technical detail:* [context.md#task-add-token-kinds-and-themes](./context.md#task-add-token-kinds-and-themes)
 
 **Acceptance criteria**:
-- [ ] Every kind matches the protocol's kind with the same number and name, and the protocol has no kind the package lacks
-- [ ] A theme made from the default plus a comment style styles line, hash and block comments with it, and adding a line-comment style changes line comments only
-- [ ] Validating a theme with an unknown style word reports that word, and validating the default theme reports nothing
-- [ ] The default theme cannot be changed in place, and extending it gives a new theme
-- [ ] An unknown kind number resolves to its category's style and class
+- [x] Every kind matches the protocol's kind with the same number and name, and the protocol has no kind the package lacks
+- [x] A theme made from the default plus a comment style styles line, hash and block comments with it, and adding a line-comment style changes line comments only
+- [x] Validating a theme with an unknown style word reports that word, and validating the default theme reports nothing
+- [x] The default theme cannot be changed in place, and extending it gives a new theme
+- [x] An unknown kind number resolves to its category's style and class
 
-#### - [ ] Task: Add the built-in formats and the stylesheet
+#### - [x] Task: Add the built-in formats and the stylesheet
 **Id:** 4f94762e-6184-473d-aaf5-7cf9976dd5bb
 **Repo:** xcl-python
 **Depends on:**
@@ -315,11 +316,11 @@ Add the formatter protocol and the five built-in formats (plain text, terminal c
 *Technical detail:* [context.md#task-add-the-built-in-formats-and-the-stylesheet](./context.md#task-add-the-built-in-formats-and-the-stylesheet)
 
 **Acceptance criteria**:
-- [ ] Every built-in format applied to each published reference input writes the published output byte for byte
-- [ ] The stylesheet generated from the default theme equals the published stylesheet, and the HTML class names equal the published list
-- [ ] Formatting with a theme that contains an unknown style word succeeds and ignores the word
-- [ ] Asking for a format chosen from a terminal stream gives terminal colour; from a file, or with `NO_COLOR` set, it gives plain text
-- [ ] A format written by a user against the formatter protocol is accepted where a built-in one is
+- [x] Every built-in format applied to each published reference input writes the published output byte for byte
+- [x] The stylesheet generated from the default theme equals the published stylesheet, and the HTML class names equal the published list
+- [x] Formatting with a theme that contains an unknown style word succeeds and ignores the word
+- [x] Asking for a format chosen from a terminal stream gives terminal colour; from a file, or with `NO_COLOR` set, it gives plain text
+- [x] A format written by a user against the formatter protocol is accepted where a built-in one is
 
 ### Milestone 2: Errors, resources and change summaries print in one call, and reports appear on unhandled and logged errors
 
@@ -327,7 +328,7 @@ Add the formatter protocol and the five built-in formats (plain text, terminal c
 
 **Validation point**: The unit and integration suites pass for both configuration flavours. That includes the unsupported-block report printed and formatted, the traceback and logged-exception reports, detail wrapping at 80, 40 and off, labelled text joining to plain output, a custom format receiving the whole text for errors, resources and diffs, and the orange-properties VS Code theme colouring attribute names.
 
-#### - [ ] Task: Keep reports on errors and print them in one call
+#### - [x] Task: Keep reports on errors and print them in one call
 **Id:** 48f95336-5609-483b-b6b5-61630b7417c9
 **Repo:** xcl-python
 **Depends on:**
@@ -339,15 +340,15 @@ Make every xcl error keep the engine's report as labelled text and carry the pla
 *Technical detail:* [context.md#task-keep-reports-on-errors-and-print-them-in-one-call](./context.md#task-keep-reports-on-errors-and-print-them-in-one-call)
 
 **Acceptance criteria**:
-- [ ] Applying a configuration with an unsupported block on line 7 and printing the raised error writes the full report: summary, location naming line 7, numbered source lines with the fault, and detail
-- [ ] Getting that error's report as a string returns the same text the print writes
-- [ ] Running a script whose apply raises that error, uncaught, prints a traceback followed by the plain report
-- [ ] Logging the caught error with its traceback through standard logging writes the plain report after the traceback
-- [ ] Converting the error to a string gives a single line
-- [ ] A detail longer than 80 characters prints with no detail line over 80 columns by default, none over 40 at width 40, and on one line with wrapping off
-- [ ] The error's labelled text joins to its plain report, and each piece carries a kind
+- [x] Applying a configuration with an unsupported block on line 7 and printing the raised error writes the full report: summary, location naming line 7, numbered source lines with the fault, and detail
+- [x] Getting that error's report as a string returns the same text the print writes
+- [x] Running a script whose apply raises that error, uncaught, prints a traceback followed by the plain report
+- [x] Logging the caught error with its traceback through standard logging writes the plain report after the traceback
+- [x] Converting the error to a string gives a single line
+- [x] A detail longer than 80 characters prints with no detail line over 80 columns by default, none over 40 at width 40, and on one line with wrapping off
+- [x] The error's labelled text joins to its plain report, and each piece carries a kind
 
-#### - [ ] Task: Print resources and change summaries in one call
+#### - [x] Task: Print resources and change summaries in one call
 **Id:** 340791f4-6541-43b8-8a71-24acd8fbfb32
 **Repo:** xcl-python
 **Depends on:**
@@ -359,13 +360,13 @@ Give both configuration flavours one call each to print an entity and a saved re
 *Technical detail:* [context.md#task-print-resources-and-change-summaries-in-one-call](./context.md#task-print-resources-and-change-summaries-in-one-call)
 
 **Acceptance criteria**:
-- [ ] Printing a created resource with computed values, from a lookup and from its saved record, writes its configuration text, on both configuration flavours
-- [ ] Printing a diff writes its change summary
-- [ ] The labelled text of a resource and of a change summary each joins to the matching plain output, and each piece carries a kind
-- [ ] A user-written format passed to error, resource and change-summary printing receives the whole labelled text in one call each time and writes to the given stream
-- [ ] Printing a diff that carries no labelled text fails with a message saying where printable diffs come from
+- [x] Printing a created resource with computed values, from a lookup and from its saved record, writes its configuration text, on both configuration flavours
+- [x] Printing a diff writes its change summary
+- [x] The labelled text of a resource and of a change summary each joins to the matching plain output, and each piece carries a kind
+- [x] A user-written format passed to error, resource and change-summary printing receives the whole labelled text in one call each time and writes to the given stream
+- [x] Printing a diff that carries no labelled text fails with a message saying where printable diffs come from
 
-#### - [ ] Task: Load VS Code themes through the engine
+#### - [x] Task: Load VS Code themes through the engine
 **Id:** d072bb20-0524-4ea4-b342-01e8b2af6ced
 **Repo:** xcl-python
 **Depends on:**
@@ -377,9 +378,9 @@ Add `load_vscode_theme`, which sends a VS Code colour theme, from a path or its 
 *Technical detail:* [context.md#task-load-vs-code-themes-through-the-engine](./context.md#task-load-vs-code-themes-through-the-engine)
 
 **Acceptance criteria**:
-- [ ] Loading a VS Code theme that colours properties orange and printing a resource with it in terminal colour colours attribute names orange
-- [ ] Loading works with no configuration created
-- [ ] An unusable theme raises the theme error with the engine's reason
+- [x] Loading a VS Code theme that colours properties orange and printing a resource with it in terminal colour colours attribute names orange
+- [x] Loading works with no configuration created
+- [x] An unusable theme raises the theme error with the engine's reason
 
 ### Milestone 3: Events reach standard logging, logged errors render in colour, and Python's output is proven identical to Go's
 
@@ -387,7 +388,7 @@ Add `load_vscode_theme`, which sends a VS Code colour theme, from a path or its 
 
 **Validation point**: The logging unit and integration tests pass. The parity suite passes with its new stages on every fixture, including the new unsupported-block fixture, against the xcl parity program built from the branch. The Go parity program's own tests pass.
 
-#### - [ ] Task: Send events to standard logging
+#### - [x] Task: Send events to standard logging
 **Id:** 58c66252-582e-4816-9771-df57b1534a87
 **Repo:** xcl-python
 **Depends on:**
@@ -399,12 +400,12 @@ Add `xcl.logging_handler`, which returns an event handler that writes each event
 *Technical detail:* [context.md#task-send-events-to-standard-logging](./context.md#task-send-events-to-standard-logging)
 
 **Acceptance criteria**:
-- [ ] Log events are written at their own level with their own message, lifecycle events at info as "operation phase", error events at error and blocked events at warn
-- [ ] Each record carries the event's resource, operation and other fields, and the event itself
-- [ ] Nothing is written for an event below the logger's level
-- [ ] Applying a configuration with the bridge as the event handler writes records for the apply's events
+- [x] Log events are written at their own level with their own message, lifecycle events at info as "operation phase", error events at error and blocked events at warn
+- [x] Each record carries the event's resource, operation and other fields, and the event itself
+- [x] Nothing is written for an event below the logger's level
+- [x] Applying a configuration with the bridge as the event handler writes records for the apply's events
 
-#### - [ ] Task: Render logged errors in a chosen format
+#### - [x] Task: Render logged errors in a chosen format
 **Id:** 99b65f1b-6fea-407f-b820-095d71b47da5
 **Repo:** xcl-python
 **Depends on:**
@@ -416,11 +417,11 @@ Add `xcl.highlight.LogFormatter`, a standard logging formatter that, for a logge
 *Technical detail:* [context.md#task-render-logged-errors-in-a-chosen-format](./context.md#task-render-logged-errors-in-a-chosen-format)
 
 **Acceptance criteria**:
-- [ ] A logging handler given the formatter with terminal colour, logging a caught xcl error with its traceback, writes the report with terminal colour codes
-- [ ] The report appears once, not also as the plain note
-- [ ] A logged exception that is not an xcl error is written exactly as the standard formatter writes it
+- [x] A logging handler given the formatter with terminal colour, logging a caught xcl error with its traceback, writes the report with terminal colour codes
+- [x] The report appears once, not also as the plain note
+- [x] A logged exception that is not an xcl error is written exactly as the standard formatter writes it
 
-#### - [ ] Task: Record printing and logging in the Go parity program
+#### - [x] Task: Record printing and logging in the Go parity program
 **Id:** e542e38c-a05b-4fc2-be18-28f631966e21
 **Repo:** xcl
 **Depends on:** none
@@ -431,11 +432,11 @@ Extend xcl's Go parity program so its record also holds the plain printed report
 *Technical detail:* [context.md#task-record-printing-and-logging-in-the-go-parity-program](./context.md#task-record-printing-and-logging-in-the-go-parity-program)
 
 **Acceptance criteria**:
-- [ ] The record of every fixture holds the printed report, entities, change summary and event log, with run paths replaced
-- [ ] The new fixture's printed report shows the unsupported block on line 7 with its numbered source lines
-- [ ] The record is still the same on every run of the same fixture
+- [x] The record of every fixture holds the printed report, entities, change summary and event log, with run paths replaced
+- [x] The new fixture's printed report shows the unsupported block on line 7 with its numbered source lines
+- [x] The record is still the same on every run of the same fixture
 
-#### - [ ] Task: Compare printing and logging with Go in the Python parity suite
+#### - [x] Task: Compare printing and logging with Go in the Python parity suite
 **Id:** 589b2736-a0cc-4e6b-874d-eded19ac61d4
 **Repo:** xcl-python
 **Depends on:**
@@ -449,9 +450,9 @@ Extend the Python parity program to record the same new sections through the pac
 *Technical detail:* [context.md#task-compare-printing-and-logging-with-go-in-the-python-parity-suite](./context.md#task-compare-printing-and-logging-with-go-in-the-python-parity-suite)
 
 **Acceptance criteria**:
-- [ ] A Python program that applies the configuration with an unsupported block on line 7 and prints the raised error as plain text writes the same report Go writes, byte for byte
-- [ ] Printing every created resource with computed values, and every change summary, writes the same text as Go for every fixture
-- [ ] The logging bridge writes records whose levels and messages match Go's logging bridge for the same apply, with the resource and operation on each
+- [x] A Python program that applies the configuration with an unsupported block on line 7 and prints the raised error as plain text writes the same report Go writes, byte for byte
+- [x] Printing every created resource with computed values, and every change summary, writes the same text as Go for every fixture
+- [x] The logging bridge writes records whose levels and messages match Go's logging bridge for the same apply, with the resource and operation on each
 
 ### Milestone 4: The package docs, the parity list, the website and the release describe Python printing
 
@@ -459,7 +460,7 @@ Extend the Python parity program to record the same new sections through the pac
 
 **Validation point**: The manual reviews of the README, PARITY.md and the website pass, and the site builds. The xcl-python release bundling the xcl release is published, and its notes carry the replacement line.
 
-#### - [ ] Task: Document Python printing in the README and parity list
+#### - [x] Task: Document Python printing in the README and parity list
 **Id:** fa37b310-5b2c-4cdb-9047-190aaf302d66
 **Repo:** xcl-python
 **Depends on:**
@@ -474,11 +475,11 @@ Rewrite the README's encoding and error sections to document printing errors, ho
 *Technical detail:* [context.md#task-document-python-printing-in-the-readme-and-parity-list](./context.md#task-document-python-printing-in-the-readme-and-parity-list)
 
 **Acceptance criteria**:
-- [ ] The README shows Python examples of error printing, reports on unhandled and logged errors, output formats, themes, stylesheet generation, custom formats and logging
-- [ ] The README has a migration note naming the replacement for the removed `highlight=` keyword
-- [ ] The parity list pairs Go's printing, theme, format and logging functions with their Python forms, and no longer lists `highlight=`
+- [x] The README shows Python examples of error printing, reports on unhandled and logged errors, output formats, themes, stylesheet generation, custom formats and logging
+- [x] The README has a migration note naming the replacement for the removed `highlight=` keyword
+- [x] The parity list pairs Go's printing, theme, format and logging functions with their Python forms, and no longer lists `highlight=`
 
-#### - [ ] Task: Document Python printing on the website
+#### - [x] Task: Document Python printing on the website
 **Id:** 3ecb953b-80ea-414f-b7bc-fd2c57fc47d5
 **Repo:** xcl-website
 **Depends on:**
@@ -493,27 +494,12 @@ Rewrite the Python tabs of the website's configuration-text, problems, diff and 
 *Technical detail:* [context.md#task-document-python-printing-on-the-website](./context.md#task-document-python-printing-on-the-website)
 
 **Acceptance criteria**:
-- [ ] The problems and configuration-text pages show Python examples of error printing, reports on unhandled and logged errors, output formats, themes, stylesheet generation, custom formats and logging
-- [ ] No page says the report, rendered diffs, editor themes or custom formats are unavailable from Python
-- [ ] Every existing page URL still works and the site builds
+- [x] The problems and configuration-text pages show Python examples of error printing, reports on unhandled and logged errors, output formats, themes, stylesheet generation, custom formats and logging
+- [x] No page says the report, rendered diffs, editor themes or custom formats are unavailable from Python
+- [x] Every existing page URL still works and the site builds
 
-#### - [ ] Task: Release the engine and the package with the printing work
-**Id:** ab1f8a85-7805-4263-9f9b-2b18ea1e6a27
-**Repo:** xcl-python
-**Depends on:**
-- e542e38c-a05b-4fc2-be18-28f631966e21 — Record printing and logging in the Go parity program
-- 589b2736-a0cc-4e6b-874d-eded19ac61d4 — Compare printing and logging with Go in the Python parity suite
-- fa37b310-5b2c-4cdb-9047-190aaf302d66 — Document Python printing in the README and parity list
-**Execution:** human — merging pull requests with release labels, publishing releases and editing GitHub release notes are actions outside the repo
-
-Make sure the xcl release that xcl-python will bundle contains the core plan, the engine plan and the parity program change. Pin that release in xcl-python, either on this work's branch or by pushing this work onto the automated engine-bump pull request, and merge it with the `minor` label so the next minor version is published. Then add a line to that release's generated notes naming the replacement for the removed `highlight=` keyword, and let the website change go out after the release.
-
-*Technical detail:* [context.md#task-release-the-engine-and-the-package-with-the-printing-work](./context.md#task-release-the-engine-and-the-package-with-the-printing-work)
-
-**Acceptance criteria**:
-- [ ] The xcl release pinned by xcl-python contains the printing core, the engine labelled text and the parity program's new stages
-- [ ] xcl-python's main branch pins that release, its checks pass, and the next minor version is published
-- [ ] That version's GitHub release notes contain a line naming the replacement for the removed `highlight=` keyword
+**Descoped requirements**:
+- Release the engine and the package with the printing work (task ab1f8a85-7805-4263-9f9b-2b18ea1e6a27) — descoped: done by a person after the merge. Merging pull requests with release labels, publishing releases and editing GitHub release notes happen outside the repos and only once this spec's branches are merged. What the person must do: (1) in xcl, make sure the core plan, the engine plan and this spec's parity-program change ("Record printing and logging in the Go parity program") are merged and released through the release label on their pull requests (a separate `patch` release if the parity change merges after the other two are released); (2) in xcl-python, set `xcl-ref.txt` to that release tag, either on this work's branch or by pushing this work onto the automated `engine/<tag>` pull request (which otherwise fails its checks, see xcl-python `gotchas/ci-regenerates-stubs.md`), closing the other; (3) merge the xcl-python pull request with the `minor` label so the next minor version is published; (4) edit that GitHub release's generated notes and add: "Breaking: `highlight=` was removed from `encode_entity` and `encode_saved_entity`; use `cfg.print_entity(entity, formatter=xcl.highlight.TERMINAL)` (or `print_saved_entity`) to print coloured configuration text, or `entity_tokens` for labelled text."; (5) merge the website pull request after the package release is on PyPI. Checked by `xcl.engine_version()` of the released package reporting the xcl release tag, the release page showing the added line, and the website showing the new Python tabs. Covers the spec's "Replacement for the previous option is documented" (release-notes half) and the release-notes half of "Old option gone, notes present", and the constraint that the bundled engine is an xcl release.
 
 ## Open Questions
 
@@ -535,3 +521,213 @@ Everything else was settled during planning and is recorded in the drafting assu
 - **Changing the release workflows.** The breaking-change line is added by hand to this release's generated notes. xcl-python keeps no changelog file.
 - **New website pages or navigation.** Python examples go into the existing pages' Python tabs only.
 - **Fixing type errors that `py.typed` may surface in unrelated annotations.** This plan keeps its own public annotations accurate and adds no type-checker test.
+
+## Changelog
+
+### Plan change — 2026-10-26: release task descoped to follow-up work
+
+**Change**: Took the human task "Release the engine and the package with the printing work" (ab1f8a85) out of the `## Milestones & Tasks` checklist and listed it under **Descoped requirements** as done by a person after the merge, with what the person must do. Added the release checks to the manual reviews in `## Testing Approach` so the implementation test plan carries them.
+**Why**: The user decided for this epic that human release tasks are follow-up work: the workflow has no step to finish a human task, and the releases can only happen after the spec's branches are merged.
+**Effect**: The release-notes line naming the replacement for `highlight=`, the released-engine pin in `xcl-ref.txt` and the published minor version are met by the person's follow-up, not by this run. During this run the Python suites run against an engine, plugins and parity program built from this spec's xcl worktree.
+
+### 2026-10-26 — Task: Regenerate the protocol stubs and remove the colour keyword
+
+**What was done**: Regenerated `xcl/_core/core_pb2.py`/`.pyi` from the spec's xcl worktree, so the package's messages carry `TokenKind`, `Token`, `Error.report`, the encode `tokens` flag and response field, `OperationFinished.diff_tokens` and `ConvertTheme`, with no `highlight` field. Removed `highlight=` from `encode_entity` and `encode_saved_entity` on `xcl.Config` and `xcl.aio.Config` (signatures, requests, docstrings), deleted the colour tests, renamed the record tests, and added four tests showing the keyword is refused as an unexpected argument.
+
+**Deviations**: `xcl-ref.txt` stays at `v0.11.1`, as in plan `20261023074627-cc23fc08-encode-saved-entity-during-operation`: the development pin to an xcl branch only serves CI, this run never pushes, and the xcl branch is local. The suites ran against an engine, plugins and stubs built from the xcl worktree (`make protos engine plugins XCL_SRC=<xcl worktree>`); the descoped release task sets the pin to the release. The README example and paragraph and the PARITY.md encode rows lost `highlight` now (rather than in the documentation task), so no document describes the removed keyword in the meantime. The unused `ANSI`/`strip_colour` helpers in `tests/integration/test_sync.py` went with the colour tests.
+
+**Files changed**:
+- `xcl-python: xcl/_core/core_pb2.py`
+- `xcl-python: xcl/_core/core_pb2.pyi`
+- `xcl-python: xcl/config.py`
+- `xcl-python: xcl/aio.py`
+- `xcl-python: tests/unit/test_config.py`
+- `xcl-python: tests/integration/test_sync.py`
+- `xcl-python: tests/integration/test_aio.py`
+- `xcl-python: README.md`
+- `xcl-python: PARITY.md`
+
+**Discoveries**: Local `protoc` is 36.1 and the committed stubs were already generated with it (`Protobuf Python Version: 7.36.1`), so regenerating locally adds no version churn. With the regenerated stubs and the worktree engine the whole suite passes (538 passed, 1 skipped).
+
+### 2026-10-26 — Task: Add token kinds and themes
+
+**What was done**: Added the public `xcl.highlight` package with `Kind` (an `IntEnum` of the protocol's 41 kinds, with `parent` and `css_class`), `parent_of`, `css_class_of`, the frozen `Token`, private protocol converters that keep an unknown kind as its number, `Style`/`parse_style`/`hex_colour` (a port of Go's `style.go`, plus the private SGR helper the terminal format will use), and `Theme`, the immutable `DEFAULT_THEME`, `style_for` and `validate`. Added `xcl.InvalidStyleError` (code `invalid_style`, `words` as `(kind, style, word)` tuples, one message line per word in Go's `style "<style>" for <Kind>: unknown word "<word>"` form) and exported it and `xcl.highlight` from the top level.
+
+**Deviations**: The kind helper `kinds()` and a public `known()` were not added: iterating `Kind` already gives the kinds in numeric order, and `_known` stays private. The docstring walk now skips module constants (such as `DEFAULT_THEME`, a `MappingProxyType` that cannot carry a docstring) in the per-module loop, the same rule its `xcl.__all__` loop already applies. Messages name kinds as Go does (`LineComment`, `Kind(1199)`), not by the Python member name, so they match Go's `InvalidStyleError`.
+
+**Files changed**:
+- `xcl-python: xcl/highlight/__init__.py`
+- `xcl-python: xcl/highlight/_kinds.py`
+- `xcl-python: xcl/highlight/_style.py`
+- `xcl-python: xcl/highlight/_theme.py`
+- `xcl-python: xcl/_errors.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: tests/unit/test_docstrings.py`
+- `xcl-python: tests/unit/test_highlight_kinds.py`
+- `xcl-python: tests/unit/test_highlight_style.py`
+- `xcl-python: tests/unit/test_highlight_theme.py`
+
+**Discoveries**: `validate` imports `InvalidStyleError` inside the function and `InvalidStyleError` imports the kind names inside its constructor, so `xcl._errors` and `xcl.highlight` never import each other at module load; the later error-notes task must keep `xcl._errors` free of a module-level import of `xcl.highlight` modules that import `xcl._errors` back. Go's `Theme.Validate` reports an empty style string as nothing, and so does the port.
+
+### 2026-10-26 — Task: Add the built-in formats and the stylesheet
+
+**What was done**: Added the `Formatter` protocol and the built-in formats `PLAIN`, `TERMINAL`, `HTML`, `HTML_INLINE` and `SVG` (`xcl/highlight/_formatters.py`), each a line-for-line port of the landed Go formatter; `css(theme)` (`_css.py`), a port of `WriteCSS`; and the opt-in `for_stream` (`_stream.py`). All 15 reference outputs, `default.css` and `classes.txt` match byte for byte. Tests: 15 reference tests plus stylesheet and class-list tests, formatter behaviour tests (escaping, per-line reset, unknown kind 1199, unknown style word, a user formatter typed as `Formatter`), CSS rule tests and eight `for_stream` tests including a real pty.
+
+**Deviations**: The landed Go code matched the plan's byte rules, with two details the notes did not spell out and the port follows: a stylesheet rule ends `; }` (`.xcl .x { a; b; }`), and a named background colour (only reachable programmatically, since `bg:` takes hex) uses SGR code+10. `Theme` became `Union[Mapping[int, str], Mapping[Kind, str]]` and `DEFAULT_THEME` is annotated `types.MappingProxyType[int, str]`, because `Mapping[int, str]` rejected a `dict[Kind, str]` variable and `Mapping` has no `|` for mypy; two mypy tests in `tests/unit/test_typing.py` hold the documented theme idioms (`DEFAULT_THEME | {...}`, a dict of `Kind` keys, a dict of numbers, an annotated `Theme`) and flag a non-string style. The tests were written by a sub-agent as the plan's High complexity requires.
+
+**Files changed**:
+- `xcl-python: xcl/highlight/_formatters.py`
+- `xcl-python: xcl/highlight/_css.py`
+- `xcl-python: xcl/highlight/_stream.py`
+- `xcl-python: xcl/highlight/_theme.py`
+- `xcl-python: xcl/highlight/__init__.py`
+- `xcl-python: tests/unit/test_highlight_reference.py`
+- `xcl-python: tests/unit/test_highlight_formatters.py`
+- `xcl-python: tests/unit/test_highlight_css.py`
+- `xcl-python: tests/unit/test_highlight_stream.py`
+- `xcl-python: tests/unit/test_typing.py`
+
+**Discoveries**: Recorded as knowledge entry `gotchas/theme-typing-mapping-keys.md` (repo tier, xcl-python store): `Mapping` key invariance and the missing `Mapping.__or__` make the natural `Theme = Mapping[int, str]` reject documented usage under `py.typed`. Formatter instances are module constants, which the docstring walk now skips like other constants; their private classes carry the docstrings.
+
+### 2026-10-26 — Task: Keep reports on errors and print them in one call
+
+**What was done**: Every `xcl.Error` now keeps the engine's report as `err.tokens` (converted in `from_proto` for the error and each cause) and, when it has one, carries the plain report wrapped at 80 columns as an exception note, so tracebacks and `logging.exception` show it; `str(err)` stays the engine's message. Added `xcl._wrap.wrap_detail` (an exact port of go-wordwrap v1.0.1 `WrapString`, checked against strings Go produced), `xcl._render` (detail-only wrapping, render, plain report) and `xcl.print_error`/`xcl.format_error`, shaped like `traceback.print_exception`/`format_exception`. Tests (written by a sub-agent, as the High complexity requires): wrap cases from Go, error tokens and notes, print/format on hand-built reports, and real-engine tests of the line-7 unsupported block (printed, as a string, one-line `str`, logged, uncaught in a subprocess, tokens joining to the plain report) for both flavours.
+
+**Deviations**: None in behaviour. `Error.__init__` imports `plain_report` only when tokens are given and `from_proto` imports the token converter inside the function, so `xcl._errors` still imports no `xcl.highlight` module at load. The report fixture is a ten-line configuration (`sync_app "web"`, blank line, `sync_app "api"` with a nested `timeout` block opening on line 7) rather than nine lines; the engine shows lines 5 to 9 around the fault.
+
+**Files changed**:
+- `xcl-python: xcl/_wrap.py`
+- `xcl-python: xcl/_render.py`
+- `xcl-python: xcl/_print.py`
+- `xcl-python: xcl/_errors.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: tests/unit/test_wrap.py`
+- `xcl-python: tests/unit/test_print.py`
+- `xcl-python: tests/unit/test_errors.py`
+- `xcl-python: tests/integration/test_sync.py`
+- `xcl-python: tests/integration/test_aio.py`
+
+**Discoveries**: The engine's unsupported-block `ConfigError` carries the report on the top-level error and on its one cause, so both get a note; a traceback shows the top-level note once because causes are not chained as `__cause__`. Go's `unicode.IsSpace` differs from Python's `str.isspace` (Python also counts U+001C–U+001F), so the wrapper spells out the White_Space set. A strict local run of the whole suite hits GitHub's anonymous API rate limit in the plugin-release tests; `GITHUB_TOKEN=$(gh auth token)` avoids it (the registry client reads `GITHUB_TOKEN`).
+
+### 2026-10-26 — Task: Print resources and change summaries in one call
+
+**What was done**: Both configuration flavours gained `entity_tokens`, `print_entity`, `saved_entity_tokens` and `print_saved_entity`, which ask the engine for labelled text (`tokens=True`) with the four existing encode choices and hand the whole token list to the chosen formatter (`sys.stdout` by default). The encode requests are built by shared `_encode_entity_request`/`_encode_saved_entity_request` helpers in `xcl/config.py`, imported by `xcl/aio.py`. `Diff` gained `tokens` (excluded from equality and repr), filled from `OperationFinished.diff_tokens` in `Operation.finish`, and `xcl.print_diff` prints it, raising `ValueError` naming `Config.diff` for a diff without labelled text. Unit tests on the fake transport (requests carry `tokens`, output, stdout default, custom format, diff tokens kept for both flavours) and real-engine tests with the recording plugin (computed text from a lookup and a saved record, token joins, the git-style change summary, a recording custom format for error, entity and diff, and asyncio twins).
+
+**Deviations**: The finished-diff unit tests live in `tests/unit/test_config.py` (driving `Config.diff` over the fake transport) rather than a new `tests/unit/test_poll.py`, which the plan allowed as an alternative. Added `test_encode_saved_entity_does_not_ask_for_tokens` beside the planned `encode_entity` one.
+
+**Files changed**:
+- `xcl-python: xcl/config.py`
+- `xcl-python: xcl/aio.py`
+- `xcl-python: xcl/diff.py`
+- `xcl-python: xcl/_poll.py`
+- `xcl-python: xcl/_print.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: tests/unit/test_config.py`
+- `xcl-python: tests/unit/test_print.py`
+- `xcl-python: tests/integration/test_sync.py`
+- `xcl-python: tests/integration/test_aio.py`
+
+**Discoveries**: A diff over config-only (Python-registered) types reports no changes ("Diff: no changes, 0 unchanged."), as Go does: only provider-backed resources appear in a change summary, so diff printing tests need a plugin such as the recording fixture.
+
+### 2026-10-26 — Task: Load VS Code themes through the engine
+
+**What was done**: Added `xcl.highlight.load_vscode_theme(source)`, which reads a VS Code colour theme from a path or bytes, sends it to the engine's configuration-free `ConvertTheme` on handle 0 and returns only the styled kinds (as `Kind` members, an unknown number kept as an `int`), as Go's `LoadVSCodeTheme` does. Added `xcl.InvalidThemeError` (code `invalid_theme`, registered for the engine's code, `details["source"]`/`["reason"]`). Unit tests on the fake transport (handle 0, no `CreateConfig`, path and bytes, kind mapping, error class) and real-engine tests (the orange-properties theme colours `image` with `\x1b[38;2;255;136;0m` under `TERMINAL`, only styled kinds returned, loading in a fresh process with no configuration, an unusable colour raising `InvalidThemeError` with the engine's reason).
+
+**Deviations**: None. `xcl/config.py` (named in the task's scope) needed no change.
+
+**Files changed**:
+- `xcl-python: xcl/highlight/_vscode.py`
+- `xcl-python: xcl/highlight/__init__.py`
+- `xcl-python: xcl/_errors.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: tests/unit/test_highlight_vscode.py`
+- `xcl-python: tests/unit/test_errors.py`
+- `xcl-python: tests/integration/test_sync.py`
+
+**Discoveries**: `load_vscode_theme` imports the client inside the function, so `import xcl.highlight` still starts nothing; unit tests replace `xcl._client.default_client` with `monkeypatch` to route the call to the fake transport.
+
+### 2026-10-26 — Task: Send events to standard logging
+
+**What was done**: Added `xcl.logging_handler(logger=None)` (`xcl/_logbridge.py`), an `on_event` handler that mirrors Go's `events.SlogHandler`: the logger's level is checked first; log events are written at their own level (debug/info/warn/error, anything else info) with their own message, other events as `"<operation> <phase>"` at info, error for phase `error` and warning for `blocked`. Records carry the event's time and, as attributes under Go's names, `source`, `operation`, `phase`, `resource`, `type`, `file`, `duration` (a `timedelta`), `error` (the `xcl.Error`), the sorted event details, and `xcl_event`. Unit tests per level and phase, attributes, ordering, reserved names, time and the default logger; integration tests on a real apply for both flavours.
+
+**Deviations**: Following Go exactly, a log event whose `level` or `message` detail is not a string is written at info with an empty message (Go's type assertion), rather than `str(...)` as the plan's note suggested. An event detail that collides with an attribute already set (such as a detail named `resource`) is skipped, keeping Go's first attribute, since a record cannot hold two values for one name. The record's `relativeCreated` is moved by the same offset as `created`, which needs no private `logging` state and works on every supported Python.
+
+**Files changed**:
+- `xcl-python: xcl/_logbridge.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: tests/unit/test_logbridge.py`
+- `xcl-python: tests/integration/test_sync.py`
+- `xcl-python: tests/integration/test_aio.py`
+
+**Discoveries**: None beyond the existing `gotchas/aio-events-out-of-order.md`: under `xcl.aio.Config` the bridge's records can arrive out of order, so the asyncio integration test checks membership, not order.
+
+### 2026-10-26 — Task: Render logged errors in a chosen format
+
+**What was done**: Added `xcl.highlight.LogFormatter`, a `logging.Formatter` taking the standard options (`fmt`, `datefmt`, `style`, `validate`, `defaults`) plus `formatter`, `theme` and `width`. Its `formatException` writes, for an `xcl.Error` carrying a report, the traceback from a `TracebackException` whose notes drop the plain report note (user notes stay), then the report from `format_error` in the chosen format; any other exception goes to the standard `formatException`. Unit tests (coloured report, report once, traceback first, plain by default, user notes kept, other exceptions and report-less xcl errors as standard, `fmt` and `{`-style honoured, detail width) and a real-engine test with the line-7 report.
+
+**Deviations**: None.
+
+**Files changed**:
+- `xcl-python: xcl/highlight/_logging.py`
+- `xcl-python: xcl/highlight/__init__.py`
+- `xcl-python: tests/unit/test_highlight_logging.py`
+- `xcl-python: tests/integration/test_sync.py`
+
+**Discoveries**: An unsupported-block error's one-line message itself contains the detail sentence (`...: Unsupported block type; Blocks of type "timeout" are not expected here. (...)`), so a test counting the report's appearances must count the report's own lines (such as the detail at the start of a line), not the sentence anywhere.
+
+### 2026-10-26 — Task: Record printing and logging in the Go parity program
+
+**What was done**: xcl's Go parity program (`bindings/libxcl/cmd/parity`) now records `printed_validate` and `printed_apply` (the plain report `xcl.PrintError` prints, or `""`), `printed_diff_before` and, with a changed configuration, `printed_diff_changed` (the summary `xcl.PrintDiff` prints, or the outcome), `printed_entities` (`xcl.PrintEntity` with `IncludeComputed()` for every non-builtin entity), and `log` (every event up to the load written through `events.SlogHandler` into a recording `slog.Handler`, as `{level, message, resource, operation}`, sorted), all with run paths replaced. `newConfig` takes an optional event handler. A new `unsupported_block` fixture (an `app` with a nested `timeout` block opening on line 7) and README sections document the stages. Go tests (testify `require`) cover the new keys, the exact line-7 report, printed entities and diffs, the log entries and order, path normalisation and determinism of the new fixture.
+
+**Deviations**: Added `printed_diff_before` (not in the plan): the goal check read "the record of every fixture holds the ... change summary" literally, and `printed_diff_changed` exists only for fixtures with a changed configuration, so the diff before the apply is printed for every fixture as well (a failed diff records its outcome). The Python parity task must record the same key. The parity program's own record is built only by `go test ./cmd/parity/`; xcl-python's `build/plugins/parity` is rebuilt in the next task.
+
+**Files changed**:
+- `xcl: bindings/libxcl/cmd/parity/main.go`
+- `xcl: bindings/libxcl/cmd/parity/main_test.go`
+- `xcl: bindings/libxcl/testdata/parity/unsupported_block/main.xcl`
+- `xcl: bindings/libxcl/testdata/parity/unsupported_block/types.json`
+- `xcl: bindings/libxcl/testdata/parity/README.md`
+
+**Discoveries**: The event log is deterministic across runs (five repeated runs of each fixture agree) once sorted: plugin debug messages (`starting plugin`, `plugin address`, `waiting for RPC address`, ...) carry no timings or paths in their message. The unsupported-block fixture's validate, diff and apply all fail; its log shows `validate error` events for `app.api` from the parse stage beside the top-level `validate error`.
+
+### 2026-10-26 — Task: Compare printing and logging with Go in the Python parity suite
+
+**What was done**: The Python parity program (`tests/parity/run_python.py`) now records the same new keys as Go's through the package's own API: `printed_validate`/`printed_apply` (`xcl.format_error`), `printed_diff_before`/`printed_diff_changed` (`xcl.print_diff`), `printed_entities` (`Config.print_entity(..., include_computed=True)`) and `log` (every event through `xcl.logging_handler` into a recording handler, sorted as Go sorts it). `new_config` takes an `on_event`. `tests/parity/types.py` gained the `unsupported_block` fixture's type, with its `types.json` check, and `test_parity.py` a comparison test for the new fixture plus explicit checks of the line-7 report and of the printing and log keys for `plugin_entities`. The rebuilt Go parity program and the Python program agree on every fixture, logs included.
+
+**Deviations**: Python also records `printed_diff_before`, matching the Go key added during the previous task's goal check. The plan's open question about the log stage did not arise: Go's and Python's event logs agree on every fixture with no filtering.
+
+**Files changed**:
+- `xcl-python: tests/parity/run_python.py`
+- `xcl-python: tests/parity/types.py`
+- `xcl-python: tests/parity/test_types.py`
+- `xcl-python: tests/parity/test_parity.py`
+
+**Discoveries**: The goal reviewer's reply must be bare JSON for `implement goal record`; a reply with prose around the JSON is refused and the reviewer is asked again.
+
+### 2026-10-26 — Task: Document Python printing in the README and parity list
+
+**What was done**: The README gained a "Printing and highlighting" section (printing errors with an example report, reports on unhandled and logged errors through exception notes, `str(err)` and `err.tokens`; printing resources, saved records and change summaries; the five output formats and `for_stream`; themes, `validate` and `load_vscode_theme`; the HTML classes and `css`; writing a format), a "Logging" section (`logging_handler` and `LogFormatter`), a "Migrating from highlight=" note naming `print_entity(..., formatter=xcl.highlight.TERMINAL)`, `print_saved_entity` and `entity_tokens`, a pointer from the encoding section and a line in "Errors". PARITY.md gained the encode-row additions (`entity_tokens`, `print_entity`, the saved-record pair), "Printing" and "Logging" tables pairing each Go function with its Python form, and "Not applicable" rows for `highlight.Tokenize` and `Kind.Scope()`.
+
+**Deviations**: The `highlight=` example and parity cells had already been removed in the first task. The new sections sit before "Asyncio" as top-level sections rather than directly after the encoding subsection, following the README's heading levels.
+
+**Files changed**:
+- `xcl-python: README.md`
+- `xcl-python: PARITY.md`
+
+**Discoveries**: None.
+
+### 2026-10-26 — Task: Document Python printing on the website
+
+**What was done**: The Python tabs of xcl.dev's configuration-text, problems, diff and events pages and of the plugins and configuration-only examples now show Python printing: `cfg.print_entity`/`print_saved_entity`, the five formats and `for_stream`, themes with `DEFAULT_THEME | {...}` and `validate`, `load_vscode_theme`, `css`, HTML in a template, a custom format class with `style_for`, `entity_tokens`; `xcl.print_error`/`format_error` with `width=`, colour and themes, reports on uncaught errors and `logging.exception` through exception notes, `LogFormatter`; `xcl.print_diff` with colour, themes, HTML and `diff.tokens`; `xcl.logging_handler` in place of the hand-written logging handler; the `run`, `plan` and `inspect` example listings printing through the package. Every "not yet available from Python"/"is coming" statement about printing and every `highlight=` mention is gone. Edited by three sub-agents in parallel, one per page group, as the plan suggested.
+
+**Deviations**: problems.mdx gained one subsection, "In a traceback", inside the existing page (no page added, renamed or removed; navigation unchanged). The configuration-only example now shows its Go program's `main`, which prints errors with `xcl.PrintError`, beside a Python `main` using `xcl.print_error`. The HTML-in-a-template Python examples use Jinja's `markupsafe.Markup` as the counterpart of Go's `template.HTML`. The events page's per-problem receiver tells a single problem's error event from the final one by `event.error.tokens and not event.error.causes`, checked against the engine.
+
+**Files changed**:
+- `xcl-website: src/pages/configuration-text.mdx`
+- `xcl-website: src/pages/problems.mdx`
+- `xcl-website: src/pages/diff.mdx`
+- `xcl-website: src/pages/events.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+- `xcl-website: src/pages/examples/configuration-only.mdx`
+
+**Discoveries**: Python tracebacks name the error class by its private module path (`xcl._errors.ConfigError`), which the website's sample outputs show as Python prints it. The site builds from a worktree after `npm ci` (23 pages).

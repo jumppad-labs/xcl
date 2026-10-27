@@ -1,6 +1,7 @@
 ---
 created_date: "2026-10-11"
 document_status: draft
+spec: 20261023075136-42c51a7d-printing-tokens-over-the-engine
 specs:
     - 20261011130709-aa3eb933-python-support
     - 20261011211634-a8895873-python-out-of-process-engine
@@ -156,8 +157,13 @@ message Error {
   // causes are the wrapped errors, in order, for an error that collects
   // several, such as a configuration that fails validation in three places.
   repeated Error causes = 4;
+  // report is the error's report as Go prints it with xcl.PrintError,
+  // labelled; set only when the error holds a configuration problem.
+  repeated Token report = 5;
 }
 ```
+
+An error that holds a configuration problem carries its full report in `report`: the report Go's `xcl.PrintError` prints, with its severity, summary, location, the numbered lines of source around the fault with the fault marked, and the detail, as labelled text (see [Labelled text](#labelled-text)). The core lays the report out once, when it converts the error, with the same function `xcl.PrintError` uses, so the report's plain text is Go's plain report exactly. It is sent unwrapped: the detail is one line, and each language wraps it to its own width when it prints. The report is set on every error that holds a configuration problem, wherever it is in the error's tree, and on each cause that holds one, so the top-level error of a failed apply carries every problem's report in order and each cause carries its own. That includes a provider failure the parser reports at its block (code `provider`) and errors carried by events while an operation runs, so a host prints a problem with its source from the error it already received, including from an event handler, and never asks the engine again. An error with no configuration problem, such as `not_found`, has an empty `report` and its message unchanged. The report travels on every `Error` rather than through a separate call, so printing one costs no engine call.
 
 `coreservice` maps Go errors to codes with `errors.Is` and `errors.As` against the sentinels and detail types the root module exports from `config.go` and `errors.go`:
 
@@ -184,8 +190,9 @@ message Error {
 | `config` | `*errors.ConfigError`; each collected error becomes a cause, itself mapped |
 | `provider` | an error a provider returned, with `address` and `step` in details |
 | `cancelled` | the operation was cancelled by the host |
-| `operation_in_progress` | a lookup was made while an operation was running on the handle |
+| `operation_in_progress` | a lookup other than `EncodeSavedEntity` was made while an operation was running on the handle |
 | `invalid_argument` | a request that parsed but makes no sense, e.g. no paths |
+| `invalid_theme` | `*errors.InvalidThemeError` from `ConvertTheme`, a VS Code theme it cannot use (`source`, `reason`) |
 | `internal` | anything not matched above |
 
 The code list is part of the ABI contract: a code is never renamed or reused, only added. Bindings map codes to native exceptions (`xcl.NotFoundError`, `xcl.PluginLoadError`, ...) with an `xcl.Error` base class holding `code`, `details` and `causes`, so an unknown code still raises something catchable.
@@ -196,7 +203,8 @@ The code list is part of the ABI contract: a code is never renamed or reused, on
 
 - At most one operation (`StartValidate`, `StartApply`, `StartDiff`, `StartDestroy`, `StartLoad`) runs at a time; starting a second returns `operation_in_progress`.
 - `Poll`, `Complete`, `Log`, `StateGet`, `StateFind` and `Cancel` are allowed while an operation runs. They are the host's side of the operation.
-- Lookups (`Find*`, `Entities`, `Outputs`, `EncodeSavedEntity`, `EncodeEntity`) are refused with `operation_in_progress` while an operation runs, because `Config.Apply` and `Config.Destroy` replace the entity slice when they finish and the root module does not promise concurrent reads during an operation.
+- Lookups (`Find*`, `Entities`, `Outputs`, `EncodeEntity`) are refused with `operation_in_progress` while an operation runs, because `Config.Apply` and `Config.Destroy` replace the entity slice when they finish and the root module does not promise concurrent reads during an operation.
+- `EncodeSavedEntity` is allowed while an operation runs, including from a host's handling of the operation's events, because it reads none of the configuration's entities: it types the record through the plugin catalog, whose use counting keeps the operation's plugins running, and renders it. A host can therefore render each resource's saved record as its create success event arrives, and the text is the same as after the operation.
 
 The binding is told to release the GIL (Python) or use an asynchronous call (Node) around `xcl_call`, since `Poll` blocks for up to its wait time.
 
@@ -212,8 +220,9 @@ package xcl.core.v1;
 option go_package = "github.com/jumppad-labs/xcl/coreservice/proto";
 
 service CoreService {
-  // Library
+  // Library (handle 0: no configuration is needed)
   rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
+  rpc ConvertTheme(ConvertThemeRequest) returns (ConvertThemeResponse);
 
   // Configuration lifecycle (CreateConfig takes handle 0 and returns one)
   rpc CreateConfig(CreateConfigRequest) returns (CreateConfigResponse);
@@ -240,6 +249,8 @@ service CoreService {
   rpc FindByType(FindByTypeRequest) returns (EntitiesResponse);
   rpc FindOne(FindByTypeRequest) returns (EntityResponse);
   rpc Outputs(OutputsRequest) returns (OutputsResponse);
+  // EncodeSavedEntity reads none of the entities, so unlike the other
+  // lookups it is also allowed while an operation runs
   rpc EncodeSavedEntity(EncodeSavedEntityRequest) returns (EncodeSavedEntityResponse);
   rpc EncodeEntity(EncodeEntityRequest) returns (EncodeEntityResponse);
 
@@ -394,6 +405,7 @@ message OperationFinished {
   uint64 operation_id = 1;
   Error error = 2;                           // unset on success
   bytes diff_json = 3;                       // StartDiff: json.Marshal of the diff.Diff
+  repeated Token diff_tokens = 4;            // StartDiff: the change summary xcl.PrintDiff prints, labelled
 }
 
 message CompleteRequest {
@@ -479,16 +491,56 @@ message EncodeOptions {
   bool show_references  = 4;   // xcl.ShowReferences()
 }
 
-message EncodeSavedEntityRequest  { bytes entity = 1; bool highlight = 2; EncodeOptions options = 3; }
-message EncodeSavedEntityResponse { bytes text = 1; }
+// field 2 was highlight, terminal colour applied by the engine: reserved by
+// number and name, never reused
+message EncodeSavedEntityRequest  { bytes entity = 1; reserved 2; reserved "highlight"; EncodeOptions options = 3; bool tokens = 4; }
+message EncodeSavedEntityResponse { bytes text = 1; repeated Token tokens = 2; }   // tokens empty unless asked
 
-message EncodeEntityRequest  { bytes entity = 1; bool highlight = 2; EncodeOptions options = 3; }
-message EncodeEntityResponse { bytes text = 1; }
+message EncodeEntityRequest  { bytes entity = 1; reserved 2; reserved "highlight"; EncodeOptions options = 3; bool tokens = 4; }
+message EncodeEntityResponse { bytes text = 1; repeated Token tokens = 2; }
 ```
 
 `Find[T]`, `FindByType[T]`, `FindOne[T]` and `All[T]` are Go generics; their type parameter does two things, picks the address segments (`All`) and converts the entity. Over the wire the host passes the segments and does the conversion itself, so `All[T]` becomes `FindByType` with the segments the host derived from its `@xcl.entity("database", "postgres")` registration. Entities returned by lookups are serialised through `encoding/json`, so every sensitive value is the marker `"(sensitive)"`; a host never receives a secret from a lookup, which is what `query_sensitive.go` guarantees to Go callers. Provider tasks are the exception: they carry real values through `internal/wire`, as they do for Go providers.
 
-Encoding an entity as configuration text is a lookup too, refused while an operation runs. `EncodeSavedEntity` renders a saved record, as state stores it and events carry it, through `Config.EncodeSavedEntity`. `EncodeEntity` renders an entity's record in the shape a lookup returns it, possibly edited by the host or built by hand, through `Config.EncodeEntityRecord`. Both take `EncodeOptions`, the four choices of Go's encoder, and an unset `options` is Go's default output, so a saved-record call that sends none renders as it always has. Because a lookup's record holds the marker for every sensitive field, set or not, `EncodeEntity` fills each sensitive value still holding the marker from the engine's own copy of the entity, found by `meta.id`, so the text is what Go writes for that entity: the marker for a set value, the configured value with `reveal_sensitive`, and nothing for one never set; an empty list or map, which the lookup left out of its JSON, is taken from the same copy. A value the host holds for real, such as an edit or a value in a record built by hand, is shown as it is, and a record whose id names nothing is not filled. A host builds the record from its own object; an SDK that hydrated the object from a lookup writes each field it has not changed exactly as the lookup returned it, so values the host language filled in, such as defaults, do not reach the text. Both calls go through the one rendering path Go's `EncodeEntity` uses, so the text is identical to Go's, and `highlight` applies the terminal colouring after rendering, the same for both.
+Encoding an entity as configuration text is a lookup too. `EncodeEntity` reads the engine's own copy of the entity, so like the other lookups it is refused while an operation runs; `EncodeSavedEntity` reads none of the configuration's entities, so it is allowed during an operation, including from a host's event handling, and an empty, invalid or unrecognised record reports the same error then as outside one. `EncodeSavedEntity` renders a saved record, as state stores it and events carry it, through `Config.EncodeSavedEntity`. `EncodeEntity` renders an entity's record in the shape a lookup returns it, possibly edited by the host or built by hand, through `Config.EncodeEntityRecord`. Both take `EncodeOptions`, the four choices of Go's encoder, and an unset `options` is Go's default output, so a saved-record call that sends none renders as it always has. Because a lookup's record holds the marker for every sensitive field, set or not, `EncodeEntity` fills each sensitive value still holding the marker from the engine's own copy of the entity, found by `meta.id`, so the text is what Go writes for that entity: the marker for a set value, the configured value with `reveal_sensitive`, and nothing for one never set; an empty list or map, which the lookup left out of its JSON, is taken from the same copy. A value the host holds for real, such as an edit or a value in a record built by hand, is shown as it is, and a record whose id names nothing is not filled. A host builds the record from its own object; an SDK that hydrated the object from a lookup writes each field it has not changed exactly as the lookup returned it, so values the host language filled in, such as defaults, do not reach the text. Both calls go through the one rendering path Go's `EncodeEntity` uses, so the text is identical to Go's. With `tokens` set, either call also returns the text labelled by the core's lexer, `highlight.Tokenize`, whose texts joined are `text`; a caller that does not ask pays nothing. The engine applies no colour itself: the `highlight` field older callers set to ask for terminal colour is reserved, and such a request, which still parses because protobuf skips unknown fields, is answered with plain text.
+
+### Labelled text
+
+Resources, change summaries and error reports cross as labelled text: the plain text split into pieces, each tagged with what it is. Lexing and layout stay in the core; each language only formats the pieces, plain or styled as its users choose (see `printing-and-highlighting.md` for the formatters in each language).
+
+```protobuf
+// A value's category is kind / 100 * 100. Numbers are Go's highlight.Kind
+// and never change; each name is TOKEN_KIND_ and the Go name in upper snake
+// case.
+enum TokenKind {
+  TOKEN_KIND_TEXT = 0;
+  TOKEN_KIND_BLOCK = 100;  TOKEN_KIND_BLOCK_TYPE = 101;  TOKEN_KIND_NESTED_BLOCK = 102;
+  TOKEN_KIND_LABEL = 200;  TOKEN_KIND_TYPE_LABEL = 201;  TOKEN_KIND_NAME_LABEL = 202;
+  TOKEN_KIND_ATTRIBUTE = 300;
+  TOKEN_KIND_STRING = 400; TOKEN_KIND_STRING_ESCAPE = 401; TOKEN_KIND_HEREDOC = 402;
+                           TOKEN_KIND_HEREDOC_MARKER = 403; TOKEN_KIND_HEREDOC_OPERATOR = 404;
+  TOKEN_KIND_NUMBER = 500;
+  TOKEN_KIND_CONSTANT = 600;
+  TOKEN_KIND_FUNCTION = 700; TOKEN_KIND_BUILTIN_FUNCTION = 701;
+  TOKEN_KIND_REFERENCE = 800; TOKEN_KIND_MEMBER = 801;
+  TOKEN_KIND_OPERATOR = 900;
+  TOKEN_KIND_PUNCTUATION = 1000; TOKEN_KIND_INTERPOLATION_BEGIN = 1001; TOKEN_KIND_INTERPOLATION_END = 1002;
+                                 TOKEN_KIND_TEMPLATE_DIRECTIVE = 1003; TOKEN_KIND_ACCESSOR = 1004;
+  TOKEN_KIND_COMMENT = 1100; TOKEN_KIND_LINE_COMMENT = 1101; TOKEN_KIND_HASH_COMMENT = 1102; TOKEN_KIND_BLOCK_COMMENT = 1103;
+  TOKEN_KIND_DIFF = 1200; TOKEN_KIND_INSERTED = 1201; TOKEN_KIND_DELETED = 1202; TOKEN_KIND_CHANGED = 1203;
+  TOKEN_KIND_PROBLEM = 1300; TOKEN_KIND_ERROR = 1301; TOKEN_KIND_WARNING = 1302;
+  TOKEN_KIND_REPORT = 1400; TOKEN_KIND_SUMMARY = 1401; TOKEN_KIND_LOCATION = 1402; TOKEN_KIND_GUTTER = 1403; TOKEN_KIND_DETAIL = 1404;
+}
+
+message Token { TokenKind kind = 1; string text = 2; }   // the texts joined in order are the plain text
+
+message ConvertThemeRequest  { bytes vscode_theme_json = 1; }   // JSON, comments and trailing commas allowed
+message ConvertThemeResponse { map<int32, string> styles = 1; } // TokenKind number to a style such as "bold #ff8800"
+```
+
+Kinds are numbered in blocks of 100: the value ending in 00 is a category, and a value's category is its number divided by 100, times 100, in every language. proto3 enums are open, so a kind a binding built against an older protocol does not know still arrives as its number and falls into its category, and is styled as that category is; a theme that styles `TOKEN_KIND_COMMENT` styles every kind of comment. The numbers mirror Go's `highlight.Kind`, and a test in `coreservice` holds the enum to `highlight.Kinds()` in both directions, by number and name, so the two cannot drift. Labelled text arrives in three places: `Error.report`, the `tokens` of both encode calls when asked, and `OperationFinished.diff_tokens` for a finished diff, which describes the same diff as `diff_json` because the core derives both from the one value.
+
+`ConvertTheme` turns a VS Code colour theme into a style string per kind, through the core's TextMate selector rules, as Go's `highlight.LoadVSCodeTheme` does. It takes handle 0, so a host converts a theme without creating a configuration. Only the kinds the theme styles appear in `styles`; every other kind keeps the language's default. A theme the core cannot use fails with `invalid_theme`, whose `source` and `reason` details say what was wrong, and an empty request with `invalid_argument`.
 
 ### Types
 
@@ -633,7 +685,7 @@ The split keeps process management, the GIL and fork detection in one place; let
 Generation moves from the `protoc` line in the `Makefile` to `buf`:
 
 - `buf.yaml` and `buf.gen.yaml` in each repository; `make protos` runs `buf generate`.
-- `buf breaking --against '.git#branch=main'` in CI fails any change that renumbers, retypes or removes a field or method, enforcing the rule that codes, fields and methods are added and never renamed or reused.
+- `buf breaking --against '.git#branch=main'` in CI fails any change that renumbers or retypes a field, removes a method, or removes a field without reserving both its number and its name, enforcing the rule that codes, fields and methods are added and never renamed or reused. The FILE rules are used with `FIELD_NO_DELETE` swapped for `FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED` and `FIELD_NO_DELETE_UNLESS_NAME_RESERVED`, since `FIELD_NO_DELETE` refuses even a fully reserved removal.
 - `buf lint` keeps names consistent (`xcl.core.v1`, `FooRequest` and `FooResponse`).
 
 ### How the SDKs get the protos

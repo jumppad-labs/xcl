@@ -247,7 +247,7 @@ Testing follows the repo's conventions: testify `require`, one behaviour per tes
 
 **Validation point**: The `errors` and `internal/report` tests pass: context clipped at the file's edges, `%+v` gives the report, `%v` gives one line, and the zap test finds the report in `errorVerbose`. The existing report tests pass with the extra context lines.
 
-#### - [ ] Task: Lay out error reports in one private package
+#### - [x] Task: Lay out error reports in one private package
 **Id:** 1a65fb65-b0e7-4064-8aa0-cb3e9b4ee239
 **Repo:** xcl
 **Depends on:** none
@@ -258,11 +258,11 @@ Move the wording of an error report (severity and summary, location, numbered so
 *Technical detail:* [context.md#task-lay-out-error-reports-in-one-private-package](./context.md#task-lay-out-error-reports-in-one-private-package)
 
 **Acceptance criteria**:
-- [ ] There is one place that decides a report's wording, and the existing report output is unchanged
-- [ ] Detail can be wrapped at any width, or left whole when the width is 0
-- [ ] Every problem inside an error is found, including through application wrapping and joined errors, without descending into a problem's own cause
+- [x] There is one place that decides a report's wording, and the existing report output is unchanged
+- [x] Detail can be wrapped at any width, or left whole when the width is 0
+- [x] Every problem inside an error is found, including through application wrapping and joined errors, without descending into a problem's own cause
 
-#### - [ ] Task: Capture two lines of context around each fault
+#### - [x] Task: Capture two lines of context around each fault
 **Id:** c5eb1740-6882-418f-a342-d9b05297d8e4
 **Repo:** xcl
 **Depends on:** none
@@ -273,12 +273,12 @@ When a configuration problem is recorded, keep up to two lines before and after 
 *Technical detail:* [context.md#task-capture-two-lines-of-context-around-each-fault](./context.md#task-capture-two-lines-of-context-around-each-fault)
 
 **Acceptance criteria**:
-- [ ] A fault in the middle of a file captures the two lines before and the two after it
-- [ ] A fault on line 1 of a three-line file captures lines 1 to 3
-- [ ] A fault on the last line captures that line and the two before it
-- [ ] No file is read again to capture context
+- [x] A fault in the middle of a file captures the two lines before and the two after it
+- [x] A fault on line 1 of a three-line file captures lines 1 to 3
+- [x] A fault on the last line captures that line and the two before it
+- [x] No file is read again to capture context
 
-#### - [ ] Task: Print the full report through detailed error formatting
+#### - [x] Task: Print the full report through detailed error formatting
 **Id:** 560866fc-d07d-4dd7-bb93-fa32b9b8fa26
 **Repo:** xcl
 **Depends on:**
@@ -291,10 +291,10 @@ Make a single configuration problem, and the collected configuration error, answ
 *Technical detail:* [context.md#task-print-the-full-report-through-detailed-error-formatting](./context.md#task-print-the-full-report-through-detailed-error-formatting)
 
 **Acceptance criteria**:
-- [ ] Formatting a configuration error in its ordinary form gives a single line
-- [ ] Asking for its detailed form gives the full report with the surrounding lines, detail wrapped at 80 columns
-- [ ] Logging the error with zap writes the full plain report in the entry's detailed error field
-- [ ] zap is used only by tests, at a pinned version
+- [x] Formatting a configuration error in its ordinary form gives a single line
+- [x] Asking for its detailed form gives the full report with the surrounding lines, detail wrapped at 80 columns
+- [x] Logging the error with zap writes the full plain report in the entry's detailed error field
+- [x] zap is used only by tests, at a pinned version
 
 ### Milestone 2: Errors, resources and change summaries print in one call, as plain text, terminal colour, HTML or SVG, styled by themes
 
@@ -302,7 +302,7 @@ Make a single configuration problem, and the collected configuration error, answ
 
 **Validation point**: The whole root module's test suite passes, including the ported tokenizer parity assertions with unchanged scope strings, the "matches captured output" regression tests, and the new print, format, theme and labelled-text tests. Nothing in the module refers to a removed identifier, which the build itself proves.
 
-#### - [ ] Task: Capture today's plain output of resources and change summaries
+#### - [x] Task: Capture today's plain output of resources and change summaries
 **Id:** c944aff2-99d6-443f-9a69-bc5bf771153b
 **Repo:** xcl
 **Depends on:** none
@@ -313,10 +313,10 @@ Before anything about printing changes, record the exact plain text the current 
 *Technical detail:* [context.md#task-capture-todays-plain-output-of-resources-and-change-summaries](./context.md#task-capture-todays-plain-output-of-resources-and-change-summaries)
 
 **Acceptance criteria**:
-- [ ] The captured output comes from the code as it stands before this plan's printing changes
-- [ ] The fixed inputs cover nested blocks, references, sensitive values, every kind of change and every resource action
+- [x] The captured output comes from the code as it stands before this plan's printing changes
+- [x] The fixed inputs cover nested blocks, references, sensitive values, every kind of change and every resource action
 
-#### - [ ] Task: Rebuild highlighting around kinds, themes and formatters
+#### - [x] Task: Rebuild highlighting around kinds, themes and formatters
 **Id:** 668c52a0-5ffc-46ca-a0ab-801363fc69c1
 **Repo:** xcl
 **Depends on:**
@@ -328,17 +328,17 @@ Replace the highlighting package's scope-labelled pieces and renderers with the 
 *Technical detail:* [context.md#task-rebuild-highlighting-around-kinds-themes-and-formatters](./context.md#task-rebuild-highlighting-around-kinds-themes-and-formatters)
 
 **Acceptance criteria**:
-- [ ] Configuration text is labelled exactly as before, and the existing grammar-parity assertions pass with unchanged scope names
-- [ ] A theme that styles only comments colours every kind of comment, and styling line comments as well gives them their own style
-- [ ] An unknown style word is reported by validation and ignored when printing
-- [ ] Terminal output resets colour before every newline and, with codes removed, equals the plain output
-- [ ] HTML output uses only the documented class names, escapes text and has no inline styles; inline-styled HTML has styles and no classes
-- [ ] SVG output is a well-formed document with one text line per source line and a view box wide enough for the longest line
-- [ ] A stylesheet generated from any theme is valid CSS scoped to the container class, and changing only attributes changes only the attribute rule
-- [ ] A VS Code theme that colours properties orange colours attribute names orange
-- [ ] Colour chosen from a destination is terminal colour for a terminal and plain text for a file or when NO_COLOR is set
+- [x] Configuration text is labelled exactly as before, and the existing grammar-parity assertions pass with unchanged scope names
+- [x] A theme that styles only comments colours every kind of comment, and styling line comments as well gives them their own style
+- [x] An unknown style word is reported by validation and ignored when printing
+- [x] Terminal output resets colour before every newline and, with codes removed, equals the plain output
+- [x] HTML output uses only the documented class names, escapes text and has no inline styles; inline-styled HTML has styles and no classes
+- [x] SVG output is a well-formed document with one text line per source line and a view box wide enough for the longest line
+- [x] A stylesheet generated from any theme is valid CSS scoped to the container class, and changing only attributes changes only the attribute rule
+- [x] A VS Code theme that colours properties orange colours attribute names orange
+- [x] Colour chosen from a destination is terminal colour for a terminal and plain text for a file or when NO_COLOR is set
 
-#### - [ ] Task: Label change summaries with kinds
+#### - [x] Task: Label change summaries with kinds
 **Id:** dd13916e-b0ee-4851-a1a7-670f3cc2f616
 **Repo:** xcl
 **Depends on:**
@@ -350,10 +350,10 @@ Switch the change-summary layout from scope-labelled pieces to labelled text wit
 *Technical detail:* [context.md#task-label-change-summaries-with-kinds](./context.md#task-label-change-summaries-with-kinds)
 
 **Acceptance criteria**:
-- [ ] A change summary's labelled text joins back to exactly the text it produced before
-- [ ] Created, deleted and changed parts carry the inserted, deleted and changed kinds
+- [x] A change summary's labelled text joins back to exactly the text it produced before
+- [x] Created, deleted and changed parts carry the inserted, deleted and changed kinds
 
-#### - [ ] Task: Add one-call printing of errors, resources and change summaries
+#### - [x] Task: Add one-call printing of errors, resources and change summaries
 **Id:** bf7098c4-edcc-45e6-84c6-db052d6ea591
 **Repo:** xcl
 **Depends on:**
@@ -368,17 +368,17 @@ Give the root package one call each to print an error, a resource or a change su
 *Technical detail:* [context.md#task-add-one-call-printing-of-errors-resources-and-change-summaries](./context.md#task-add-one-call-printing-of-errors-resources-and-change-summaries)
 
 **Acceptance criteria**:
-- [ ] Printing the error from applying a configuration with an unsupported block on line 7 writes a report starting "Error: Unsupported block type", naming the file, line 7, the block and the field, showing numbered lines 5 to 9, and ending with the detail
-- [ ] A configuration with two problems, wrapped by the application, prints both reports in order
-- [ ] An error without a configuration problem prints as exactly its message and a newline
-- [ ] The detailed formatting of the configuration error equals printing it as plain text
-- [ ] Detail is wrapped at 80 columns by default, at the chosen width, or not at all
-- [ ] Plain output of the fixed resources and change summaries equals the output captured before the change
-- [ ] Terminal, HTML and inline-HTML printing of the error behave as the formats promise, with the fault marked as an error
-- [ ] A user-written format receives the whole report at once and writes to the given destination
-- [ ] The labelled text of an error report, a resource and a change summary joins to its plain output
+- [x] Printing the error from applying a configuration with an unsupported block on line 7 writes a report starting "Error: Unsupported block type", naming the file, line 7, the block and the field, showing numbered lines 5 to 9, and ending with the detail
+- [x] A configuration with two problems, wrapped by the application, prints both reports in order
+- [x] An error without a configuration problem prints as exactly its message and a newline
+- [x] The detailed formatting of the configuration error equals printing it as plain text
+- [x] Detail is wrapped at 80 columns by default, at the chosen width, or not at all
+- [x] Plain output of the fixed resources and change summaries equals the output captured before the change
+- [x] Terminal, HTML and inline-HTML printing of the error behave as the formats promise, with the fault marked as an error
+- [x] A user-written format receives the whole report at once and writes to the given destination
+- [x] The labelled text of an error report, a resource and a change summary joins to its plain output
 
-#### - [ ] Task: Move every remaining caller to the new printing
+#### - [x] Task: Move every remaining caller to the new printing
 **Id:** 97a596f0-3dbc-428b-8c81-8c64907e1038
 **Repo:** xcl
 **Depends on:**
@@ -390,9 +390,9 @@ Update everything else in the repository that used the removed API. The core ser
 *Technical detail:* [context.md#task-move-every-remaining-caller-to-the-new-printing](./context.md#task-move-every-remaining-caller-to-the-new-printing)
 
 **Acceptance criteria**:
-- [ ] The core service still returns coloured text when asked for highlighting, and plain text otherwise
-- [ ] The examples' inspect, plan and pretty-log output is unchanged in plain text and still coloured when colour is forced
-- [ ] No code or test in the repository uses a removed highlighting, report or change-summary rendering function
+- [x] The core service still returns coloured text when asked for highlighting, and plain text otherwise
+- [x] The examples' inspect, plan and pretty-log output is unchanged in plain text and still coloured when colour is forced
+- [x] No code or test in the repository uses a removed highlighting, report or change-summary rendering function
 
 ### Milestone 3: Reference outputs published for every language's printing
 
@@ -400,7 +400,7 @@ Update everything else in the repository that used the removed API. The core ser
 
 **Validation point**: The reference-output test passes without `-update`, and regenerating with `-update` leaves the tree unchanged.
 
-#### - [ ] Task: Publish reference outputs for every built-in format
+#### - [x] Task: Publish reference outputs for every built-in format
 **Id:** 60674e3d-c8e7-4fa8-a829-c0e0a9baa721
 **Repo:** xcl
 **Depends on:**
@@ -413,9 +413,9 @@ Add the reference set other languages are checked against: labelled inputs for a
 *Technical detail:* [context.md#task-publish-reference-outputs-for-every-built-in-format](./context.md#task-publish-reference-outputs-for-every-built-in-format)
 
 **Acceptance criteria**:
-- [ ] The repository holds labelled inputs, outputs for every built-in format, the default stylesheet and the class-name list
-- [ ] The Go formats' output matches every reference file byte for byte
-- [ ] Regenerating the files from unchanged code leaves them unchanged
+- [x] The repository holds labelled inputs, outputs for every built-in format, the default stylesheet and the class-name list
+- [x] The Go formats' output matches every reference file byte for byte
+- [x] Regenerating the files from unchanged code leaves them unchanged
 
 ### Milestone 4: Examples print reports, and the release notes and website describe the new printing
 
@@ -423,7 +423,7 @@ Add the reference set other languages are checked against: labelled inputs for a
 
 **Validation point**: Each example's smoke test against a broken configuration finds a report on stderr. The website builds. The manual reviews of the changelog and the website pass.
 
-#### - [ ] Task: Make the example programs print errors as reports
+#### - [x] Task: Make the example programs print errors as reports
 **Id:** 16cab7d3-7891-450c-9136-b14922ecdd54
 **Repo:** xcl
 **Depends on:**
@@ -435,11 +435,11 @@ Change every example program that reports an error to print it through the new e
 *Technical detail:* [context.md#task-make-the-example-programs-print-errors-as-reports](./context.md#task-make-the-example-programs-print-errors-as-reports)
 
 **Acceptance criteria**:
-- [ ] Running each example against a configuration with a mistake prints a report with the numbered faulty source lines
-- [ ] No example prints a configuration error as a single line
-- [ ] Application errors that are not configuration problems still print as one line
+- [x] Running each example against a configuration with a mistake prints a report with the numbered faulty source lines
+- [x] No example prints a configuration error as a single line
+- [x] Application errors that are not configuration problems still print as one line
 
-#### - [ ] Task: Write the release notes and repository docs
+#### - [x] Task: Write the release notes and repository docs
 **Id:** 0ea6110b-3a4b-41aa-9093-b31c673ae5e3
 **Repo:** xcl
 **Depends on:**
@@ -453,10 +453,10 @@ Add the changelog entry describing the new printing, themes, formats, reference 
 *Technical detail:* [context.md#task-write-the-release-notes-and-repository-docs](./context.md#task-write-the-release-notes-and-repository-docs)
 
 **Acceptance criteria**:
-- [ ] The changelog lists a one-line replacement for each removed highlighting, report and change-summary rendering function
-- [ ] The repository docs describe the new printing and no longer mention a removed function
+- [x] The changelog lists a one-line replacement for each removed highlighting, report and change-summary rendering function
+- [x] The repository docs describe the new printing and no longer mention a removed function
 
-#### - [ ] Task: Document the new printing on the website
+#### - [x] Task: Document the new printing on the website
 **Id:** a3b4a3e9-2874-4159-b8a9-83464bd0fb8b
 **Repo:** xcl-website
 **Depends on:**
@@ -469,9 +469,9 @@ Rewrite the website's highlighting, problems, diff, events and example pages to 
 *Technical detail:* [context.md#task-document-the-new-printing-on-the-website](./context.md#task-document-the-new-printing-on-the-website)
 
 **Acceptance criteria**:
-- [ ] The site has sections on printing errors, resources and change summaries, output formats, themes, class names, stylesheet generation, custom formats and logging integration, each with a Go example
-- [ ] No page documents a removed function
-- [ ] Every existing page URL still works and the site builds
+- [x] The site has sections on printing errors, resources and change summaries, output formats, themes, class names, stylesheet generation, custom formats and logging integration, each with a Go example
+- [x] No page documents a removed function
+- [x] Every existing page URL still works and the site builds
 
 ## Open Questions
 
@@ -489,3 +489,243 @@ None. The two uncertainties found during research were settled during planning w
 - **Cutting a release.** Tagging the next pre-1.0 minor version that carries this breaking change is not part of this plan. Releases follow the repo's release process.
 - **A Python website redesign or new website pages and navigation.** The docs are rewritten inside existing pages only.
 - **Removing the protocol's legacy `highlight` encode option, or Python's `highlight=` parameter.** Those belong to the engine and Python specs respectively.
+
+## Changelog
+
+### 2026-10-26 — Task: Lay out error reports in one private package
+
+**What was done**: Added the private package `internal/report`, which lays a problem out as token-free segments (severity, summary, location, gutter, source line with its fault range, detail, plain text), wraps detail at a width, and walks an error tree for problems. `xcl.DiagnosticPieces` was rebuilt on top of it, with byte-identical output, so the report's wording now lives only in `report.Layout`.
+
+**Deviations**: `report.Walk` descends into an `Unwrap() []error` collection only when a problem lies beneath it, the same rule the plan gives for `Unwrap() error`, so a multi-error holding only plain errors is visited whole with its own message. The plan named the rule only for single wraps; applying it to both is consistent and changes no planned output.
+
+**Files changed**:
+- `xcl: internal/report/report.go`
+- `xcl: internal/report/wrap.go`
+- `xcl: internal/report/walk.go`
+- `xcl: internal/report/report_test.go`
+- `xcl: internal/report/wrap_test.go`
+- `xcl: internal/report/walk_test.go`
+- `xcl: diagnostics.go`
+
+**Discoveries**: `Layout` never emits an empty segment (an empty source line writes only its gutter), so a consumer that maps segments to tokens keeps the "no empty tokens" invariant without filtering. The location's trailing newline is a separate `Plain` segment so `Location` tokens hold only the location text.
+
+### 2026-10-26 — Task: Capture two lines of context around each fault
+
+**What was done**: `errors.NewDiagnostic` (through `linesOf`) now keeps up to two lines before and after the lines a fault covers, clipped at the start and end of the file, from the source bytes already held. Tests asserting the captured lines and the report text were updated, and new tests cover the middle of a file, the first and last lines, files with and without a final line break, a fault at the end of a file, a multi-line fault and not reading the file.
+
+**Deviations**: `coreservice/errors_test.go` (`TestErrorCodeDiagnosticSendsItsSource`) also asserted the captured lines (the `source_start` and `source` details sent over CoreService), so its expectations were widened too; the plan did not list it. Context is widened only into lines that hold something (the empty element after a final line break is not context), but a fault on that empty line, such as one at the end of the file, still keeps the line it covers.
+
+**Files changed**:
+- `xcl: errors/diagnostic.go`
+- `xcl: errors/diagnostic_test.go`
+- `xcl: internal/parser/validate_test.go`
+- `xcl: internal/parser/parse_test.go`
+- `xcl: diagnostics_test.go`
+- `xcl: coreservice/errors_test.go`
+
+**Discoveries**: The wider context also reaches other languages: CoreService's `Error.details` carries `source_start` and `source` from `Diagnostic.Source`, so Python's problems now receive the two context lines either side too. The viper tests needed no change (they assert with `Contains`).
+
+### 2026-10-26 — Task: Print the full report through detailed error formatting
+
+**What was done**: `*errors.Diagnostic` and `*errors.ConfigError` implement `fmt.Formatter` (`errors/format.go`): `%v`/`%s` give `Error()`, `%q` the quoted line, `%+v` the plain report built from `internal/report` (every diagnostic laid out with detail wrapped at 80, every other leaf error as its message and a newline). zap was added as a pinned, test-only dependency, and a test proves `zap.Error` carries the report in `errorVerbose`.
+
+**Deviations**: An unknown verb writes `%!<verb>(<type>=<Error()>)`, and `%w` (through `fmt.Errorf`) gives the one line. The reason zap is test-only is recorded as a comment on its `go.mod` line. `go mod tidy` also added `go.uber.org/multierr` as an indirect requirement.
+
+**Files changed**:
+- `xcl: errors/format.go`
+- `xcl: errors/format_test.go`
+- `xcl: errors/format_zap_test.go`
+- `xcl: errors/diagnostic.go`
+- `xcl: go.mod`
+- `xcl: go.sum`
+
+**Discoveries**: The example modules and `bindings/libxcl` build unchanged after the root gains a test-only requirement (module graph pruning), so no example `go.sum` needed updating. `xcl.PrintError` is named in the new doc comments ahead of the task that adds it.
+
+### 2026-10-26 — Task: Capture today's plain output of resources and change summaries
+
+**What was done**: Captured the current plain output of the encoder (`EncodeEntity` with `IncludeComputed()`) for five fixed resources (nested block, computed value, repeated blocks and lists, references with a written dependency, a sensitive value) and of the change-summary renderer (`highlight.Text.Render(d.Pieces())`) for four fixed change summaries (every action, every replace and dependency reason, every kind of value change, no changes) into `testdata/print/`. `print_fixtures_test.go` declares the fixtures and holds the current code to the captured bytes, one test per fixture.
+
+**Deviations**: The files were written by a throwaway test run against the unchanged encoder and renderer, then the throwaway test was deleted. Diff fixtures are literals in `print_fixtures_test.go` (`printExampleDiff`, `printReasonsDiff`, `printChangesDiff`) rather than reused from the `diff` package's tests, which live in another package. The plan's listed `encode_test.go`, `encode_highlight_test.go`, `internal/testutil/entities.go`, `diff/example_test.go` and `diff/render_test.go` needed no change.
+
+**Files changed**:
+- `xcl: print_fixtures_test.go`
+- `xcl: testdata/print/entity_database.txt`
+- `xcl: testdata/print/entity_network.txt`
+- `xcl: testdata/print/entity_container.txt`
+- `xcl: testdata/print/entity_references.txt`
+- `xcl: testdata/print/entity_sensitive.txt`
+- `xcl: testdata/print/diff_example.txt`
+- `xcl: testdata/print/diff_reasons.txt`
+- `xcl: testdata/print/diff_changes.txt`
+- `xcl: testdata/print/diff_nochange.txt`
+
+**Discoveries**: The goal reviewer noted that no fixture renders with `RevealSensitive`; a diff change with `Sensitive` and both values set is rendered revealed, which `diff_changes` covers.
+
+### 2026-10-26 — Task: Rebuild highlighting around kinds, themes and formatters
+
+**What was done**: The `highlight` package was rebuilt on the design's model: numbered `Kind`s with `Parent`, `String`, `Class` and `Scope`; `Token` and `Tokenize` (the tokenizer unchanged in behaviour, emitting kinds); `Theme` as a map of style strings with `With`, `Style` and `Validate`, and `DefaultTheme`; `Style`, `Colour` and `ParseStyle`; `LoadVSCodeTheme` built on the old TextMate matcher; the `Formatter`/`FormatterFunc` seam with `Plain`, `Terminal`, `HTML`, `HTMLInline` and `SVG`; `WriteCSS`; and `For`. `errors` gained `ErrInvalidStyle`/`InvalidStyleError`. The old API (`Piece`, `Pieces`, `Renderer`, `RendererFunc`, `PieceFunc`, `Text` renderer, `ANSI`, `ANSIRenderer`, `NewANSI`, `ANSIOption`, `WithTheme`, `WithThemeFile`, `Scope*`) was deleted. A sub-agent wrote the tests (314 in `highlight`), with the grammar-parity expectations unchanged.
+
+**Deviations**: Codebase research was done in the main context rather than by sub-agents (the plan's context already held the file map). `Style.IsZero` was added as a small helper. A named background colour, which `ParseStyle` never produces, is still handled by `Terminal` (SGR 40–47/100–107) for user-built `Style` values. `WriteCSS` skips a kind whose style yields no declarations at all. HTML spans for unknown kinds carry only the resolved (parent's) class. As planned, packages outside `highlight`/`errors` do not compile until "Move every remaining caller" lands.
+
+**Files changed**:
+- `xcl: highlight/kind.go`
+- `xcl: highlight/tokenize.go`
+- `xcl: highlight/style.go`
+- `xcl: highlight/theme.go`
+- `xcl: highlight/vscode.go`
+- `xcl: highlight/formatter.go`
+- `xcl: highlight/terminal.go`
+- `xcl: highlight/html.go`
+- `xcl: highlight/svg.go`
+- `xcl: highlight/css.go`
+- `xcl: highlight/for.go`
+- `xcl: highlight/doc.go`
+- `xcl: highlight/highlight.go` (deleted)
+- `xcl: highlight/ansi.go` (deleted)
+- `xcl: highlight/ansi_test.go` (deleted)
+- `xcl: highlight/tokenize_test.go`
+- `xcl: highlight/highlight_test.go`
+- `xcl: highlight/kind_test.go`
+- `xcl: highlight/style_test.go`
+- `xcl: highlight/theme_test.go`
+- `xcl: highlight/vscode_test.go`
+- `xcl: highlight/terminal_test.go`
+- `xcl: highlight/html_test.go`
+- `xcl: highlight/svg_test.go`
+- `xcl: highlight/css_test.go`
+- `xcl: highlight/for_test.go`
+- `xcl: errors/highlight_errors.go`
+- `xcl: errors/highlight_errors_test.go`
+
+**Discoveries**: Style strings cannot say "explicitly nothing", so a VS Code rule that resets `fontStyle` to `""` without a colour is dropped by `LoadVSCodeTheme` and the kind falls back to its category's style, where VS Code would show it unstyled. `/dev/null` is a character device, which makes `For`'s terminal branch testable without a TTY. Function values are not comparable, so tests tell `Plain` from `Terminal` by their output.
+
+### 2026-10-26 — Task: Label change summaries with kinds
+
+**What was done**: `diff.(*Diff).Pieces()` became `Tokens() []highlight.Token`: markers and paths are labelled `Inserted`, `Deleted` or `Changed`, comment lines `HashComment`, headers and values through `highlight.Tokenize`, and everything else `Text`. The text is unchanged. `pieces_test.go` became `tokens_test.go` (asserting kinds, plus new tests for each header and value marker kind), `render_test.go` formats through `highlight.Plain`/`Terminal` and a test-local marker formatter with every expected string unchanged, and the example became `ExampleDiff_Tokens` with the same Output.
+
+**Deviations**: The theme-without-diff-rules test now uses `highlight.Theme{Comment: "italic"}` in place of a VS Code theme JSON, since themes are plain data.
+
+**Files changed**:
+- `xcl: diff/render.go`
+- `xcl: diff/pieces_test.go` (renamed to `diff/tokens_test.go`)
+- `xcl: diff/tokens_test.go`
+- `xcl: diff/render_test.go`
+- `xcl: diff/example_test.go`
+
+**Discoveries**: None.
+
+### 2026-10-26 — Task: Add one-call printing of errors, resources and change summaries
+
+**What was done**: The root package gained `PrintError`, `PrintEntity` and `PrintDiff` (`print.go`), configured by `PrintOption`s `WithFormatter`, `WithTheme` and `WithWidth` (defaults Plain, `DefaultTheme`, 80), with every `EncodeOption` also a `PrintOption`. `diagnostics.go` was replaced by `ErrorTokens`, which walks the whole error tree and labels each diagnostic's report with the Error/Warning, Summary, Location, Gutter and Detail kinds, the source lexed with the fault overlaid. `EntityTokens` was added to `encode.go`, and `ErrInvalidStyle`/`InvalidStyleError` are re-exported. `DiagnosticPieces` was removed. A sub-agent ported the root tests and wrote the print, entity and diff tests, including the line-7 unsupported-block report in one `PrintError` call and zap's `errorVerbose`.
+
+**Deviations**: The root test files `config_singleton_lifecycle_test.go` and `sensitive_leak_test.go`, which the plan gave to "Move every remaining caller", were ported in this task so the root package's tests could compile and run here. A second fixture, `testdata/print/two/main.xcl`, holds the two recoverable problems. `WithFormatter(nil)` keeps the default formatter. In the ported report tests the `": "` after the severity now sits inside the `Summary` token, as the layout labels it.
+
+**Files changed**:
+- `xcl: print.go`
+- `xcl: diagnostics.go`
+- `xcl: encode.go`
+- `xcl: config.go`
+- `xcl: diagnostics_test.go`
+- `xcl: encode_highlight_test.go`
+- `xcl: print_fixtures_test.go`
+- `xcl: print_error_test.go`
+- `xcl: print_entity_test.go`
+- `xcl: print_diff_test.go`
+- `xcl: highlight_errors_test.go`
+- `xcl: config_singleton_lifecycle_test.go`
+- `xcl: sensitive_leak_test.go`
+- `xcl: testdata/print/bad/main.xcl`
+- `xcl: testdata/print/two/main.xcl`
+
+**Discoveries**: `xclerrors.Diagnostics` is itself an error with `Unwrap() []error`, so it can be passed straight to `PrintError`/`ErrorTokens`. `coreservice/lookups.go` is now the only non-test code still on the removed API.
+
+### 2026-10-26 — Task: Move every remaining caller to the new printing
+
+**What was done**: The core service's legacy `highlight=true` now formats `highlight.Tokenize(text)` with `highlight.Terminal` and the default theme. The plugin example's `inspect` and `plan` print through `xcl.PrintEntity`/`xcl.PrintDiff` with a formatter from a new `formatterFor` helper (the existing lipgloss colour check), and `prettylog` prints each created entity with `xcl.PrintEntity` and the lipgloss-chosen formatter. The parser and viper tests were ported (`plainDiff` helper joining `Tokens()`; `xcl.PrintError(..., xcl.WithWidth(0))`). The whole root module, every example module and `bindings/libxcl` build and pass, and nothing refers to a removed function.
+
+**Deviations**: `config_singleton_lifecycle_test.go` and `sensitive_leak_test.go` had already been ported in "Add one-call printing". `coreservice/lookups_test.go`, `example/prettylog/prettylog_test.go` and `go.mod` needed no change: the default theme keeps `1;35` for block types and `34` for attributes.
+
+**Files changed**:
+- `xcl: coreservice/lookups.go`
+- `xcl: example/plugin/inspect.go`
+- `xcl: example/plugin/plan.go`
+- `xcl: example/prettylog/prettylog.go`
+- `xcl: internal/parser/decide_test.go`
+- `xcl: internal/parser/diff_unknown_test.go`
+- `xcl: viper/xclviper_test.go`
+- `xcl: viper/xclviper_directory_test.go`
+
+**Discoveries**: `formatterFor` in `example/plugin/inspect.go` is shared with `plan.go` and is ready for the example's error printing in the next milestone.
+
+### 2026-10-26 — Task: Publish reference outputs for every built-in format
+
+**What was done**: `highlight/testdata/reference/` now holds the cross-language contract: three token-stream inputs as JSON (`report`, `entity`, `diff`), each one's Plain, Terminal, HTML, inline HTML and SVG output with the default theme, `default.css` from `WriteCSS(DefaultTheme)`, `classes.txt`, the `inputs/entity.xcl` source and a README for other languages' maintainers. `highlight/reference_test.go` (external `highlight_test`) builds the inputs from real code (`xcl.ErrorTokens` over `NewDiagnostic` on fixed source, `Tokenize` of the entity source, `diff.(*Diff).Tokens` of the example diff), checks them against the stored JSON, and holds every format, the stylesheet and the class list to the files byte for byte. `-update` rewrites them; two consecutive `-update` runs leave every file identical.
+
+**Deviations**: The report input's error sits on line 4 of a nine-line source, so the context shows lines 2–6 including a blank line, and its source line holds `"a<b"` to exercise escaping. The report's warning has no subject, covering the no-location layout.
+
+**Files changed**:
+- `xcl: highlight/reference_test.go`
+- `xcl: highlight/testdata/reference/README.md`
+- `xcl: highlight/testdata/reference/inputs/entity.xcl`
+- `xcl: highlight/testdata/reference/report.tokens.json`
+- `xcl: highlight/testdata/reference/entity.tokens.json`
+- `xcl: highlight/testdata/reference/diff.tokens.json`
+- `xcl: highlight/testdata/reference/{report,entity,diff}.plain.txt`
+- `xcl: highlight/testdata/reference/{report,entity,diff}.terminal.txt`
+- `xcl: highlight/testdata/reference/{report,entity,diff}.html`
+- `xcl: highlight/testdata/reference/{report,entity,diff}.inline.html`
+- `xcl: highlight/testdata/reference/{report,entity,diff}.svg`
+- `xcl: highlight/testdata/reference/default.css`
+- `xcl: highlight/testdata/reference/classes.txt`
+
+**Discoveries**: Go runs a file's tests in source order, so the token-input tests come first in `reference_test.go`: on an `-update` run they rewrite the JSON before the format tests read it back.
+
+### 2026-10-26 — Task: Make the example programs print errors as reports
+
+**What was done**: The configuration-only, plugin and remote-plugin examples print every error through `xcl.PrintError`: configonly and remoteplugin with `highlight.For(os.Stderr)`/`highlight.For(stderr)`, the plugin example with its lipgloss-based `formatterFor`. A configuration with a mistake now shows a report with the numbered faulty lines; any other error is its message on one line, without the old `error:` prefix. Each example gained a broken configuration under `testdata/broken/` and tests running the real program against it, and a test that an application error still prints as one line.
+
+**Deviations**: The plugin example's broken-configuration smoke test runs `plan`, which pings Docker before reading the configuration, so it is Docker-gated like the example's other smoke tests (it ran here). The remoteplugin test goes through `run()` with the fake GitHub release the example's tests already use, since `apply` fetches the release key before reading the configuration; it needs no Docker. The missing-plugin smoke test now asserts the one-line message's ending instead of the `error:` prefix.
+
+**Files changed**:
+- `xcl: example/configonly/main.go`
+- `xcl: example/configonly/smoke_test.go`
+- `xcl: example/configonly/testdata/broken/main.xcl`
+- `xcl: example/plugin/main.go`
+- `xcl: example/plugin/smoke_test.go`
+- `xcl: example/plugin/testdata/broken/main.xcl`
+- `xcl: example/remoteplugin/main.go`
+- `xcl: example/remoteplugin/main_test.go`
+- `xcl: example/remoteplugin/testdata/broken/main.xcl`
+
+**Discoveries**: A missing configuration directory is reported by the parser as a diagnostic without a subject ("Error: Unable to read the configuration"), so it too prints as a short report rather than one line.
+
+### 2026-10-26 — Task: Write the release notes and repository docs
+
+**What was done**: `CHANGELOG.md` gained the section for this spec: the print functions and options, `For`, restored context, `fmt.Formatter` and zap, the rebuilt `highlight` package (kinds, tokens, themes and style strings, `Validate`, `LoadVSCodeTheme`, the formatters, the HTML class contract, `WriteCSS`), the labelled-text functions, the reference outputs, the core service's `highlight=true`, the examples and zap as a test-only dependency, then a Breaking list with a one-line replacement for every removed function and the behaviour changes. `docs/overview.md` describes the context lines, `%+v`, `PrintError`/`ErrorTokens` and `internal/report`; `docs/README.md`'s package table describes `highlight`, `diff`, `print.go`/`diagnostics.go` and `internal/report`; `README.md` mentions `PrintError` after its configuration example.
+
+**Deviations**: The Breaking list also records that an example program now prints a non-configuration error without the `error:` prefix.
+
+**Files changed**:
+- `xcl: CHANGELOG.md`
+- `xcl: docs/overview.md`
+- `xcl: docs/README.md`
+- `xcl: README.md`
+
+**Discoveries**: None.
+
+### 2026-10-26 — Task: Document the new printing on the website
+
+**What was done**: Three sub-agents rewrote seven existing pages in place, each Go example compile-checked and each output shown taken from real runs. `configuration-text.mdx` replaces "Highlighting" with "Printing and highlighting": `PrintEntity` with mixed options, output formats and `highlight.For`, themes and style strings with category fallback and `Validate`, VS Code themes, the HTML class contract with a table of every class, `WriteCSS`, `template.HTML`, the reference outputs, and writing a format. `problems.mdx` documents `PrintError` (context lines, wrapped errors, width, colour, `%+v`) and logging (zap's `errorVerbose`, slog). `diff.mdx`, `sensitive-values.mdx`, `events.mdx`, `examples/viper.mdx` and `examples/plugins.mdx` move to `PrintDiff`/`Tokens`, `PrintEntity` and `PrintError`, with the plugin listings matching the example sources and a real report from `testdata/broken`. No page names a removed function, no page was renamed or removed, navigation is unchanged, `npm run build` completes and `astro check` reports 0 errors.
+
+**Deviations**: Python tabs keep their current form and say richer printing in Python is coming. `src/styles/global.css` was left unchanged (the optional rendered `.xcl` example was not added). The pages record what the code really does where it is finer than the plan's wording: slog's text handler formats an error value with `%+v`, so logging the error directly writes the whole report as one escaped value; zap's `errorVerbose` holds the report only for the unwrapped error; and `%v` on a `ConfigError` gives one line per problem. `node_modules` was installed in the website worktree with `npm ci` for the build.
+
+**Files changed**:
+- `xcl-website: src/pages/configuration-text.mdx`
+- `xcl-website: src/pages/problems.mdx`
+- `xcl-website: src/pages/diff.mdx`
+- `xcl-website: src/pages/events.mdx`
+- `xcl-website: src/pages/sensitive-values.mdx`
+- `xcl-website: src/pages/examples/viper.mdx`
+- `xcl-website: src/pages/examples/plugins.mdx`
+
+**Discoveries**: `log/slog`'s text handler formats an error attribute with `%+v`, so with `fmt.Formatter` on the error types a plain `slog.Any("error", err)` now carries the full report (escaped onto one line); `events.SlogHandler` and slog's JSON handler still log one line. An event handler printing reports should print `*errors.Diagnostic` events only, since the event ending the call carries the whole `*ConfigError` and would repeat every report.

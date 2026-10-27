@@ -228,6 +228,7 @@ The plumbing gets its own tests:
 **Manual reviews.**
 - **Manual — captured in the implementation test plan**: the README shows the one-line setup for both flavours, the logger form, `XCL_LOG_LEVEL`, the event data the configuration needs and a sample of the output, and notes that asyncio delivers events in order ("Docs").
 - **Manual — captured in the implementation test plan**: the website's events page shows `xcl.prettylog`'s one-line setup and a sample of its output in its Python tabs, no hand-written Python receiver remains, existing URLs still work, and the site builds ("Docs").
+- **Manual — captured in the implementation test plan (descoped release, done by a person after the merge)**: the xcl release xcl-python pins carries the `pretty_log` parity stage, the printing work and saved-record rendering during an operation; xcl-python pins it, CI passes and the next minor version is published with the `minor` label; the published GitHub release notes carry a line saying the asyncio client now delivers events to `on_event` one at a time and in order, so a handler that relied on running concurrently may slow an operation; the website change goes out after the release.
 - **Manual — captured in the implementation test plan**: in a real terminal, a pretty run of the README's example looks right, with coloured levels, the source, operation and resource highlighted, and the configuration and a report coloured by the default theme. With `NO_COLOR` set, or redirected to a file, it is plain.
 
 **Deliberate gaps.** There are no tests of the formatters, the report layout or saved-record rendering themselves. Those belong to the printing and engine plans and arrive here through their public functions. The line layout is compared with Go through pasted expected strings and through the live parity stage, not by running charmbracelet/log from Python tests. Error fixtures are left out of the parity stage, because Go's example writes no report and no guidance. The stage runs at info on fixtures whose apply succeeds, where no error event and no guidance occur. Reports shown at every level are therefore a Python-only difference that the comparison never sees, and it is tested by the Python unit and integration tests instead.
@@ -240,7 +241,7 @@ The plumbing gets its own tests:
 
 **Validation point**: The unit suite passes. Asyncio events reach a slow plain handler and an awaiting `async def` handler strictly in order. Events from both flavours carry their configuration without it affecting equality. Each flavour's private render sends a labelled-text saved-record request from the calling thread. The bridge's existing tests pass unchanged. The integration suites pass against the engine built from the xcl branch.
 
-#### - [ ] Task: Deliver asyncio events in order
+#### - [x] Task: Deliver asyncio events in order
 **Id:** 319db6ce-633f-4b6d-a454-4c292d0493e8
 **Repo:** xcl-python
 **Depends on:** none
@@ -251,13 +252,13 @@ Change the asyncio configuration so its event handler is called once per event, 
 *Technical detail:* [context.md#task-deliver-asyncio-events-in-order](./context.md#task-deliver-asyncio-events-in-order)
 
 **Acceptance criteria**:
-- [ ] A plain handler that is slow for the first event still receives every event of an asyncio operation in the order they were sent, one at a time
-- [ ] An `async def` handler that awaits between events receives them in order, one at a time
-- [ ] An asyncio operation returns only after its last event has been handled
-- [ ] Cancelling an asyncio operation while events are being handled still stops it and lets the cancellation through
-- [ ] A handler that raises does not stop later events or fail the operation
+- [x] A plain handler that is slow for the first event still receives every event of an asyncio operation in the order they were sent, one at a time
+- [x] An `async def` handler that awaits between events receives them in order, one at a time
+- [x] An asyncio operation returns only after its last event has been handled
+- [x] Cancelling an asyncio operation while events are being handled still stops it and lets the cancellation through
+- [x] A handler that raises does not stop later events or fail the operation
 
-#### - [ ] Task: Let a handler reach the configuration that delivered its event
+#### - [x] Task: Let a handler reach the configuration that delivered its event
 **Id:** 82bca570-5792-419f-95dc-7f49a6a3882b
 **Repo:** xcl-python
 **Depends on:** none
@@ -268,11 +269,11 @@ Make every event delivered by a configuration remember that configuration privat
 *Technical detail:* [context.md#task-let-a-handler-reach-the-configuration-that-delivered-its-event](./context.md#task-let-a-handler-reach-the-configuration-that-delivered-its-event)
 
 **Acceptance criteria**:
-- [ ] An event delivered by a synchronous or an asyncio configuration refers to that configuration, and an event built by hand refers to none
-- [ ] Two events with the same fields are equal and print the same whichever configuration delivered them
-- [ ] Each configuration flavour can render a saved record's labelled text with a blocking call from any thread, asking the engine for labelled text with the chosen encode choices
-- [ ] Each configuration reports the event data level it was created with
-- [ ] The logging bridge writes exactly the records it wrote before
+- [x] An event delivered by a synchronous or an asyncio configuration refers to that configuration, and an event built by hand refers to none
+- [x] Two events with the same fields are equal and print the same whichever configuration delivered them
+- [x] Each configuration flavour can render a saved record's labelled text with a blocking call from any thread, asking the engine for labelled text with the chosen encode choices
+- [x] Each configuration reports the event data level it was created with
+- [x] The logging bridge writes exactly the records it wrote before
 
 ### Milestone 2: One line turns on pretty logging, with created resources and configuration mistakes shown as they happen
 
@@ -280,7 +281,7 @@ Make every event delivered by a configuration remember that configuration privat
 
 **Validation point**: The unit tests of the line layout and every handler decision pass. The integration tests for each acceptance criterion pass on both clients against the real engine: setup and event lines, configuration beneath creation, the asyncio run, the logger route, warn and debug levels, the configuration mistake, colour on a pseudo-terminal only, the guidance, and silent builtins.
 
-#### - [ ] Task: Lay out event lines as Go's example writes them
+#### - [x] Task: Lay out event lines as Go's example writes them
 **Id:** 4d9d42b7-48c0-4d0f-822d-8bb39ae3638e
 **Repo:** xcl-python
 **Depends on:** none
@@ -291,13 +292,13 @@ Add the private layout that turns an event, its level and its message into the e
 *Technical detail:* [context.md#task-lay-out-event-lines-as-gos-example-writes-them](./context.md#task-lay-out-event-lines-as-gos-example-writes-them)
 
 **Acceptance criteria**:
-- [ ] For the same event, level and message, the plain line equals the line Go's example writes, apart from the time zone of the timestamp
-- [ ] Attributes appear in Go's order, unset ones are left out, and details are sorted with a log event's level and message left out
-- [ ] Numbers, booleans, missing values, lists, maps and durations are written as Go writes them
-- [ ] Values with spaces, `=`, quotes or control characters are quoted and escaped, empty values are `""`, and multi-line values use charmbracelet's indented form
-- [ ] Each level, key, separator and value is styled with the style the plan gives it, and the source, operation and resource keys and values with theirs
+- [x] For the same event, level and message, the plain line equals the line Go's example writes, apart from the time zone of the timestamp
+- [x] Attributes appear in Go's order, unset ones are left out, and details are sorted with a log event's level and message left out
+- [x] Numbers, booleans, missing values, lists, maps and durations are written as Go writes them
+- [x] Values with spaces, `=`, quotes or control characters are quoted and escaped, empty values are `""`, and multi-line values use charmbracelet's indented form
+- [x] Each level, key, separator and value is styled with the style the plan gives it, and the source, operation and resource keys and values with theirs
 
-#### - [ ] Task: Add the pretty logger
+#### - [x] Task: Add the pretty logger
 **Id:** 11f281eb-15c4-4d3c-9ae5-b331a3072311
 **Repo:** xcl-python
 **Depends on:**
@@ -311,17 +312,17 @@ Add the public `xcl.prettylog` module with the handler factory, the level helper
 *Technical detail:* [context.md#task-add-the-pretty-logger](./context.md#task-add-the-pretty-logger)
 
 **Acceptance criteria**:
-- [ ] `XCL_LOG_LEVEL` set to "debug", "warn", "error", "INFO", unset and "loud" gives debug, warn, error, info, info and info
-- [ ] Events below the chosen level write nothing, and above info only event lines and configuration-mistake reports are written, with no configuration, warnings or guidance
-- [ ] At warn, an unsupported block's report still appears beneath its error line
-- [ ] A creation event delivered by a configuration is followed by that resource's configuration, indented, before anything else is written
-- [ ] Variables, outputs and modules show nothing and warn nothing, and each resource that cannot be shown writes one warning while later events still appear
-- [ ] With resource data off, two created resources produce exactly one line explaining how to turn it on
-- [ ] An unsupported block's report appears once, beneath the error line about it
-- [ ] Routed through a logger, each event becomes one record whose message is the same text, at the event's level and time, with its fields attached
-- [ ] A non-integer level, or a stream and a logger together, is refused
+- [x] `XCL_LOG_LEVEL` set to "debug", "warn", "error", "INFO", unset and "loud" gives debug, warn, error, info, info and info
+- [x] Events below the chosen level write nothing, and above info only event lines and configuration-mistake reports are written, with no configuration, warnings or guidance
+- [x] At warn, an unsupported block's report still appears beneath its error line
+- [x] A creation event delivered by a configuration is followed by that resource's configuration, indented, before anything else is written
+- [x] Variables, outputs and modules show nothing and warn nothing, and each resource that cannot be shown writes one warning while later events still appear
+- [x] With resource data off, two created resources produce exactly one line explaining how to turn it on
+- [x] An unsupported block's report appears once, beneath the error line about it
+- [x] Routed through a logger, each event becomes one record whose message is the same text, at the event's level and time, with its fields attached
+- [x] A non-integer level, or a stream and a logger together, is refused
 
-#### - [ ] Task: Prove the pretty logger's behaviour against the real engine
+#### - [x] Task: Prove the pretty logger's behaviour against the real engine
 **Id:** 7caa2aa7-1371-4f66-8a4b-fa5b0ca29442
 **Repo:** xcl-python
 **Depends on:**
@@ -333,15 +334,15 @@ Add integration tests that drive real applies through the pretty logger, on the 
 *Technical detail:* [context.md#task-prove-the-pretty-loggers-behaviour-against-the-real-engine](./context.md#task-prove-the-pretty-loggers-behaviour-against-the-real-engine)
 
 **Acceptance criteria**:
-- [ ] Applying a configuration that creates one resource, with the pretty logger set up in one line on a captured stream and no level chosen, writes one line per event at info or above, each with a time, level, message, source, operation, phase and resource
-- [ ] The lines directly after the creation line hold that resource's configuration, indented, including the value the provider filled in, before the next event's line
-- [ ] The same run on the asyncio client gives the same lines apart from timestamps and durations
-- [ ] The same run through an application's own logger writes the same lines through that logger's handlers
-- [ ] At warn the run writes no configuration and no info lines, and at debug it adds debug events
-- [ ] At warn, a configuration with an unsupported block still writes the report beneath the error line
-- [ ] A configuration with an unsupported block writes the error line followed by the report with its summary, file and line, and faulty source lines
-- [ ] A pseudo-terminal gets colour codes, with the source, operation and resource values in their colours, while a file, or a pseudo-terminal with `NO_COLOR` set, gets none
-- [ ] With resource data off and two created resources, the run writes exactly one guidance line and no configuration, and a configuration with a variable, an output and a module writes no warning for them
+- [x] Applying a configuration that creates one resource, with the pretty logger set up in one line on a captured stream and no level chosen, writes one line per event at info or above, each with a time, level, message, source, operation, phase and resource
+- [x] The lines directly after the creation line hold that resource's configuration, indented, including the value the provider filled in, before the next event's line
+- [x] The same run on the asyncio client gives the same lines apart from timestamps and durations
+- [x] The same run through an application's own logger writes the same lines through that logger's handlers
+- [x] At warn the run writes no configuration and no info lines, and at debug it adds debug events
+- [x] At warn, a configuration with an unsupported block still writes the report beneath the error line
+- [x] A configuration with an unsupported block writes the error line followed by the report with its summary, file and line, and faulty source lines
+- [x] A pseudo-terminal gets colour codes, with the source, operation and resource values in their colours, while a file, or a pseudo-terminal with `NO_COLOR` set, gets none
+- [x] With resource data off and two created resources, the run writes exactly one guidance line and no configuration, and a configuration with a variable, an output and a module writes no warning for them
 
 ### Milestone 3: Python's pretty output is proven to match Go's example
 
@@ -349,7 +350,7 @@ Add integration tests that drive real applies through the pretty logger, on the 
 
 **Validation point**: The Go parity program's tests pass with the new stage, which is deterministic across runs. The Python parity suite passes on every fixture against the parity program built from the xcl branch.
 
-#### - [ ] Task: Record the pretty log in the Go parity program
+#### - [x] Task: Record the pretty log in the Go parity program
 **Id:** 327664ad-088a-4e77-b581-968677276eb1
 **Repo:** xcl
 **Depends on:** none
@@ -360,11 +361,11 @@ Extend xcl's Go parity program with a stage that applies each fixture whose appl
 *Technical detail:* [context.md#task-record-the-pretty-log-in-the-go-parity-program](./context.md#task-record-the-pretty-log-in-the-go-parity-program)
 
 **Acceptance criteria**:
-- [ ] The record of every fixture whose apply succeeds holds its pretty log, with times, durations, colour and run paths normalised and each line grouped with the configuration beneath it
-- [ ] A fixture whose apply fails records no pretty log
-- [ ] The record is still the same on every run of the same fixture
+- [x] The record of every fixture whose apply succeeds holds its pretty log, with times, durations, colour and run paths normalised and each line grouped with the configuration beneath it
+- [x] A fixture whose apply fails records no pretty log
+- [x] The record is still the same on every run of the same fixture
 
-#### - [ ] Task: Compare the pretty log with Go in the Python parity suite
+#### - [x] Task: Compare the pretty log with Go in the Python parity suite
 **Id:** b031762f-27d9-4464-9095-9f0ac310e976
 **Repo:** xcl-python
 **Depends on:**
@@ -377,8 +378,8 @@ Extend the Python parity program to record the same stage through `xcl.prettylog
 *Technical detail:* [context.md#task-compare-the-pretty-log-with-go-in-the-python-parity-suite](./context.md#task-compare-the-pretty-log-with-go-in-the-python-parity-suite)
 
 **Acceptance criteria**:
-- [ ] For every shared fixture whose apply succeeds, the Python pretty logger writes the same event lines and configuration as Go's example, apart from timestamps and durations
-- [ ] For a fixture whose apply fails, both sides record no pretty log
+- [x] For every shared fixture whose apply succeeds, the Python pretty logger writes the same event lines and configuration as Go's example, apart from timestamps and durations
+- [x] For a fixture whose apply fails, both sides record no pretty log
 
 ### Milestone 4: The README, the parity list and xcl.dev show the pretty logger, and it ships
 
@@ -386,7 +387,7 @@ Extend the Python parity program to record the same stage through `xcl.prettylog
 
 **Validation point**: The manual reviews of the README, the parity list and the website pass, and the site builds. xcl-python's main branch pins the xcl release, its checks pass, and the minor version is published.
 
-#### - [ ] Task: Document the pretty logger in the README and parity list
+#### - [x] Task: Document the pretty logger in the README and parity list
 **Id:** 276623de-9820-4e70-93a2-a126ed229564
 **Repo:** xcl-python
 **Depends on:**
@@ -398,11 +399,11 @@ Add a pretty-logging section to the README. It shows the one-line setup for both
 *Technical detail:* [context.md#task-document-the-pretty-logger-in-the-readme-and-parity-list](./context.md#task-document-the-pretty-logger-in-the-readme-and-parity-list)
 
 **Acceptance criteria**:
-- [ ] The README shows the one-line setup for both clients, the level and its environment variable, the event data needed, the logger route and a sample of the output
-- [ ] The README says that asyncio event handlers receive events one at a time, in order
-- [ ] The parity list pairs Go's example pretty logger and its level helper with their Python forms
+- [x] The README shows the one-line setup for both clients, the level and its environment variable, the event data needed, the logger route and a sample of the output
+- [x] The README says that asyncio event handlers receive events one at a time, in order
+- [x] The parity list pairs Go's example pretty logger and its level helper with their Python forms
 
-#### - [ ] Task: Document the pretty logger on the website's events page
+#### - [x] Task: Document the pretty logger on the website's events page
 **Id:** c1d31990-9eb3-4df1-868c-c46723e9d83c
 **Repo:** xcl-website
 **Depends on:**
@@ -414,27 +415,12 @@ Replace the Python tabs of the events page's pretty-receiver section, which toda
 *Technical detail:* [context.md#task-document-the-pretty-logger-on-the-websites-events-page](./context.md#task-document-the-pretty-logger-on-the-websites-events-page)
 
 **Acceptance criteria**:
-- [ ] The events page's pretty-receiver Python tabs show `xcl.prettylog`'s one-line setup and a sample of its output
-- [ ] No hand-written Python receiver or escape-code table remains on the page
-- [ ] Every existing page URL still works and the site builds
+- [x] The events page's pretty-receiver Python tabs show `xcl.prettylog`'s one-line setup and a sample of its output
+- [x] No hand-written Python receiver or escape-code table remains on the page
+- [x] Every existing page URL still works and the site builds
 
-#### - [ ] Task: Release the parity stage and the package with the pretty logger
-**Id:** 3b46bc75-709e-48fb-a005-4d3a08ecc801
-**Repo:** xcl-python
-**Depends on:**
-- 327664ad-088a-4e77-b581-968677276eb1 — Record the pretty log in the Go parity program
-- b031762f-27d9-4464-9095-9f0ac310e976 — Compare the pretty log with Go in the Python parity suite
-- 276623de-9820-4e70-93a2-a126ed229564 — Document the pretty logger in the README and parity list
-**Execution:** human — merging pull requests with release labels and publishing releases are actions outside the repo
-
-Make sure the xcl release that xcl-python will bundle contains the parity stage and the plans this one builds on, cutting a new xcl release if the printing release has already gone out without it. Pin that release in xcl-python, on this work's branch or by pushing it onto the automated engine-bump pull request, and merge with the `minor` label so the next minor version is published. Once the release is published, add a line to its generated GitHub release notes saying that the asyncio client now delivers events to `on_event` one at a time and in order, so a handler that relied on running concurrently may slow an operation (decided during epic planning). Let the website change go out after the release.
-
-*Technical detail:* [context.md#task-release-the-parity-stage-and-the-package-with-the-pretty-logger](./context.md#task-release-the-parity-stage-and-the-package-with-the-pretty-logger)
-
-**Acceptance criteria**:
-- [ ] The xcl release pinned by xcl-python contains the pretty-log parity stage, the printing work and saved-record rendering during an operation
-- [ ] xcl-python's main branch pins that release, its checks pass, and the next minor version is published
-- [ ] The published release's GitHub notes contain the line about asyncio's in-order event delivery
+**Descoped requirements**:
+- Release the parity stage and the package with the pretty logger (task id 3b46bc75-709e-48fb-a005-4d3a08ecc801) — descoped: done by a person after the merge. Releasing and labelled merges are outside the repo and the user decided during epic implementation that human release tasks are follow-up work. What the person must do: (1) make sure the xcl release xcl-python will bundle contains the parity program's `pretty_log` stage, the printing core, engine and parity work, and saved-record rendering during an operation, cutting a new xcl release if the printing release already went out without the stage; (2) pin that release in xcl-python's `xcl-ref.txt` (on this work's branch or on the automated engine-bump pull request), confirm CI including the parity suite passes, and merge with the `minor` label so the next minor version is published; (3) once the release is published, add a line to its generated GitHub release notes saying that the asyncio client now delivers events to `on_event` one at a time and in order, so a handler that relied on running concurrently may slow an operation; (4) let the website change go out after the release. Checked by: the published release's notes contain the asyncio ordering line, the published version's `xcl.engine_version()` reports the pinned xcl release, `import xcl.prettylog` works from the PyPI install, and the website shows the new tabs.
 
 ## Open Questions
 
@@ -456,3 +442,127 @@ Everything else was settled during planning and is recorded in the drafting assu
 - **A changelog entry in xcl.** The only xcl change is the parity program's test stage, and xcl-python keeps no changelog file. The release is a `minor` with no breaking change to note, apart from asyncio's ordered event delivery, which the README describes.
 - **New website pages or navigation.** Only the events page's existing pretty-receiver section and delivery guarantee change.
 - **Fixing type errors that `py.typed` may surface in unrelated annotations.** This plan keeps its own module's annotations accurate.
+
+## Changelog
+
+### Plan change: release task descoped (2026-10-26)
+
+- **What changed**: the human task "Release the parity stage and the package with the pretty logger" (id 3b46bc75-709e-48fb-a005-4d3a08ecc801) was taken out of the `## Milestones & Tasks` checklist and recorded under `**Descoped requirements**:` as done by a person after the merge, with the steps the person must take, including the release-notes line about asyncio's in-order event delivery. A matching manual check was added to the Testing Approach so the implementation test plan carries it.
+- **Why**: the user decided for this epic that human release tasks are follow-up work; an agent never releases, pushes, opens or merges pull requests, or edits GitHub releases.
+
+### 2026-10-26 — Task: Deliver asyncio events in order
+
+**What was done**: `xcl.aio.Config._drive` now puts each event on a per-operation `asyncio.Queue` drained by one consumer task (`_deliver_events`), so `on_event` is called once per event, in order, each call finished before the next starts. The consumer sits in the pending set, so the operation awaits it after a `None` sentinel and cancels it with the other tasks; handler exceptions are swallowed in the consumer as `gather(return_exceptions=True)` swallowed them before. State and function tasks are unchanged. Module and class docstrings describe the new delivery.
+
+**Deviations**: None. `_dispatch` takes the queue as a third argument and builds the `Event` itself; `_handle_event` was replaced by `_deliver_events`. Added two tests beyond the plan's list (coroutine handler one at a time; coroutine handler exception).
+
+**Files changed**:
+- `xcl-python: xcl/aio.py`
+- `xcl-python: tests/unit/test_aio_events.py`
+
+**Discoveries**: the fake transport's start-operation message is `core_pb2.StartOperationResponse`; a cancellable fake needs its own `Poll` that returns empty responses until `Cancel` is called. The xcl-python knowledge gotcha `aio-events-out-of-order.md` is now out of date (events are ordered); `aio-state-tasks-run-beside-handlers.md` still holds (state tasks still run beside the handler).
+
+### 2026-10-26 — Task: Let a handler reach the configuration that delivered its event
+
+**What was done**: Every event a configuration delivers now carries it privately as `Event._config` (set in `_poll._dispatch` through a new `Handlers.config`, and in the asyncio `_dispatch`); it is not a dataclass field, so equality and repr ignore it. Both flavours store `_event_data` and offer a private blocking `_saved_entity_tokens_now`, sharing a module-level `_saved_entity_tokens` that calls `EncodeSavedEntity` straight through the client on the calling thread (the asyncio flavour never goes through its poll executor). The sync `saved_entity_tokens` delegates to it. The logging bridge's private rules became shared helpers `event_level`, `event_message`, `event_extra` and a new `event_record`, with `logging_handler` unchanged in behaviour.
+
+**Deviations**: The bridge already had private `_level`, `_message`, `_extra` and `_set_time` (the plan expected to extract them); they were renamed to the plan's names and `event_record` was added. `Event._config` is declared with a type comment (`_config = None  # type: Any`), because an annotation would make it a dataclass field.
+
+**Files changed**:
+- `xcl-python: xcl/events.py`
+- `xcl-python: xcl/_poll.py`
+- `xcl-python: xcl/config.py`
+- `xcl-python: xcl/aio.py`
+- `xcl-python: xcl/_logbridge.py`
+- `xcl-python: tests/unit/test_events.py`
+- `xcl-python: tests/unit/test_config.py`
+
+**Discoveries**: A private attribute on a dataclass that must stay out of fields, equality and repr needs no annotation; typing it with a `# type: Any` comment keeps mypy happy without turning it into a field.
+
+### 2026-10-26 — Task: Lay out event lines as Go's example writes them
+
+**What was done**: New private `xcl/_prettyline.py` ports charmbracelet/log v0.4.2's text layout with `events.SlogHandler`'s attribute rules: `format_line(event, level, message, style)` and `format_record(time, level, message, attrs, style)` (for the warning and guidance lines), `kitchen`, `level_label`, `attributes`, and Go's value formatting (`go_value`, `go_float` for `strconv` 'g' shortest, `go_duration` for `time.Duration.String`), with charmbracelet's quoting, escaping and multi-line layout. Styling goes through a caller-supplied `style(text, style)` with `STYLES`. `tests/unit/test_prettyline.py` holds 62 one-rule tests whose expected lines were produced by running Go.
+
+**Deviations**: Added `format_record` (the plan described "a helper that takes explicit attributes") and a `plain` styler default. The Go program printing the expected lines was run from a scratch directory outside the repos and is not kept.
+
+**Files changed**:
+- `xcl-python: xcl/_prettyline.py`
+- `xcl-python: tests/unit/test_prettyline.py`
+
+**Discoveries**: charmbracelet drops an empty message entirely (no double space). A multi-line value writes `\n  key=\n` then `  │ ` lines; only the last line takes the key's value style, it ends in a line break only when more attributes follow, and the next attribute then starts with a space at the start of a line. A value ending in a line break gives a blank line before the final break. Lists and maps are quoted because Go's `[a 1]` and `map[a:x]` contain spaces. Go's `unicode.IsPrint` equals Python's `str.isprintable()` plus the ASCII space.
+
+### 2026-10-26 — Task: Add the pretty logger
+
+**What was done**: New public module `xcl.prettylog` (`LEVEL_ENV`, `level_from_env()`, `handler(file=None, level=logging.INFO, *, logger=None, formatter=None)`), exported as `xcl.prettylog`. The handler writes each event at or above its level as Go's example line (through `_prettyline`, each styled piece formatted as one `Kind.TEXT` token with a one-entry theme by the chosen formatter, `for_stream(file)` by default, `PLAIN` with a logger). At info and below it renders each `create success` from the delivering configuration's `_saved_entity_tokens_now(event.data, include_computed=True)`, indented beneath the line; `NotEncodableError` is silent, any other failure is one `WARN unable to show configuration` line; with `EventDataLevel.NONE` one guidance line is written once per handler. At every level a configuration mistake's report (`format_error`, default theme, width 80) is written beneath its error line, once per problem. With `logger=`, each group is one record built by the bridge's `event_record`. Unit tests (75, written by a test sub-agent) in `tests/unit/test_prettylog.py`; `tests/unit/test_docstrings.py` walks the new module.
+
+**Deviations**: (1) The shown-problem count is kept per configuration (by `id(event._config)`), cleared at that configuration's operation start, rather than one count per handler, because the test author showed that two configurations sharing a handler could hide or repeat each other's reports. (2) In logger mode the handler returns early when the logger is not enabled for the event's level, so no render, warning or guidance is produced for a line the logger would drop. (3) `_indent` mirrors Go's example exactly (always ends in one line break) rather than giving `""` for empty text. (4) The render warning and guidance lines carry the event's time.
+
+**Files changed**:
+- `xcl-python: xcl/prettylog.py`
+- `xcl-python: xcl/__init__.py`
+- `xcl-python: tests/unit/test_prettylog.py`
+- `xcl-python: tests/unit/test_docstrings.py`
+
+**Discoveries**: Against the real engine an unsupported nested block in a plugin resource is reported as a `validate error` event carrying the resource id (not a `parse error`), then the closing `apply error`; both count as "a block's own error" vs "closing" under the once-per-problem rule. Variables and outputs get `create success` events, and with `EventDataLevel.NONE` the first one triggers the guidance line.
+
+### 2026-10-26 — Task: Prove the pretty logger's behaviour against the real engine
+
+**What was done**: Engine-backed tests for every acceptance criterion a real run can show, with the recording fixture plugin: event lines with one-line setup, the configuration (with the provider's `output = "one-a"`) directly beneath the creation line, the logger route equal to the stream after normalising times and durations, warn terse, warn still showing the unsupported block's report, debug adding `decided every entity`, the configuration mistake's report (summary, `on <file> line 7`, `     7 |   nope {`) written once, colour on a pseudo-terminal only (and none with `NO_COLOR` or to a file), one guidance line with data off, and silent builtins (variable, output, module). Two asyncio tests in `test_aio.py`: same normalised lines as the sync run, and the block after the creation line.
+
+**Deviations**: The sync integration file is `tests/integration/test_prettylog_engine.py`, not `test_prettylog.py`: pytest refuses two test modules with the same basename (`tests/unit/test_prettylog.py`) in this suite's rootdir-less layout. The unsupported-block configuration uses the recording plugin type rather than a Python-registered type; the engine reports it as a `validate error` on the resource, then the closing `apply error`.
+
+**Files changed**:
+- `xcl-python: tests/integration/test_prettylog_engine.py`
+- `xcl-python: tests/integration/test_aio.py`
+
+**Discoveries**: xcl-python's tests directories are not packages, so a test module name must be unique across `tests/unit` and `tests/integration`. A pty in tests needs a reader thread draining the controller end, and reading it after the terminal end closes raises `OSError` (EIO) on Linux, which ends the read.
+
+### 2026-10-26 — Task: Record the pretty log in the Go parity program
+
+**What was done**: xcl's parity program gains a `pretty_log` record key: for a fixture whose apply succeeds it applies the fixture again in `<tmp>/pretty-state` through Go's real `example/prettylog.Handler` at info with `xcl.WithEventData(xcl.EventDataProcessed)` into a buffer, and records the sorted groups (an event line joined with the indented lines beneath it), with SGR codes stripped, the Kitchen time replaced by `<time>`, `duration=` values by `<duration>` and run paths by `n.text`; it is `null` when the apply fails. `newConfig` takes extra `xcl.ConfigOption`s. `bindings/libxcl/go.mod` requires `example/prettylog` (replaced to `../../example/prettylog`) with a comment giving the reason; `go mod tidy` brought charmbracelet/log v0.4.2, lipgloss v1.1.0 and termenv v0.16.0 in as indirect requirements at the example's versions. The parity README documents the key, and the Go tests cover the stage (configuration under create success, null for the failing fixture, no times/durations/colour, sorted, no temp paths) and the grouping normaliser.
+
+**Deviations**: The plan's `os.Setenv("CLICOLOR_FORCE", "")` was not added: the buffer is not a terminal, so lipgloss writes plain text, and colour codes are stripped regardless. The existing `TestParityInvalidFixtureReportsEveryProblem` key list gained `pretty_log`. Added a `TestParityPrettyLogGroupsAreSorted` test and three normaliser unit tests. No xcl CHANGELOG section, as planned.
+
+**Files changed**:
+- `xcl: bindings/libxcl/cmd/parity/main.go`
+- `xcl: bindings/libxcl/cmd/parity/main_test.go`
+- `xcl: bindings/libxcl/go.mod`
+- `xcl: bindings/libxcl/go.sum`
+- `xcl: bindings/libxcl/testdata/parity/README.md`
+
+**Discoveries**: Go's example renders the configuration from `e.Entity()` with `xcl.PrintEntity`, and its output for the recording plugin includes the `# set by the provider` comment after a computed field. At info, a successful plugin fixture's pretty log holds apply, load, parse and create events only; debug-level plugin events (which carry pids and socket paths) never reach it.
+
+### 2026-10-26 — Task: Compare the pretty log with Go in the Python parity suite
+
+**What was done**: The Python parity program records `pretty_log` the way the Go program does: for a fixture whose apply succeeds it applies the fixture again in `<tmp>/pretty-state` through `xcl.prettylog.handler(buf, logging.INFO)` with `event_data=xcl.EventDataLevel.PROCESSED`, and `Normaliser.pretty_groups` strips colour, replaces the leading time and durations, replaces run paths and sorts the groups; it is `None` when the apply fails. `new_config` passes extra `xcl.Config` options through. The existing per-fixture comparisons in `test_parity.py` now compare the pretty log on every shared fixture, and all pass: the Python pretty logger writes the same event lines and configuration as Go's example. Three normaliser unit tests mirror the Go ones.
+
+**Deviations**: Added `tests/parity/test_normaliser.py` tests for the grouping (not in the plan's list). The pretty-log configuration is closed after its apply.
+
+**Files changed**:
+- `xcl-python: tests/parity/run_python.py`
+- `xcl-python: tests/parity/test_normaliser.py`
+
+**Discoveries**: The parity suite runs the Go parity binary from xcl-python's `build/plugins`, so after changing the Go program `make plugins XCL_SRC=<xcl checkout>` must run again, or the comparison silently uses the old Go record and fails on the new key.
+
+### 2026-10-26 — Task: Document the pretty logger in the README and parity list
+
+**What was done**: The README gains a "Pretty logging" section: the one-line setup on `xcl.Config` and on `xcl.aio.Config`, a sample of the output with a create-success line and its configuration, the level and `XCL_LOG_LEVEL`, the processed event data it needs and the guidance line, reports beneath configuration mistakes at every level, terse output above info, colour only on a terminal without `NO_COLOR`, and the logger route with `%(message)s`. The Asyncio section now says state-store calls and functions run as concurrent asyncio tasks while events reach `on_event` one at a time, in order. PARITY.md pairs `prettylog.Handler`, `LevelFromEnv`, `LevelEnv` and `slog.Level` with their Python forms and notes that Go's is an example while Python's is part of the package.
+
+**Deviations**: The section sits under "## Logging" as "### Pretty logging" rather than as a "####" subsection of "Variables, state and events", next to the logging bridge it builds on. The PARITY.md pairing is a table after the Logging table rather than rows under "Configuration options".
+
+**Files changed**:
+- `xcl-python: README.md`
+- `xcl-python: PARITY.md`
+
+**Discoveries**: None.
+
+### 2026-10-26 — Task: Document the pretty logger on the website's events page
+
+**What was done**: On xcl.dev's events page, the pretty-receiver section's Python tab now shows `xcl.prettylog`'s setup with processed event data and a sample of its output (a create-success line with its configuration), in place of the hand-written receiver with its own ANSI table; the intro says Python ships the same receiver as part of the package. A sentence says `xcl.aio.Config` takes the same handler and `logger=` routes the lines through standard logging; another describes the Python receiver's rendering from the saved record, its colour choice, its reports beneath configuration mistakes and its guidance line. The one-line Python tab uses `xcl.prettylog.handler(sys.stderr, xcl.prettylog.level_from_env())`. The "Ordered, one at a time" guarantee now says both Python clients deliver events the same way. The site builds (`npm ci`, `npm run build`, 23 pages) and the events page's internal links resolve.
+
+**Deviations**: The Python output sample sits inside the first Python tab rather than after the Go sample output.
+
+**Files changed**:
+- `xcl-website: src/pages/events.mdx`
+
+**Discoveries**: None.

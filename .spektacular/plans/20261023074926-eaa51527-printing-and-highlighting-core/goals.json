@@ -1,0 +1,1219 @@
+{
+  "plan": "20261023074926-eaa51527-printing-and-highlighting-core",
+  "items": [
+    {
+      "item": "1a65fb65-b0e7-4064-8aa0-cb3e9b4ee239",
+      "title": "Lay out error reports in one private package",
+      "checks": [
+        {
+          "at": "2026-10-26T10:41:52Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "1a65fb65-b0e7-4064-8aa0-cb3e9b4ee239",
+            "title": "Lay out error reports in one private package",
+            "criteria": [
+              "There is one place that decides a report's wording, and the existing report output is unchanged",
+              "Detail can be wrapped at any width, or left whole when the width is 0",
+              "Every problem inside an error is found, including through application wrapping and joined errors, without descending into a problem's own cause"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "internal/report/report.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diagnostics.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/report/wrap.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/report/walk.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diagnostics_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "The wording now lives only in internal/report/report.go Layout (lines 105-156): the \"Error\"/\"Warning\" labels, \": \"+summary, the \"  on \u003cfile\u003e line N, in E, field F:\" location, the \"(source code not available)\" line, the gutter format \"  %4d | \" and the blank-line endings. diagnostics.go:31-38 only calls report.Layout and labels the segments, with no wording of its own. Comparing the removed code in xcl.diff (lines 78-124 and 126-163) with Layout, each string and newline matches, so the output appears unchanged. I did not run the tests, so this rests on reading the code."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "internal/report/wrap.go:7-12: Wrap returns detail unchanged when width \u003c= 0, and otherwise calls wordwrap.WrapString(detail, uint(width)). diagnostics.go:106-107 applies it to the Detail segment only, so source lines are never wrapped."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "internal/report/walk.go:10-33: Walk calls visit and returns as soon as isProblem(err) is true, so a problem's Cause is never visited. For other errors it descends through both Unwrap() []error (joined errors) and Unwrap() error (application wrapping), but only when Contains reports a problem beneath them (walk.go:37-58). Contains also checks Unwrap() []error before Unwrap() error. Note: nothing outside the report package calls Walk yet (grep found only walk_test.go), so the errors package does not use it in this diff. The criterion is judged on the function's behaviour, which the code shows."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "c5eb1740-6882-418f-a342-d9b05297d8e4",
+      "title": "Capture two lines of context around each fault",
+      "checks": [
+        {
+          "at": "2026-10-26T10:46:21Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "c5eb1740-6882-418f-a342-d9b05297d8e4",
+            "title": "Capture two lines of context around each fault",
+            "criteria": [
+              "A fault in the middle of a file captures the two lines before and the two after it",
+              "A fault on line 1 of a three-line file captures lines 1 to 3",
+              "A fault on the last line captures that line and the two before it",
+              "No file is read again to capture context"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "errors/diagnostic.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "errors/diagnostic_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/parser/validate_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/parser/parse_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "viper/xclviper_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "viper/xclviper_directory_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diagnostics_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "errors/diagnostic.go:123-124 sets start = max(1, first-contextLines) and end = max(last, min(lineCount, last+contextLines)) with contextLines = 2 (line 136). errors/diagnostic_test.go TestNewDiagnosticInTheMiddleOfAFileTakesTwoLinesEitherSide (diff lines 409-413) puts a fault on line 5 of the nine-line longSource and expects Start 3 and lines 3 to 7, which the code produces."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "errors/diagnostic.go:123-124: for a fault on line 1 of the three-line source, start = max(1, -1) = 1 and lineCount = 3 (the trailing empty element from the final newline is dropped at lines 118-121), so end = 3. errors/diagnostic_test.go TestNewDiagnosticOnTheFirstLineOfAThreeLineFileTakesLinesOneToThree (diff lines 416-421) expects Start 1 and lines 1 to 3."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "errors/diagnostic.go:123-124: for a fault on line 9 of the nine-line longSource, start = 7 and end = max(9, min(9, 11)) = 9, so lines 7 to 9 are taken and the empty trailing element is excluded. errors/diagnostic_test.go TestNewDiagnosticOnTheLastLineTakesThatLineAndTheTwoBefore (diff lines 423-428) expects Start 7 and lines name, enabled and closing brace."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "No os.ReadFile or os.Open exists in errors/ (grep found none). linesOf (errors/diagnostic.go:97-132) slices the src bytes passed in by the caller, so context comes from memory. The only read is internal/parser/parser.go:817 in parseFile, which reads each file once per parse and stores the bytes at line 831; the diff does not add a read. errors/diagnostic_test.go TestNewDiagnosticNeverReadsTheFileForContext (diff lines 464-473) backs this by writing the file, passing a different in-memory source, and expecting the context from the in-memory bytes."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "560866fc-d07d-4dd7-bb93-fa32b9b8fa26",
+      "title": "Print the full report through detailed error formatting",
+      "checks": [
+        {
+          "at": "2026-10-26T10:49:46Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "560866fc-d07d-4dd7-bb93-fa32b9b8fa26",
+            "title": "Print the full report through detailed error formatting",
+            "criteria": [
+              "Formatting a configuration error in its ordinary form gives a single line",
+              "Asking for its detailed form gives the full report with the surrounding lines, detail wrapped at 80 columns",
+              "Logging the error with zap writes the full plain report in the entry's detailed error field",
+              "zap is used only by tests, at a pinned version"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "errors/format.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/report"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "conventions/shared-errors-package.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "errors/diagnostic.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "errors/format_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "errors/format_zap_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "go.mod"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "go.sum"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "errors/format.go:25-27 and 39-41 route %v and %s on *Diagnostic and *ConfigError to formatError, which writes err.Error() (format.go:53-56). errors/format_test.go:33-43 checks %v and %s equal the one-line Error(). format_test.go:111-116 (TestConfigErrorWithOneProblemFormattedWithVIsASingleLine) checks a single problem's %v contains no newline."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "errors/format.go:46-62 and 68-89: %+v on the error calls plainReport, which lays out the report from report.Layout and wraps the Detail segment with report.Wrap at reportWidth = 80 (format.go:14, 80). internal/report/wrap.go:7-12 wraps with go-wordwrap at the given width. format_test.go:51-53 checks the full expected report, including the numbered context lines 1-3 around the fault. format_test.go:97-109 checks every wrapped detail line is \u003c= 80 columns and that the detail spans more than one line."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "errors/format_zap_test.go:19-35 builds a *ConfigError holding a Diagnostic with source. Lines 37-53 log it with zap.Error through a zapcore JSON encoder and unmarshal the entry. Lines 55-62 (TestZapLogsTheReportOfAConfigErrorInErrorVerbose) require entry[\"errorVerbose\"] to equal fmt.Sprintf(\"%+v\", ce) and to contain the numbered gutter line. Lines 64-70 check the error field is the one-line message. The mechanism is format.go:39-41, which implements fmt.Formatter on *ConfigError. Note: the test covers a ConfigError passed directly, not one wrapped by another error; format.go:21-24 and 35-38 document that %+v does not apply to wrapping errors."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "go.mod:23 requires go.uber.org/zap v1.27.0 with the comment 'test only: errors/format_zap_test.go proves zap.Error logs the report in errorVerbose'; it is pinned to an exact version. go.sum:504-505 has the matching hashes, and go.sum:519-524 adds goleak and multierr. A grep of the code root for 'go.uber.org/zap' and 'zap.' finds imports only in errors/format_zap_test.go:10-11, which is a _test.go file in package errors_test. No non-test .go file imports zap (the other matches are unrelated 'zap' function names in internal/xcl/hclsyntax test fixtures, or prose in .spektacular docs). Caveat: go.mod places zap in the direct require block, not marked // indirect, which is consistent with a direct test import. The one-line comment in go.mod is the only in-file statement that it is test-only."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "c944aff2-99d6-443f-9a69-bc5bf771153b",
+      "title": "Capture today's plain output of resources and change summaries",
+      "checks": [
+        {
+          "at": "2026-10-26T10:52:15Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "c944aff2-99d6-443f-9a69-bc5bf771153b",
+            "title": "Capture today's plain output of resources and change summaries",
+            "criteria": [
+              "The captured output comes from the code as it stands before this plan's printing changes",
+              "The fixed inputs cover nested blocks, references, sensitive values, every kind of change and every resource action"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "encode_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "encode_highlight_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/testutil/entities.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diff/example_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diff/render_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "print_fixtures_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "print_fixtures_test.go:14-18 says the fixtures were captured 'as they were before printing was rebuilt' and must never be regenerated from the code under test. The fixture files (testdata/print/*.txt) are untracked, so git cannot date them. Indirect evidence supports the claim: the staged diff (xcl.diff) and xcl.status do not touch the code the fixtures exercise (EncodeEntity's encoder, diff/render.go, the highlight package's Text.Render). The printing changes in the diff (diagnostics.go, internal/report/*, errors/format.go) only feed diagnostic reports, which the fixture tests never call. So the fixtures match the pre-change output of those paths. This is an inference, since the capture time itself cannot be confirmed from the files."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Nested blocks: fixtures/entity_container.txt and entity_references.txt contain a nested network {} block. Repeated blocks and lists: printFixtureEntities (print_fixtures_test.go:38-51) covers database, network, container, references and sensitive. References: entity_references.txt:6 renders resource.network.main.meta.name, with ShowReferences() set in print_fixtures_test.go:48. Sensitive values: entity_sensitive.txt:3 and diff_changes.txt:7,15 show masked values. Every action: diff_example.txt covers create, update, replace and delete; the diff.ActionCreate/Update/Replace/Delete constants are in diff/diff.go:23-37. Every replace reason: printReasonsDiff (print_fixtures_test.go:97-117) covers failed, provider, dependency and none, and diff_reasons.txt holds them. Every kind of change: diff_changes.txt covers changed (line 3), added (line 5), removed (line 4), becoming unknown (line 6), masked sensitive (line 7) and changed sensitive (line 8). Gap: the revealed-sensitive mode (diff.Options RevealSensitive and xcl.RevealSensitive) is never rendered, because the fixtures call Pieces() and Text.Render with no options and the entity encode options do not include RevealSensitive."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "668c52a0-5ffc-46ca-a0ab-801363fc69c1",
+      "title": "Rebuild highlighting around kinds, themes and formatters",
+      "checks": [
+        {
+          "at": "2026-10-26T11:08:07Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "668c52a0-5ffc-46ca-a0ab-801363fc69c1",
+            "title": "Rebuild highlighting around kinds, themes and formatters",
+            "criteria": [
+              "Configuration text is labelled exactly as before, and the existing grammar-parity assertions pass with unchanged scope names",
+              "A theme that styles only comments colours every kind of comment, and styling line comments as well gives them their own style",
+              "An unknown style word is reported by validation and ignored when printing",
+              "Terminal output resets colour before every newline and, with codes removed, equals the plain output",
+              "HTML output uses only the documented class names, escapes text and has no inline styles; inline-styled HTML has styles and no classes",
+              "SVG output is a well-formed document with one text line per source line and a view box wide enough for the longest line",
+              "A stylesheet generated from any theme is valid CSS scoped to the container class, and changing only attributes changes only the attribute rule",
+              "A VS Code theme that colours properties orange colours attribute names orange",
+              "Colour chosen from a destination is terminal colour for a terminal and plain text for a file or when NO_COLOR is set"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "highlight/kind.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/highlight.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/tokenize.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "span.scope"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "span.kind"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/ansi.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "terminal.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/style.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/theme.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/prettylog/prettylog_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/vscode.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "theme.style"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/jsonc.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/formatter.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/terminal.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/html.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/svg.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/css.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/for.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/doc.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "errors/highlight_errors.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "errors/highlight_errors_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/tokenize_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/highlight_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/kind_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/style_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/theme_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/vscode_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "theme_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "ansi_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "testdata/reference-theme.json"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/terminal_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/html_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/svg_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/css_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/for_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "/dev/null"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/ansi_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/jsonc_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "highlight/kind.go:133-175 maps each kind to the same TextMate scope the removed highlight/highlight.go constants held (BlockType storage.type.xcl, NameLabel entity.name.tag.xcl, Attribute variable.other.property.xcl, String string.quoted.double.xcl, Number constant.numeric.xcl, LineComment comment.line.double-slash.xcl, Inserted markup.inserted.diff, Error invalid.illegal.diagnostic, and so on for all 40 kinds). highlight/tokenize_test.go keeps the bracketed scope-string expectations (for example lines 359-382, [storage.type.xcl], [support.class.reference.xcl]) unchanged, and only the formatter they run through changed (markers at line 3361 uses token.Kind.Scope()). I did not run the tests; the verify summary reports them passing."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "highlight/theme.go:1858-1871 Style falls back to the parent category when a kind has no style. highlight/terminal_test.go:137-146 TestThemeStylingOnlyCommentsColoursEveryKindOfComment expects Comment-only styling to colour // a, # b and /* c */ identically. highlight/terminal_test.go:148-155 TestThemeStylingLineCommentsGivesThemTheirOwnStyle expects LineComment 'bold green' to replace the Comment style for // only, while # and /* keep the Comment style. The whole-style replacement is tested in highlight/theme_test.go:TestThemeStyleReplacesTheParentStyleWhole."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "highlight/theme.go Validate (around line 1878) returns an InvalidStyleError per unknown word via unknownWords (highlight/style.go:135-145). errors/highlight_errors.go:52-76 defines ErrInvalidStyle and InvalidStyleError. highlight/theme_test.go TestThemeValidateReportsAnUnknownWord and TestThemeValidateDetailsTheUnknownWord cover reporting. highlight/terminal_test.go TestTerminalWithAnUnknownStyleWordSucceeds and TestTerminalWithAnUnknownStyleWordAppliesTheKnownWords show printing ignores the word (highlight/style.go applyWord returns false and parsing never fails)."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "highlight/terminal.go:18-41 writes every styled token one line at a time, each non-empty line wrapped in SGR open and \\x1b[0m close, with the newline written outside the codes, so a reset precedes every line break. Unstyled tokens carry no codes. Stripping codes gives the plain text since only codes are added. highlight/terminal_test.go:68-80 checks no newline falls inside a colour, including with Text styled. highlight/terminal_test.go:51-58 checks StripANSI(terminal) equals Plain output. Tests were not run by me."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "highlight/html.go:16-34 HTML writes \u003cpre class=\"xcl\"\u003e and spans with classes from classesOf (kind.Class, kebab-case), never a style attribute. Text is written without a span. escapeHTML (html.go:118-129) escapes \u0026 \u003c \u003e \" '. highlight/html_test.go:157-168 checks only documented class names, :140-146 checks no 'style=' in HTML output, and :121-131 checks escaping. HTMLInline (html.go:41-63) writes style attributes and no class; html_test.go:188-192 checks no 'class=' in the output and :182-186 checks style is present."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "highlight/svg.go:26-76 writes a standalone \u003csvg xmlns=...\u003e document with one \u003ctext xml:space=\"preserve\"\u003e per line (svgLines, svg.go:81-102, drops the trailing empty line). The viewBox width is 2*svgMargin + svgCharWidth*columns, where columns counts runes per line (svg.go:28-40), so it fits the longest line, and height fits every line. Escaping is via escapeHTML. highlight/svg_test.go:60-64 checks the output parses as XML, :84-103 checks one text element per line, :105-128 checks the viewBox, and :122-128 checks characters rather than bytes."
+            },
+            {
+              "criterion": 7,
+              "verdict": "met",
+              "evidence": "highlight/css.go:16-44 WriteCSS emits '.xcl { ... }' for Text and '.xcl .xcl-\u003ckind\u003e { ... }' for each kind the theme styles, in orderedKinds order, with resets (cssResets, css.go:48-71). Named colours are written as hex and dim as opacity. highlight/css_test.go:89-103 checks the stylesheet parses as plain CSS (braces, selector, ;-terminated declarations) and that every selector is scoped to .xcl. highlight/css_test.go:105-112 covers a loaded VS Code theme. highlight/css_test.go:149-163 TestWriteCSSChangingOnlyAttributesChangesOnlyTheAttributeRule checks that changing only Attribute changes only the attribute rule line."
+            },
+            {
+              "criterion": 8,
+              "verdict": "met",
+              "evidence": "highlight/vscode.go:130-149 LoadVSCodeTheme maps each kind's Scope() through the tokenColors rules, so a variable.other.property rule reaches Attribute, whose scope is variable.other.property.xcl (kind.go:141). highlight/vscode_test.go:115-123 TestLoadVSCodeThemeColoursPropertiesAsAttributes expects loaded[Attribute] to be #ff8800. highlight/vscode_test.go:125-135 checks the terminal output is \\x1b[38;2;255;136;0ma\\x1b[0m. Orange is taken to be #ff8800, which is what the test uses."
+            },
+            {
+              "criterion": 9,
+              "verdict": "met",
+              "evidence": "highlight/for.go:16-32 For returns Plain for a non-*os.File, a nil file, or a file that is not a character device (regular file), returns Plain when NO_COLOR is non-empty, and returns Terminal otherwise. highlight/for_test.go:69-113 covers a buffer, a regular file, a nil file, a closed file, a character device (Terminal), and a character device with NO_COLOR=1 (Plain)."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "dd13916e-b0ee-4851-a1a7-670f3cc2f616",
+      "title": "Label change summaries with kinds",
+      "checks": [
+        {
+          "at": "2026-10-26T11:10:42Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "dd13916e-b0ee-4851-a1a7-670f3cc2f616",
+            "title": "Label change summaries with kinds",
+            "criteria": [
+              "A change summary's labelled text joins back to exactly the text it produced before",
+              "Created, deleted and changed parts carry the inserted, deleted and changed kinds"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "diff/render.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "layout.pieces"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diff/pieces_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diff/tokens_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diff/render_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diff/example_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "diff/render.go (worktree .../xcl/diff/render.go:88-121) builds Tokens() through layout.add, which appends every non-empty text to the token list and merges adjacent same-kind tokens; every text producer (plain, marker, hcl, resource header, change lines, summary) goes through add, so no text bypasses the list. Tokens() returns l.tokens (render.go:101). diff/tokens_test.go:27-46 TestTokensJoinToThePlainDiff joins the token texts and compares them with the expected plain diff, including the summary line; TestTokensOfANilDiffSayNothingChanges covers the nil case (tokens_test.go:49-53)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "diff/render.go:145-152: the resource header marker uses marker(kind) with kindFor mapping markInserted to highlight.Inserted, markDeleted to highlight.Deleted and markChanged (the replace case) to highlight.Changed (render.go:533-545). Change lines use the same mapping: additions markInserted (render.go:206-209), removals markDeleted (render.go:212), updates and replacements markChanged (render.go:200-218), and the path is labelled with the same kind (render.go:185). highlight/kind.go:99-103 defines Inserted, Deleted and Changed. diff/tokens_test.go:119-161 asserts Inserted for a created header marker and added value, Deleted for a deleted header marker and removed value, and Changed for a replaced header marker. Note: the staged diff also touches many files outside this item (highlight/ansi.go and highlight/highlight.go deleted, errors/, diagnostics.go, go.mod, internal/report, highlight/*); this is a scope concern for the rule, not a verdict on either criterion."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "bf7098c4-edcc-45e6-84c6-db052d6ea591",
+      "title": "Add one-call printing of errors, resources and change summaries",
+      "checks": [
+        {
+          "at": "2026-10-26T11:20:57Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "bf7098c4-edcc-45e6-84c6-db052d6ea591",
+            "title": "Add one-call printing of errors, resources and change summaries",
+            "criteria": [
+              "Printing the error from applying a configuration with an unsupported block on line 7 writes a report starting \"Error: Unsupported block type\", naming the file, line 7, the block and the field, showing numbered lines 5 to 9, and ending with the detail",
+              "A configuration with two problems, wrapped by the application, prints both reports in order",
+              "An error without a configuration problem prints as exactly its message and a newline",
+              "The detailed formatting of the configuration error equals printing it as plain text",
+              "Detail is wrapped at 80 columns by default, at the chosen width, or not at all",
+              "Plain output of the fixed resources and change summaries equals the output captured before the change",
+              "Terminal, HTML and inline-HTML printing of the error behave as the formats promise, with the fault marked as an error",
+              "A user-written format receives the whole report at once and writes to the given destination",
+              "The labelled text of an error report, a resource and a change summary joins to its plain output"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "print.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diagnostics.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "report.add"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "encode.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "config.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight_errors_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diagnostics_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "print_error_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "testdata/print/bad/main.xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "print_entity_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "print_fixtures_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "print_diff_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "encode_highlight_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "print_error_test.go:171-207 applies testdata/print/bad/main.xcl (unsupported 'timeout' block on line 7, field timeout[0]) and asserts the first line is \"Error: Unsupported block type\", a location line containing main.xcl, line 7, variable.name and field timeout[0], numbered lines 5 to 9 (lines 4 and 10 absent), and the last non-empty line is the detail. The fixture file testdata/print/bad/main.xcl has the block on line 7. Printing path: print.go:120-135 via ErrorTokens (diagnostics.go)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "print_error_test.go:257-274 wraps the two-problem fixture testdata/print/two/main.xcl in fmt.Errorf and asserts two 'Error: Unsupported block type' reports, with the variable.first report's index before the variable.second report's index, and both details present. ErrorTokens walks Unwrap chains via internal/report.Walk (diagnostics.go:98-211)."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "print_error_test.go:276-278 asserts printedError(t, errors.New(\"boom\")) equals \"boom\\n\"; diagnostics.go ErrorTokens returns a single Text token of err.Error()+\"\\n\" when no diagnostic is in the chain. Also print_error_test.go:461-465."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "print_error_test.go:289-293 asserts printedError(t, configError) equals fmt.Sprintf(\"%+v\", configError) for the bad fixture. The %+v formatting is in the errors package (errors/format.go, untracked, with its own copy of the layout per the comment at diagnostics.go:227-229), and the test holds the two to the same output."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "print.go:13 defines defaultPrintWidth = 80 and newPrintOptions defaults to it; WithWidth (print.go:90-94) sets columns or 0 for no wrap. print_error_test.go:304-323 covers the 80-column default (requireNoLineLongerThan 80), WithWidth(40), and WithWidth(0) leaving the detail on one line."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "print_fixtures_test.go:191-255 prints the fixed entities (database, network, container, references, sensitive) and change summaries (example, reasons, changes, nochange) via PrintEntity/PrintDiff and requires equality with testdata/print/entity_*.txt and diff_*.txt, which are present as untracked files in the status list. Limitation: those captured files are untracked, so I could not confirm them against the pre-change git history; the test wiring itself is present and correct."
+            },
+            {
+              "criterion": 7,
+              "verdict": "met",
+              "evidence": "Terminal: print_error_test.go:325-348 asserts the output starts with \\x1b[1;31mError\\x1b[0m, colour is reset before every line break, and stripping SGR gives the plain report. HTML: print_error_test.go:350-385 asserts one \u003cpre class=\"xcl\"\u003e block (highlight/html.go:19), the fault as \u003cspan class=\"xcl-problem xcl-error\"\u003etimeout\u003c/span\u003e (classesOf in highlight/html.go:67-87 with Error's parent Problem, highlight/kind.go:168 and Class at kind.go:215), no style= attributes, and escaped configuration. Inline HTML: print_error_test.go:387-401 asserts style= present and class= absent."
+            },
+            {
+              "criterion": 8,
+              "verdict": "met",
+              "evidence": "print_error_test.go:130-148 defines recordingFormatter; print_error_test.go:403-428 asserts it is called exactly once, receives the whole report's tokens (joined text equals printedError output), and print_error_test.go:421-428 asserts its output is written to the given destination (prefix \"[Error][: Unsupported block type]...\")."
+            },
+            {
+              "criterion": 9,
+              "verdict": "met",
+              "evidence": "Error report: print_error_test.go:430-436 asserts joinedTokenText(ErrorTokens(err)) equals the plain printed report. Resource: print_entity_test.go:58 TestEntityTokensJoinToThePlainPrintedEntity. Change summary: print_diff_test.go:38 TestDiffTokensJoinToThePlainPrintedDiff."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "97a596f0-3dbc-428b-8c81-8c64907e1038",
+      "title": "Move every remaining caller to the new printing",
+      "checks": [
+        {
+          "at": "2026-10-26T11:24:10Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "97a596f0-3dbc-428b-8c81-8c64907e1038",
+            "title": "Move every remaining caller to the new printing",
+            "criteria": [
+              "The core service still returns coloured text when asked for highlighting, and plain text otherwise",
+              "The examples' inspect, plan and pretty-log output is unchanged in plain text and still coloured when colour is forced",
+              "No code or test in the repository uses a removed highlighting, report or change-summary rendering function"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/lookups.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/lookups_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "config_singleton_lifecycle_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "sensitive_leak_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/parser/decide_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/parser/diff_unknown_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/parser"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "viper/xclviper_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "viper/xclviper_directory_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/plugin/inspect.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/plugin/plan.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/prettylog/prettylog.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/prettylog/prettylog_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "go.mod"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "coreservice/lookups.go:204-215 colour() returns text unchanged when on is false, and otherwise formats highlight.Tokenize(text) with highlight.Terminal and highlight.DefaultTheme, returning the coloured bytes. encodeEntity (lookups.go:166) and the saved-entity path call colour(text, req.GetHighlight()). coreservice/lookups_test.go:424-454 covers it: TestEncodeEntityHighlightAddsColour asserts the \\x1b[ escape appears, and TestEncodeEntityHighlightMatchesSavedRecord and TestEncodeSavedEntityHighlightStripsToPlainText assert that stripping colour gives the plain text. The plain-text path is the unchanged-text early return."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "example/plugin/inspect.go:31 prints via xcl.PrintEntity with xcl.WithFormatter(formatterFor(out)); formatterFor (inspect.go:37-43) returns highlight.Terminal when lipgloss.NewRenderer(out).ColorProfile() is not termenv.Ascii, and highlight.Plain otherwise. example/plugin/plan.go:21 prints via xcl.PrintDiff with the same formatterFor. example/prettylog/prettylog.go:83-86 chooses Terminal or Plain by the same colour-profile check, and writeConfiguration (lines 117, 133) prints the entity via xcl.PrintEntity. Colour is forced by the lipgloss/termenv colour profile, which the same check reads, so forcing colour switches to Terminal. Plain output is the Plain formatter over the same text that EncodeEntity produces (the EncodeEntity doc in encode.go states the tokens' joined text equals the encoded text). I did not run the examples, so the byte-for-byte equality with the previous plain output is judged from the code, not from a golden comparison."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "A grep of all *.go files under the xcl code root for Pieces, PieceFunc, highlight.Piece, highlight.ANSI, NewANSI, DiagnosticPieces, highlight.Scope, highlight.Renderer, WithThemeFile and Text.Render returned no uses of any removed function or type. The only hits were highlight.Text as a token Kind (a live constant, not the removed highlight.Text.Render), the new names such as highlight.Terminal and highlight.Plain, and lipgloss .Render calls in example/plugin/status.go (lines 218-281), which are not highlight functions. The staged diff also deletes highlight/ansi.go, highlight/highlight.go and diff/pieces_test.go, and no remaining file references them."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "60674e3d-c8e7-4fa8-a829-c0e0a9baa721",
+      "title": "Publish reference outputs for every built-in format",
+      "checks": [
+        {
+          "at": "2026-10-26T11:26:39Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "60674e3d-c8e7-4fa8-a829-c0e0a9baa721",
+            "title": "Publish reference outputs for every built-in format",
+            "criteria": [
+              "The repository holds labelled inputs, outputs for every built-in format, the default stylesheet and the class-name list",
+              "The Go formats' output matches every reference file byte for byte",
+              "Regenerating the files from unchanged code leaves them unchanged"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "report.tokens.json"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "entity.tokens.json"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "diff.tokens.json"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".plain.txt"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".terminal.txt"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".html"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".inline.html"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".svg"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "default.css"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "classes.txt"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/testdata/reference/inputs/entity.xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/reference_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "All 22 listed files exist and are non-empty under /home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261023074926-eaa51527-printing-and-highlighting-core/xcl/highlight/testdata/reference/: report/entity/diff .tokens.json (154/450/358 matches), .plain.txt, .terminal.txt, .html, .inline.html and .svg for each of the three inputs, default.css (17 lines), classes.txt (41 lines: 'xcl' then the class of each kind), README.md (41 lines), and inputs/entity.xcl (20 lines). The glob and grep confirm presence. Also listed in xcl.status lines 59-80 and 74 as untracked new files."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "highlight/reference_test.go:152-166 (requireReference) compares the formatter output to the stored file with require.Equal on the full string, and TestReferenceReportPlain/Terminal/HTML/HTMLInline/SVG, TestReferenceEntity* and TestReferenceDiff* (lines 200-258) cover every Go format for all three inputs. The supplied verification line 'go vet ./... \u0026\u0026 go test ./... -count=1' passed, and 'go test ./highlight -count=1' passed after regeneration, so the exact-match checks succeeded. I did not re-run the tests (read-only), so this rests on that reported result plus the exact-string assertion in the test file."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Regeneration is wired through the -update flag (reference_test.go:23, 157-159), which rewrites each file with the freshly built bytes. The supplied verification shows two -update runs with identical sha256 for every file in testdata/reference (STABLE). README.md:56 states the same expectation. I did not re-run the regeneration (read-only), so this rests on that reported result."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "16cab7d3-7891-450c-9136-b14922ecdd54",
+      "title": "Make the example programs print errors as reports",
+      "checks": [
+        {
+          "at": "2026-10-26T11:32:21Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "16cab7d3-7891-450c-9136-b14922ecdd54",
+            "title": "Make the example programs print errors as reports",
+            "criteria": [
+              "Running each example against a configuration with a mistake prints a report with the numbered faulty source lines",
+              "No example prints a configuration error as a single line",
+              "Application errors that are not configuration problems still print as one line"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "example/configonly/main.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/configonly/testdata/broken/main.xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/configonly/smoke_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "testdata/broken"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/plugin/main.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "inspect.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "plan.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/plugin/smoke_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "main_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/remoteplugin/main.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/remoteplugin/main_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Each example's error path now calls xcl.PrintError: example/configonly/main.go:51, example/plugin/main.go:116 (in run, reached by apply/plan/status/inspect/destroy errors), example/remoteplugin/main.go:98. PrintError (print.go:120-135) lays out diagnostics via ErrorTokens (diagnostics.go:131-245), which numbers each source line (diagnostics.go tokenList/segment, Gutter kind with '%4d |'). Each example has a broken configuration with a mistake: example/configonly/testdata/broken/main.xcl (unsupported argument replica_count), example/plugin/testdata/broken/main.xcl and example/remoteplugin/testdata/broken/main.xcl (unsupported block type timeout). The smoke/main tests assert numbered lines: example/configonly/smoke_test.go:75-84 ('     5 |   replica_count = 3', '     3 | deployment \"web\" {'), example/plugin/smoke_test.go (TestSmokePlanPrintsAReportForAMistake, '     5 |', '     7 |', '     9 |'), example/remoteplugin/main_test.go (TestApplyOfAMistakePrintsAReport, '     5 |', '     7 |'). The verification summary reports these packages and the Docker-gated plugin tests passing; I did not run them."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "No example prints a configuration error as 'error: %s' any longer: the only remaining 'error: ' occurrences in example/ are NotContains assertions (example/configonly/smoke_test.go:90, example/plugin/smoke_test.go:134, example/remoteplugin/main_test.go:127, 60). Grep for Fprintf of an err to stderr in example mains finds none. Every config-problem path goes through PrintError, which prints diagnostics as reports (print.go:120-135, diagnostics.go ErrorTokens). The only other log is example/prettylog/prettylog.go:105/127 'unable to show configuration', an encoding warning for an entity, not a configuration error the example prints for a mistake."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Non-diagnostic errors reach the same PrintError call, which prints them as a single Text token of message plus line break: diagnostics.go:194-196 (`if !report.Contains(err, isDiagnostic) { return []highlight.Token{{Kind: highlight.Text, Text: err.Error() + \"\\n\"}} }`) and the leaf branch at diagnostics.go:224-228. Tests: example/configonly/smoke_test.go:96-101 (TestConfigOnlyExampleSmokePrintsAnApplicationErrorAsOneLine, unknown service message as one line; the error is an application error from ingressRoutes wrapped with fmt.Errorf in loadConfig), example/plugin/smoke_test.go (TestSmokeApplyFailsForMissingPlugin, stderr ends with 'build it with `make build` in example/plugin\\n', the explainPluginLoad message in example/plugin/main.go / inspect.go path), and the remoteplugin fetchKey/newConfig errors go through the same PrintError (example/remoteplugin/main.go:98, 133-137, 194-199)."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "0ea6110b-3a4b-41aa-9093-b31c673ae5e3",
+      "title": "Write the release notes and repository docs",
+      "checks": [
+        {
+          "at": "2026-10-26T11:34:29Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "0ea6110b-3a4b-41aa-9093-b31c673ae5e3",
+            "title": "Write the release notes and repository docs",
+            "criteria": [
+              "The changelog lists a one-line replacement for each removed highlighting, report and change-summary rendering function",
+              "The repository docs describe the new printing and no longer mention a removed function"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "CHANGELOG.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "docs/overview.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/report"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "docs/README.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "conventions/testing-and-mocking.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "CHANGELOG.md lines 15-26 (new top section 20261023074926-eaa51527-printing-and-highlighting-core, 'Breaking' list) give one bullet per removed item, each a one-line replacement: highlight.Piece (L15), Pieces (L16), Renderer (L17), RendererFunc and PieceFunc (L18), Text.Render (L19), ANSI and ANSIRenderer (L20), NewANSI with WithTheme(io.Reader) (L21), WithThemeFile (L22), ANSIOption (L23), Scope* constants (L24), xcl.DiagnosticPieces (L25), diff.(*Diff).Pieces (L26). All twelve removed items in the goal are covered."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "The new printing is described in README.md:109-112 (xcl.PrintError with WithFormatter(highlight.For(os.Stderr))), docs/README.md:48 (PrintError, PrintEntity, PrintDiff with WithFormatter, WithTheme, WithWidth, and ErrorTokens) and docs/overview.md:131-133 (xcl.PrintError, ErrorTokens). Greps of docs/, README.md and the rest of the code root (excluding .spektacular/) for Pieces, PieceFunc, RendererFunc, Renderer, ANSI, NewANSI, WithThemeFile, Scope*, DiagnosticPieces, .Render( and highlight.Text.Render found no hits in any repository doc. The only hits are in CHANGELOG.md's migration bullets, which is correct, and highlight/doc.go (package doc, lines 1-37) names no removed function. Note: conventions/testing-and-mocking.md does not exist in the worktree code root, so it could not be checked; it does not affect either criterion as written."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "a3b4a3e9-2874-4159-b8a9-83464bd0fb8b",
+      "title": "Document the new printing on the website",
+      "checks": [
+        {
+          "at": "2026-10-26T11:44:10Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "a3b4a3e9-2874-4159-b8a9-83464bd0fb8b",
+            "title": "Document the new printing on the website",
+            "criteria": [
+              "The site has sections on printing errors, resources and change summaries, output formats, themes, class names, stylesheet generation, custom formats and logging integration, each with a Go example",
+              "No page documents a removed function",
+              "Every existing page URL still works and the site builds"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "/home/nicj/code/github.com/jumppad-labs/xcl-website"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/configuration-text.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "classes.txt"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/problems.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/diff.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/events.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/sensitive-values.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/examples/viper.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/examples/plugins.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/styles/global.css"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": ".xcl"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/components/Nav.astro"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "gotchas/no-redirects-on-page-removal.md"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "gotchas/guides-dropdown-label-opens-first-child.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "All eight topics have a Go example. Printing errors: problems.mdx ~L108-150 (\"Showing problems to a person\", PrintError example). Resources: configuration-text.mdx ~L368-420 (PrintEntity example at ~L393). Change summaries: diff.mdx ~L197-210 (\"Reading the printed output\", PrintDiff example). Output formats: configuration-text.mdx ~L423-450 (table plus SVG Go example). Themes: configuration-text.mdx ~L499-580 (With/WithTheme example at ~L526). Class names: configuration-text.mdx ~L639-700, a class table under \"### On a website\" with the Go HTML example at ~L733; the table itself has no code block, so this rests on that subsection's example. Stylesheet generation: configuration-text.mdx ~L687-702 (highlight.WriteCSS example). Custom formats: configuration-text.mdx ~L756-800 (FormatterFunc example). Logging integration: problems.mdx ~L1338-1373 (zap example) and events.mdx ~L852-890 (SlogHandler and PrintError example)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Grep of the xcl-website worktree (excluding node_modules) for DiagnosticPieces, NewANSI, highlight.Pieces, Pieces(), PieceFunc, RendererFunc, highlight.ANSI, WithThemeFile, ScopeInserted and the other Scope* names, highlight.Renderer, .Render(, WithTheme(, ANSIOption and the piece types returned no matches. The remaining highlight.Text hits (configuration-text.mdx L541, L642, L763) use it as the unlabelled Kind, which the new API still exports, not as the removed renderer. The sensitive-values and diff.mdx mentions of 'rendering' or 'Pieces' are prose only, and none names a removed function."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "The staged xcl-website status lists only modified files (M) for the pages, with no deletions, renames or new untracked pages, so every existing URL remains. Anchors used by links resolve to headings: configuration-text.mdx L368 '## Printing and highlighting' for /configuration-text/#printing-and-highlighting (linked from diff.mdx L293, problems.mdx L211 and L273, events.mdx L465) and problems.mdx '## Showing problems to a person' for /problems/#showing-problems-to-a-person (linked from events.mdx L91 and viper.mdx L255). No remaining link to the removed #highlighting anchor was found. Nav.astro is unchanged. I could not re-run npm run build without writing to dist, so the build result rests on the supplied 'npm run build: pass' line and on the static checks above."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    }
+  ]
+}
