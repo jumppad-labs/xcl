@@ -1022,6 +1022,91 @@ func isWebCreated(e *corepb.Event) bool {
 	return e.GetOperation() == "create" && e.GetPhase() == "success" && e.GetResourceId() == "app.web"
 }
 
+// savesWeb reports whether task is a SAVE whose records include app.web
+func savesWeb(t *testing.T, task *corepb.StateTask) bool {
+	t.Helper()
+
+	if task.GetKind() != corepb.StateTask_SAVE {
+		return false
+	}
+
+	for _, entity := range decodeEntities(t, task.GetEntities()) {
+		if entity["meta"].(map[string]any)["id"] == "app.web" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// driveUntilWebCreated is drive for a handler that must run while the
+// operation is still in progress. The engine delivers events from their own
+// goroutine, so the SAVE that follows app.web's create success event can
+// reach the host before the event does; answered at once, it would let the
+// operation finish before the handler runs. Here that SAVE is held back until
+// the create success event has been handled, so the operation is still
+// waiting on the host while onEvent handles it.
+func (c *testClient) driveUntilWebCreated(handle, opID uint64, store *fakeStore, onEvent func(*corepb.Event)) *corepb.OperationFinished {
+	c.t.Helper()
+
+	answer := func(task *corepb.StateTask) {
+		c.ok(handle, "Complete", &corepb.CompleteRequest{
+			TaskId: task.GetTaskId(),
+			Result: &corepb.CompleteRequest_State{State: store.answer(task)},
+		}, &corepb.CompleteResponse{})
+	}
+
+	webCreated := false
+	var held []*corepb.StateTask
+
+	deadline := time.Now().Add(driveTimeout)
+
+	for time.Now().Before(deadline) {
+		resp := &corepb.PollResponse{}
+		c.ok(handle, "Poll", &corepb.PollRequest{WaitMs: 200}, resp)
+
+		switch task := resp.GetTask().(type) {
+		case nil:
+			continue
+
+		case *corepb.PollResponse_Event:
+			onEvent(task.Event)
+
+			if isWebCreated(task.Event) {
+				webCreated = true
+
+				for _, waiting := range held {
+					answer(waiting)
+				}
+				held = nil
+			}
+
+		case *corepb.PollResponse_State:
+			require.Equal(c.t, opID, task.State.GetOperationId())
+
+			if !webCreated && savesWeb(c.t, task.State) {
+				held = append(held, task.State)
+				continue
+			}
+
+			answer(task.State)
+
+		case *corepb.PollResponse_Finished:
+			require.Equal(c.t, opID, task.Finished.GetOperationId())
+			require.True(c.t, webCreated, "the operation finished without a create/success event for app.web")
+
+			return task.Finished
+
+		default:
+			c.t.Fatalf("unexpected task %T", task)
+		}
+	}
+
+	c.t.Fatalf("operation %d did not finish within %s", opID, driveTimeout)
+
+	return nil
+}
+
 func TestEncodeSavedEntityDuringApplyMatchesAfter(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
@@ -1034,11 +1119,10 @@ func TestEncodeSavedEntityDuringApplyMatchesAfter(t *testing.T) {
 	var record []byte
 	var duringComputed, duringDefault string
 
-	// the SAVE task that follows the create success event waits for the
-	// host, which answers it only after this handler returns, so the
-	// operation is still running here
+	// the SAVE task that follows the create success event is held until this
+	// handler returns, so the operation is still running here
 	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
-	finished := c.drive(handle, opID, store, func(e *corepb.Event) {
+	finished := c.driveUntilWebCreated(handle, opID, store, func(e *corepb.Event) {
 		if !isWebCreated(e) {
 			return
 		}
@@ -1141,7 +1225,7 @@ func TestEncodeEntityFromHandlerDuringApplyRefused(t *testing.T) {
 	var refused *corepb.Error
 
 	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
-	finished := c.drive(handle, opID, store, func(e *corepb.Event) {
+	finished := c.driveUntilWebCreated(handle, opID, store, func(e *corepb.Event) {
 		if !isWebCreated(e) {
 			return
 		}
@@ -1165,7 +1249,7 @@ func TestEncodeEditedEntityFromHandlerDuringApplyRefused(t *testing.T) {
 	var refused *corepb.Error
 
 	opID := c.start(handle, "StartApply", &corepb.StartApplyRequest{Paths: []string{writeConfig(t, appConfig)}})
-	finished := c.drive(handle, opID, store, func(e *corepb.Event) {
+	finished := c.driveUntilWebCreated(handle, opID, store, func(e *corepb.Event) {
 		if !isWebCreated(e) {
 			return
 		}
