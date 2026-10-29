@@ -1,0 +1,405 @@
+{
+  "plan": "20261023074223-e06f835f-event-data-level-enum",
+  "items": [
+    {
+      "item": "a437ae0f-6f47-452c-be33-5b43f0e4985a",
+      "title": "Add the EventDataLevel enum and accept only its members",
+      "checks": [
+        {
+          "at": "2026-10-26T08:32:06Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "a437ae0f-6f47-452c-be33-5b43f0e4985a",
+            "title": "Add the EventDataLevel enum and accept only its members",
+            "criteria": [
+              "`from xcl import EventDataLevel` works, and the enum has exactly three members, `NONE`, `RAW` and `PROCESSED`, with values `\"none\"`, `\"raw\"` and `\"processed\"`.",
+              "Each member, given to either configuration, sends the engine the same protocol level the matching string sent before, and leaving the option out sends none.",
+              "Giving either configuration the string `\"processed\"`, the string `\"verbose\"`, an integer or an explicit `None` raises a `TypeError` whose message names `xcl.EventDataLevel`, and no configuration is created in the engine.",
+              "The `xcl.Config` docstring describes the option in terms of the enum, and the enum's docstring describes each level as Go's documentation does.",
+              "No test or library code in the package still passes a bare string as the event data level, and the existing processed-level integration tests pass using the member."
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/events.py"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "events.go"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl.events"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "core_pb2.EVENT_DATA_NONE/RAW/PROCESSED"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_sync.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_test_plugin.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_events.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "test_config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "asyncio.run"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/events.py:17-38 defines `class EventDataLevel(enum.StrEnum)` with exactly NONE = \"none\", RAW = \"raw\", PROCESSED = \"processed\". xcl-python/xcl/__init__.py:57 imports it, and :67 lists it in `__all__`, so `from xcl import EventDataLevel` resolves. tests/unit/test_events.py:279-288 asserts the member names and values."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/config.py:20-24 maps EventDataLevel.NONE/RAW/PROCESSED to core_pb2.EVENT_DATA_NONE/RAW/PROCESSED, the same wire values the old EVENT_DATA_LEVELS dict used. config.py:72 and aio.py:53 default `event_data` to EventDataLevel.NONE, and both pass the converted level into `_request` (config.py:97, aio.py:80). Unit tests in tests/unit/test_config.py:86-191 check the wire value for each member in both Config classes and for the omitted option."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/config.py:27-39 `_event_data_level` raises TypeError with a message containing \"xcl.EventDataLevel\" unless `isinstance(value, EventDataLevel)`. The check is an isinstance test, so the string \"processed\" (equal to the member) is refused, as are \"verbose\", 1 and None. In the sync Config it runs at config.py:78, before `_request` and the `CreateConfig` call at config.py:102. In the async Config it runs at aio.py:59, before the executor is created and before `_ensure_open`, so no engine call is made. tests/unit/test_config.py:194-263 covers each refused value for both classes and asserts no CreateConfig call."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/config.py:48-55 documents `event_data` as \"an :class:`xcl.EventDataLevel`, ``EventDataLevel.NONE`` (the default), ``RAW`` or ``PROCESSED``\". xcl-python/xcl/events.py:18-33 gives the enum docstring with a paragraph per level, matching the substance of Go's events.go:21-40 (NONE carries no data and is the default; RAW is the resource before the provider call on every event; PROCESSED is the state-recorded resource on success events, with the masking caveat). The wording is adapted to Python names (Event.entity, encode_saved_entity, event mask)."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "Grep over xcl-python for `event_data\\s*=\\s*[\"']`, `\"event_data\"`, EVENT_DATA_LEVELS and the bare words found no library or integration-test use of a string as the level; all integration call sites (tests/integration/test_sync.py, test_aio.py, test_test_plugin.py) now pass xcl.EventDataLevel.PROCESSED. The only remaining bare strings in code are the negative tests at tests/unit/test_config.py:165, 174, 201 and 210, which pass \"processed\" or \"verbose\" on purpose to check refusal. Criterion 3 requires that, so they are not uses of a string as a valid level. Non-code docs still show the old form: xcl-python/README.md:230 (`event_data=\"processed\"`) and xcl-python/PARITY.md:66. Criterion 5 covers only test and library code, so these do not change the verdict, but README.md:230 would now raise TypeError and README is outside this item's scope."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "bec34d15-ac04-481c-a27b-35029e2897a8",
+      "title": "Prove each level against the engine",
+      "checks": [
+        {
+          "at": "2026-10-26T08:36:07Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "bec34d15-ac04-481c-a27b-35029e2897a8",
+            "title": "Prove each level against the engine",
+            "criteria": [
+              "With `EventDataLevel.RAW`, the create events for the applied resource carry that resource's data.",
+              "With the option left out, no delivered event carries any resource data.",
+              "With `EventDataLevel.NONE`, no delivered event carries any resource data.",
+              "With `EventDataLevel.PROCESSED`, the create success event's entity is the created resource, for both `xcl.Config` and `xcl.aio.Config`."
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_sync.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "test_sync.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "sync_app.web"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "gotchas/event-data-includes-temp-paths.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "entity.meta.id"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl-ref.txt"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "tests/integration/test_sync.py:641-654 test_raw_event_data_carries_the_resource applies WEB with event_data=xcl.EventDataLevel.RAW, collects every resource_id 'sync_app.web' operation 'create' event, requires at least one, and asserts each has non-empty data whose JSON has meta.id == 'sync_app.web' and image == 'nginx'. xcl/config.py:20-23 maps RAW to core_pb2.EVENT_DATA_RAW, so the level is wired through to the engine."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "tests/integration/test_sync.py:657-665 test_event_data_left_out_carries_nothing builds xcl.Config with no event_data argument and asserts events is non-empty and every event has data == b\"\". xcl/config.py:72 defaults event_data to EventDataLevel.NONE, so the omitted option is the NONE path. xcl/events.py:61-62 shows data and meta are the only fields that could hold resource data, and meta is documented (events.py:49) as log-message detail only."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "tests/integration/test_sync.py:668-676 test_none_event_data_carries_nothing passes event_data=xcl.EventDataLevel.NONE and asserts events is non-empty and every event has data == b\"\". xcl/events.py:23 documents NONE as carrying no resource data on any event."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "For xcl.Config: tests/integration/test_sync.py:679-701 test_event_entity_is_emitting_configs_class uses PROCESSED, filters on resource_id 'app.web', operation 'create' and phase 'success', and asserts event.entity() is an instance of SyncApp (and PlainApp for the second config). For xcl.aio.Config: tests/integration/test_aio.py:274-291 test_async_event_entity_is_configs_class uses PROCESSED, filters on 'aio_app.web' create success, and asserts the entity is an App with name 'web' and meta.id 'aio_app.web'. Note: test_sync.py:626-638 test_event_entity_hydrates selects the first create event without a phase filter, so it does not on its own prove the success event; the success-phase tests above do. Verification was not re-run, so the evidence is from reading the tests and xcl/events.py:94-102 entity() implementation."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "0ecb27ac-960f-401c-9d68-60f3f6284ca1",
+      "title": "Declare the package typed and check the option with mypy",
+      "checks": [
+        {
+          "at": "2026-10-26T08:38:32Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "0ecb27ac-960f-401c-9d68-60f3f6284ca1",
+            "title": "Declare the package typed and check the option with mypy",
+            "criteria": [
+              "The built wheel and sdist contain the typed-package marker.",
+              "mypy run over a program passing `\"processed\"` as `event_data` to `xcl.Config` and to `xcl.aio.Config` reports an error on each of those lines that names `EventDataLevel`.",
+              "mypy run over the same program passing `xcl.EventDataLevel.PROCESSED` reports no errors.",
+              "The test dependencies include mypy, with a comment explaining it is used only to check the package's typing as users see it."
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/py.typed"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "pyproject.toml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_typing.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_import.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-python/xcl/py.typed exists as an empty untracked file (listed in xcl-python.status as ?? xcl/py.typed). pyproject.toml:66 sets wheel packages = [\"xcl\"] and :61-62 sdist only-include includes \"xcl\", so the marker is packaged. The verify step reports `unzip -l \u003cwheel\u003e | grep py.typed` -\u003e xcl/py.typed and `tar tzf \u003csdist\u003e | grep py.typed` -\u003e xcl_lang-0.5.0.dev0/xcl/py.typed. I did not rebuild, so this rests on that reported output."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl/config.py (diff hunk at line 69-76) and xcl/aio.py (hunk at line 50-53) annotate event_data as EventDataLevel with a default of EventDataLevel.NONE. The verify step ran mypy on the string program and got rc=1 with `program.py:6: error: Argument \"event_data\" to \"Config\" has incompatible type \"str\"; expected \"EventDataLevel\"` and the same error at program.py:7. tests/unit/test_typing.py:28-49 asserts one error naming EventDataLevel on each of those lines, and the verify step reports 2 passed for that file."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "tests/unit/test_typing.py:52-66 (test_mypy_accepts_event_data_member) runs mypy over xcl.Config(event_data=xcl.EventDataLevel.PROCESSED) and xcl.aio.Config(event_data=xcl.EventDataLevel.PROCESSED) and asserts returncode == 0. The verify step reports tests/unit/test_typing.py: 2 passed. xcl/__init__.py diff exports EventDataLevel at top level, so the member resolves for mypy. The member snippet was not run by hand, so this rests on that passing test."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "pyproject.toml:36-42 places \"mypy\u003e=1.11\" in [project.optional-dependencies] test, with the comment at lines 38-41: \"mypy is used only by tests/unit/test_typing.py, which runs it as a user would over small programs against the installed package, to check that a user's type checker sees the package's annotations, such as event_data taking an xcl.EventDataLevel\"."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "1f94d121-4e53-4194-9bab-a2b29f16a79c",
+      "title": "Show the enum in the package README and parity list",
+      "checks": [
+        {
+          "at": "2026-10-26T08:40:12Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "1f94d121-4e53-4194-9bab-a2b29f16a79c",
+            "title": "Show the enum in the package README and parity list",
+            "criteria": [
+              "The README shows no bare string event data level, and its events example uses an `xcl.EventDataLevel` member.",
+              "The README has a migration note stating that string levels are refused and that the member of the same name is passed instead, with no bare-string example.",
+              "The parity list's event data row names Go's `xcl.EventDataLevel` and `WithEventData`, and the Python `xcl.EventDataLevel` with its three members."
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "PARITY.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "README.md:230 is the only event_data example and reads `event_data=xcl.EventDataLevel.PROCESSED`. No bare string level appears in any code block. The strings that do appear in README.md:238 and README.md:351-357 are prose about refused strings, not a level passed as a string. The verification grep for quoted level words in README.md and PARITY.md found nothing."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "README.md:348-357 is the section '## Migrating from string event data levels'. It says a string is refused with a `TypeError`, even one spelled like a level, and that the member of the same name, upper-cased (`xcl.EventDataLevel.NONE`, `.RAW`, `.PROCESSED`), is passed instead. The section has no code block and no bare-string example."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "PARITY.md:66 is the configuration-options row for `WithEventData(level)`, whose Go column reads '`level` an `xcl.EventDataLevel` (`xcl.EventDataNone`, `xcl.EventDataRaw`, `xcl.EventDataProcessed`)'. The Python column reads '`event_data=xcl.EventDataLevel.NONE`, `.RAW` or `.PROCESSED` (an `xcl.EventDataLevel`; a string is refused)'. That names Go's `xcl.EventDataLevel` and `WithEventData`, and the Python `xcl.EventDataLevel` with its three members."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "a5c9e273-cc56-4cd5-a241-ee35aadadda8",
+      "title": "Show the enum on the xcl website pages",
+      "checks": [
+        {
+          "at": "2026-10-26T08:42:07Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "a5c9e273-cc56-4cd5-a241-ee35aadadda8",
+            "title": "Show the enum on the xcl website pages",
+            "criteria": [
+              "No page on the site shows or describes a bare string event data level.",
+              "The events page names the three members of `xcl.EventDataLevel` where it lists the Python options.",
+              "The site builds with the changed pages."
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/events.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "xcl.mask"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/configuration-text.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/examples/configuration-only.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/examples/plugins.mdx"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "No bare string event data level remains under xcl-website/src. A grep for quoted none/raw/processed near event_data, level or data finds nothing. A case-insensitive grep for quoted or bare processed/raw finds no string-valued level. The four changed call sites now use xcl.EventDataLevel.PROCESSED (configuration-text.mdx:103, events.mdx:191, examples/configuration-only.mdx:652, examples/plugins.mdx:1136). The only Python level prose is events.mdx:203-205, which uses the enum. Non-string references remain at events.mdx:406 and examples/configuration-only.mdx:663, which name `xcl.EventDataProcessed`. That is not a bare string, so it does not fail this criterion, but it is a wrong identifier and should be checked against the library."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-website/src/pages/events.mdx:203-205 reads: 'Python the options are `event_data=` with an `xcl.EventDataLevel` (`NONE`, `RAW` or `PROCESSED`), `event_mask=` with one of the `xcl.mask` built-ins, and `no_event_mask=True`.' All three members are named there. The diff hunk at events.mdx:200-206 shows this change."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Not re-run, since this review is read-only. The verify step reports `npm ci` and `npm run build` exiting 0 with '23 page(s) built' and 'Complete!', and the built dist pages for events, configuration-text, examples/configuration-only and examples/plugins contain EventDataLevel. The staged diff (xcl-website.diff) changes only MDX prose and code lines, with no new imports or components, so the build result applies to these edits. Also note that xcl.mask does not exist at the xcl-website root (Glob for **/xcl.mask* found nothing), so that scope entry was not used. It is optional and no criterion needs it."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    }
+  ]
+}

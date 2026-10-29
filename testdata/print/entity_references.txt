@@ -1,0 +1,12 @@
+resource "container" "api" {
+  depends_on = ["resource.database.main"]
+  default    = "hello world"
+
+  network {
+    name             = resource.network.main.meta.name
+    ip_address       = "10.0.0.20"
+    assigned_address = "assigned-main" # set by the provider
+  }
+
+  command = ["api"]
+}

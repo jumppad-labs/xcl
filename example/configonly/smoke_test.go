@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -64,5 +65,37 @@ func TestConfigOnlyExampleSmokeFailsForMissingConfig(t *testing.T) {
 	run := runExample(buildExample(t), filepath.Join(t.TempDir(), "missing"))
 
 	require.Error(t, run.err)
-	require.Contains(t, run.stderr, "error:")
+	require.Contains(t, run.stderr, "Error: Unable to read the configuration\n")
+}
+
+// TestConfigOnlyExampleSmokePrintsAReportForAMistake runs the example against
+// a configuration whose deployment sets an attribute it does not have, and
+// checks stderr holds the report with the faulty line numbered, not a single
+// line
+func TestConfigOnlyExampleSmokePrintsAReportForAMistake(t *testing.T) {
+	run := runExample(buildExample(t), "./testdata/broken")
+
+	require.Error(t, run.err)
+	require.Contains(t, run.stderr, "Error: Unsupported argument\n")
+	require.Contains(t, run.stderr, " line 5, in deployment.web, field replica_count:\n")
+	require.Contains(t, run.stderr, "     5 |   replica_count = 3\n")
+	require.Contains(t, run.stderr, "     3 | deployment \"web\" {\n")
+	require.Contains(t, run.stderr, "\nAn argument named \"replica_count\" is not expected here.\n")
+}
+
+func TestConfigOnlyExampleSmokeDoesNotPrintAMistakeAsOneLine(t *testing.T) {
+	run := runExample(buildExample(t), "./testdata/broken")
+
+	require.Error(t, run.err)
+	require.NotContains(t, run.stderr, "error: ")
+}
+
+// TestConfigOnlyExampleSmokePrintsAnApplicationErrorAsOneLine runs the example
+// against a configuration that reads but names a service that does not exist,
+// an error of the application's own, which is printed as its message alone
+func TestConfigOnlyExampleSmokePrintsAnApplicationErrorAsOneLine(t *testing.T) {
+	run := runExample(buildExample(t), "./testdata/unknown_service")
+
+	require.Error(t, run.err)
+	require.True(t, strings.HasSuffix(run.stderr, "\ningress ingress.shop path /: service \"service.missing\" not found\n"), "stderr: %s", run.stderr)
 }

@@ -119,10 +119,17 @@ func (s *Service) outputs(conf *configuration, _ *corepb.OutputsRequest) (*corep
 }
 
 // encodeSavedEntity is EncodeSavedEntity, a saved record rendered as
-// configuration text with the encoding choices asked for, coloured for a
-// terminal when asked.
+// configuration text with the encoding choices asked for, and labelled by
+// the core's lexer as well when asked.
+//
+// Unlike every other lookup it does not call lookupAllowed. Lookups are
+// refused while an operation runs because the entity slice is replaced when
+// the operation ends, and Config.EncodeSavedEntity reads none of the
+// configuration's entities: it types the record through the plugin catalog
+// and renders it. So it is allowed during an operation, including from a
+// host's handling of the operation's events.
 func (s *Service) encodeSavedEntity(conf *configuration, req *corepb.EncodeSavedEntityRequest) (*corepb.EncodeSavedEntityResponse, error) {
-	if err := encodeAllowed(conf, "EncodeSavedEntity", req.GetEntity()); err != nil {
+	if err := requireEntity(req.GetEntity()); err != nil {
 		return nil, err
 	}
 
@@ -131,15 +138,28 @@ func (s *Service) encodeSavedEntity(conf *configuration, req *corepb.EncodeSaved
 		return nil, err
 	}
 
-	return &corepb.EncodeSavedEntityResponse{Text: colour(text, req.GetHighlight())}, nil
+	resp := &corepb.EncodeSavedEntityResponse{Text: text}
+	if req.GetTokens() {
+		resp.Tokens = tokensToProto(highlight.Tokenize(text))
+	}
+
+	return resp, nil
 }
 
 // encodeEntity is EncodeEntity, an entity's record as a lookup returns it,
-// possibly edited, rendered as configuration text. With reveal_sensitive the
-// engine fills a marker from its own copy of the entity, since a lookup only
-// ever hands out the marker.
+// possibly edited, rendered as configuration text, and labelled by the core's
+// lexer as well when asked. With reveal_sensitive the engine fills a marker
+// from its own copy of the entity, since a lookup only ever hands out the
+// marker.
+//
+// It reads the live entity by meta.id through Config.EncodeEntityRecord, so
+// like every other lookup it is refused while an operation runs.
 func (s *Service) encodeEntity(conf *configuration, req *corepb.EncodeEntityRequest) (*corepb.EncodeEntityResponse, error) {
-	if err := encodeAllowed(conf, "EncodeEntity", req.GetEntity()); err != nil {
+	if err := conf.lookupAllowed("EncodeEntity"); err != nil {
+		return nil, err
+	}
+
+	if err := requireEntity(req.GetEntity()); err != nil {
 		return nil, err
 	}
 
@@ -148,17 +168,18 @@ func (s *Service) encodeEntity(conf *configuration, req *corepb.EncodeEntityRequ
 		return nil, err
 	}
 
-	return &corepb.EncodeEntityResponse{Text: colour(text, req.GetHighlight())}, nil
-}
-
-// encodeAllowed refuses an encode while an operation runs, as every lookup
-// is, and an encode of no record at all. Both encode calls share it, so they
-// refuse alike.
-func encodeAllowed(conf *configuration, what string, entity []byte) error {
-	if err := conf.lookupAllowed(what); err != nil {
-		return err
+	resp := &corepb.EncodeEntityResponse{Text: text}
+	if req.GetTokens() {
+		resp.Tokens = tokensToProto(highlight.Tokenize(text))
 	}
 
+	return resp, nil
+}
+
+// requireEntity refuses an encode of no record at all. Both encode calls
+// share it, so they reject an empty record alike, during an operation or
+// outside one.
+func requireEntity(entity []byte) error {
 	if len(entity) == 0 {
 		return invalidArgument("an entity is required", "argument", "entity")
 	}
@@ -184,14 +205,4 @@ func encodeOptions(options *corepb.EncodeOptions) []xcl.EncodeOption {
 	}
 
 	return encode
-}
-
-// colour applies the terminal highlighting both encode calls offer, after
-// rendering, so the same text is coloured the same from either call.
-func colour(text []byte, on bool) []byte {
-	if !on {
-		return text
-	}
-
-	return highlight.ANSI.Render(highlight.Pieces(text))
 }

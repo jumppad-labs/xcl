@@ -26,7 +26,12 @@ type operation struct {
 // Cancel cancels, and returns its id. Its end is posted as an
 // OperationFinished task after every task the work posted, so the host sees
 // it last. At most one operation runs at a time; a second is refused.
-func (c *configuration) start(work func(ctx context.Context) (diffJSON []byte, err error)) (uint64, error) {
+//
+// A diff's work returns the diff it found, and every other operation's work
+// returns none. The finished task carries both representations of a diff,
+// its JSON and its change summary as labelled text, derived from the one
+// value so they always describe the same diff.
+func (c *configuration) start(work func(ctx context.Context) (*diff.Diff, error)) (uint64, error) {
 	c.mu.Lock()
 
 	if c.inProgress != nil {
@@ -45,8 +50,21 @@ func (c *configuration) start(work func(ctx context.Context) (diffJSON []byte, e
 	go func() {
 		defer close(op.done)
 
-		diffJSON, err := work(op.ctx)
+		found, err := work(op.ctx)
 		op.cancel()
+
+		finished := &corepb.OperationFinished{OperationId: op.id}
+		if found != nil {
+			diffJSON, marshalErr := json.Marshal(found)
+			switch {
+			case marshalErr == nil:
+				finished.DiffJson = diffJSON
+				finished.DiffTokens = tokensToProto(found.Tokens())
+			case err == nil:
+				err = marshalErr
+			}
+		}
+		finished.Error = toProto(err)
 
 		// the operation is over before the host can see it finish, so a call
 		// the host makes as soon as it polls the finished task is not refused
@@ -56,11 +74,7 @@ func (c *configuration) start(work func(ctx context.Context) (diffJSON []byte, e
 		}
 		c.mu.Unlock()
 
-		c.queue.post(&corepb.PollResponse{Task: &corepb.PollResponse_Finished{Finished: &corepb.OperationFinished{
-			OperationId: op.id,
-			Error:       toProto(err),
-			DiffJson:    diffJSON,
-		}}})
+		c.queue.post(&corepb.PollResponse{Task: &corepb.PollResponse_Finished{Finished: finished}})
 	}()
 
 	return op.id, nil
@@ -81,6 +95,8 @@ func (c *configuration) running() bool {
 
 // lookupAllowed refuses a lookup while an operation runs on the
 // configuration, since the entity slice is replaced when an operation ends.
+// A call that reads none of the entities, such as EncodeSavedEntity, does
+// not need it.
 func (c *configuration) lookupAllowed(what string) error {
 	if c.running() {
 		return operationInProgress(what)
@@ -116,7 +132,7 @@ func (s *Service) startValidate(conf *configuration, req *corepb.StartValidateRe
 		return nil, invalidArgument("at least one path is required", "argument", "paths")
 	}
 
-	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
+	return startResponse(conf.start(func(ctx context.Context) (*diff.Diff, error) {
 		return nil, conf.cfg.ValidateContext(ctx, req.GetPaths()...)
 	}))
 }
@@ -126,7 +142,7 @@ func (s *Service) startApply(conf *configuration, req *corepb.StartApplyRequest)
 		return nil, invalidArgument("at least one path is required", "argument", "paths")
 	}
 
-	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
+	return startResponse(conf.start(func(ctx context.Context) (*diff.Diff, error) {
 		return nil, conf.cfg.ApplyContext(ctx, req.GetPaths()...)
 	}))
 }
@@ -141,24 +157,19 @@ func (s *Service) startDiff(conf *configuration, req *corepb.StartDiffRequest) (
 		options = append(options, diff.RevealSensitive())
 	}
 
-	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
-		found, err := conf.cfg.DiffContext(ctx, req.GetPaths(), options...)
-		if err != nil {
-			return nil, err
-		}
-
-		return json.Marshal(found)
+	return startResponse(conf.start(func(ctx context.Context) (*diff.Diff, error) {
+		return conf.cfg.DiffContext(ctx, req.GetPaths(), options...)
 	}))
 }
 
 func (s *Service) startDestroy(conf *configuration, _ *corepb.StartDestroyRequest) (*corepb.StartOperationResponse, error) {
-	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
+	return startResponse(conf.start(func(ctx context.Context) (*diff.Diff, error) {
 		return nil, conf.cfg.DestroyContext(ctx)
 	}))
 }
 
 func (s *Service) startLoad(conf *configuration, _ *corepb.StartLoadRequest) (*corepb.StartOperationResponse, error) {
-	return startResponse(conf.start(func(ctx context.Context) ([]byte, error) {
+	return startResponse(conf.start(func(ctx context.Context) (*diff.Diff, error) {
 		return nil, conf.cfg.LoadContext(ctx)
 	}))
 }

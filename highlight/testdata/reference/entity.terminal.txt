@@ -1,0 +1,22 @@
+[3;90m// the reference resource: every kind of configuration text[0m
+[3;90m# a hash comment[0m
+[3;90m/* a block[0m
+[3;90m   comment */[0m
+[1;35mresource[0m [36m"container"[0m [32m"web"[0m {
+  [34mimage[0m    = [33m"nginx:1.27"[0m
+  [34mreplicas[0m = [95m3[0m
+  [34menabled[0m  = [95mtrue[0m
+  [34mowner[0m    = [95mnull[0m
+  [34mmessage[0m  = [33m"line one[0m[95m\n[0m[33mport < 1024 & [0m[95m\"[0m[33mquoted[0m[95m\"[0m[33m"[0m
+  [34mnetwork[0m  = [36mresource[0m.[36mnetwork[0m.[36mmain[0m.[36mmeta[0m.[36mname[0m
+  [34mport[0m     = max([95m8080[0m, [95m8443[0m)
+  [34mgreeting[0m = [33m"hello [0m${[36mvariable[0m.[36mname[0m}[33m!"[0m
+
+  [34mscript[0m = [33m<<-[0m[33mEOF[0m
+[33m    echo "[0m#{{ .[36mVars[0m.[36mgreeting[0m }}[33m"[0m
+  [33mEOF[0m
+
+  [1;35mvolume[0m {
+    [34msource[0m = [33m"/data"[0m
+  }
+}

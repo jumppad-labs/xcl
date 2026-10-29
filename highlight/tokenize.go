@@ -5,12 +5,11 @@ import (
 	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 )
 
-// Piece is one labelled run of text. Scope is the TextMate scope the text is
-// labelled with, one of the Scope constants, or "" for text left unlabelled,
-// such as whitespace, braces and commas.
-type Piece struct {
-	Scope string
-	Text  string
+// Token is one labelled run of text: its Kind, and the text. Text left
+// unlabelled, such as whitespace, braces and commas, is of kind Text.
+type Token struct {
+	Kind Kind
+	Text string
 }
 
 // builtinFunctions are the functions the xcl-vscode grammar labels
@@ -78,44 +77,45 @@ type frame struct {
 	inMarker bool
 }
 
-// span gives every token and gap between start and end one scope, decided
+// span gives every token and gap between start and end one kind, decided
 // ahead of reaching them: a block label, which the grammar captures whole,
 // or a template directive, which the grammar leaves as string text
 type span struct {
 	start, end int
-	scope      string
+	kind       Kind
 }
 
 // tokenizer walks the scanner's tokens in byte order with a cursor. Before
 // each token it emits the gap between the cursor and the token, and it emits
-// the text after the last token at the end, so the pieces always cover every
+// the text after the last token at the end, so the tokens always cover every
 // byte of the input exactly once. That is what makes highlighting unable to
 // change the text.
 type tokenizer struct {
 	src    []byte
 	tokens hclsyntax.Tokens
-	pieces []Piece
+	out    []Token
 	cursor int
 	stack  []frame
 	spans  []span
 }
 
-// Pieces splits src, xcl configuration text, into pieces labelled with the
-// scopes the xcl-vscode grammar gives the same text. Joined in order, their
-// text gives back src exactly: every byte is in exactly one piece, so
-// rendering can add to the text but never change it. Neighbouring pieces have
-// different scopes, and none is empty.
+// Tokenize splits src, xcl configuration text, into tokens labelled with the
+// kinds of text the xcl-vscode grammar recognises, each kind's Scope being
+// the name the grammar gives the same text. Joined in order, their text gives
+// back src exactly: every byte is in exactly one token, so formatting can add
+// to the text but never change it. Neighbouring tokens have different kinds,
+// and none is empty.
 //
-// Pieces accepts any input, including text that is not valid configuration:
-// what cannot be labelled is left with the empty scope.
-func Pieces(src []byte) []Piece {
+// Tokenize accepts any input, including text that is not valid
+// configuration: what cannot be labelled is left as Text.
+func Tokenize(src []byte) []Token {
 	// the diagnostics are ignored, an invalid token is simply left unlabelled
 	tokens, _ := hclsyntax.LexConfig(src, "", hcl.InitialPos)
 
 	t := &tokenizer{src: src, tokens: tokens}
 	t.run()
 
-	return t.pieces
+	return t.out
 }
 
 func (t *tokenizer) run() {
@@ -134,12 +134,12 @@ func (t *tokenizer) run() {
 		}
 
 		if start > t.cursor {
-			t.emit(t.spanScope(t.cursor), string(t.src[t.cursor:start]))
+			t.emit(t.spanKind(t.cursor), string(t.src[t.cursor:start]))
 		}
 
 		text := string(t.src[start:end])
-		if scope, ok := t.spanAt(start); ok {
-			t.emit(scope, text)
+		if kind, ok := t.spanAt(start); ok {
+			t.emit(kind, text)
 		} else {
 			t.label(i, text)
 		}
@@ -149,7 +149,7 @@ func (t *tokenizer) run() {
 	}
 
 	if t.cursor < len(t.src) {
-		t.emit(t.spanScope(t.cursor), string(t.src[t.cursor:]))
+		t.emit(t.spanKind(t.cursor), string(t.src[t.cursor:]))
 	}
 }
 
@@ -165,49 +165,49 @@ func (t *tokenizer) clamp(offset int) int {
 	return offset
 }
 
-// emit appends a piece, joining it to the previous piece when both carry the
-// same scope
-func (t *tokenizer) emit(scope, text string) {
+// emit appends a token, joining it to the previous token when both are of
+// the same kind
+func (t *tokenizer) emit(kind Kind, text string) {
 	if text == "" {
 		return
 	}
 
-	if n := len(t.pieces); n > 0 && t.pieces[n-1].Scope == scope {
-		t.pieces[n-1].Text += text
+	if n := len(t.out); n > 0 && t.out[n-1].Kind == kind {
+		t.out[n-1].Text += text
 		return
 	}
 
-	t.pieces = append(t.pieces, Piece{Scope: scope, Text: text})
+	t.out = append(t.out, Token{Kind: kind, Text: text})
 }
 
-// spanAt returns the scope of the span covering offset, dropping the spans
+// spanAt returns the kind of the span covering offset, dropping the spans
 // the walk has already passed
-func (t *tokenizer) spanAt(offset int) (string, bool) {
+func (t *tokenizer) spanAt(offset int) (Kind, bool) {
 	for len(t.spans) > 0 && t.spans[0].end <= offset {
 		t.spans = t.spans[1:]
 	}
 
 	if len(t.spans) > 0 && t.spans[0].start <= offset {
-		return t.spans[0].scope, true
+		return t.spans[0].kind, true
 	}
 
-	return "", false
+	return Text, false
 }
 
-// spanScope is the scope of gap text at offset: a span's scope inside one,
+// spanKind is the kind of gap text at offset: a span's kind inside one,
 // and unlabelled otherwise
-func (t *tokenizer) spanScope(offset int) string {
-	scope, _ := t.spanAt(offset)
-	return scope
+func (t *tokenizer) spanKind(offset int) Kind {
+	kind, _ := t.spanAt(offset)
+	return kind
 }
 
 // addSpan records a span, unless one already covers its start
-func (t *tokenizer) addSpan(start, end int, scope string) {
+func (t *tokenizer) addSpan(start, end int, kind Kind) {
 	if _, ok := t.spanAt(start); ok {
 		return
 	}
 
-	t.spans = append(t.spans, span{start: start, end: end, scope: scope})
+	t.spans = append(t.spans, span{start: start, end: end, kind: kind})
 }
 
 // top returns the innermost frame, and false at the top level
@@ -247,7 +247,7 @@ func (t *tokenizer) track(i int) {
 	}
 }
 
-// label emits the pieces of token i, whose text is text
+// label emits the tokens of token i, whose text is text
 func (t *tokenizer) label(i int, text string) {
 	token := t.tokens[i]
 	top, nested := t.top()
@@ -272,26 +272,26 @@ func (t *tokenizer) label(i int, text string) {
 	switch token.Type {
 	case hclsyntax.TokenTemplateSeqEnd:
 		if nested && top.kind == frameInterp {
-			t.emit(ScopeInterpolationEnd, text)
+			t.emit(InterpolationEnd, text)
 			return
 		}
-		t.emit("", text)
+		t.emit(Text, text)
 	case hclsyntax.TokenOQuote:
-		t.emit(ScopeString, text)
+		t.emit(String, text)
 	case hclsyntax.TokenOHeredoc:
 		t.labelHeredocOpener(text)
 	case hclsyntax.TokenNumberLit:
-		t.emit(ScopeNumber, text)
+		t.emit(Number, text)
 	case hclsyntax.TokenIdent:
-		t.emit(t.identScope(i, !nested), text)
+		t.emit(t.identKind(i, !nested), text)
 	case hclsyntax.TokenDot:
-		t.emit(t.dotScope(i), text)
+		t.emit(t.dotKind(i), text)
 	default:
 		if operatorTokens[token.Type] {
-			t.emit(ScopeOperator, text)
+			t.emit(Operator, text)
 			return
 		}
-		t.emit("", text)
+		t.emit(Text, text)
 	}
 }
 
@@ -305,13 +305,13 @@ func (t *tokenizer) labelInQuote(i int, text string) {
 	case hclsyntax.TokenQuotedLit:
 		t.labelQuotedLiteral(text)
 	case hclsyntax.TokenTemplateInterp:
-		t.emit(ScopeInterpolationBegin, text)
+		t.emit(InterpolationBegin, text)
 	case hclsyntax.TokenTemplateControl:
-		t.labelDirective(i, ScopeString, text)
+		t.labelDirective(i, String, text)
 	default:
 		// the closing quote, and anything the scanner found inside an
 		// unterminated string
-		t.emit(ScopeString, text)
+		t.emit(String, text)
 	}
 }
 
@@ -324,23 +324,23 @@ func (t *tokenizer) labelInHeredoc(i int, text string) {
 	case hclsyntax.TokenStringLit:
 		t.labelHeredocBody(text)
 	case hclsyntax.TokenTemplateInterp:
-		t.emit(ScopeInterpolationBegin, text)
+		t.emit(InterpolationBegin, text)
 	case hclsyntax.TokenTemplateControl:
-		t.labelDirective(i, ScopeHeredoc, text)
+		t.labelDirective(i, Heredoc, text)
 	case hclsyntax.TokenCHeredoc:
 		t.labelHeredocCloser(text)
 	default:
-		t.emit(ScopeHeredoc, text)
+		t.emit(Heredoc, text)
 	}
 }
 
 // labelDirective labels a %{ ... } template directive. The grammar has no
 // rule for directives, so the whole directive, up to its closing }, keeps
-// the scope of the string around it.
-func (t *tokenizer) labelDirective(i int, scope, text string) {
+// the kind of the string around it.
+func (t *tokenizer) labelDirective(i int, kind Kind, text string) {
 	start := t.clamp(t.tokens[i].Range.Start.Byte)
-	t.addSpan(start, t.directiveEnd(i), scope)
-	t.emit(scope, text)
+	t.addSpan(start, t.directiveEnd(i), kind)
+	t.emit(kind, text)
 }
 
 // directiveEnd returns the end of the } closing the directive token i
@@ -362,66 +362,66 @@ func (t *tokenizer) directiveEnd(i int) int {
 	return len(t.src)
 }
 
-// identScope returns the scope of identifier i. topLevel is false inside an
+// identKind returns the kind of identifier i. topLevel is false inside an
 // interpolation, where the grammar applies only its expression rules. The
 // checks run in the order the grammar tries its rules, with the rules whose
 // match starts earlier first.
-func (t *tokenizer) identScope(i int, topLevel bool) string {
+func (t *tokenizer) identKind(i int, topLevel bool) Kind {
 	// reference: "(\\.)([a-zA-Z_][a-zA-Z0-9_-]*)" starts at the dot, so it
 	// claims an identifier after a dot before any rule starting at the
 	// identifier itself
 	if t.followsDot(i) {
-		return ScopeMember
+		return Member
 	}
 
 	name := string(t.tokens[i].Bytes)
 
 	if topLevel {
 		if t.labelBlockHeader(i) {
-			return ScopeBlockType
+			return BlockType
 		}
 		if t.labelBlockKeyword(i, name) {
-			return ScopeBlockType
+			return BlockType
 		}
 		// nested block: "(?<![.\\w-])([a-zA-Z_][a-zA-Z0-9_-]*)\\b(?=\\s*\\{)"
 		if t.nextIs(i, hclsyntax.TokenOBrace) {
-			return ScopeNestedBlock
+			return NestedBlock
 		}
 		// attribute: "\\b([a-zA-Z_][a-zA-Z0-9_-]*)\\b(?=\\s*=(?!=))"
 		if t.nextIs(i, hclsyntax.TokenEqual) {
-			return ScopeAttribute
+			return Attribute
 		}
 	}
 
 	// language_constant: "\\b(true|false|null)\\b"
 	if name == "true" || name == "false" || name == "null" {
-		return ScopeLanguageConstant
+		return Constant
 	}
 
 	// functions: a built-in name, or any identifier, followed by (
 	if t.nextIs(i, hclsyntax.TokenOParen) {
 		if builtinFunctions[name] {
-			return ScopeBuiltinFunction
+			return BuiltinFunction
 		}
-		return ScopeFunction
+		return Function
 	}
 
 	// reference: "(?<![.\\w-])([a-zA-Z_][a-zA-Z0-9_-]*)(?=\\.[a-zA-Z_])"
 	if t.leadsMember(i) {
-		return ScopeReference
+		return Reference
 	}
 
-	return ""
+	return Text
 }
 
-// dotScope returns the scope of the dot token i: an accessor when an
+// dotKind returns the kind of the dot token i: an accessor when an
 // identifier follows it directly, and unlabelled otherwise
-func (t *tokenizer) dotScope(i int) string {
+func (t *tokenizer) dotKind(i int) Kind {
 	if t.adjacent(i, i+1) && t.tokens[i+1].Type == hclsyntax.TokenIdent {
-		return ScopeAccessor
+		return Accessor
 	}
 
-	return ""
+	return Text
 }
 
 // labelBlockHeader applies the grammar's two labelled block rules to
@@ -443,13 +443,13 @@ func (t *tokenizer) labelBlockHeader(i int) bool {
 	}
 
 	if secondEnd, ok := t.blockLabel(firstEnd); ok && t.nextIs(secondEnd, hclsyntax.TokenOBrace) {
-		t.addLabelSpan(i+1, firstEnd, ScopeTypeLabel)
-		t.addLabelSpan(firstEnd+1, secondEnd, ScopeNameLabel)
+		t.addLabelSpan(i+1, firstEnd, TypeLabel)
+		t.addLabelSpan(firstEnd+1, secondEnd, NameLabel)
 		return true
 	}
 
 	if t.nextIs(firstEnd, hclsyntax.TokenOBrace) {
-		t.addLabelSpan(i+1, firstEnd, ScopeNameLabel)
+		t.addLabelSpan(i+1, firstEnd, NameLabel)
 		return true
 	}
 
@@ -470,10 +470,10 @@ func (t *tokenizer) labelBlockKeyword(i int, name string) bool {
 	if !ok {
 		return true
 	}
-	t.addLabelSpan(i+1, firstEnd, ScopeTypeLabel)
+	t.addLabelSpan(i+1, firstEnd, TypeLabel)
 
 	if secondEnd, ok := t.blockLabel(firstEnd); ok {
-		t.addLabelSpan(firstEnd+1, secondEnd, ScopeNameLabel)
+		t.addLabelSpan(firstEnd+1, secondEnd, NameLabel)
 	}
 
 	return true
@@ -521,11 +521,11 @@ func (t *tokenizer) blockLabel(i int) (int, bool) {
 	return 0, false
 }
 
-// addLabelSpan gives tokens open to close, a label and its quotes, one scope
-func (t *tokenizer) addLabelSpan(open, close int, scope string) {
+// addLabelSpan gives tokens open to close, a label and its quotes, one kind
+func (t *tokenizer) addLabelSpan(open, close int, kind Kind) {
 	start := t.clamp(t.tokens[open].Range.Start.Byte)
 	end := t.clamp(t.tokens[close].Range.End.Byte)
-	t.spans = append(t.spans, span{start: start, end: end, scope: scope})
+	t.spans = append(t.spans, span{start: start, end: end, kind: kind})
 }
 
 // startsLine reports whether only whitespace comes before token i on its line
@@ -582,18 +582,18 @@ func (t *tokenizer) leadsMember(i int) bool {
 func (t *tokenizer) labelComment(text string) {
 	switch {
 	case len(text) >= 2 && text[:2] == "/*":
-		t.emit(ScopeBlockComment, text)
+		t.emit(BlockComment, text)
 		return
 	case len(text) >= 2 && text[:2] == "//":
 		body, newline := splitTrailingNewline(text)
-		t.emit(ScopeLineComment, body)
-		t.emit("", newline)
+		t.emit(LineComment, body)
+		t.emit(Text, newline)
 	case len(text) >= 1 && text[0] == '#':
 		body, newline := splitTrailingNewline(text)
-		t.emit(ScopeHashComment, body)
-		t.emit("", newline)
+		t.emit(HashComment, body)
+		t.emit(Text, newline)
 	default:
-		t.emit("", text)
+		t.emit(Text, text)
 	}
 }
 
@@ -623,13 +623,13 @@ func (t *tokenizer) labelQuotedLiteral(text string) {
 			continue
 		}
 
-		t.emit(ScopeString, text[start:offset])
-		t.emit(ScopeEscape, text[offset:offset+length])
+		t.emit(String, text[start:offset])
+		t.emit(StringEscape, text[offset:offset+length])
 		offset += length
 		start = offset
 	}
 
-	t.emit(ScopeString, text[start:])
+	t.emit(String, text[start:])
 }
 
 // escapeLength returns the length of the escape sequence text starts with,
@@ -685,13 +685,13 @@ func (t *tokenizer) labelHeredocOpener(text string) {
 	case len(text) >= 2 && text[:2] == "<<":
 		operatorEnd = 2
 	}
-	t.emit(ScopeHeredocOperator, text[:operatorEnd])
+	t.emit(HeredocOperator, text[:operatorEnd])
 
 	offset := operatorEnd
 	for offset < len(text) && isSpace(text[offset]) && text[offset] != '\n' {
 		offset++
 	}
-	t.emit("", text[operatorEnd:offset])
+	t.emit(Text, text[operatorEnd:offset])
 
 	markerStart := offset
 	if offset < len(text) && isIdentStart(text[offset]) {
@@ -700,8 +700,8 @@ func (t *tokenizer) labelHeredocOpener(text string) {
 			offset++
 		}
 	}
-	t.emit(ScopeHeredocMarker, text[markerStart:offset])
-	t.emit("", text[offset:])
+	t.emit(HeredocMarker, text[markerStart:offset])
+	t.emit(Text, text[offset:])
 }
 
 // labelHeredocCloser splits a heredoc's closing line into its marker and the
@@ -717,9 +717,9 @@ func (t *tokenizer) labelHeredocCloser(text string) {
 		end++
 	}
 
-	t.emit("", text[:start])
-	t.emit(ScopeHeredocMarker, text[start:end])
-	t.emit("", text[end:])
+	t.emit(Text, text[:start])
+	t.emit(HeredocMarker, text[start:end])
+	t.emit(Text, text[end:])
 }
 
 // labelHeredocBody labels a line of a heredoc's body, cutting out the
@@ -737,12 +737,12 @@ func (t *tokenizer) labelHeredocBody(text string) {
 		if !heredoc.inMarker {
 			open := indexOf(text, offset, "#{{")
 			if open < 0 {
-				t.emit(ScopeHeredoc, text[offset:])
+				t.emit(Heredoc, text[offset:])
 				return
 			}
 
-			t.emit(ScopeHeredoc, text[offset:open])
-			t.emit(ScopeInterpolationBegin, text[open:open+3])
+			t.emit(Heredoc, text[offset:open])
+			t.emit(InterpolationBegin, text[open:open+3])
 			heredoc.inMarker = true
 			offset = open + 3
 			continue
@@ -750,19 +750,19 @@ func (t *tokenizer) labelHeredocBody(text string) {
 
 		switch {
 		case hasPrefixAt(text, offset, "}}"):
-			t.emit(ScopeInterpolationEnd, text[offset:offset+2])
+			t.emit(InterpolationEnd, text[offset:offset+2])
 			heredoc.inMarker = false
 			offset += 2
 		case text[offset] == '.' && offset+1 < len(text) && isIdentStart(text[offset+1]):
-			t.emit(ScopeAccessor, text[offset:offset+1])
+			t.emit(Accessor, text[offset:offset+1])
 			end := offset + 2
 			for end < len(text) && isIdentPart(text[end]) {
 				end++
 			}
-			t.emit(ScopeMember, text[offset+1:end])
+			t.emit(Member, text[offset+1:end])
 			offset = end
 		default:
-			t.emit(ScopeTemplateInterpolation, text[offset:offset+1])
+			t.emit(TemplateDirective, text[offset:offset+1])
 			offset++
 		}
 	}

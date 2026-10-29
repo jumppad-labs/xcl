@@ -52,6 +52,70 @@ func TestApplyStopsTheExternalPluginWhenDone(t *testing.T) {
 	require.False(t, externalHost(t, f.config).Running())
 }
 
+// twoWidgets declares a widget that depends on another, so its create
+// starts only once the first widget's create has succeeded and further
+// events follow the first widget's create success event
+const twoWidgets = `widget "main" {
+  size = 3
+
+  part {
+    name = "wheel"
+  }
+}
+
+widget "second" {
+  size = widget.main.size
+
+  part {
+    name = "axle"
+  }
+}
+`
+
+func TestRenderFromHandlerDuringApplyKeepsTheExternalPluginRunning(t *testing.T) {
+	binary := buildSubtypelessPlugin(t)
+	isolateHome(t)
+
+	var c *Config
+
+	var renderErr error
+	var text []byte
+	runningAfterRender := false
+	rendered := false
+
+	// With a buffer of one event the apply cannot finish, and so cannot
+	// release its use of the plugins, while the handler is busy with the
+	// first widget's create success: the second widget's events are still
+	// to be delivered.
+	handler := func(e Event) {
+		if e.Operation != "create" || e.Phase != "success" || e.ResourceID != "widget.main" {
+			return
+		}
+
+		text, renderErr = c.EncodeSavedEntity(e.Data)
+		runningAfterRender = externalHost(t, c).Running()
+		rendered = true
+	}
+
+	f := setupPersonConfig(t, externalWidgetRegistry(binary), t.TempDir(), twoWidgets,
+		WithEventData(EventDataProcessed),
+		WithEventBufferSize(1),
+		WithEventHandler(handler),
+	)
+	c = f.config
+
+	err := c.Apply(f.configFile)
+	require.NoError(t, err)
+
+	require.True(t, rendered, "no create success event for widget.main was delivered")
+	require.NoError(t, renderErr)
+	require.Contains(t, string(text), `widget "main"`)
+	require.True(t, runningAfterRender, "the external plugin was stopped by a render during the apply")
+
+	// the plugin is stopped once the apply is done, as without the render
+	require.False(t, externalHost(t, c).Running())
+}
+
 func TestLoadAfterApplyStartsTheExternalPluginAgainAndStopsIt(t *testing.T) {
 	binary := buildSubtypelessPlugin(t)
 	isolateHome(t)

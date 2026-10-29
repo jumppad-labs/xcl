@@ -1,0 +1,10 @@
+# A configuration with a mistake: the network has a block the Docker plugin's
+# network does not take, so the configuration cannot be read and nothing is
+# created.
+docker "network" "broken" {
+  subnet = "10.99.0.0/24"
+
+  timeout "http" {
+    connect = 30
+  }
+}

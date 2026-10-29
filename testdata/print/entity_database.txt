@@ -1,0 +1,9 @@
+resource "database" "main" {
+  location = "us-east"
+  port     = 5432
+
+  timeouts {
+    connect = 30
+    read    = 60
+  }
+}

@@ -1,0 +1,534 @@
+{
+  "plan": "20261023074627-cc23fc08-encode-saved-entity-during-operation",
+  "items": [
+    {
+      "item": "64338e68-32e3-4675-95cf-c4c7b34bb30f",
+      "title": "Allow the saved-record render while an operation runs",
+      "checks": [
+        {
+          "at": "2026-10-26T09:14:43Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "64338e68-32e3-4675-95cf-c4c7b34bb30f",
+            "title": "Allow the saved-record render while an operation runs",
+            "criteria": [
+              "A saved record renders to configuration text while each of apply, validate, diff, destroy and load is running, and each operation still finishes without error.",
+              "Rendering an entity record (a looked-up or edited entity) while an operation runs is still refused with the operation-in-progress error, as are the other lookups.",
+              "During an operation, a record that is not valid JSON fails with the invalid saved data error, a record of an unknown type fails with the same unregistered-type error it gives after the operation, and an empty request fails as an invalid argument. None of them fails with the operation-in-progress error.",
+              "The protocol definition documents that the saved-record call is allowed during an operation, and regenerating the Go code (`make core-protos`) leaves it in step with the protocol. (Plan change: buf generates only the protocol's messages, so an rpc comment never reaches the generated Go code; regeneration produces no diff, and `make buf-lint` and `make buf-breaking` pass.)"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/lookups.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "meta.id"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/operations.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "proto/xcl/core/v1/core.proto"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/proto/core.pb.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/operations_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "c.drive"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "app.web"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "store.saved"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "coreservice/operations_test.go:117-182 adds TestEncodeSavedEntityDuringValidate, DuringApply, DuringDiff, DuringDestroy and DuringLoad. Each holds the operation at its first state task via holdAtFirstStateTask, calls EncodeSavedEntity, asserts the text contains app \"web\" and \"nginx\", then completeHeld drives the operation to completion and requires no error. coreservice/lookups.go:131-142 encodeSavedEntity no longer calls lookupAllowed, so the call is not refused while running."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "coreservice/lookups.go:152-154 encodeEntity still calls conf.lookupAllowed(\"EncodeEntity\") first, so it is refused with operation-in-progress during an operation. coreservice/operations_test.go still contains TestEncodeEntityDuringOperationRefused (the diff keeps it unchanged). Other lookups were not touched in the diff (coreservice/operations.go:81-86 lookupAllowed is unchanged in behaviour)."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "coreservice/operations_test.go:184-204 TestEncodeSavedEntityInvalidJSONDuringOperation asserts CodeInvalidSavedData; TestEncodeSavedEntityUnregisteredTypeDuringOperation (206-229) asserts CodeUnregisteredType with type detail \"bogus\" during the operation and the identical code and details after it ends; TestEncodeSavedEntityEmptyDuringOperation (231-245) asserts CodeInvalidArgument with argument \"entity\". The empty check is requireEntity at coreservice/lookups.go:132 and 171-177, which runs without any running-state check. CodeInvalidSavedData and CodeUnregisteredType are defined at coreservice/errors.go:33-34 and mapped at lines 267-306. The tests assert the specific codes, so none of them can pass by returning operation-in-progress."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "proto/xcl/core/v1/core.proto:256-260 adds a comment above rpc EncodeSavedEntity stating it is allowed while an operation runs, including from an event handler. The xcl.diff touches no coreservice/proto/core.pb.go, and a grep for the comment text \"EncodeSavedEntity is\" finds nothing in the generated Go files, which matches the plan change that buf does not carry rpc comments into the Go output. The Makefile (lines 24-31) defines core-protos as buf generate, buf-lint as buf lint and buf-breaking against main, consistent with the verification results. The protocol-side change is comment-only, so buf-breaking has nothing to flag. I did not run the make targets myself (read-only), so the regeneration and lint results rest on the supplied verification summary."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "61e00152-2c93-4d99-918c-d9ceec78662c",
+      "title": "Prove rendering from an event handler leaves the apply unchanged",
+      "checks": [
+        {
+          "at": "2026-10-26T09:18:09Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "61e00152-2c93-4d99-918c-d9ceec78662c",
+            "title": "Prove rendering from an event handler leaves the apply unchanged",
+            "criteria": [
+              "A record rendered from the create success event during an apply, with computed values included, is identical to the same render after the apply. The same holds with default options.",
+              "An apply whose event handling renders every create success record ends with the same result, the same sequence of event operations and phases, and the same saved state as an apply that renders nothing.",
+              "From the same event handling, rendering the event's entity as a looked-up record fails with the operation-in-progress error, and the apply still completes.",
+              "From the same event handling, rendering an edited entity record fails with the operation-in-progress error."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/operations_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "create/success"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "app.web"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "c.fail"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "c.ok"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "coreservice/operations_test.go:258-297 TestEncodeSavedEntityDuringApplyMatchesAfter: inside the create/success handler it asserts the operation is running, renders e.GetData() with IncludeComputed and with default options, then after the apply renders the same record with the same options and requires equality for both (require.Equal at lines 293 and 296). The test helpers exist: drive with onEvent at service_test.go:132, encodeSavedEntity at lookups_test.go:206."
+            },
+            {
+              "criterion": 2,
+              "verdict": "not_met",
+              "evidence": "coreservice/operations_test.go:332-361 TestApplyUnchangedByRenderingInHandler compares events, saved records and finished error between a rendering apply and a silent apply, which covers the criterion's comparison. But the rendering handler returns early for every resource id prefixed variable. or output. (lines 338-341), so it does not render every create success record as the criterion requires. encode.go:203-209 refuses variable, output, module and root records with NotEncodableError, so the test could still call render on those records and ignore or assert the error, and the apply would still be checked. The gap is that the test skips them rather than rendering them."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "coreservice/operations_test.go:363-385 TestEncodeEntityFromHandlerDuringApplyRefused: from the create/success handler it calls EncodeEntity (the looked-up-by-id path, see lookups.go EncodeEntity uses conf.lookupAllowed) and requires CodeOperationInProgress (line 382), then requires finished.GetError() to be nil (line 384), so the apply completes."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "coreservice/operations_test.go:387-416 TestEncodeEditedEntityFromHandlerDuringApplyRefused: from the create/success handler it sets image to \"edited\" in the event's JSON, calls EncodeEntity with it, requires CodeOperationInProgress (line 413), and requires the apply to finish without error (line 415)."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-10-26T09:19:39Z",
+          "round": 1,
+          "attempt": 2,
+          "goal": {
+            "item": "61e00152-2c93-4d99-918c-d9ceec78662c",
+            "title": "Prove rendering from an event handler leaves the apply unchanged",
+            "criteria": [
+              "A record rendered from the create success event during an apply, with computed values included, is identical to the same render after the apply. The same holds with default options.",
+              "An apply whose event handling renders every create success record ends with the same result, the same sequence of event operations and phases, and the same saved state as an apply that renders nothing.",
+              "From the same event handling, rendering the event's entity as a looked-up record fails with the operation-in-progress error, and the apply still completes.",
+              "From the same event handling, rendering an edited entity record fails with the operation-in-progress error."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/operations_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "create/success"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "app.web"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "c.fail"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "c.ok"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "coreservice/operations_test.go TestEncodeSavedEntityDuringApplyMatchesAfter (diff lines 258-297): inside the create/success handler (isWebCreated, app.web) it takes e.GetData() and renders it with IncludeComputed and with default options while the operation is running (asserted via c.s.lookup(handle).running()); after the apply it renders the same record with the same options and requires equality for both (require.Equal on afterComputed/duringComputed and afterDefault/duringDefault)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "coreservice/operations_test.go TestApplyUnchangedByRenderingInHandler (diff lines 332-365): applyWithHandler runs two fresh applies of appConfig through a fakeStore, one rendering every create/success event (variable and output via c.fail expecting CodeNotEncodable, all others via c.encodeSavedEntity) and one rendering nothing. It requires both finished results to have no error, require.Equal on the event name sequence (eventName = operation/phase, lines 189-191) and require.Equal on decodeEntities of the saved records. Note: the result comparison is error-only (OperationFinished has no other field set for apply, per core.proto:250-254), and the variable/output renders are asserted to fail rather than succeed, so 'renders every create success record' is met in the sense that each one is called."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "coreservice/operations_test.go TestEncodeEntityFromHandlerDuringApplyRefused (diff lines 367-389): from the app.web create/success handler it calls c.fail(handle, \"EncodeEntity\", ...) and requires CodeOperationInProgress, then requires the apply's finished error to be nil. The refusal comes from conf.lookupAllowed in coreservice/lookups.go encodeEntity (diff lines 29-33)."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "coreservice/operations_test.go TestEncodeEditedEntityFromHandlerDuringApplyRefused (diff lines 391-420): from the app.web create/success handler it changes image to \"edited\" in the event data, calls c.fail(handle, \"EncodeEntity\", ...) and requires CodeOperationInProgress; the apply must still finish with no error. The refusal path is the same lookupAllowed check in encodeEntity."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 2,
+      "state": "accepted"
+    },
+    {
+      "item": "705b4073-6a29-4ba3-a6a2-122d91d664ed",
+      "title": "Verify plugins keep running when a handler renders during an apply",
+      "checks": [
+        {
+          "at": "2026-10-26T09:22:18Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "705b4073-6a29-4ba3-a6a2-122d91d664ed",
+            "title": "Verify plugins keep running when a handler renders during an apply",
+            "criteria": [
+              "A saved record rendered from an event handler during an apply that uses an external plugin returns text, and the external plugin process is still running when the render returns.",
+              "That apply completes successfully, and the external plugin process is stopped after it, exactly as without the render."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "config_plugin_lifecycle_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "config_plugin_lifecycle_test.go:75-117 adds TestRenderFromHandlerDuringApplyKeepsTheExternalPluginRunning. The handler (lines 90-98) fires on the create/success event for widget.main, calls c.EncodeSavedEntity(e.Data) (line 95) and records externalHost(t, c).Running() (line 96). Lines 110-113 assert the event was delivered, renderErr is nil, the text contains widget \"main\", and runningAfterRender is true. The fixture uses WithEventData(EventDataProcessed) (line 101), so e.Data is populated. Supporting code: encode.go:164 takes c.catalog.Use(nil) during the render, and config.go:703-717 (withPlugins) holds a catalog.Use for the duration of the work with defer done(), so a render during an operation only adds a user and does not stop the plugin. The -race -count=5 run passed per the verify summary. I did not re-run the test (read-only), so this rests on reading the code and the reported result."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "config_plugin_lifecycle_test.go:107-108 requires the apply to return NoError. Line 116 then requires externalHost(t, c).Running() to be false after the apply, which matches the non-render behaviour asserted in TestApplyStopsTheExternalPluginWhenDone (line 52). The diff (goal-check/xcl.diff lines 1-75) touches only config_plugin_lifecycle_test.go for this item; the coreservice/ and proto/ hunks belong to earlier accepted tasks and are out of this item's scope."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "c045b2c9-b98e-49a5-a062-9240033f243d",
+      "title": "Describe the change in the xcl changelog and the other-language design",
+      "checks": [
+        {
+          "at": "2026-10-26T10:26:29Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "c045b2c9-b98e-49a5-a062-9240033f243d",
+            "title": "Describe the change in the xcl changelog and the other-language design",
+            "criteria": [
+              "The changelog has a section for this spec describing the newly allowed render, what stays refused and why, and a Breaking list saying none.",
+              "The other-language design says the saved-record render is allowed while an operation runs, including from an event handler, and that the entity-record render and the other lookups are refused. No sentence in it still says every render is refused during an operation."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "CHANGELOG.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "design:libxcl.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "CHANGELOG.md:3-11 is the section for 20261023074627-cc23fc08-encode-saved-entity-during-operation. Line 5 describes the newly allowed render: EncodeSavedEntity is accepted while StartValidate/StartApply/StartDiff/StartDestroy/StartLoad runs, including from event handling. Line 7 lists what stays refused and why: EncodeEntity, Entities, Find, FindByType, FindOne and Outputs return operation_in_progress because they read entities the operation replaces when it ends. Lines 9-11 hold a **Breaking:** list whose entry is 'None.'"
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Stored design libxcl-stored.md (read back through the CLI) line 201 says EncodeSavedEntity is allowed while an operation runs, including from a host's handling of the operation's events. Line 200 says lookups (Find*, Entities, Outputs, EncodeEntity) are refused with operation_in_progress while an operation runs. Line 495 says EncodeEntity is refused while an operation runs and EncodeSavedEntity is allowed. Line 245-246 says EncodeSavedEntity is also allowed while an operation runs. A search for 'render', 'refused' and 'operation runs' across the whole file found no sentence saying every render is refused during an operation. The long lines the grep omitted (lines 1013, 1160, 1166, 1202) were checked for 'render' and do not contain it."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "aa6a42dc-b5bc-4f41-83d5-693dd89e37d3",
+      "title": "Test rendering from Python event handlers during an apply",
+      "checks": [
+        {
+          "at": "2026-10-26T10:30:11Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "aa6a42dc-b5bc-4f41-83d5-693dd89e37d3",
+            "title": "Test rendering from Python event handlers during an apply",
+            "criteria": [
+              "Using the synchronous client, an event handler renders the create success record with computed values included. The render returns text, the apply succeeds, and the text equals the same render after the apply.",
+              "Using the asyncio client, an awaiting event handler gets the same result, and the apply completes.",
+              "An apply whose handler renders every create success record produces the same events and saved state as one whose handler renders nothing.",
+              "From the handler, encoding the event's entity, or an entity the handler edited, raises the operation-in-progress error, and the apply still completes.",
+              "From the handler, a record that is not valid JSON raises the invalid saved data error, and a record of an unknown type raises the same error class the render gives after the apply."
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl-ref.txt"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_sync.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "c.apply"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_aio.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Staged diff tests/integration/test_sync.py (hunk @@ -1552, new test_encode_saved_entity_from_handler_during_apply at about line 172 of the file): the handler calls configs[0].encode_saved_entity(event.data, include_computed=True) on create success, the test asserts raised == [], that the text contains 'resource \"slow\" \"one\"' and 'done = true', and that texts[0] == after, where after is rendered after c.apply(config) returns without error."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Staged diff tests/integration/test_aio.py (hunk @@ -861, test_async_encode_saved_entity_from_handler_during_apply): an async on_event awaits configs[0].encode_saved_entity(event.data, include_computed=True), GatedStore holds the save until the handler finishes, and the test asserts raised == [], the expected text fragments, and texts == after after await c.apply(config) completes inside asyncio.run."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Staged diff test_sync.py test_apply_unchanged_by_rendering_in_handler plus helper apply_rendering: it runs the same apply once with render=True and once with render=False, then asserts rendering_events == silent_events and rendering_saved == silent_saved (saved records decoded and sorted, file meta removed on both sides). The rendering run is also asserted to contain ('create','success')."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "Staged diff test_sync.py test_encode_entity_from_handler_during_apply_refused and test_encode_edited_entity_from_handler_during_apply_refused assert texts == [], len(raised) == 1 and isinstance(raised[0], xcl.OperationInProgressError); the sync entity test also asserts the apply finished (found is not None). test_aio.py test_async_encode_entity_from_handler_during_apply_refused and test_async_encode_edited_entity_from_handler_during_apply_refused make the same assertions for the asyncio client; asyncio.run completing without error shows the apply returned normally."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "Staged diff test_sync.py test_encode_saved_invalid_record_from_handler_during_apply calls encode_saved_entity(b\"not json\") from the create success handler and asserts isinstance(raised[0], xcl.InvalidSavedDataError) (class defined in xcl/_errors.py:156, exported in xcl/__init__.py:26). test_encode_saved_unregistered_record_from_handler_during_apply uses a bogus type record, asserts isinstance(raised[0], xcl.UnregisteredTypeError), and asserts type(raised[0]) is type(after.value), where after is the error from the same call made after the apply."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "27c95072-5647-41dc-8ca8-d9808f0dba5a",
+      "title": "Document when Python programs can render configuration text",
+      "checks": [
+        {
+          "at": "2026-10-26T10:32:02Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "27c95072-5647-41dc-8ca8-d9808f0dba5a",
+            "title": "Document when Python programs can render configuration text",
+            "criteria": [
+              "The saved-record encoder's documentation, on both clients, says it works at any time, including from an event handler during an operation.",
+              "The entity encoder's documentation still says it is refused while an operation runs, and points readers at the saved-record encoder for rendering from an event handler.",
+              "The README's encoding section states both rules, with an example that renders each created resource from the event handler."
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "PARITY.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_docstrings.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl/config.py:298-303 (Config.encode_saved_entity docstring) says \"It can be called at any time, including from an ``on_event`` handler while an operation runs\". xcl/aio.py:288 (aio encode_saved_entity docstring) says \"allowed during an operation, including from an event handler\" and defers to xcl.Config.encode_saved_entity for the rest. The aio line does not use the words \"at any time\" itself, so that part of the claim rests on the cross-reference."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl/config.py:260-267 (Config.encode_entity docstring) says it is refused with xcl.OperationInProgressError while an operation runs, including from an on_event handler, and that to render from a handler, use encode_saved_entity(event.data). xcl/aio.py:267 has only a one-line docstring, \"refused while an operation runs; see xcl.Config.encode_entity\", which points to the sync docstring that names the saved-record encoder."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "README.md:296-301 states the saved-record rule (works at any time, including from an on_event handler during an operation). README.md:303-315 is an example whose on_event handler, on each create success event, calls cfg.encode_saved_entity(e.data, include_computed=True) with event_data=xcl.EventDataLevel.PROCESSED. README.md:327-335 states the entity-encoder rule (refused while an operation runs, including from a handler, with encode_saved_entity as the alternative for event.data)."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "ec6c7a60-9480-4041-bdcb-0ec3ea68870a",
+      "title": "Say on the xcl website when configuration text can be rendered",
+      "checks": [
+        {
+          "at": "2026-10-26T10:34:00Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "ec6c7a60-9480-4041-bdcb-0ec3ea68870a",
+            "title": "Say on the xcl website when configuration text can be rendered",
+            "criteria": [
+              "The configuration-text page states that saved records render during an operation and from an event handler, and that looked-up entities do not.",
+              "The events page no longer implies that a looked-up event entity can be encoded from inside the handler during an operation.",
+              "The site builds without errors."
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/configuration-text.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "event.data"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/events.mdx"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/pages/configuration-text.mdx:108-112 says a saved record can be rendered at any time, including from an event handler while the operation runs. Lines 131-135 show the handler example, and lines 137-141 say cfg.encode_entity on a looked-up or edited entity is refused during an operation, from a handler too, with xcl.OperationInProgressError. Line 182-183 repeats this for event entities."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "src/pages/events.mdx:212-220 now recommends cfg.encode_saved_entity(event.data) for rendering from inside the handler during the run, and says cfg.encode_entity(event.entity()) works only after the operation finishes and is refused with xcl.OperationInProgressError while it runs. The diff removes the old in-handler implication at lines 70-72."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Not verified by running the build (read-only). Judged from the verification summary (npm run build exit 0, 23 pages built, Complete!). The MDX read in src/pages/configuration-text.mdx:114-144 has its CodeTabs and div nesting closed correctly. xcl-website.status lists only configuration-text.mdx and events.mdx as modified, and event.data is absent from the working tree and not in the status."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    }
+  ]
+}

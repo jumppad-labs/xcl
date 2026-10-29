@@ -1,215 +1,176 @@
 package xcl
 
 import (
-	"fmt"
-
-	"github.com/apparentlymart/go-textseg/v15/textseg"
-	"github.com/mitchellh/go-wordwrap"
-
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 	"github.com/jumppad-labs/xcl/highlight"
-	hcl "github.com/jumppad-labs/xcl/internal/xcl"
+	"github.com/jumppad-labs/xcl/internal/report"
 )
 
-// DiagnosticPieces lays diagnostics out as a report for a person to read, as
-// labelled pieces for a renderer: highlight.Text for plain text,
-// highlight.ANSI for a terminal, or any other highlight.Renderer.
+// ErrorTokens returns the report of every configuration problem in err as
+// labelled tokens, for a formatter of your own. PrintError prints the same
+// report in one call; use ErrorTokens when formatting it yourself.
 //
-// Each diagnostic is written as its severity and summary, where it is — the
-// file, the line, and the block and field it is in — the lines of source
-// around it, and its detail:
+// Every diagnostic inside err is found, however the application wrapped it,
+// through Unwrap() error and Unwrap() []error. Each is written as its
+// severity and summary, where it is — the file, the line, and the block and
+// field it is in — the numbered lines of source around it, and its detail:
 //
 //	Error: Unsupported argument
 //
 //	  on main.xcl line 2, in agent.claude:
+//	     1 | agent "claude" {
 //	     2 |   modls = ["opus"]
+//	     3 | }
 //
 //	An argument named "modls" is not expected here.
 //
-// The severity is labelled highlight.ScopeError or highlight.ScopeWarning,
-// and so is the source at fault; the rest of the source is labelled as
-// configuration, as highlight.Pieces labels it. The source is the lines the
-// diagnostic took when it was made, so laying it out never reads a file.
+// The severity is labelled highlight.Error or highlight.Warning, and so is
+// the source at fault, overlaid on the rest of the source, which is labelled
+// as configuration, as highlight.Tokenize labels it. The summary, location,
+// gutter and detail are labelled highlight.Summary, highlight.Location,
+// highlight.Gutter and highlight.Detail. The detail is never wrapped, so the
+// tokens are the report as it was laid out; PrintError wraps it when it
+// prints. The source is the lines the diagnostic took when it was made, so
+// laying a report out never reads a file.
 //
-// The detail is wrapped at width columns; a width of 0 leaves it unwrapped.
-// Source lines are never wrapped.
-func DiagnosticPieces(diagnostics xclerrors.Diagnostics, width int) []highlight.Piece {
-	r := &report{width: width}
-
-	for _, diagnostic := range diagnostics {
-		r.diagnostic(diagnostic)
+// An error beside the diagnostics that is not one is written as its message
+// and a line break, as Text. An error holding no diagnostic at all is a single
+// Text token of its message and a line break, and nil gives no tokens.
+func ErrorTokens(err error) []highlight.Token {
+	if err == nil {
+		return nil
 	}
 
-	return r.pieces
+	if !report.Contains(err, isDiagnostic) {
+		return []highlight.Token{{Kind: highlight.Text, Text: err.Error() + "\n"}}
+	}
+
+	tokens := &tokenList{}
+
+	report.Walk(err, isDiagnostic, func(leaf error, problem bool) {
+		if !problem {
+			tokens.add(highlight.Text, leaf.Error()+"\n")
+			return
+		}
+
+		for _, segment := range report.Layout(problemOf(leaf.(*xclerrors.Diagnostic))) {
+			tokens.segment(segment)
+		}
+	})
+
+	return tokens.tokens
 }
 
-// report builds the pieces of a diagnostics report in order
-type report struct {
-	width  int
-	pieces []highlight.Piece
+// isDiagnostic reports whether err is a diagnostic, which a report is laid
+// out for
+func isDiagnostic(err error) bool {
+	_, ok := err.(*xclerrors.Diagnostic)
+	return ok
 }
 
-// add appends text with scope, joining it to the previous piece when both
-// have the same scope
-func (r *report) add(scope, text string) {
+// problemOf takes the fields of a diagnostic that a report is laid out from.
+// The errors package has its own copy for an error's %+v formatting, as it
+// cannot import this package; a test holds the two to the same output.
+func problemOf(d *xclerrors.Diagnostic) report.Problem {
+	problem := report.Problem{
+		Warning: d.IsWarning(),
+		Summary: d.Summary,
+		Detail:  d.Detail,
+		Entity:  d.Entity,
+		Field:   d.Field,
+		Subject: d.Subject,
+	}
+
+	if d.Source != nil {
+		problem.File = d.Source.File
+		problem.Start = d.Source.Start
+		problem.Lines = d.Source.Lines
+		problem.HasSource = true
+	}
+
+	return problem
+}
+
+// tokenList builds tokens in order
+type tokenList struct {
+	tokens []highlight.Token
+}
+
+// add appends text of kind, joining it to the previous token when both are of
+// the same kind
+func (l *tokenList) add(kind highlight.Kind, text string) {
 	if text == "" {
 		return
 	}
 
-	if n := len(r.pieces); n > 0 && r.pieces[n-1].Scope == scope {
-		r.pieces[n-1].Text += text
+	if n := len(l.tokens); n > 0 && l.tokens[n-1].Kind == kind {
+		l.tokens[n-1].Text += text
 		return
 	}
 
-	r.pieces = append(r.pieces, highlight.Piece{Scope: scope, Text: text})
+	l.tokens = append(l.tokens, highlight.Token{Kind: kind, Text: text})
 }
 
-// diagnostic lays out one diagnostic, followed by a blank line
-func (r *report) diagnostic(d *xclerrors.Diagnostic) {
-	scope, label := highlight.ScopeError, "Error"
-	if d.IsWarning() {
-		scope, label = highlight.ScopeWarning, "Warning"
+// segment labels one segment of a laid out report: the severity, and the
+// fault within the source, as an error or a warning, the rest of the source
+// as configuration, the summary, location, gutter and detail with their
+// report kinds, and everything else as Text
+func (l *tokenList) segment(segment report.Segment) {
+	problem := highlight.Error
+	if segment.Warning {
+		problem = highlight.Warning
 	}
 
-	r.add(scope, label)
-	r.add("", ": "+d.Summary+"\n")
-
-	if d.Subject != nil {
-		r.add("", "\n"+location(d)+":\n")
-
-		if d.Source == nil {
-			r.add("", "  (source code not available)\n")
-		} else {
-			r.source(d.Source, *d.Subject, scope)
-		}
-	}
-
-	if d.Detail != "" {
-		detail := d.Detail
-		if r.width > 0 {
-			detail = wordwrap.WrapString(detail, uint(r.width))
-		}
-
-		r.add("", "\n"+detail+"\n")
-	}
-
-	r.add("", "\n")
-}
-
-// location says where a diagnostic is: the file and line, and the block and
-// field it is in when it is in one
-func location(d *xclerrors.Diagnostic) string {
-	where := fmt.Sprintf("  on %s line %d", d.Subject.Filename, d.Subject.Start.Line)
-
-	if d.Entity != "" {
-		where += ", in " + d.Entity
-	}
-
-	if d.Field != "" {
-		where += ", field " + d.Field
-	}
-
-	return where
-}
-
-// source lays out the lines of source, numbered, each labelled as
-// configuration with the part subject covers labelled scope
-func (r *report) source(src *xclerrors.SourceLines, subject hcl.Range, scope string) {
-	for i, line := range src.Lines {
-		number := src.Start + i
-
-		r.add("", fmt.Sprintf("  %4d | ", number))
-
-		pieces := highlight.Pieces([]byte(line))
-		if start, end, ok := fault(line, number, subject); ok {
-			pieces = overlay(pieces, start, end, scope)
+	switch segment.Part {
+	case report.Severity:
+		l.add(problem, segment.Text)
+	case report.Summary:
+		l.add(highlight.Summary, segment.Text)
+	case report.Location:
+		l.add(highlight.Location, segment.Text)
+	case report.Gutter:
+		l.add(highlight.Gutter, segment.Text)
+	case report.Source:
+		lexed := highlight.Tokenize([]byte(segment.Text))
+		if segment.HasFault {
+			lexed = overlay(lexed, segment.Fault[0], segment.Fault[1], problem)
 		}
 
-		for _, p := range pieces {
-			r.add(p.Scope, p.Text)
+		for _, token := range lexed {
+			l.add(token.Kind, token.Text)
 		}
-
-		r.add("", "\n")
+	case report.Detail:
+		l.add(highlight.Detail, segment.Text)
+	default:
+		l.add(highlight.Text, segment.Text)
 	}
 }
 
-// fault returns the byte range of line, line number number, that subject
-// covers, and false when it covers none of it. A subject that covers nothing,
-// such as a missing value, is shown as covering the character it starts at.
-func fault(line string, number int, subject hcl.Range) (int, int, bool) {
-	if number < subject.Start.Line || number > subject.End.Line {
-		return 0, 0, false
-	}
-
-	startColumn := 1
-	if number == subject.Start.Line {
-		startColumn = subject.Start.Column
-	}
-
-	endColumn := -1
-	if number == subject.End.Line {
-		endColumn = subject.End.Column
-	}
-
-	if subject.Start.Line == subject.End.Line && subject.Start.Column == subject.End.Column {
-		endColumn = startColumn + 1
-	}
-
-	start := byteAt(line, startColumn)
-	end := len(line)
-	if endColumn >= 0 {
-		end = byteAt(line, endColumn)
-	}
-
-	if end <= start {
-		return 0, 0, false
-	}
-
-	return start, end, true
-}
-
-// byteAt returns the byte offset in line of column, counting columns from 1
-// in grapheme clusters as HCL counts them, or the length of line for a column
-// past its end
-func byteAt(line string, column int) int {
-	offset := 0
-	for current := 1; current < column && offset < len(line); current++ {
-		advance, _, _ := textseg.ScanGraphemeClusters([]byte(line[offset:]), true)
-		if advance == 0 {
-			break
-		}
-
-		offset += advance
-	}
-
-	return min(offset, len(line))
-}
-
-// overlay labels the bytes from start to end of the text pieces hold with
-// scope, splitting pieces where the range starts and ends
-func overlay(pieces []highlight.Piece, start, end int, scope string) []highlight.Piece {
-	result := make([]highlight.Piece, 0, len(pieces)+2)
+// overlay labels the bytes from start to end of the text tokens hold with
+// kind, splitting tokens where the range starts and ends
+func overlay(tokens []highlight.Token, start, end int, kind highlight.Kind) []highlight.Token {
+	result := make([]highlight.Token, 0, len(tokens)+2)
 	position := 0
 
-	for _, p := range pieces {
-		pieceStart, pieceEnd := position, position+len(p.Text)
-		position = pieceEnd
+	for _, token := range tokens {
+		tokenStart, tokenEnd := position, position+len(token.Text)
+		position = tokenEnd
 
-		cutStart := max(start, pieceStart)
-		cutEnd := min(end, pieceEnd)
+		cutStart := max(start, tokenStart)
+		cutEnd := min(end, tokenEnd)
 		if cutStart >= cutEnd {
-			result = append(result, p)
+			result = append(result, token)
 			continue
 		}
 
-		if before := p.Text[:cutStart-pieceStart]; before != "" {
-			result = append(result, highlight.Piece{Scope: p.Scope, Text: before})
+		if before := token.Text[:cutStart-tokenStart]; before != "" {
+			result = append(result, highlight.Token{Kind: token.Kind, Text: before})
 		}
 
-		result = append(result, highlight.Piece{Scope: scope, Text: p.Text[cutStart-pieceStart : cutEnd-pieceStart]})
+		result = append(result, highlight.Token{Kind: kind, Text: token.Text[cutStart-tokenStart : cutEnd-tokenStart]})
 
-		if after := p.Text[cutEnd-pieceStart:]; after != "" {
-			result = append(result, highlight.Piece{Scope: p.Scope, Text: after})
+		if after := token.Text[cutEnd-tokenStart:]; after != "" {
+			result = append(result, highlight.Token{Kind: token.Kind, Text: after})
 		}
 	}
 

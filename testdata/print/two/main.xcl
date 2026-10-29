@@ -1,0 +1,13 @@
+variable "first" {
+  default = "one"
+  timeout "http" {
+    seconds = 30
+  }
+}
+
+variable "second" {
+  default = "two"
+  retry "http" {
+    attempts = 3
+  }
+}

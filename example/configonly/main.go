@@ -13,7 +13,9 @@
 // gathers it into the application's own struct, appConfig, with one Decode
 // call; ingressRoutes follows the links from each ingress path to the service,
 // deployment, container and port its traffic reaches; and main prints one
-// line per route.
+// line per route. When the configuration has a mistake, main prints the
+// report xcl.PrintError lays out, the faulty lines of source numbered, in
+// colour on a terminal.
 //
 // The example keeps no state: without a state option xcl holds the applied
 // configuration in memory only, which is all a program that only reads its
@@ -31,6 +33,7 @@ import (
 	"github.com/jumppad-labs/xcl"
 	"github.com/jumppad-labs/xcl/example/configonly/resources"
 	"github.com/jumppad-labs/xcl/example/prettylog"
+	"github.com/jumppad-labs/xcl/highlight"
 	"github.com/jumppad-labs/xcl/registry"
 )
 
@@ -41,7 +44,11 @@ func main() {
 	}
 
 	if err := run(dir); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		// a configuration problem is printed as a report with the lines at
+		// fault, anything else as its message. Colour is asked for here, as
+		// xcl never decides it alone: terminal colour for a terminal, plain
+		// text when stderr is redirected or NO_COLOR is set.
+		xcl.PrintError(os.Stderr, err, xcl.WithFormatter(highlight.For(os.Stderr)))
 		os.Exit(1)
 	}
 }

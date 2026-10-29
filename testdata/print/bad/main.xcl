@@ -1,0 +1,10 @@
+// the name the service is known by
+variable "name" {
+  description = "the service name"
+
+  // the default holds characters a web page escapes
+  default = "a<b & \"c\""
+  timeout "http" {
+    seconds = 30
+  }
+}

@@ -14,11 +14,13 @@ import (
 // summary, detail, and the exact range of the fault and of its context — and
 // adds what a reader of configuration needs as well: the block it is about,
 // the field, where that block starts, and the lines of source around the
-// fault, taken when the diagnostic was made so that showing them never reads
-// a file again.
+// fault — the lines it covers and up to two either side, clipped at the
+// file's ends — taken when the diagnostic was made so that showing them never
+// reads a file again.
 //
-// Error is one plain line. To show a diagnostic to a person, with its source,
-// render it: see xcl's diagnostics rendering.
+// Error is one plain line. Formatting a diagnostic with %+v gives the report
+// a person reads, with its source; xcl.PrintError prints that report for any
+// error xcl returns, however it was wrapped.
 type Diagnostic struct {
 	hcl.Diagnostic
 
@@ -36,8 +38,9 @@ type Diagnostic struct {
 	// Subject is the fault itself, which can be anywhere inside it.
 	EntityPos *hcl.Range
 
-	// Source is the configuration around the fault, or nil when the source
-	// was not to hand
+	// Source is the configuration around the fault: the lines it covers and
+	// up to two lines before and after them, clipped at the start and end of
+	// the file. It is nil when the source was not to hand.
 	Source *SourceLines
 
 	// Cause is the error the problem was found through, such as the error a
@@ -61,7 +64,8 @@ type SourceLines struct {
 }
 
 // NewDiagnostic makes a Diagnostic from an HCL diagnostic, taking the lines of
-// source its subject and context cover from sources, by file name. Source is
+// source its subject and context cover, and up to two lines either side, from
+// sources, by file name. Source is
 // left nil when the diagnostic has no subject or its file is not in sources.
 //
 // The expression and evaluation context are left out: they hold the values
@@ -88,8 +92,9 @@ func NewDiagnostic(d *hcl.Diagnostic, sources map[string][]byte) *Diagnostic {
 	return diagnostic
 }
 
-// linesOf returns the whole lines of src that r covers, or nil when r is not
-// within src
+// linesOf returns the whole lines of src that r covers, with up to two lines
+// before and after them, clipped at the start and end of src, or nil when r
+// is not within src
 func linesOf(src []byte, r hcl.Range) *SourceLines {
 	first, last := r.Start.Line, max(r.End.Line, r.Start.Line)
 	if first < 1 {
@@ -108,13 +113,28 @@ func linesOf(src []byte, r hcl.Range) *SourceLines {
 	}
 	last = min(last, len(lines))
 
-	covered := make([]string, 0, last-first+1)
-	for _, line := range lines[first-1 : last] {
-		covered = append(covered, strings.TrimSuffix(line, "\r"))
+	// the context is taken only from lines that hold something: a file
+	// ending with a line break has no line after it, though splitting it
+	// gives an empty one
+	lineCount := len(lines)
+	if lineCount > 1 && lines[lineCount-1] == "" {
+		lineCount--
 	}
 
-	return &SourceLines{File: r.Filename, Start: first, Lines: covered}
+	start := max(1, first-contextLines)
+	end := max(last, min(lineCount, last+contextLines))
+
+	taken := make([]string, 0, end-start+1)
+	for _, line := range lines[start-1 : end] {
+		taken = append(taken, strings.TrimSuffix(line, "\r"))
+	}
+
+	return &SourceLines{File: r.Filename, Start: start, Lines: taken}
 }
+
+// contextLines is how many lines of source are taken before and after the
+// lines a fault covers
+const contextLines = 2
 
 // IsError reports whether the problem stops the configuration being used
 func (d *Diagnostic) IsError() bool {
@@ -132,7 +152,9 @@ func (d *Diagnostic) IsWarning() bool {
 //
 //	main.xcl:2,3-8: Unsupported argument; An argument named "modls" is not expected here. (agent.claude)
 //
-// It never holds source, colour or line breaks.
+// It never holds source, colour or line breaks. Formatting the diagnostic
+// with %+v gives the full report instead, but only on the diagnostic itself,
+// not on an error wrapping it; xcl.PrintError is the dependable route.
 func (d *Diagnostic) Error() string {
 	var line strings.Builder
 

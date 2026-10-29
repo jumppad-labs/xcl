@@ -1,0 +1,23 @@
+  # resource.container.api will be updated
+  ~ resource "container" "api" {
+      ~ ports[0].host      = 8080 -> 9090
+      + ports[2]           = { host = 443, local = 8443 }
+      ~ env["DB_PASSWORD"] = (sensitive value)
+    }
+
+  # resource.container.cache changed outside xcl and will be updated
+  ~ resource "container" "cache" {}
+
+  # resource.container.web will be created
+  + resource "container" "web" {
+      + image   = "nginx"
+      + db_host = (known after apply)
+    }
+
+  # resource.network.app will be replaced, its last apply failed
+-/+ resource "network" "app" {}
+
+  # resource.postgres.old will be deleted
+  - resource "postgres" "old" {}
+
+Diff: 1 to create, 2 to update, 1 to replace, 1 to delete, 4 unchanged.

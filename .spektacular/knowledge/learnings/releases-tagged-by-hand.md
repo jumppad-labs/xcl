@@ -2,10 +2,8 @@
 tags: [ci, releases, versioning]
 ---
 
-# xcl releases were tagged by hand
+# xcl releases were tagged by hand (superseded)
 
-As of 2026-10-11, xcl has no release workflow. Tags `v0.1.0` to `v0.2.1` were pushed by hand, and nothing builds release artifacts. The plugin repos pin xcl by tag (`v0.1.1` at the time).
+Until October 2026, xcl tags were pushed by hand and nothing built release artifacts. That is no longer true: releases are now automated from pull request labels across xcl, xcl-python and xcl-website. See `architecture/release-chain.md` in this store for how they work, and `conventions/release-plan-after-implementation.md` for writing a release plan once released work is merged.
 
-The python-support plan adds the first release workflow (`libxcl-release.yml` on `v*` tags), and the epic's release sequence is `v0.3.0` (language-surface), then `v0.4.0` (python-support). Before 1.0, breaking changes bump the minor version.
-
-**How to apply:** when planning work that needs a release, check the latest tag with `git tag` rather than assuming the next number. Treat cutting a tag as a task for a person, unless a release workflow does it.
+What still holds: before 1.0, breaking changes bump the minor version, and the next number comes from the latest tag (`git tag --sort=-v:refname`), not from assumption.

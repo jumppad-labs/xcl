@@ -1,0 +1,815 @@
+{
+  "version": 1,
+  "entries": {
+    "architecture/config-is-the-public-query-surface.md": {
+      "created": "2026-09-21T19:03:46Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "architecture/links-are-attribute-paths.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "architecture/reference-outputs-are-a-contract.md": {
+      "created": "2026-10-26T11:36:47.670775284Z",
+      "tracked_since": "2026-10-26T11:36:47.670775284Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 2,
+        "last": "2026-10-26T12:10:39.302624848Z",
+        "recent": [
+          {
+            "at": "2026-10-26T11:49:22.709294899Z"
+          },
+          {
+            "at": "2026-10-26T12:10:39.302624848Z"
+          }
+        ]
+      }
+    },
+    "architecture/release-chain.md": {
+      "created": "2026-10-27T07:04:37.917295452Z",
+      "tracked_since": "2026-10-27T07:04:37.917295452Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "architecture/shared-public-types-live-in-types.md": {
+      "created": "2026-10-05T11:59:07Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "architecture/ux-flow.md": {
+      "created": "2026-07-08T07:10:57Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 2,
+        "last": "2026-10-26T11:36:15.868615332Z",
+        "recent": [
+          {
+            "at": "2026-10-26T10:33:13.109889552Z"
+          },
+          {
+            "at": "2026-10-26T11:36:15.868615332Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/assert-ordering-on-graph-parents.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/code-style.md": {
+      "created": "2026-07-15T15:01:30Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/config-parser-options-builder.md": {
+      "created": "2026-10-11T15:34:21Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/database-and-external-services.md": {
+      "created": "2026-07-15T15:01:30Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/dependencies.md": {
+      "created": "2026-07-15T15:01:30Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/development-standards.md": {
+      "created": "2026-07-15T15:01:30Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/find-references-with-hclsyntax-variables.md": {
+      "created": "2026-10-11T15:34:21Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/never-modify-dependencies.md": {
+      "created": "2026-09-19T11:06:59Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/patterns-and-architecture.md": {
+      "created": "2026-07-15T15:01:30Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/project-structure.md": {
+      "created": "2026-07-15T15:01:30Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/release-plan-after-implementation.md": {
+      "created": "2026-10-27T07:04:37.909254871Z",
+      "tracked_since": "2026-10-27T07:04:37.909254871Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 2,
+        "last": "2026-10-27T07:41:18.92299762Z",
+        "recent": [
+          {
+            "at": "2026-10-27T07:37:48.379089606Z",
+            "workflow": "implement",
+            "spec": "20261016064106-8931613a-python-encode-entity"
+          },
+          {
+            "at": "2026-10-27T07:41:18.92299762Z",
+            "workflow": "implement",
+            "spec": "20261016064106-8931613a-python-encode-entity"
+          }
+        ]
+      }
+    },
+    "conventions/shared-errors-package.md": {
+      "created": "2026-09-21T12:58:24Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/shared-test-helpers.md": {
+      "created": "2026-10-06T12:43:27Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/test-state-from-real-apply.md": {
+      "created": "2026-09-19T10:15:30Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/testing-and-mocking.md": {
+      "created": "2026-07-15T15:01:30Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "conventions/testing-provider-changed-and-update.md": {
+      "created": "2026-10-10T10:28:39Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "decisions/own-hcl-fork-with-xcl-tags.md": {
+      "created": "2026-09-19T10:15:30Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "decisions/parser-refactor-analysis.md": {
+      "created": "2026-07-08T07:10:57Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 4,
+        "last": "2026-10-26T11:36:15.868615332Z",
+        "recent": [
+          {
+            "at": "2026-10-26T08:33:09.576183409Z"
+          },
+          {
+            "at": "2026-10-26T10:33:13.10339115Z"
+          },
+          {
+            "at": "2026-10-26T10:33:13.109889552Z"
+          },
+          {
+            "at": "2026-10-26T11:36:15.868615332Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "decisions/xcl-is-its-own-language.md": {
+      "created": "2026-10-11T15:34:21Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 2,
+        "last": "2026-10-26T11:36:15.868615332Z",
+        "recent": [
+          {
+            "at": "2026-10-26T11:36:15.862106556Z"
+          },
+          {
+            "at": "2026-10-26T11:36:15.868615332Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "glossary/entity.md": {
+      "created": "2026-09-21T09:07:43Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/buf-field-no-delete.md": {
+      "created": "2026-10-23T10:17:24Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 2,
+        "last": "2026-10-26T11:59:19.538696975Z",
+        "recent": [
+          {
+            "at": "2026-10-26T10:33:13.10339115Z"
+          },
+          {
+            "at": "2026-10-26T11:59:19.538696975Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 2,
+        "last": "2026-10-26T11:59:22.225944113Z",
+        "recent": [
+          {
+            "at": "2026-10-26T10:33:38.294163607Z"
+          },
+          {
+            "at": "2026-10-26T11:59:22.225944113Z"
+          }
+        ]
+      }
+    },
+    "gotchas/builtin-records-not-encodable.md": {
+      "created": "2026-10-26T10:34:05.322439587Z",
+      "tracked_since": "2026-10-26T10:34:05.322439587Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-10-26T13:19:04.575008741Z",
+        "recent": [
+          {
+            "at": "2026-10-26T13:19:04.575008741Z"
+          }
+        ]
+      }
+    },
+    "gotchas/cty-unknown-args-drop-marks.md": {
+      "created": "2026-10-05T11:59:07Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/custom-marshaljson-changes-internal-hops.md": {
+      "created": "2026-10-05T11:59:07Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/errors-cannot-import-highlight.md": {
+      "created": "2026-10-23T10:17:24Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 1,
+        "last": "2026-10-26T11:36:15.862106556Z",
+        "recent": [
+          {
+            "at": "2026-10-26T11:36:15.862106556Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/event-data-includes-temp-paths.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 1,
+        "last": "2026-10-26T10:33:13.109889552Z",
+        "recent": [
+          {
+            "at": "2026-10-26T10:33:13.109889552Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 2,
+        "last": "2026-10-26T12:10:39.346787918Z",
+        "recent": [
+          {
+            "at": "2026-10-26T08:33:47.522584281Z"
+          },
+          {
+            "at": "2026-10-26T12:10:39.346787918Z"
+          }
+        ]
+      }
+    },
+    "gotchas/example-modules-cannot-import-internal.md": {
+      "created": "2026-10-06T12:43:27Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/expression-text-lost-at-parse.md": {
+      "created": "2026-10-05T11:59:07Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/file-state-is-indented-json.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/go-plugin-inherits-stdin.md": {
+      "created": "2026-10-12T09:26:48Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/go-vet-rejects-repeated-json-tags.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/goimports-aliases-internal-xcl.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/hcl-halts-on-malformed-block-header.md": {
+      "created": "2026-09-18T16:56:21Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/meta-field-golden-schema.md": {
+      "created": "2026-09-19T17:01:57Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 1,
+        "last": "2026-10-26T11:36:15.868615332Z",
+        "recent": [
+          {
+            "at": "2026-10-26T11:36:15.868615332Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/meta-type-holds-two-axes.md": {
+      "created": "2026-09-21T09:07:43Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/nested-module-keys-use-append-parent-module.md": {
+      "created": "2026-10-05T11:59:07Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/optional-is-a-tag-kind.md": {
+      "created": "2026-10-11T15:34:21Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/orchestrated-goto-from-project-root.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 1,
+        "last": "2026-10-26T08:33:09.576183409Z",
+        "recent": [
+          {
+            "at": "2026-10-26T08:33:09.576183409Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/plugin-types-rebuilt-with-structof.md": {
+      "created": "2026-10-05T11:59:07Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/register-repo-before-planning.md": {
+      "created": "2026-10-11T15:34:21Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/registered-types-convert-only-to-themselves.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/root-outputs-are-not-referenceable.md": {
+      "created": "2026-10-07T19:48:49Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 2,
+        "last": "2026-10-26T11:36:15.868615332Z",
+        "recent": [
+          {
+            "at": "2026-10-26T10:33:13.109889552Z"
+          },
+          {
+            "at": "2026-10-26T11:36:15.868615332Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/rpc-comments-not-in-generated-go.md": {
+      "created": "2026-10-26T10:34:05.316241628Z",
+      "tracked_since": "2026-10-26T10:34:05.316241628Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-10-26T11:49:22.699047485Z",
+        "recent": [
+          {
+            "at": "2026-10-26T11:49:22.699047485Z"
+          }
+        ]
+      }
+    },
+    "gotchas/save-state-through-encodeforstate.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/sensitive-values-leak-through-fmt.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/style-strings-cannot-reset.md": {
+      "created": "2026-10-26T11:36:34.291285093Z",
+      "tracked_since": "2026-10-26T11:36:34.291285093Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-10-26T12:10:39.313847719Z",
+        "recent": [
+          {
+            "at": "2026-10-26T12:10:39.313847719Z"
+          }
+        ]
+      }
+    },
+    "gotchas/unsupported-block-reports-twice.md": {
+      "created": "2026-10-23T10:17:24Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-10-26T12:10:39.336612332Z",
+        "recent": [
+          {
+            "at": "2026-10-26T12:10:39.336612332Z"
+          }
+        ]
+      }
+    },
+    "gotchas/xcl-tags-gate-what-reaches-cty.md": {
+      "created": "2026-09-23T10:32:16Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "learnings/builtin-functions-and-old-readme.md": {
+      "created": "2026-10-11T15:34:21Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "learnings/config-operations-not-cancellable.md": {
+      "created": "2026-10-11T15:34:21Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "learnings/depends-on-mirrors-links.md": {
+      "created": "2026-10-05T11:59:07Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "learnings/failed-resource-in-e2e-with-bad-host.md": {
+      "created": "2026-10-07T19:48:49Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "learnings/host-store-holds-operation.md": {
+      "created": "2026-10-23T10:17:24Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 1,
+        "last": "2026-10-26T10:33:13.109889552Z",
+        "recent": [
+          {
+            "at": "2026-10-26T10:33:13.109889552Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-10-26T10:33:34.793584118Z",
+        "recent": [
+          {
+            "at": "2026-10-26T10:33:34.793584118Z"
+          }
+        ]
+      }
+    },
+    "learnings/loggers-and-error-reports.md": {
+      "created": "2026-10-26T11:44:21.352630406Z",
+      "tracked_since": "2026-10-26T11:44:21.352630406Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 3,
+        "last": "2026-10-26T13:19:04.584994237Z",
+        "recent": [
+          {
+            "at": "2026-10-26T11:49:22.719295141Z"
+          },
+          {
+            "at": "2026-10-26T12:10:39.325949144Z"
+          },
+          {
+            "at": "2026-10-26T13:19:04.584994237Z"
+          }
+        ]
+      }
+    },
+    "learnings/releases-tagged-by-hand.md": {
+      "created": "2026-10-11T15:34:21Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 2,
+        "last": "2026-10-27T07:04:12.366180951Z",
+        "recent": [
+          {
+            "at": "2026-10-27T07:04:08.535467063Z"
+          },
+          {
+            "at": "2026-10-27T07:04:12.366180951Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-10-27T07:04:16.879014521Z",
+        "recent": [
+          {
+            "at": "2026-10-27T07:04:16.879014521Z",
+            "workflow": "implement",
+            "spec": "20261016064106-8931613a-python-encode-entity"
+          }
+        ]
+      }
+    },
+    "learnings/secret-fixture-for-sensitive-tests.md": {
+      "created": "2026-10-05T19:53:03Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "learnings/state-save-and-load-points.md": {
+      "created": "2026-10-05T11:59:07Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    }
+  }
+}

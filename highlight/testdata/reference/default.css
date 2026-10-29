@@ -1,0 +1,17 @@
+.xcl .xcl-block { color: #bc3fbc; font-weight: bold; }
+.xcl .xcl-label { color: #0dbc79; }
+.xcl .xcl-type-label { color: #11a8cd; }
+.xcl .xcl-attribute { color: #2472c8; }
+.xcl .xcl-string { color: #e5e510; }
+.xcl .xcl-string-escape { color: #d670d6; }
+.xcl .xcl-number { color: #d670d6; }
+.xcl .xcl-constant { color: #d670d6; }
+.xcl .xcl-reference { color: #11a8cd; }
+.xcl .xcl-comment { color: #666666; font-style: italic; }
+.xcl .xcl-inserted { color: #0dbc79; }
+.xcl .xcl-deleted { color: #cd3131; }
+.xcl .xcl-changed { color: #e5e510; }
+.xcl .xcl-error { color: #cd3131; font-weight: bold; }
+.xcl .xcl-warning { color: #e5e510; font-weight: bold; }
+.xcl .xcl-summary { font-weight: bold; }
+.xcl .xcl-gutter { opacity: 0.5; }

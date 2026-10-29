@@ -1,0 +1,16 @@
+<pre class="xcl"><span class="xcl-problem xcl-error">Error</span><span class="xcl-report xcl-summary">: Unsupported block type</span>
+
+<span class="xcl-report xcl-location">  on main.xcl line 4, in variable.name, field timeout[0]:</span>
+<span class="xcl-report xcl-gutter">     2 | </span>  <span class="xcl-attribute">default</span> <span class="xcl-operator">=</span> <span class="xcl-string">&quot;a&lt;b&quot;</span>
+<span class="xcl-report xcl-gutter">     3 | </span>
+<span class="xcl-report xcl-gutter">     4 | </span>  <span class="xcl-problem xcl-error">timeout</span> <span class="xcl-label xcl-name-label">&quot;http&quot;</span> {
+<span class="xcl-report xcl-gutter">     5 | </span>    <span class="xcl-attribute">connect</span> <span class="xcl-operator">=</span> <span class="xcl-number">30</span>
+<span class="xcl-report xcl-gutter">     6 | </span>  }
+
+<span class="xcl-report xcl-detail">Blocks of type &quot;timeout&quot; are not expected here. A variable takes only default, description, type and sensitive, so move the timeout to the resource that uses it.</span>
+
+<span class="xcl-problem xcl-warning">Warning</span><span class="xcl-report xcl-summary">: Deprecated attribute</span>
+
+<span class="xcl-report xcl-detail">retries is deprecated, use a retry block.</span>
+
+</pre>
