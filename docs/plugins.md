@@ -67,9 +67,11 @@ it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
   or replace, each an `entity.DependencyChange{Address, Change}`. Embed
   `plugins.DefaultChanged[T]` ([`plugins/changed.go`](../plugins/changed.go))
   to get a comparison of the JSON form of both copies that ignores `meta`,
-  `depends_on` and `disabled`, answering update or no change, and ignores
-  both lists; define `Changed` on the provider to override it, for example
-  to answer replace
+  `depends_on` and `disabled`, answering update or no change; set its
+  `ReplaceOn` field to the settings that can't change in place, and a change
+  at or under any of them answers replace. It ignores `dependencies`; define
+  `Changed` on the provider to override it, for example to react to a
+  replaced dependency
   (see [Overriding `Changed`](plugin-developer-guide.md#overriding-changed)).
 - `Update(ctx, resource, changes, dependencies)` changes the entity in
   place. `changes` is the same comparison run again when the apply reaches

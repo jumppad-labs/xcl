@@ -362,7 +362,8 @@ type ContainerProvider struct {
 `DefaultChanged` compares the JSON form of both copies, ignoring xcl's own
 entity metadata (`meta`, `depends_on` and `disabled`). It answers
 `entity.Update` when they differ and `entity.NoChange` when they don't. It
-ignores both `changes` and `dependencies` and never answers `entity.Replace`.
+ignores `dependencies`, and answers `entity.Replace` only for the settings
+listed in its `ReplaceOn` field (see below); with none listed, it never does.
 Because `Read` has put reality into `new`, one comparison catches both kinds
 of change:
 
@@ -464,13 +465,35 @@ type DependencyChange struct {
 An empty list means nothing this entity depends on is changing. `Update` is
 given the same list.
 
+#### Settings that need a replace
+
+List the settings the real system can't change in place in
+`DefaultChanged`'s `ReplaceOn` field, set by the provider's constructor. A
+change at or under any of them answers `entity.Replace`, whether its new value
+is known yet or not; anything else is left to the comparison above:
+
+```go
+func NewNetworkProvider(tasks containers.Tasks) *NetworkProvider {
+	return &NetworkProvider{
+		DefaultChanged: plugins.DefaultChanged[*Network]{
+			ReplaceOn: []entity.Path{entity.Path{}.Attribute("subnet")},
+		},
+		tasks: tasks,
+	}
+}
+```
+
+The settings that need a replace are then listed in one place, and the
+provider writes no `Changed` for them. A zero-value `DefaultChanged` replaces
+on nothing.
+
 #### Overriding `Changed`
 
-Define `Changed` on your provider when a plain comparison is wrong for your
-type: a setting the real system cannot change in place, a dependency whose
-replacement leaves the entity broken, or two values that differ as text
-but mean the same thing. Answer what you know and defer to the embedded
-`DefaultChanged` for the rest. The Docker container in the plugin example
+Define `Changed` on your provider when `ReplaceOn` and the comparison are not
+enough for your type: a dependency whose replacement leaves the entity broken,
+or two values that differ as text but mean the same thing. Answer what you
+know and defer to the embedded `DefaultChanged` for the rest, which still
+applies its `ReplaceOn` settings. The Docker container in the plugin example
 ([`example/plugin/plugins/docker/providers/container.go`](../example/plugin/plugins/docker/providers/container.go))
 does both, deciding only from what it is told:
 
