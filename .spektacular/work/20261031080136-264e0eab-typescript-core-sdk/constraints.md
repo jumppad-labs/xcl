@@ -1,0 +1,11 @@
+- The work is built to three design documents in the project's `design` design source: `typescript-sdk.md`, which fixes the TypeScript API, the package layout and the platform packages; `typescript-entity-types.md`, which fixes how entity types are defined; and `libxcl.md`, which fixes the core service, the framing, the engine's process lifecycle and the release assets. The plan designs within them and raises any disagreement rather than designing around them.
+- The package runs the bundled `xcl-core` engine as a subprocess and reimplements none of the engine's behaviour; it uses no native addon and no FFI.
+- Entity types are defined as `typescript-entity-types.md` settles. Its proposal, decorated entity classes, is under review, and this spec is a draft until it is decided.
+- The package supports Node 22 and later.
+- The package is published to npm as `xcl-lang`, with npm provenance, and with one engine package per platform named `xcl-lang-<os>-<arch>[-<libc>]`.
+- The eight supported platforms are Linux x86-64 and arm64 on glibc and on musl, macOS x86-64 and arm64, and Windows x86-64 and arm64. musl support is not negotiable.
+- The code lives in the `jumppad-labs/xcl-typescript` repository.
+- The API is asynchronous only; there is no synchronous variant.
+- The package never listens for interrupts unless the program asks it to.
+- The Go library's and the Python package's behaviour must not change; in the xcl repository only the release and CI workflows change.
+- End-to-end and registry tests use the xcl-plugin-test plugin, not Docker.
