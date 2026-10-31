@@ -1,13 +1,10 @@
 package registry
 
 import (
-	"archive/tar"
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -24,72 +21,126 @@ import (
 	xclerrors "github.com/jumppad-labs/xcl/errors"
 )
 
-// verifyEntry checks the files of a cache entry, or of an install about to
-// become one, offline: the signature over the checksums file against keys
-// when any are trusted, the archive against its line in the checksums file,
-// and the extracted binary against the archive's copy. Every failure is
-// ErrPluginVerification.
-func verifyEntry(dir string, names assetNames, keys openpgp.EntityList) error {
-	if err := verifyArchive(dir, names, keys); err != nil {
-		return err
+// verifyEntry checks a cache entry offline, as it is on every start: the
+// signature over the index against keys when any are trusted, the index
+// itself, the zip of the build for host against its checksum in the index,
+// the zip's manifest against the index, and the extracted binary against its
+// copy in the zip. It returns the command the manifest names, the binary's
+// path inside the entry followed by its arguments. Every failure is
+// ErrPluginVerification, apart from an index that offers no build for host,
+// which is ErrPluginNotFound.
+func verifyEntry(dir, repository, tag string, host platform, keys openpgp.EntityList) ([]string, error) {
+	index, build, err := checkIndex(dir, repository, tag, host, keys)
+	if err != nil {
+		return nil, err
 	}
 
-	return verifyBinary(dir, names)
+	manifest, err := checkBuild(dir, index, build, host)
+	if err != nil {
+		return nil, err
+	}
+
+	command := manifest.Executable.Command
+	if err := verifyExtracted(dir, build.Asset, command[0]); err != nil {
+		return nil, err
+	}
+
+	return command, nil
 }
 
-// verifyArchive checks the checksums file kept in dir is signed by one of
-// keys, when any are trusted, and the archive matches its SHA-256 in it
-func verifyArchive(dir string, names assetNames, keys openpgp.EntityList) error {
-	checksums, err := os.ReadFile(filepath.Join(dir, names.checksums))
+// checkIndex checks the index of the release of repository at tag kept in
+// dir: its signature against keys when any are trusted, then that it is
+// complete, and returns it with the build it offers for host. Nothing here
+// needs the build itself, so an install checks it before downloading one.
+func checkIndex(dir, repository, tag string, host platform, keys openpgp.EntityList) (*releaseIndex, chosenBuild, error) {
+	name := indexName(repository, tag)
+
+	data, err := os.ReadFile(filepath.Join(dir, name))
 	if errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%w: release has no checksums file %s", xclerrors.ErrPluginVerification, names.checksums)
+		return nil, chosenBuild{}, fmt.Errorf("%w: index %s is missing", xclerrors.ErrPluginVerification, name)
 	}
 
 	if err != nil {
-		return err
+		return nil, chosenBuild{}, err
 	}
 
-	if err := verifySignature(dir, names, checksums, keys); err != nil {
-		return err
+	if err := verifySignature(dir, indexSignatureName(repository, tag), data, keys); err != nil {
+		return nil, chosenBuild{}, err
 	}
 
-	sums, err := parseChecksums(checksums)
+	index, err := readIndex(data, name)
 	if err != nil {
-		return fmt.Errorf("%w: %s: %s", xclerrors.ErrPluginVerification, names.checksums, err)
+		return nil, chosenBuild{}, err
 	}
 
-	expected, listed := sums[names.archive]
-	if !listed {
-		return fmt.Errorf("%w: archive %s is not listed in %s", xclerrors.ErrPluginVerification, names.archive, names.checksums)
+	if err := index.validate(repository, tag); err != nil {
+		return nil, chosenBuild{}, err
 	}
 
-	actual, err := fileSHA256(filepath.Join(dir, names.archive))
+	build, err := index.choose(host)
+	if err != nil {
+		return nil, chosenBuild{}, err
+	}
+
+	return index, build, nil
+}
+
+// checkBuild checks the zip of build kept in dir: that it matches its
+// checksum in index, that its manifest agrees with index for host, and that
+// it holds the binary the manifest's command names. It returns the manifest.
+func checkBuild(dir string, index *releaseIndex, build chosenBuild, host platform) (*buildManifest, error) {
+	zipPath := filepath.Join(dir, build.Asset)
+
+	sum, err := fileSHA256(zipPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%w: archive %s is missing", xclerrors.ErrPluginVerification, names.archive)
+		return nil, fmt.Errorf("%w: zip %s is missing", xclerrors.ErrPluginVerification, build.Asset)
 	}
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if actual != expected {
-		return fmt.Errorf(
-			"%w: archive %s does not match its checksum, expected %s, got %s",
-			xclerrors.ErrPluginVerification, names.archive, expected, actual,
+	if sum != build.SHA256 {
+		return nil, fmt.Errorf(
+			"%w: zip %s does not match its checksum in the index, expected sha256:%x, got sha256:%x",
+			xclerrors.ErrPluginVerification, build.Asset, build.SHA256, sum,
 		)
 	}
 
-	return nil
+	var source []byte
+	err = withZipEntry(zipPath, build.Asset, manifestName, func(r io.Reader) error {
+		source, err = io.ReadAll(r)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	manifest, err := readManifest(source, build.Asset)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := manifest.agrees(index, host); err != nil {
+		return nil, err
+	}
+
+	command := manifest.Executable.Command[0]
+	if err := withZipEntry(zipPath, build.Asset, command, func(io.Reader) error { return nil }); err != nil {
+		return nil, err
+	}
+
+	return manifest, nil
 }
 
-// verifySignature checks the detached signature kept in dir verifies the
-// checksums file against one of keys. Without keys it checks nothing.
-func verifySignature(dir string, names assetNames, checksums []byte, keys openpgp.EntityList) error {
+// verifySignature checks the detached signature named signatureName, kept in
+// dir, verifies index against one of keys. Without keys it checks nothing.
+func verifySignature(dir, signatureName string, index []byte, keys openpgp.EntityList) error {
 	if len(keys) == 0 {
 		return nil
 	}
 
-	signature, err := os.ReadFile(filepath.Join(dir, names.signature))
+	signature, err := os.ReadFile(filepath.Join(dir, signatureName))
 	if errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%w: release is not signed, and trusted keys were supplied", xclerrors.ErrPluginVerification)
 	}
@@ -98,7 +149,7 @@ func verifySignature(dir string, names assetNames, checksums []byte, keys openpg
 		return err
 	}
 
-	_, err = openpgp.CheckArmoredDetachedSignature(keys, bytes.NewReader(checksums), bytes.NewReader(signature), nil)
+	_, err = openpgp.CheckArmoredDetachedSignature(keys, bytes.NewReader(index), bytes.NewReader(signature), nil)
 	if err == nil {
 		return nil
 	}
@@ -109,14 +160,14 @@ func verifySignature(dir string, names assetNames, checksums []byte, keys openpg
 		if keyID, ok := signatureIssuer(signature); ok {
 			return fmt.Errorf(
 				"%w: signature %s does not verify against any trusted key: signed by key %016X, which is not trusted",
-				xclerrors.ErrPluginVerification, names.signature, keyID,
+				xclerrors.ErrPluginVerification, signatureName, keyID,
 			)
 		}
 	}
 
 	return fmt.Errorf(
 		"%w: signature %s does not verify against any trusted key: %s",
-		xclerrors.ErrPluginVerification, names.signature, err,
+		xclerrors.ErrPluginVerification, signatureName, err,
 	)
 }
 
@@ -152,26 +203,28 @@ func signatureIssuer(signature []byte) (uint64, bool) {
 	return 0, false
 }
 
-// verifyBinary checks the extracted binary in dir is the archive's copy
-func verifyBinary(dir string, names assetNames) error {
-	var expected string
-
-	err := withArchiveBinary(filepath.Join(dir, names.archive), names, func(binary io.Reader) error {
+// verifyExtracted checks the binary command names, extracted into dir, is
+// the copy in the zip asset kept beside it, so a binary changed in the cache
+// is never started
+func verifyExtracted(dir, asset, command string) error {
+	var expected [32]byte
+	err := withZipEntry(filepath.Join(dir, asset), asset, command, func(r io.Reader) error {
 		hash := sha256.New()
-		if _, err := io.Copy(hash, binary); err != nil {
+		if _, err := io.Copy(hash, r); err != nil {
 			return err
 		}
 
-		expected = hex.EncodeToString(hash.Sum(nil))
+		copy(expected[:], hash.Sum(nil))
+
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	actual, err := fileSHA256(filepath.Join(dir, names.binary))
+	actual, err := fileSHA256(filepath.Join(dir, filepath.FromSlash(path.Clean(command))))
 	if errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%w: cached binary %s is missing", xclerrors.ErrPluginVerification, names.binary)
+		return fmt.Errorf("%w: cached binary %s is missing", xclerrors.ErrPluginVerification, command)
 	}
 
 	if err != nil {
@@ -179,113 +232,135 @@ func verifyBinary(dir string, names assetNames) error {
 	}
 
 	if actual != expected {
-		return fmt.Errorf("%w: cached binary %s does not match its archive", xclerrors.ErrPluginVerification, names.binary)
+		return fmt.Errorf("%w: cached binary %s does not match its copy in zip %s", xclerrors.ErrPluginVerification, command, asset)
 	}
 
 	return nil
 }
 
-// extractBinary writes the plugin binary at the root of the archive at
-// archivePath to dest, executable
-func extractBinary(archivePath string, names assetNames, dest string) error {
-	return withArchiveBinary(archivePath, names, func(binary io.Reader) error {
-		file, err := os.OpenFile(dest, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0755)
-		if err != nil {
-			return err
+// extractZip extracts every file of the zip at zipPath, named asset, into
+// dest, keeping the zip's directories, and marks the binary command names
+// executable whatever mode its entry carries. An entry whose path leaves
+// dest, or that is neither a file nor a directory, fails verification, and
+// no existing file is overwritten.
+func extractZip(zipPath, asset, dest, command string) error {
+	reader, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return fmt.Errorf("%w: %s is not a zip: %s", xclerrors.ErrPluginVerification, asset, err)
+	}
+	defer reader.Close()
+
+	binary := path.Clean(command)
+
+	for _, file := range reader.File {
+		if !insideZip(file.Name) {
+			return fmt.Errorf("%w: zip %s has entry %q outside its root", xclerrors.ErrPluginVerification, asset, file.Name)
 		}
 
-		if _, err := io.Copy(file, binary); err != nil {
-			file.Close()
-			return err
+		name := path.Clean(file.Name)
+		target := filepath.Join(dest, filepath.FromSlash(name))
+		mode := file.Mode()
+
+		switch {
+		case mode.IsDir():
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return fmt.Errorf("unable to extract %s from zip %s: %w", file.Name, asset, err)
+			}
+
+			continue
+		case !mode.IsRegular():
+			return fmt.Errorf("%w: zip %s has entry %q that is not a regular file", xclerrors.ErrPluginVerification, asset, file.Name)
 		}
 
-		return file.Close()
-	})
-}
+		perm := os.FileMode(0644)
+		if name == binary || mode.Perm()&0111 != 0 {
+			perm = 0755
+		}
 
-// withArchiveBinary calls read with the contents of the plugin binary at the
-// root of the archive at archivePath. Only an entry named exactly as the
-// contract names the binary, at the archive root, is read, so no other path
-// in the archive is ever used.
-func withArchiveBinary(archivePath string, names assetNames, read func(io.Reader) error) error {
-	if names.zip {
-		return withZipBinary(archivePath, names, read)
+		if err := extractZipFile(file, target, perm); err != nil {
+			return fmt.Errorf("unable to extract %s from zip %s: %w", file.Name, asset, err)
+		}
 	}
 
-	return withTarGzBinary(archivePath, names, read)
+	// the registry, not the zip, decides the binary is executable
+	if err := os.Chmod(filepath.Join(dest, filepath.FromSlash(binary)), 0755); err != nil {
+		return fmt.Errorf("unable to mark %s executable: %w", command, err)
+	}
+
+	return nil
 }
 
-// withTarGzBinary reads the binary from a gzipped tar
-func withTarGzBinary(archivePath string, names assetNames, read func(io.Reader) error) error {
-	file, err := os.Open(archivePath)
+// extractZipFile writes the zip entry file to target with perm, creating its
+// directory, and refuses to overwrite a file already there
+func extractZipFile(file *zip.File, target string, perm os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+
+	contents, err := file.Open()
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer contents.Close()
 
-	compressed, err := gzip.NewReader(file)
+	out, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, perm)
 	if err != nil {
-		return fmt.Errorf("%w: archive %s is not a gzipped tar: %s", xclerrors.ErrPluginVerification, names.archive, err)
-	}
-	defer compressed.Close()
-
-	archive := tar.NewReader(compressed)
-
-	for {
-		header, err := archive.Next()
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			return fmt.Errorf("%w: archive %s cannot be read: %s", xclerrors.ErrPluginVerification, names.archive, err)
-		}
-
-		if header.Typeflag == tar.TypeReg && path.Clean(header.Name) == names.binary {
-			return read(archive)
-		}
+		return err
 	}
 
-	return fmt.Errorf("%w: archive %s has no %s at its root", xclerrors.ErrPluginVerification, names.archive, names.binary)
+	if _, err := io.Copy(out, contents); err != nil {
+		out.Close()
+		return err
+	}
+
+	return out.Close()
 }
 
-// withZipBinary reads the binary from a zip
-func withZipBinary(archivePath string, names assetNames, read func(io.Reader) error) error {
-	archive, err := zip.OpenReader(archivePath)
+// withZipEntry calls read with the contents of the regular file name in the
+// zip at zipPath, named asset. A zip that cannot be read, or has no such
+// file, fails verification.
+func withZipEntry(zipPath, asset, name string, read func(io.Reader) error) error {
+	reader, err := zip.OpenReader(zipPath)
 	if err != nil {
-		return fmt.Errorf("%w: archive %s is not a zip: %s", xclerrors.ErrPluginVerification, names.archive, err)
+		return fmt.Errorf("%w: %s is not a zip: %s", xclerrors.ErrPluginVerification, asset, err)
 	}
-	defer archive.Close()
+	defer reader.Close()
 
-	for _, entry := range archive.File {
-		if entry.FileInfo().IsDir() || path.Clean(entry.Name) != names.binary {
+	want := path.Clean(name)
+
+	for _, file := range reader.File {
+		if path.Clean(file.Name) != want || !file.Mode().IsRegular() {
 			continue
 		}
 
-		contents, err := entry.Open()
+		contents, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("%w: archive %s cannot be read: %s", xclerrors.ErrPluginVerification, names.archive, err)
+			return fmt.Errorf("%w: zip %s cannot be read: %s", xclerrors.ErrPluginVerification, asset, err)
 		}
 		defer contents.Close()
 
 		return read(contents)
 	}
 
-	return fmt.Errorf("%w: archive %s has no %s at its root", xclerrors.ErrPluginVerification, names.archive, names.binary)
+	return fmt.Errorf("%w: zip %s has no %s", xclerrors.ErrPluginVerification, asset, name)
 }
 
-// fileSHA256 is the lowercase hex SHA-256 of the file at path
-func fileSHA256(path string) (string, error) {
+// fileSHA256 is the SHA-256 of the file at path
+func fileSHA256(path string) ([32]byte, error) {
+	var sum [32]byte
+
 	file, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return sum, err
 	}
 	defer file.Close()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
-		return "", err
+		return sum, err
 	}
 
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	copy(sum[:], hash.Sum(nil))
+
+	return sum, nil
 }

@@ -34,8 +34,10 @@ type GRPCPluginHost struct {
 	cachedFunctions []RegisteredFunction
 	functionsCached bool
 
-	// path is the plugin binary Start was given, Restart starts it again
+	// path is the plugin binary Start was given and args the arguments it
+	// is started with, Restart starts it again with them
 	path string
+	args []string
 
 	// calls maps the ID of each provider call in progress to its logger,
 	// so the plugin's log messages reach the right resource and receiver
@@ -57,9 +59,11 @@ func NewGRPCPluginHost(emit events.Emit, state State) *GRPCPluginHost {
 // are emitted as events naming the binary's file name as their Source, so
 // they can be told apart from the host's. A message written during a provider
 // call carries that call's resource and step, one written outside a call,
-// and go-plugin's own messages, go to emit.
-func (h *GRPCPluginHost) Start(pluginPath string) error {
+// and go-plugin's own messages, go to emit. Any args are passed to the
+// process, and kept so Restart passes them again.
+func (h *GRPCPluginHost) Start(pluginPath string, args ...string) error {
 	h.path = pluginPath
+	h.args = args
 
 	return h.connect()
 }
@@ -86,7 +90,7 @@ func (h *GRPCPluginHost) Path() string {
 	return h.path
 }
 
-// connect starts the plugin binary at h.path and connects to it. A host that
+// connect starts the plugin binary at h.path with h.args and connects to it. A host that
 // was connected before keeps its wrapper, which the cached adapters hold, and
 // points it at the new process.
 func (h *GRPCPluginHost) connect() error {
@@ -102,7 +106,7 @@ func (h *GRPCPluginHost) connect() error {
 	h.client = plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  HandshakeConfig,
 		Plugins:          PluginMap,
-		Cmd:              exec.Command(pluginPath),
+		Cmd:              exec.Command(pluginPath, h.args...),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		// go-plugin logs how it starts and talks to the plugin process, and
 		// passes on what the process writes to stderr. Emit it all as events

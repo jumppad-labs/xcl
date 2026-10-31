@@ -81,14 +81,14 @@ var ErrPluginLoad = xclerrors.ErrPluginLoad
 // recover the repository, version and platform with errors.As and
 // PluginInstallError.
 var (
-	// ErrPluginNotFound means the plugin's release, or its build for the
-	// current platform, does not exist, or the repository is private and no
-	// token was given.
+	// ErrPluginNotFound means the plugin's release does not exist, has no
+	// index, or offers no build for the current platform, or the repository
+	// is private and no token was given.
 	ErrPluginNotFound = xclerrors.ErrPluginNotFound
 
 	// ErrPluginVerification means a downloaded or cached plugin failed
-	// verification: no checksums, a checksum mismatch, or a missing or
-	// untrusted signature when trusted keys were given.
+	// verification: an incomplete index, a checksum or manifest mismatch,
+	// or a missing or untrusted index signature when trusted keys were given.
 	ErrPluginVerification = xclerrors.ErrPluginVerification
 )
 

@@ -110,17 +110,18 @@ func (p inProcess) Start(emit events.Emit) (plugins.PluginHost, error) {
 	return plugins.NewDirectPluginHost(emit, nil, p.plugin)
 }
 
-// Executable returns a Plugin for the plugin binary at path. It is started as
-// a separate process over gRPC, and is known by the binary's file name. A
-// path that does not exist is not checked here, it fails when the plugin is
-// started.
-func Executable(path string) Plugin {
-	return executable{path: path}
+// Executable returns a Plugin for the plugin binary at path, started with
+// args. It is started as a separate process over gRPC, and is known by the
+// binary's file name. A path that does not exist is not checked here, it
+// fails when the plugin is started.
+func Executable(path string, args ...string) Plugin {
+	return executable{path: path, args: args}
 }
 
 // executable starts a plugin binary as a process over gRPC
 type executable struct {
 	path string
+	args []string
 }
 
 // Name returns the binary's file name, without a Windows .exe extension
@@ -128,12 +129,12 @@ func (p executable) Name() string {
 	return plugins.PluginBinaryName(p.path)
 }
 
-// Start runs the binary and connects to it. The host it returns can stop and
+// Start runs the binary with its arguments and connects to it. The host it returns can stop and
 // restart the process, which a Config does around each operation.
 func (p executable) Start(emit events.Emit) (plugins.PluginHost, error) {
 	host := plugins.NewGRPCPluginHost(emit, nil)
 
-	if err := host.Start(p.path); err != nil {
+	if err := host.Start(p.path, p.args...); err != nil {
 		return nil, fmt.Errorf("unable to start plugin binary %s: %w", p.path, err)
 	}
 

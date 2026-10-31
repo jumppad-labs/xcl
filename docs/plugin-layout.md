@@ -220,12 +220,14 @@ installs. Pushing a version tag (`make release VERSION=v0.1.0`) builds the
 plugin for linux, darwin and windows on amd64 and arm64 with `make dist`, and
 publishes a GitHub release holding:
 
-- `<name>_<version>_<os>_<arch>.tar.gz` (`.zip` on windows), with the binary
-  at the archive root;
-- `<name>_<version>_checksums.txt`, in `sha256sum` format;
-- `<name>_<version>_checksums.txt.sig`, an armoured detached OpenPGP
-  signature over the checksums file, made with the key in the repository's
-  secrets.
+- `<name>_<version>_<os>_<arch>.zip` for each platform, holding the binary,
+  marked executable, the README, the LICENSE and an `xcl-plugin.xcl` manifest
+  naming the plugin, its version, its protocol, the command that starts it
+  and its platform;
+- `<name>_<version>_index.xcl`, the release's index, listing every zip with
+  its `sha256:` checksum;
+- `<name>_<version>_index.xcl.sig`, an armoured detached OpenPGP signature
+  over the index, made with the key in the repository's secrets.
 
 `<name>` is the repository name and `<version>` the tag without its leading
 `v`. An application installs the release with the GitHub registry, see

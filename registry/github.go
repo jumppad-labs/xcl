@@ -22,9 +22,10 @@ const GitHubName = "github.com"
 const DefaultGitHubAPIURL = "https://api.github.com"
 
 // GitHub is a registry of plugins installed from GitHub releases laid out by
-// the plugin release asset contract. Each plugin is declared by repository
-// and exact release tag; when plugins load, it is downloaded for the current
-// platform, verified against the release's checksums, kept in a cache and
+// version 2 of the plugin release asset contract. Each plugin is declared by
+// repository and exact release tag; when plugins load, the release's index is
+// read and checked, only the build for the current platform is downloaded and
+// verified against its checksum in the index, and it is kept in a cache and
 // started as an external plugin. A cached plugin is used without contacting
 // GitHub, and is verified again every time it is started.
 //
@@ -69,8 +70,7 @@ func GitHubCacheDir(dir string) GitHubOption {
 
 // GitHubTrustedKeys adds ASCII-armoured OpenPGP public keys the registry
 // trusts. When any are given, a plugin is used only when its release's
-// checksums file carries a detached signature that verifies against one of
-// them, checked when the plugin is installed and every time it is started.
+// index carries a detached signature that verifies against one of them, checked when the plugin is installed and every time it is started.
 // Without keys, signatures are not checked and unsigned releases install. A
 // key that cannot be read fails the load, naming the registry.
 func GitHubTrustedKeys(armored ...string) GitHubOption {

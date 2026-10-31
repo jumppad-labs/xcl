@@ -139,7 +139,7 @@ func TestCreateConfigGitHubRegistryUsesAPIURL(t *testing.T) {
 func TestCreateConfigGitHubTamperedReleaseFails(t *testing.T) {
 	binary := testutil.BuildFixturePlugin(t, "..")
 	fake := testutil.NewFakeGitHubRelease(t, githubWidgetRepository, githubWidgetTag, binary,
-		testutil.TamperArchive(runtime.GOOS, runtime.GOARCH))
+		testutil.TamperZip(runtime.GOOS, runtime.GOARCH))
 	t.Setenv("HOME", t.TempDir())
 
 	c := newTestClient(t)

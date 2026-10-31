@@ -28,7 +28,7 @@ func TestGitHubInstallUsesTheTokenOption(t *testing.T) {
 	gh := NewGitHub(GitHubCacheDir(t.TempDir()), GitHubAPIURL(fake.URL()), GitHubToken("secret"))
 	gh.RegisterPlugin(installTestRepository, installTestTag)
 
-	binary, err := widgetPlugin(t, gh).install(nil)
+	binary, _, err := widgetPlugin(t, gh).install(nil)
 	require.NoError(t, err)
 	require.FileExists(t, binary)
 	require.Equal(t, "secret", fake.LastToken())
@@ -41,7 +41,7 @@ func TestGitHubInstallUsesGithubTokenVariable(t *testing.T) {
 	fake := newInstallTestRelease(t, testutil.RequireToken("secret"))
 	gh, _ := newInstallTestRegistry(t, fake)
 
-	binary, err := widgetPlugin(t, gh).install(nil)
+	binary, _, err := widgetPlugin(t, gh).install(nil)
 	require.NoError(t, err)
 	require.FileExists(t, binary)
 	require.Equal(t, "secret", fake.LastToken())
@@ -54,7 +54,7 @@ func TestGitHubInstallUsesGhTokenVariable(t *testing.T) {
 	fake := newInstallTestRelease(t, testutil.RequireToken("secret"))
 	gh, _ := newInstallTestRegistry(t, fake)
 
-	binary, err := widgetPlugin(t, gh).install(nil)
+	binary, _, err := widgetPlugin(t, gh).install(nil)
 	require.NoError(t, err)
 	require.FileExists(t, binary)
 	require.Equal(t, "secret", fake.LastToken())
@@ -68,7 +68,7 @@ func TestGitHubInstallTokenOptionBeatsGithubTokenVariable(t *testing.T) {
 	gh := NewGitHub(GitHubCacheDir(t.TempDir()), GitHubAPIURL(fake.URL()), GitHubToken("secret"))
 	gh.RegisterPlugin(installTestRepository, installTestTag)
 
-	_, err := widgetPlugin(t, gh).install(nil)
+	_, _, err := widgetPlugin(t, gh).install(nil)
 	require.NoError(t, err)
 	require.Equal(t, "secret", fake.LastToken())
 }
@@ -81,7 +81,7 @@ func TestGitHubInstallGithubTokenBeatsGhToken(t *testing.T) {
 	fake := newInstallTestRelease(t, testutil.RequireToken("secret"))
 	gh, _ := newInstallTestRegistry(t, fake)
 
-	_, err := widgetPlugin(t, gh).install(nil)
+	_, _, err := widgetPlugin(t, gh).install(nil)
 	require.NoError(t, err)
 	require.Equal(t, "secret", fake.LastToken())
 }
@@ -92,7 +92,7 @@ func TestGitHubInstallPublicReleaseSendsNoAuthorization(t *testing.T) {
 	fake := newInstallTestRelease(t)
 	gh, _ := newInstallTestRegistry(t, fake)
 
-	_, err := widgetPlugin(t, gh).install(nil)
+	_, _, err := widgetPlugin(t, gh).install(nil)
 	require.NoError(t, err)
 	require.Equal(t, "", fake.LastToken())
 }
@@ -103,7 +103,7 @@ func TestGitHubInstallPrivateReleaseWithoutTokenIsPluginNotFound(t *testing.T) {
 	fake := newInstallTestRelease(t, testutil.RequireToken("secret"))
 	gh, _ := newInstallTestRegistry(t, fake)
 
-	_, err := widgetPlugin(t, gh).install(nil)
+	_, _, err := widgetPlugin(t, gh).install(nil)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, xclerrors.ErrPluginNotFound))
 	require.Contains(t, err.Error(), "acme/xcl-plugin-widget")
@@ -117,7 +117,7 @@ func TestGitHubInstallPrivateReleaseWithWrongTokenIsPluginNotFound(t *testing.T)
 	gh := NewGitHub(GitHubCacheDir(t.TempDir()), GitHubAPIURL(fake.URL()), GitHubToken("wrong"))
 	gh.RegisterPlugin(installTestRepository, installTestTag)
 
-	_, err := widgetPlugin(t, gh).install(nil)
+	_, _, err := widgetPlugin(t, gh).install(nil)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, xclerrors.ErrPluginNotFound))
 	require.NotContains(t, err.Error(), "set GITHUB_TOKEN")
