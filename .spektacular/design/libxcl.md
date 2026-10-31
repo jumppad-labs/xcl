@@ -6,6 +6,7 @@ specs:
     - 20261011130709-aa3eb933-python-support
     - 20261011211634-a8895873-python-out-of-process-engine
     - 20261016064106-8931613a-python-encode-entity
+    - 20261031080136-264e0eab-typescript-core-sdk
 ---
 
 # xcl for other languages: the core service and its transports

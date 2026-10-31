@@ -1,6 +1,12 @@
 {
   "kind": "spec",
-  "current_step": "finished",
+  "run_id": "9055634a1aad8dfbae58414249b5443d",
+  "step_span": {
+    "id": "4d86ca05084f44e5",
+    "name": "verification",
+    "start": "2026-10-31T08:27:14.067715618Z"
+  },
+  "current_step": "verification",
   "completed_steps": [
     "new",
     "interview",
@@ -10,15 +16,34 @@
     "constraints",
     "technical_approach",
     "success_metrics",
-    "non_goals",
-    "verification",
-    "split",
-    "finished"
+    "non_goals"
   ],
-  "created_at": "2026-10-23T07:53:28.683367511Z",
-  "updated_at": "2026-10-23T07:53:46.592950151Z",
+  "created_at": "2026-10-31T08:01:36.273670237Z",
+  "updated_at": "2026-10-31T08:27:14.068167894Z",
   "data": {
-    "epic": "20261023074219-4357d314-printing-and-pretty-output",
-    "name": "20261023075328-741138ee-python-prettylog"
+    "epic": "20261031080131-8c2a58ec-typescript-sdk",
+    "name": "20261031080136-264e0eab-typescript-core-sdk",
+    "sources": [
+      {
+        "retrieved_date": "2026-10-31",
+        "uri": "spec:20261011130709-aa3eb933-python-support"
+      },
+      {
+        "retrieved_date": "2026-10-31",
+        "uri": "spec:20261011211634-a8895873-python-out-of-process-engine"
+      },
+      {
+        "retrieved_date": "2026-10-31",
+        "uri": "spec:20261011232013-da18c586-python-release-hardening"
+      },
+      {
+        "retrieved_date": "2026-10-31",
+        "uri": "spec:20261016064106-8931613a-python-encode-entity"
+      },
+      {
+        "retrieved_date": "2026-10-31",
+        "uri": "https://github.com/jumppad-labs/xcl-python/blob/main/README.md"
+      }
+    ]
   }
 }
