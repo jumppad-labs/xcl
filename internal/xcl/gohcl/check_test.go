@@ -255,3 +255,36 @@ listener {
 	diags := CheckBody(body, &listApp{})
 	require.False(t, diags.HasErrors(), diags.Error())
 }
+
+func TestCheckBodyAcceptsMultiLabelBlocksSharingTheirFirstLabelInList(t *testing.T) {
+	body := parseCheckBody(t, `
+listener "tcp" "a" {
+  port = 1
+}
+
+listener "tcp" "b" {
+  port = 2
+}
+`)
+
+	diags := CheckBody(body, &twoLabelsApp{})
+	require.False(t, diags.HasErrors(), diags.Error())
+}
+
+func TestCheckBodyRejectsDuplicateMultiLabelBlockInList(t *testing.T) {
+	body := parseCheckBody(t, `
+listener "tcp" "a" {
+  port = 1
+}
+
+listener "tcp" "a" {
+  port = 2
+}
+`)
+
+	diags := CheckBody(body, &twoLabelsApp{})
+	require.True(t, diags.HasErrors())
+	require.Equal(t, "Duplicate listener name", diags[0].Summary)
+	require.Contains(t, diags[0].Detail, `"tcp" "a"`)
+	require.Equal(t, 6, diags[0].Subject.Start.Line)
+}
