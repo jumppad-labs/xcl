@@ -56,10 +56,24 @@
       "created": "2026-10-27T07:04:37.917295452Z",
       "tracked_since": "2026-10-27T07:04:37.917295452Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:38.840036435Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:38.840036435Z"
+          }
+        ]
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:45.132829444Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:45.132829444Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "architecture/shared-public-types-live-in-types.md": {
@@ -101,7 +115,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/code-style.md": {
@@ -111,7 +133,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/config-files-are-xcl.md": {
@@ -121,8 +151,8 @@
         "count": 0
       },
       "retrievals": {
-        "count": 3,
-        "last": "2026-10-31T16:12:27.795305665Z",
+        "count": 4,
+        "last": "2026-10-31T18:15:18.353153349Z",
         "recent": [
           {
             "at": "2026-10-31T16:12:15.466655128Z"
@@ -132,6 +162,11 @@
           },
           {
             "at": "2026-10-31T16:12:27.795305665Z"
+          },
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
           }
         ]
       }
@@ -143,7 +178,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/database-and-external-services.md": {
@@ -153,7 +196,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/dependencies.md": {
@@ -163,7 +214,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/development-standards.md": {
@@ -173,7 +232,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/find-references-with-hclsyntax-variables.md": {
@@ -183,7 +250,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/never-modify-dependencies.md": {
@@ -193,7 +268,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/patterns-and-architecture.md": {
@@ -203,7 +286,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/project-structure.md": {
@@ -213,7 +304,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/release-plan-after-implementation.md": {
@@ -223,8 +322,8 @@
         "count": 0
       },
       "retrievals": {
-        "count": 2,
-        "last": "2026-10-27T07:41:18.92299762Z",
+        "count": 3,
+        "last": "2026-10-31T18:15:18.353153349Z",
         "recent": [
           {
             "at": "2026-10-27T07:37:48.379089606Z",
@@ -235,6 +334,11 @@
             "at": "2026-10-27T07:41:18.92299762Z",
             "workflow": "implement",
             "spec": "20261016064106-8931613a-python-encode-entity"
+          },
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
           }
         ]
       }
@@ -246,7 +350,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/shared-test-helpers.md": {
@@ -256,7 +368,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/test-state-from-real-apply.md": {
@@ -266,7 +386,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/testing-and-mocking.md": {
@@ -276,7 +404,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/testing-provider-changed-and-update.md": {
@@ -286,7 +422,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "decisions/one-package-per-language.md": {
@@ -319,8 +463,8 @@
       "created": "2026-07-08T07:10:57Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 5,
-        "last": "2026-10-31T16:11:54.945655012Z",
+        "count": 7,
+        "last": "2026-10-31T18:15:45.162407947Z",
         "recent": [
           {
             "at": "2026-10-26T08:33:09.576183409Z"
@@ -336,6 +480,12 @@
           },
           {
             "at": "2026-10-31T16:11:54.945655012Z"
+          },
+          {
+            "at": "2026-10-31T18:15:38.840036435Z"
+          },
+          {
+            "at": "2026-10-31T18:15:45.162407947Z"
           }
         ]
       },
@@ -372,7 +522,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "gotchas/buf-field-no-delete.md": {

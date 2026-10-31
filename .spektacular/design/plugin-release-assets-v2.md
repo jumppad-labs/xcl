@@ -1,6 +1,8 @@
 ---
 created_date: "2026-10-31"
 document_status: draft
+specs:
+    - 20261031180836-7529c085-plugin-release-contract-v2
 ---
 
 # Plugin release asset contract, version 2
