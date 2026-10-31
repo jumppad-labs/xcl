@@ -1,6 +1,6 @@
 ---
 created_date: "2026-10-09"
-document_status: final
+document_status: superseded
 closed_date: "2026-10-09"
 spec: 20261009102148-7d0b205b-github-releases-registry
 specs:
