@@ -1,6 +1,7 @@
 ---
 created_date: "2026-10-31"
-document_status: draft
+document_status: final
+closed_date: "2026-10-31"
 ---
 
 # Context: 20261031180836-7529c085-plugin-release-contract-v2
@@ -84,9 +85,22 @@ Spec requirements served: documentation describes the new layout.
 **Token estimate**: ~15k
 **Agent strategy**: single agent.
 
+### Task: Name the plugin handshake cookie XCL_PLUGIN
+
+Spec requirements served: local plugins run from a command (the handshake a hand-written plugin checks), and the existing plugins are re-released.
+
+- `plugins/grpc_plugin.go:89-92` — `MagicCookieKey: "XCL_PLUGIN"`, value `xcl` unchanged, `ProtocolVersion: 1` unchanged. Host (`plugins/grpc_plugin_host.go:103`) and server (`plugins/serve.go:23`) both use `HandshakeConfig`, so this is the only code change.
+- Search the repo for `HCLCONFIG` and fix any test, fixture or doc that names it (at planning time only grpc_plugin.go did). Fixture plugins under `internal/test_fixtures` and `bindings/libxcl/testdata` are rebuilt from source by the tests, so they follow automatically.
+- Tests: the existing external-plugin and GitHub-registry tests start real plugin binaries built from this module, which proves host and plugin agree. Add a test that a plugin binary started without `XCL_PLUGIN` refuses to serve (go-plugin prints its "not meant to be executed directly" message and exits non-zero), as a separate function from the positive case.
+- The `libxcl.md` design quotes the old cookie; the protocol 2 transport design revises that section, so it isn't edited here.
+- Convention: names outside the code carry the `XCL_` prefix (decisions/xcl-is-its-own-language.md).
+**Complexity**: Low
+**Token estimate**: ~8k
+**Agent strategy**: single agent.
+
 ### Task: Release xcl with the new registry
 
-Human task. Open a PR from `f-python-plugin` (or the implement branch) to `main` carrying the registry change, `ReplaceOn` (348ec83) and the nested-block fix (9e9893d). Label it `minor`, since before 1.0 a breaking change is `minor` (release-chain knowledge). Merge it. xcl's `tag.yml` pushes the tag, and `release.yml` publishes and dispatches xcl-python's `engine-bump.yml`.
+Human task. Open a PR from `f-python-plugin` (or the implement branch) to `main` carrying the registry change, `ReplaceOn` (348ec83), the nested-block fix (9e9893d) and the `XCL_PLUGIN` cookie. Label it `minor`, since before 1.0 a breaking change is `minor` (release-chain knowledge). Merge it. xcl's `tag.yml` pushes the tag, and `release.yml` publishes and dispatches xcl-python's `engine-bump.yml`.
 
 Check: the GitHub release exists for the new tag, and xcl-python has an `engine/<tag>` PR open. Note the tag; the plugin tasks bump to it.
 
@@ -188,6 +202,35 @@ Spec requirements served: documentation describes the new layout; users move to 
 **Token estimate**: ~25k
 **Agent strategy**: single agent. Run the site build (`npm run build`).
 
+### Task: Register a local plugin as a command
+
+Spec requirements served: local plugins run from a command.
+
+- `registry/local.go:178-183` — `RegisterExternalPlugin(command string, args ...string)` adds `Executable(command, args...)`. Update the doc comment and the package example at :61 to show `RegisterExternalPlugin("python3", "plugin.py")` alongside a binary path. Callers passing a single path (`example/plugin/main.go:237`, `bindings/libxcl/cmd/parity/main.go:200`) need no change.
+- `registry/registry.go:117-133` — rename `Executable` to the private `executablePlugin` and update its callers in `registry/local.go`, `registry/github_install.go` and the registry tests; drop it from `docs/plugins.md:321-323`. `executable.Name()`: with no arguments, `plugins.PluginBinaryName(path)` as today; with arguments, the full command line, the program and its arguments joined by spaces (spec amendment: a plugin's name is only a label in load events and errors). The GitHub registry is unaffected, because `githubPlugin.Name()` (registry/github_install.go:30) names by repository.
+- `proto/xcl/core/v1/core.proto:206-212` — add `message ExternalPlugin { repeated string command = 1; }`; in `LocalRegistry`, retire field 3 by reserving both its number and its name (`reserved 3; reserved "external_plugins";`), since CI's `buf breaking` refuses a removal that doesn't reserve both (gotchas/buf-field-no-delete.md in the xcl store); this is to satisfy CI, not for compatibility, and add `repeated ExternalPlugin external_plugin_commands = 6;`. Regenerate with `make core-protos`, then run `make buf-lint` and `make buf-breaking`.
+- `coreservice/config.go:187-189` — for each entry of `GetExternalPluginCommands()`, refuse an empty command with the existing invalid-argument error style, then call `RegisterExternalPlugin(command[0], command[1:]...)`.
+- `internal/test_fixtures/plugins/launcher` (new) — a tiny Go program that execs the binary named by its first argument with the rest, passing its environment through (`syscall.Exec` on Unix; on Windows run it as a child, wire stdio and exit with its code). Build it with a `testutil` helper beside `BuildFixturePlugin` (internal/testutil/plugins.go:47).
+- Tests: `registry/local_test.go` — a command with arguments starts the fixture plugin through the launcher and its `Name()` is the full command line; a single path keeps the binary name. Root package — a Config test applies and destroys through a plugin registered as launcher plus plugin. `coreservice/config_test.go` — a command in `LocalRegistry` starts the plugin; an empty command is refused (separate function).
+- Docs — `docs/plugins.md:330-345`, `docs/plugin-layout.md:59` and `README.md:161`: show the command form beside the binary path. Reference docs only; the guide to writing a non-Go plugin is a follow-up spec.
+- go-plugin notes for whoever writes a Python plugin by hand: the host sets `XCL_PLUGIN=xcl` (plugins/grpc_plugin.go:89-92, renamed in milestone 1); the plugin serves `PluginService` from `plugins/plugin.proto` and the gRPC health service with service name `plugin` reporting SERVING, then prints `1|<app protocol version>|tcp|127.0.0.1:<port>|grpc` on stdout. The log and state callbacks go through go-plugin's broker and are unavailable without it.
+**Complexity**: Medium
+**Token estimate**: ~30k
+**Agent strategy**: single agent, sequential: the registry and naming first, then the proto and core service, then the docs.
+
+### Task: Register a local plugin as a command from Python
+
+Spec requirements served: local plugins run from a command.
+
+- `xcl-python:xcl/registry.py:42,82-84,104` — `_external_plugins: list[list[str]]`. `register_external_plugin(command)` accepts `str | os.PathLike[str]` (a one-word command) or a non-string sequence of them (`os.fspath` each); refuse an empty sequence with the SDK's existing error type for bad registrations. `_to_proto` sends `external_plugin_commands=[core_pb2.ExternalPlugin(command=c) for c in ...]`. Check whether the asyncio API has its own registry, and change it the same way if so.
+- Build against the local xcl checkout: `make` targets with `XCL_SRC=../xcl` regenerate the protos and build `libxcl` and `xcl-core` from source (Makefile:1-45). Don't bump `xcl-ref.txt`; the engine bump comes with an xcl release.
+- Tests: a unit test for each accepted form and for the empty-sequence refusal (separate functions). An integration test registers `[sys.executable, <launcher.py>, <fixture plugin>]`, where `launcher.py` is a test helper that `os.execv`s its argument (child process plus exit code on Windows), and applies through it in the sync and the asyncio API. Existing `register_external_plugin(path)` tests stay unchanged.
+- `xcl-python:README.md` — the registering-plugins section shows `register_external_plugin(["python3", "plugin.py"])` beside a path.
+- Leave the work on its branch: it can't merge until an xcl release with the proto change is pinned in `xcl-ref.txt` (see the plan's open questions).
+**Complexity**: Low
+**Token estimate**: ~20k
+**Agent strategy**: single agent. Run the suite with the local engine built from `XCL_SRC`.
+
 ## Testing Strategy
 
 Per task:
@@ -199,6 +242,7 @@ Per task:
 - **Template, Docker and test plugins:** existing provider `Changed` tests unchanged and passing, plus e2e suites and CI `dist` jobs.
 - **Python SDK:** integration suite against the new test-plugin release.
 - **Website:** site build plus a manual page review.
+- **Local commands:** registry, root-package and coreservice tests through a launcher fixture; Python SDK unit and integration tests built against the local xcl checkout.
 
 **Tests in xcl:**
 
@@ -272,7 +316,9 @@ Per task:
 ## Migration Notes
 
 - **No backwards compatibility.** Once xcl is released, applications pinning an old-layout plugin release fail to load it with `ErrPluginNotFound` ("not a plugin release in the supported layout"). Applications must move their pins to the new releases (docker v0.4.0, test v0.3.0).
+- **Breaking changes are expected** (xcl isn't stable yet). Plugins built against an earlier xcl check `HCLCONFIG_PLUGIN` and won't start under the new host, and SDKs built against the old CoreService proto must be regenerated. The Docker and test plugins are rebuilt here, and the Python SDK regenerates its stubs from xcl.
 - **Existing cache entries** under `~/.xcl/cache/plugins` for old-layout releases are never read again; an old tag pin fails before the cache is consulted. Nothing is pruned, as today.
+- **CoreService field 3 is reserved.** `LocalRegistry.external_plugins` (strings) is replaced by `external_plugin_commands` (commands).
 - **Release order:** xcl, then the template, Docker and test plugin releases, then the xcl example, xcl-python pins and the website.
 
 ## Performance Considerations

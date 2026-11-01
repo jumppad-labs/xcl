@@ -1,6 +1,7 @@
 ---
 created_date: "2026-10-31"
-document_status: draft
+document_status: final
+closed_date: "2026-10-31"
 ---
 
 # Research: 20261031180836-7529c085-plugin-release-contract-v2
@@ -104,8 +105,8 @@ document_status: draft
 - **Rejected**: Config-based decoding (import cycle), new parser options, a dual old/new path (no backwards compatibility).
 
 ### Executable gains optional arguments (architecture)
-- **Decision**: `registry.Executable(path string, args ...string)`, which is source-compatible, so the manifest's `command` arguments reach the process.
-- **Rationale**: the design allows arguments in `command`. Variadic arguments break no caller.
+- **Decision**: `registry.Executable(path string, args ...string)`, so the manifest's `command` arguments reach the process.
+- **Rationale**: the design allows arguments in `command`, and variadic arguments let a bare path stay the simplest call.
 - **Rejected**: refusing manifests with arguments (would contradict the design).
 
 ### Conventions selected (architecture)
@@ -114,7 +115,7 @@ document_status: draft
 
 ### Which sentinel each failure wraps (data_structures)
 - **Decision**: ErrPluginNotFound for no index, no build for this platform, and container-only releases. ErrPluginVerification for signature, incomplete index, expression, checksum, manifest and protocol failures.
-- **Rationale**: matches today's split (a missing archive is not-found; a missing checksums file or a mismatch is verification), so applications matching them keep working.
+- **Rationale**: matches today's split (a missing archive is not-found; a missing checksums file or a mismatch is verification), so no new public error types are needed.
 - **Rejected**: a new sentinel per failure (more public surface, no consumer asking for it).
 
 ### Release versions (tasks)
@@ -130,6 +131,36 @@ document_status: draft
 ### Changelog written by the implement workflow (tasks)
 - **Decision**: no task edits CHANGELOG.md; the implement workflow's changelog step writes the entry.
 - **Rationale**: CHANGELOG.md sections are per spec, which matches the workflow-owned changelog store.
+
+### Run a plugin from source (revision after the walkthrough)
+- **Decision**: the plan ends with milestone 4. `Local.RegisterExternalPlugin(command string, args ...string)`, a CoreService `ExternalPlugin` command message, and the Python SDK's `register_external_plugin` accepting a path or a list. No release task: the Python change is built against the local xcl checkout and merges once a later xcl release is pinned.
+- **Rationale**: the user asked for the plan to "end with source" so they can hand-build a Python plugin and get a feel for the API, and chose running a plugin from a command over reordering the releases. The example Python plugin repo and its docs are follow-up specs in the epic.
+- **Rejected**: a hand-written Python example in this plan (the user moved it to its own spec); a `cwd` option (the design rules it out); a new Go function beside `RegisterExternalPlugin` (one function with variadic arguments is simpler).
+
+### A plugin started from a command is named after its last argument (revision)
+- **Decision**: `executable.Name()` is the binary name with no arguments, and the last argument's base name without its extension otherwise.
+- **Rationale**: the name only appears in load events and errors (internal/catalog/catalog.go:830-860), and `python3` for every Python plugin would be useless there. GitHub plugins are named by repository (registry/github_install.go:30), so a manifest command with arguments isn't affected.
+- **Rejected**: naming by the program (every Python plugin is `python3`); a name parameter (more API for a log label).
+
+### A plugin started from a command is named by its full command line (revision, 2026-11-01)
+- **Decision**: `executable.Name()` is the binary name with no arguments, and the full command line (the program and its arguments joined by spaces) otherwise. `Executable` becomes private, since the local registry's command form replaces it and nothing outside the `registry` package calls it. The spec's naming criterion was amended to match.
+- **Rationale**: the name is only a label in load events and errors (internal/catalog/catalog.go:846). The last-argument rule is a guess that breaks on commands such as `npx some-plugin --verbose`, while the full command line always says exactly what failed to start. A public `Executable` built a `registry.Plugin` that no public method accepted.
+- **Rejected**: the last-argument rule above (superseded); keeping `Executable` public with a `Local.Register(Plugin)` method (two ways to do one thing, for third-party registries nobody has written); container plugins as commands (`docker run` doesn't fit go-plugin's host socket, pull-by-digest or stop semantics; they need their own registry and design).
+
+### The Python SDK accepts a path or a list (revision)
+- **Decision**: `register_external_plugin` takes a path (a one-word command) or a sequence.
+- **Rationale**: simplicity for the developer, not compatibility: a compiled plugin is just a path, so making it a one-item list adds noise. Go's variadic form reads the same way.
+- **Rejected**: list-only, as `python-plugins.md` sketches (a single binary would need wrapping in a list).
+
+### Rename the handshake cookie to XCL_PLUGIN (revision)
+- **Decision**: a milestone 1 task renames go-plugin's magic cookie key from `HCLCONFIG_PLUGIN` to `XCL_PLUGIN`, before the xcl release.
+- **Rationale**: the user: "XCL_PLUGIN HCLCONFIG does not exist". Hand-written plugins will check this name, so it should be right before anyone writes one.
+- **Rejected**: renaming later (every plugin built in between would need rebuilding again); accepting both names (go-plugin takes a single cookie key).
+
+### Breaking changes are allowed (revision)
+- **Decision**: the spec's constraint "the registry's public API doesn't change" is replaced by "breaking changes are allowed". Nothing is kept only for compatibility.
+- **Rationale**: the user: "I don't care about breaking changes, we are not released".
+- **Effect on the plan**: no task changes. Choices that had been justified by compatibility are kept on simplicity grounds: `Executable` and `RegisterExternalPlugin` take variadic arguments, the Python SDK takes a path or a list, and the two existing error sentinels are reused. The CoreService field is still retired by reserving it, because CI's `buf breaking` requires that. Unknown package kinds are still ignored, because that is the design's rule for releases made after this one.
 
 ## Rehydration cues
 

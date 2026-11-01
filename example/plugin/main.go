@@ -232,8 +232,14 @@ func newConfig(handler xcl.EventHandler, dockerPlugin, stateDir string) (*xcl.Co
 	// Init, and the external plugin binary. Registering only records a
 	// plugin, each is loaded, and the binary started, by the first operation
 	// that needs plugins.
+
 	local := registry.NewLocal()
 	local.RegisterPlugin(&template.TemplatePlugin{})
+
+	// run the plugin from source
+	//local.RegisterExternalPlugin("go", "-C", "./plugins/docker", "run", "./cmd/docker")
+
+	// run the compiled plugin
 	local.RegisterExternalPlugin(dockerPlugin)
 
 	return xcl.NewConfig(

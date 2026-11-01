@@ -54,3 +54,4 @@ own, so it is not bound by HCL's or Terraform's choices.
 - **Modules are encapsulated.** Configuration reaches into a module only through its outputs.
 - **Functions** come from three places: built-ins, functions an application registers (like types), and functions plugins host. All are evaluated while configuration is read.
 - **Environment overrides** use the `XCL_VAR_` prefix.
+- **Names outside the code carry the `XCL_` prefix.** Environment variables and the plugin handshake cookie (`XCL_PLUGIN=xcl`) are named for XCL. `HCLCONFIG` is a leftover from before the project was XCL and is never used for a new name; any remaining use is renamed.
