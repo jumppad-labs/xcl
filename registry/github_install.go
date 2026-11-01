@@ -34,8 +34,8 @@ func (p *githubPlugin) Name() string {
 }
 
 // Start installs the plugin, or finds it in the cache, verifies it and starts
-// it, returning the host Executable starts for the cached binary with the
-// arguments its manifest names. A plugin that cannot be installed or verified
+// it, returning the host started for the cached binary with the arguments
+// its manifest names. A plugin that cannot be installed or verified
 // is never started, and the error is a PluginInstallError naming the
 // repository, version and platform.
 func (p *githubPlugin) Start(emit events.Emit) (plugins.PluginHost, error) {
@@ -49,7 +49,7 @@ func (p *githubPlugin) Start(emit events.Emit) (plugins.PluginHost, error) {
 		}
 	}
 
-	return Executable(binary, args...).Start(emit)
+	return executablePlugin(binary, args...).Start(emit)
 }
 
 // install returns the path of the plugin's verified binary in the cache and

@@ -21,7 +21,7 @@ func startRecordArgs(t *testing.T, args ...string) string {
 	recorded := filepath.Join(t.TempDir(), "args")
 	t.Setenv("XCL_RECORD_ARGS", recorded)
 
-	host, err := Executable(binary, args...).Start(nil)
+	host, err := executablePlugin(binary, args...).Start(nil)
 	require.Error(t, err)
 	require.Nil(t, host)
 

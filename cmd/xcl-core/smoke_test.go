@@ -452,7 +452,7 @@ func TestExternalPluginDoesNotReadFrames(t *testing.T) {
 
 	handle := e.createConfig(&corepb.CreateConfigRequest{
 		Registries: []*corepb.Registry{{Kind: &corepb.Registry_Local{Local: &corepb.LocalRegistry{
-			ExternalPlugins: []string{plugin},
+			ExternalPluginCommands: []*corepb.ExternalPlugin{{Command: []string{plugin}}},
 		}}}},
 		StateStore: &corepb.StateStore{Kind: &corepb.StateStore_Path{Path: stateDir}},
 	})

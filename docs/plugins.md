@@ -319,9 +319,8 @@ a `Name()`, declares plain Go types through `Types() []registry.Type` (nil for
 a registry with none) and provides plugins through `Plugins(ctx, emit)`, and a
 `Plugin`, which starts itself and returns the
 `plugins.PluginHost` xcl talks to it through. `registry.InProcess(p)` starts a
-compiled-in plugin with the direct host, and `registry.Executable(path)` starts
-a plugin binary over gRPC. Third parties write registries of their own against
-the same interfaces.
+compiled-in plugin with the direct host. Third parties write registries of
+their own against the same interfaces.
 
 The local registry, [`registry/local.go`](../registry/local.go), takes no
 logger, and registering only records:
@@ -332,13 +331,18 @@ registry.Register[resources.Deployment](local, "deployment")
 local.RegisterFunction("slugify", slugify)
 local.RegisterPlugin(&template.TemplatePlugin{})
 local.RegisterExternalPlugin("./bin/xcl-plugin-docker")
+local.RegisterExternalPlugin("python3", "plugin.py")
 local.RegisterPluginDirectory("~/.xcl/plugins")
 ```
 
 `registry.Register` declares a Go type, `RegisterFunction` offers a Go func
 to configuration (see [Application functions](#application-functions)),
 `RegisterPlugin` is for in-process plugins, `RegisterExternalPlugin` for a
-gRPC plugin binary, and `RegisterPluginDirectory` for a directory to search
+gRPC plugin xcl starts as a separate process, either a plugin binary on its
+own or a command, a program and its arguments such as an interpreter and a
+script. A plugin started from a binary is named after the binary in load
+events and errors, one started from a command by its whole command line.
+`RegisterPluginDirectory` is for a directory to search
 for executables named like the registry's pattern, `xcl-plugin-*` unless the
 registry was created with `registry.NewLocal(registry.PluginPattern("acme-plugin-*"))`.
 A directory that does not exist provides no plugins.
@@ -379,8 +383,8 @@ over the index against the registry's current trusted keys when any are
 given, the index again, the zip against its checksum in the index, the zip's
 manifest against the index, and the extracted binary against its copy in the
 zip. Only then does it return
-`registry.Executable(binary, args...).Start(emit)`, the ordinary
-external-plugin host started with the command the manifest names, so every
+the ordinary external-plugin host started with the command the manifest
+names, so every
 start of the plugin is verified and the catalog restarts it as any other.
 Because the work happens in `Start`, every failure reaches the application as
 a `*xcl.PluginLoadError` naming the plugin and `github.com`, wrapping a

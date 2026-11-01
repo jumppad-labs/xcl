@@ -204,11 +204,23 @@ message Registry {
 }
 
 message LocalRegistry {
-  string plugin_pattern = 1;                 // registry.PluginPattern, empty keeps the default
-  repeated DeclaredType types = 2;           // registry.TypeFromSchema + RegisterType
-  repeated string external_plugins = 3;      // RegisterExternalPlugin
-  repeated string plugin_directories = 4;    // RegisterPluginDirectory
-  repeated DeclaredFunction functions = 5;   // host-language functions, RegisterFunction
+  // external_plugins, a path per plugin, was replaced by
+  // external_plugin_commands
+  reserved 3;
+  reserved "external_plugins";
+
+  string plugin_pattern = 1;                                // registry.PluginPattern, empty keeps the default
+  repeated DeclaredType types = 2;                          // registry.TypeFromSchema + RegisterType
+  repeated string plugin_directories = 4;                   // RegisterPluginDirectory
+  repeated DeclaredFunction functions = 5;                  // host-language functions, RegisterFunction
+  repeated ExternalPlugin external_plugin_commands = 6;     // RegisterExternalPlugin
+}
+
+// ExternalPlugin is an external plugin xcl starts as a separate process by
+// running its command: a plugin binary on its own, or a program and its
+// arguments, such as an interpreter and a script.
+message ExternalPlugin {
+  repeated string command = 1; // the program, then its arguments, never empty
 }
 
 // DeclaredType is a config-only block type the host defines, as a schema v1

@@ -7,17 +7,18 @@
 //
 // The package ships the local registry, NewLocal, which holds Go types
 // declared with RegisterType, functions registered with RegisterFunction,
-// plugins compiled into the program, plugin binaries and directories of
-// plugin binaries, and the two ways of starting a plugin it needs: InProcess
-// and Executable. It also ships the GitHub
-// registry, NewGitHub, which installs plugins from GitHub releases into a
-// local cache, verifies them and starts them as plugin binaries. Third parties write registries
-// and plugin starters of their own against the same interfaces.
+// plugins compiled into the program, external plugins run from a command and
+// directories of plugin binaries. It also ships the GitHub registry,
+// NewGitHub, which installs plugins from GitHub releases into a local cache,
+// verifies them and starts them as plugin binaries. Third parties write
+// registries of their own against the same interfaces, starting compiled-in
+// plugins with InProcess.
 package registry
 
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jumppad-labs/xcl/events"
 	"github.com/jumppad-labs/xcl/plugins"
@@ -110,23 +111,29 @@ func (p inProcess) Start(emit events.Emit) (plugins.PluginHost, error) {
 	return plugins.NewDirectPluginHost(emit, nil, p.plugin)
 }
 
-// Executable returns a Plugin for the plugin binary at path, started with
-// args. It is started as a separate process over gRPC, and is known by the
-// binary's file name. A path that does not exist is not checked here, it
-// fails when the plugin is started.
-func Executable(path string, args ...string) Plugin {
+// executablePlugin returns a Plugin for the program at path, started with
+// args. It is started as a separate process over gRPC. A path that does not
+// exist is not checked here, it fails when the plugin is started.
+func executablePlugin(path string, args ...string) Plugin {
 	return executable{path: path, args: args}
 }
 
-// executable starts a plugin binary as a process over gRPC
+// executable starts a program as a plugin process over gRPC
 type executable struct {
 	path string
 	args []string
 }
 
-// Name returns the binary's file name, without a Windows .exe extension
+// Name returns the binary's file name, without a Windows .exe extension, for
+// a plugin started without arguments, and otherwise the whole command line,
+// since the program alone, such as python3, says nothing about the plugin.
+// The name only labels the plugin in load events and errors.
 func (p executable) Name() string {
-	return plugins.PluginBinaryName(p.path)
+	if len(p.args) == 0 {
+		return plugins.PluginBinaryName(p.path)
+	}
+
+	return strings.Join(append([]string{p.path}, p.args...), " ")
 }
 
 // Start runs the binary with its arguments and connects to it. The host it returns can stop and

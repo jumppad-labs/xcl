@@ -53,10 +53,12 @@ func main() {
 }
 ```
 
-which an application registers by its binary:
+which an application registers by its binary, or by a command that runs it,
+such as `go run` while developing:
 
 ```go
 local.RegisterExternalPlugin("./build/xcl-plugin-template")
+local.RegisterExternalPlugin("go", "run", "./cmd/notes")
 ```
 
 In the template, the plugin is `notes`, so the tree is `plugin.go`,
