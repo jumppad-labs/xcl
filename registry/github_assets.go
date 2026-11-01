@@ -9,9 +9,10 @@ import (
 
 // This file is the one place that knows the names version 2 of the plugin
 // release asset contract fixes: the plugin's name and version, and the names
-// of the release's index and its signature. The zips' names are taken from
-// the index, never computed. The rest of the GitHub registry asks it for
-// names rather than building them.
+// of the release's index and its signature. The plugin's author separates the
+// parts of the asset names with _ or -, so the index has one of two names.
+// The zips' names are taken from the index, never computed. The rest of the
+// GitHub registry asks it for names rather than building them.
 
 // exactTag matches one exact release tag, v<major>.<minor>.<patch> with an
 // optional pre-release suffix, the only form a plugin may be pinned to
@@ -37,16 +38,23 @@ func releaseVersion(tag string) string {
 	return strings.TrimPrefix(tag, "v")
 }
 
-// indexName is the name of the index of the release of repository at tag,
-// <name>_<version>_index.xcl
-func indexName(repository, tag string) string {
-	return fmt.Sprintf("%s_%s_index.xcl", pluginName(repository), releaseVersion(tag))
+// indexNames are the names the index of the release of repository at tag may
+// have, <name>_<version>_index.xcl or <name>-<version>-index.xcl, whichever
+// separator the plugin's author chose. A release has exactly one of them.
+func indexNames(repository, tag string) []string {
+	name := pluginName(repository)
+	version := releaseVersion(tag)
+
+	return []string{
+		fmt.Sprintf("%s_%s_index.xcl", name, version),
+		fmt.Sprintf("%s-%s-index.xcl", name, version),
+	}
 }
 
-// indexSignatureName is the name of the detached signature over the index of
-// the release of repository at tag
-func indexSignatureName(repository, tag string) string {
-	return indexName(repository, tag) + ".sig"
+// signatureName is the name of the detached signature over the index named
+// index
+func signatureName(index string) string {
+	return index + ".sig"
 }
 
 // platform is an operating system and architecture a plugin is built for

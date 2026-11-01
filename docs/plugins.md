@@ -410,7 +410,12 @@ Cache hits, downloads and verification are reported as `load` log events.
 The release layout it installs is version 2 of the plugin release asset
 contract. The tag is `v<major>.<minor>.<patch>` with an optional pre-release
 suffix, `<name>` is the repository name and `<version>` the tag without its
-`v`. A release holds:
+`v`. The parts of each asset name are separated by `_`, as below, or by `-`
+(`<name>-<version>-index.xcl`), whichever the plugin's author prefers. A
+release should use one separator throughout, though the registry doesn't
+check: it looks for the index under either name and refuses a release that
+has both, takes the signature's name from the index's, and takes each zip's
+name from the index. A release holds:
 
 - `<name>_<version>_index.xcl`, required: the plugin's `name` and `version`,
   and the package kinds the release offers. An `executable` block lists its

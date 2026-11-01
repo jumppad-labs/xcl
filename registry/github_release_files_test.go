@@ -101,16 +101,26 @@ func mustReadManifest(t *testing.T, src string) *buildManifest {
 	return manifest
 }
 
-func TestIndexNameFollowsContract(t *testing.T) {
-	require.Equal(t, "xcl-plugin-widget_1.0.0_index.xcl", indexName("acme/xcl-plugin-widget", "v1.0.0"))
+func TestIndexNamesAreTheUnderscoreThenTheHyphenName(t *testing.T) {
+	require.Equal(t, []string{
+		"xcl-plugin-widget_1.0.0_index.xcl",
+		"xcl-plugin-widget-1.0.0-index.xcl",
+	}, indexNames("acme/xcl-plugin-widget", "v1.0.0"))
 }
 
-func TestIndexNameKeepsPreReleaseSuffix(t *testing.T) {
-	require.Equal(t, "xcl-plugin-widget_1.2.0-rc.1_index.xcl", indexName("acme/xcl-plugin-widget", "v1.2.0-rc.1"))
+func TestIndexNamesKeepPreReleaseSuffix(t *testing.T) {
+	require.Equal(t, []string{
+		"xcl-plugin-widget_1.2.0-rc.1_index.xcl",
+		"xcl-plugin-widget-1.2.0-rc.1-index.xcl",
+	}, indexNames("acme/xcl-plugin-widget", "v1.2.0-rc.1"))
 }
 
-func TestIndexSignatureNameFollowsContract(t *testing.T) {
-	require.Equal(t, "xcl-plugin-widget_1.0.0_index.xcl.sig", indexSignatureName("acme/xcl-plugin-widget", "v1.0.0"))
+func TestSignatureNameOfUnderscoreIndexAddsSig(t *testing.T) {
+	require.Equal(t, "xcl-plugin-widget_1.0.0_index.xcl.sig", signatureName("xcl-plugin-widget_1.0.0_index.xcl"))
+}
+
+func TestSignatureNameOfHyphenIndexAddsSig(t *testing.T) {
+	require.Equal(t, "xcl-plugin-widget-1.0.0-index.xcl.sig", signatureName("xcl-plugin-widget-1.0.0-index.xcl"))
 }
 
 func TestReadIndexDecodesValidIndex(t *testing.T) {

@@ -15,10 +15,11 @@ import (
 )
 
 // This file reads the two files version 2 of the plugin release asset
-// contract defines: a release's index, <name>_<version>_index.xcl, and the
-// manifest at the root of each executable zip, xcl-plugin.xcl. The installer
-// and the verifier ask it what a release offers and whether a build agrees
-// with it; nothing else in the registry parses either file.
+// contract defines: a release's index, <name>_<version>_index.xcl or
+// <name>-<version>-index.xcl, and the manifest at the root of each executable
+// zip, xcl-plugin.xcl. The installer and the verifier ask it what a release
+// offers and whether a build agrees with it; nothing else in the registry
+// parses either file.
 //
 // Both are static xcl metadata files. They are decoded with xcl's own
 // decoder into fixed Go structs and no evaluation context, so a variable,

@@ -11,7 +11,7 @@ with its entity type in
 providers are hosted and registered, see [Plugin Architecture](plugins.md).
 For where a plugin's entity types, providers and clients live, see
 [Plugin Layout](plugin-layout.md); to start a plugin of your own, use the
-[plugin template](https://github.com/jumppad-labs/xcl-plugin-template).
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template-go).
 
 ## The contract
 
@@ -1024,7 +1024,7 @@ entity. See
 For a whole plugin laid out as [Plugin Layout](plugin-layout.md) describes,
 with an explicit `Changed`, an `Update` that acts only on the changes it is
 given and strict-double unit tests, see the
-[plugin template](https://github.com/jumppad-labs/xcl-plugin-template).
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template-go).
 
 [`plugins/example/pkg/person/provider.go`](../plugins/example/pkg/person/provider.go)
 follows everything in this guide:

@@ -726,3 +726,47 @@ func TestBuildFixturePluginBuildsNamedBinary(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, info.IsDir())
 }
+
+func TestFakeReleaseWithHyphenSeparatorNamesEveryAssetWithHyphens(t *testing.T) {
+	fake := newTestRelease(t, WithSeparator("-"))
+
+	release := fetchRelease(t, fake)
+
+	require.ElementsMatch(t, []string{
+		"xcl-plugin-widget-1.0.0-linux-amd64.zip",
+		"xcl-plugin-widget-1.0.0-linux-arm64.zip",
+		"xcl-plugin-widget-1.0.0-darwin-amd64.zip",
+		"xcl-plugin-widget-1.0.0-darwin-arm64.zip",
+		"xcl-plugin-widget-1.0.0-windows-amd64.zip",
+		"xcl-plugin-widget-1.0.0-windows-arm64.zip",
+		"xcl-plugin-widget-1.0.0-index.xcl",
+		"xcl-plugin-widget-1.0.0-index.xcl.sig",
+	}, release.names())
+}
+
+func TestFakeReleaseWithHyphenSeparatorNamesMatchContract(t *testing.T) {
+	fake := newTestRelease(t, WithSeparator("-"))
+
+	require.Equal(t, "xcl-plugin-widget-1.0.0-linux-amd64.zip", fake.ZipName("linux", "amd64"))
+	require.Equal(t, "xcl-plugin-widget-1.0.0-index.xcl", fake.IndexName())
+	require.Equal(t, "xcl-plugin-widget-1.0.0-index.xcl.sig", fake.SignatureName())
+}
+
+func TestFakeReleaseWithHyphenSeparatorIndexNamesHyphenatedZips(t *testing.T) {
+	fake := newTestRelease(t, WithSeparator("-"))
+
+	index := string(download(t, fake, fake.IndexName()))
+
+	require.Contains(t, index, `"xcl-plugin-widget-1.0.0-linux-amd64.zip"`)
+	require.NotContains(t, index, `"xcl-plugin-widget_1.0.0_linux_amd64.zip"`)
+}
+
+func TestFakeReleaseWithBothIndexesAttachesTheIndexUnderBothNames(t *testing.T) {
+	fake := newTestRelease(t, WithBothIndexes())
+
+	release := fetchRelease(t, fake)
+
+	require.Contains(t, release.names(), "xcl-plugin-widget_1.0.0_index.xcl")
+	require.Contains(t, release.names(), "xcl-plugin-widget-1.0.0-index.xcl")
+	require.Equal(t, fake.Index(), download(t, fake, "xcl-plugin-widget-1.0.0-index.xcl"))
+}

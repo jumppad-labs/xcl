@@ -184,7 +184,7 @@ gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v0.2.0")
 ```
 
 **Writing a plugin.** Start from the
-[plugin template](https://github.com/jumppad-labs/xcl-plugin-template), a
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template-go), a
 GitHub template repository with one working entity type that runs both
 in-process and as a separate program, tests against strict doubles and
 publishes signed releases the GitHub registry installs. It follows the

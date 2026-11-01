@@ -246,3 +246,39 @@ func TestGitHubPluginStartRefusesCachedEntryWithAlteredIndex(t *testing.T) {
 	require.ErrorIs(t, err, xclerrors.ErrPluginVerification)
 	require.ErrorContains(t, err, "does not verify against any trusted key")
 }
+
+func TestGitHubPluginStartWithTrustedKeyStartsSignedHyphenatedRelease(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithSeparator("-"))
+	gh := newSignatureTestRegistry(t, fake.URL(), t.TempDir(), fake.PublicKey())
+	plugin := widgetPlugin(t, gh)
+
+	host, err := plugin.Start(nil)
+	require.NoError(t, err)
+	require.NotNil(t, host)
+	t.Cleanup(host.Stop)
+}
+
+func TestGitHubPluginStartWithTrustedKeyRefusesHyphenatedReleaseSignedByOtherKey(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithSeparator("-"), testutil.SignedByOtherKey())
+	cache := t.TempDir()
+	gh := newSignatureTestRegistry(t, fake.URL(), cache, fake.PublicKey())
+	plugin := widgetPlugin(t, gh)
+
+	host, err := plugin.Start(nil)
+	require.Error(t, err)
+	require.Nil(t, host)
+	require.ErrorIs(t, err, xclerrors.ErrPluginVerification)
+	require.NoDirExists(t, hostEntryDirectory(cache))
+}
+
+func TestGitHubPluginStartWithTrustedKeyRefusesUnsignedHyphenatedRelease(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithSeparator("-"), testutil.WithoutSignature())
+	gh := newSignatureTestRegistry(t, fake.URL(), t.TempDir(), fake.PublicKey())
+	plugin := widgetPlugin(t, gh)
+
+	host, err := plugin.Start(nil)
+	require.Error(t, err)
+	require.Nil(t, host)
+	require.ErrorIs(t, err, xclerrors.ErrPluginVerification)
+	require.ErrorContains(t, err, "not signed")
+}
