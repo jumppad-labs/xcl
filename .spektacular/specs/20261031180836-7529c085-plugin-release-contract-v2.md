@@ -10,6 +10,9 @@ amendments:
     - at: "2026-11-01T08:34:57Z"
       sections: [Acceptance Criteria]
       hash: sha256:1f7f48a38b91874c1238d2461700710f14467ffd69a327783063b72e06bbbd32
+    - at: "2026-11-01T10:29:30Z"
+      design: {source: design, path: plugin-release-assets-v2.md}
+      hash: sha256:d5f6fe5d7d179eaf40ddf5071a6eda8e80b1340e92850ad68cbda3d280d6d1f5
 ---
 
 # Feature: 20261031180836-7529c085-plugin-release-contract-v2
@@ -209,3 +212,5 @@ Plugins installed from GitHub releases move to a new release layout that works f
 
 - **2026-11-01: Acceptance Criteria** (interactive implement run, task Register a local plugin as a command)
   A plugin's name is only a label in load events and errors; the last-argument rule is a guess that fails for commands such as npx some-plugin --verbose, while the full command line is always accurate
+- **2026-11-01: design design:plugin-release-assets-v2.md** (interactive implement run, before task Publish a template release in the new layout)
+  The design fixed _ as the only separator in asset names, which mixes - and _ when the repository name contains hyphens (xcl-plugin-template-go_0.1.0_index.xcl). The user approved letting the plugin author choose _ or -: the registry finds the index as <name>_<version>_index.xcl or <name>-<version>-index.xcl, refuses a release holding both, and does not check that a release uses one separator throughout.

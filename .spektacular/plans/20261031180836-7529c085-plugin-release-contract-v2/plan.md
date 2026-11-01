@@ -368,7 +368,7 @@ Rename the environment variable the host sets when it starts an external plugin,
 - [x] The host starts external plugins with `XCL_PLUGIN=xcl`, and a plugin built from this xcl serves only when it is set.
 - [x] No code, test or repository doc in xcl names `HCLCONFIG_PLUGIN` (the `libxcl.md` design is revised by the protocol 2 transport design).
 
-#### - [ ] Task: Release xcl with the new registry
+#### - [x] Task: Release xcl with the new registry
 **Id:** 58dc2f75-6b38-4013-827e-d4b6af4e8c52
 **Repo:** xcl
 **Depends on:**
@@ -382,8 +382,8 @@ Merge the branch carrying the new registry, `ReplaceOn`, the nested-block fix an
 *Technical detail:* [context.md#task-release-xcl-with-the-new-registry](./context.md#task-release-xcl-with-the-new-registry)
 
 **Acceptance criteria**:
-- [ ] An xcl release containing the new registry, `ReplaceOn` and the nested-block fix is published on GitHub.
-- [ ] The Python SDK's engine bump to that release has been opened.
+- [x] An xcl release containing the new registry, `ReplaceOn` and the nested-block fix is published on GitHub.
+- [x] The Python SDK's engine bump to that release has been opened.
 
 ### Milestone 2: Plugin authors publish releases in the new layout
 
@@ -391,7 +391,7 @@ Merge the branch carrying the new registry, `ReplaceOn`, the nested-block fix an
 
 **Validation point**: each plugin repo's CI (tests, e2e and the `dist` build) is green on the xcl release from milestone 1. Each plugin's new release is published, and xcl's opt-in live test installs the test plugin's new release, verified against the jumppad-labs key.
 
-#### - [ ] Task: Publish releases in the new layout from the plugin template
+#### - [x] Task: Publish releases in the new layout from the plugin template
 **Id:** bc7d2bfe-aec4-4314-a880-e1320ae7cd0a
 **Repo:** xcl-plugin-template
 **Depends on:**
@@ -403,16 +403,64 @@ Change the template's release build to produce a zip per platform with a generat
 *Technical detail:* [context.md#task-publish-releases-in-the-new-layout-from-the-plugin-template](./context.md#task-publish-releases-in-the-new-layout-from-the-plugin-template)
 
 **Acceptance criteria**:
-- [ ] The release build produces one zip per supported platform, each with its manifest and an executable binary, and an index whose checksums match the zips.
-- [ ] The release workflow signs the index and publishes the index, its signature and the zips.
-- [ ] The note provider answers replace and update for exactly the same changes as before.
-- [ ] The README describes the new release layout and no longer describes the old one.
+- [x] The release build produces one zip per supported platform, each with its manifest and an executable binary, and an index whose checksums match the zips.
+- [x] The release workflow signs the index and publishes the index, its signature and the zips.
+- [x] The note provider answers replace and update for exactly the same changes as before.
+- [x] The README describes the new release layout and no longer describes the old one.
+
+#### - [x] Task: Find a release's index under either separator
+**Id:** f5117cfa-895f-4311-8696-96f5f04d7347
+**Repo:** xcl
+**Depends on:**
+- 1ee47308-1326-4819-b3be-ad6364436024 — Install plugins from releases in the new layout
+**Execution:** agent
+
+The design now lets a plugin author separate the parts of asset names with `_` or `-` (amended 2026-11-01). The registry looks for the index as `<name>_<version>_index.xcl` or `<name>-<version>-index.xcl`, refuses a release holding both, and treats the signature as the index's name plus `.sig`, both when installing and when re-verifying a cached plugin. It doesn't check that a release uses one separator throughout. Update the docs' asset lists.
+
+*Technical detail:* [context.md#task-find-a-releases-index-under-either-separator](./context.md#task-find-a-releases-index-under-either-separator)
+
+**Acceptance criteria**:
+- [x] A release whose assets are named with `-` installs, verifies against its signature and starts, and is verified again from the cache.
+- [x] A release whose assets are named with `_` still installs, verifies against its signature and starts.
+- [x] A release holding both an `_` index and a `-` index is refused before any build is downloaded.
+- [x] xcl's docs say either separator may be used.
+
+#### - [x] Task: Name the template's release assets with hyphens
+**Id:** 634d6213-8606-4a17-83b5-3f5604a10c60
+**Repo:** xcl-plugin-template
+**Depends on:**
+- bc7d2bfe-aec4-4314-a880-e1320ae7cd0a — Publish releases in the new layout from the plugin template
+**Execution:** agent
+
+The repository is now `xcl-plugin-template-go`, and its name uses hyphens, so `make dist` names the index, its signature and the zips with `-` throughout. Update the README's asset names and say which xcl release first installs hyphenated releases.
+
+*Technical detail:* [context.md#task-name-the-templates-release-assets-with-hyphens](./context.md#task-name-the-templates-release-assets-with-hyphens)
+
+**Acceptance criteria**:
+- [x] `make dist` produces `<name>-<version>-index.xcl` and one `<name>-<version>-<os>-<arch>.zip` per platform, and the index names those zips with matching checksums.
+- [x] The README describes the hyphenated asset names.
+
+#### - [ ] Task: Release xcl with either separator
+**Id:** 42367878-ee15-4daf-ad60-da0359dbab5d
+**Repo:** xcl
+**Depends on:**
+- f5117cfa-895f-4311-8696-96f5f04d7347 — Find a release's index under either separator
+**Execution:** human — releasing is an action outside the repo (merging the labelled PR that tags and publishes xcl)
+
+Merge the branch carrying the separator change with the release label, so xcl's automation tags and publishes a release that installs the template's hyphenated release.
+
+*Technical detail:* [context.md#task-release-xcl-with-either-separator](./context.md#task-release-xcl-with-either-separator)
+
+**Acceptance criteria**:
+- [ ] An xcl release that finds an index under either separator is published on GitHub.
 
 #### - [ ] Task: Publish a template release in the new layout
 **Id:** 0f9236c4-3d3d-449e-9a01-d6cd28d77794
 **Repo:** xcl-plugin-template
 **Depends on:**
 - bc7d2bfe-aec4-4314-a880-e1320ae7cd0a — Publish releases in the new layout from the plugin template
+- 634d6213-8606-4a17-83b5-3f5604a10c60 — Name the template's release assets with hyphens
+- 42367878-ee15-4daf-ad60-da0359dbab5d — Release xcl with either separator
 **Execution:** human — releasing needs pushing a version tag, which runs the workflow with the signing-key secrets
 
 Push the template's next version tag so its release workflow publishes a signed release in the new layout, which the template's docs and the website pin.
@@ -708,3 +756,64 @@ Let `register_external_plugin` take a list, a program and its arguments, as well
 - `xcl: docs/plugin-layout.md`
 - `xcl: README.md`
 **Discoveries**: A test that runs `go build` (`testutil.BuildProgram`, `BuildFixturePlugin`) after `isolateHome` fills a read-only module cache under the temporary HOME and fails at TempDir cleanup, so build fixtures first (written to knowledge as `gotchas/build-fixtures-before-isolating-home.md`). Building each example module with `go build ./...` overwrites the tracked `example/remoteplugin/remoteplugin` binary, so restore it afterwards or build with `-o /dev/null`.
+
+### 2026-11-01 — Task: Release xcl with the new registry
+**What was done**: The user merged PR #40 (`f-python-plugin`) into `main` with the `minor` and `breaks-bindings` labels. xcl's automation tagged and published **v0.13.0** (merge commit 27da7d5), which carries the nested-block fix (9e9893d), `ReplaceOn` (348ec83), the v2 registry (78e1d61) and the command form of local plugins (fb3fb3c), and dispatched xcl-python's engine bump, PR #25 `engine/v0.13.0`. The plugin tasks bump to v0.13.0.
+**Deviations**: The release also carries "Register a local plugin as a command", which the plan scheduled after milestone 3. Its proto change retires `LocalRegistry.external_plugins`, so PR #40's bindings check failed and the PR merged with `breaks-bindings`. Of xcl-python's tests against v0.13.0, 244 fail because `Registry._to_proto` always sends `external_plugins`, and 15 error because the pinned test plugin v0.2.0 is in the old layout. Both are fixed on the `engine/v0.13.0` branch: the test move ("Move the Python SDK's tests and README to the new releases") and the command support ("Register a local plugin as a command from Python").
+**Files changed**:
+- None (release task)
+**Discoveries**: xcl's PR `bindings` check runs xcl-python's `main` against the PR, so a protocol field retirement can never be fixed from the Python side first. The `breaks-bindings` label is the intended way through, with the Python fix landing on the engine-bump branch.
+
+### 2026-11-01 — Task: Publish releases in the new layout from the plugin template
+**What was done**: The template's `make dist` now builds one zip per platform holding the binary, README, LICENSE and a generated `xcl-plugin.xcl` manifest, and writes `<PLUGIN>_<version>_index.xcl` listing every zip with its asset name and `sha256:` checksum. The tar.gz archives and the checksums file are gone. The release workflow signs the index instead of the checksums file and publishes `dist/*` as before. The template builds against xcl v0.13.0, and `NewNoteProvider` hands `ReplaceSettings` to `DefaultChanged` as `ReplaceOn`. The README's change-decision, release and install sections describe the new layout.
+**Deviations**: The plan said to keep the "any change → update" rule ahead of the deferral to `DefaultChanged`. Followed literally, that answers update for a `name` or `directory` change, because the `ReplaceOn` check now sits inside `DefaultChanged`. So `Changed` defers first and maps `NoChange` for a non-empty change list to `Update`, which keeps every answer as before. The one new path is an error if the resources can't be marshalled to JSON when settings changed, which is practically unreachable for `Note`. Two tests were added: the provider's `ReplaceOn` is `ReplaceSettings`, and a name change beside a content change replaces. The `Makefile` changed although it wasn't in the task's file list; the `dist` target lives there. `make lint` fails under local Go 1.27, because the pinned staticcheck v0.8.1 can't read its export data, both before and after this change. It passes with `GOTOOLCHAIN=go1.26.0`.
+**Files changed**:
+- `xcl-plugin-template: Makefile`
+- `xcl-plugin-template: .github/workflows/release.yml`
+- `xcl-plugin-template: go.mod`
+- `xcl-plugin-template: go.sum`
+- `xcl-plugin-template: providers/note.go`
+- `xcl-plugin-template: providers/note_test.go`
+- `xcl-plugin-template: README.md`
+**Discoveries**: A snapshot `make dist` read through xcl's own registry reader (readIndex, validate, choose, readManifest, agrees) is a quick end-to-end check of a plugin's release layout without publishing anything. `zip -X` on this machine keeps the binary's 0755 mode. A provider that defers to `DefaultChanged` after its own rules must defer before any catch-all "changes → update" rule, or the `ReplaceOn` settings never get a chance to answer replace.
+
+
+### 2026-11-01 — Task: Find a release's index under either separator
+
+**What was done**: The GitHub registry looks for a release's index as `<name>_<version>_index.xcl` or `<name>-<version>-index.xcl`, refuses a release (or a cache entry) holding both, and takes the signature's name from the index's name. That covers install and cache re-verification. The fake release server gained `WithSeparator` and `WithBothIndexes`, and xcl's docs say either separator may be used.
+
+**Deviations**: The plan didn't list `README.md`, `docs/README.md` or `docs/plugin-developer-guide.md`. Their template links moved to `jumppad-labs/xcl-plugin-template-go` because the repository was renamed. `docs/plugin-layout.md` now describes the template's hyphenated asset names, ahead of the template task that switches to them.
+
+**Amendments**: Design `plugin-release-assets-v2.md`, "Assets": `<sep>` is `_` or `-`, the plugin author's choice. The registry finds the index under either name, refuses a release with both, and doesn't check the separator is used consistently. This came from the user's preference not to mix `-` and `_` (a repository name with hyphens gave `xcl-plugin-template-go_0.1.0_index.xcl`), without enforcing either one. Recorded with `spec amend` against the spec's design constraint.
+
+**Files changed**:
+- `xcl: registry/github_assets.go`
+- `xcl: registry/github_install.go`
+- `xcl: registry/github_verify.go`
+- `xcl: registry/github_release_files.go`
+- `xcl: registry/github_release_files_test.go`
+- `xcl: registry/github_install_test.go`
+- `xcl: registry/github_signature_test.go`
+- `xcl: internal/testutil/github_release.go`
+- `xcl: internal/testutil/github_release_test.go`
+- `xcl: docs/plugins.md`
+- `xcl: docs/plugin-layout.md`
+- `xcl: docs/README.md`
+- `xcl: docs/plugin-developer-guide.md`
+- `xcl: README.md`
+
+**Discoveries**: The install keeps each asset under its release name in the cache entry, so re-verification finds the index by checking which of the two names exists in the entry; nothing extra is recorded. `make test-examples` rewrites the tracked `example/remoteplugin/remoteplugin` binary again (knowledge entry written). The goal check warns unless every worktree repo's diff and status are staged, including repos the task doesn't touch.
+
+### 2026-11-01 — Task: Name the template's release assets with hyphens
+
+**What was done**: The template's `make dist` names the index `<PLUGIN>-<version>-index.xcl` and each zip `<PLUGIN>-<version>-<os>-<arch>.zip`, and the index names those zips. The release workflow signs `dist/*-index.xcl`. The README lists the hyphenated names, says `_` throughout is also accepted, and says a hyphenated release needs an xcl newer than v0.13.0.
+
+**Deviations**: `Makefile` changed although the goal's file list didn't name it, since `dist` is what produces the names (the context's technical detail lists it). Before this, on PR #5, the template was renamed to `xcl-plugin-template-go` (module path, binary and asset prefix) after the user renamed the repository. xcl's GitHub registry names a plugin after its repository.
+
+**Files changed**:
+- `xcl-plugin-template: Makefile`
+- `xcl-plugin-template: .github/workflows/release.yml`
+- `xcl-plugin-template: README.md`
+
+**Discoveries**: A snapshot `make dist`, read with the xcl worktree's registry code (index lookup, validate, choose, checksum, manifest agreement), passes on all six platforms. The template's v0.1.0 release can only be installed once xcl ships the separator change.
+

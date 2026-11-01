@@ -126,9 +126,39 @@ Spec requirements served: plugin authors produce a release with one command; exi
 **Token estimate**: ~30k
 **Agent strategy**: single agent, sequential. Run `make dist VERSION=v0.0.0-snapshot` locally and inspect the index and a zip, then run `make test`.
 
+### Task: Find a release's index under either separator
+
+Design served: `plugin-release-assets-v2.md`, "Assets" (amended 2026-11-01: `<sep>` is `_` or `-`).
+
+- `registry/github_assets.go:40-50` — replace `indexName` with `indexNames(repository, tag) []string`, which returns the `_` form then the `-` form. `indexSignatureName` becomes `signatureName(index string) string`, the index's name plus `.sig`. Update the file comment, which says the separator is fixed.
+- `registry/github_install.go:145-159` — look up both names in the release. Neither found → ErrPluginNotFound, naming both. Both found → ErrPluginVerification, refused before anything is downloaded (check with `Requests()`). Then look up `signatureName(index.Name)`.
+- `registry/github_verify.go:55-67` — `checkIndex` finds the index in `dir` the same way: the one of the two names that exists. Neither → "index is missing". Both → ErrPluginVerification. It verifies against `signatureName(name)`. This covers the staging directory and the cache entry, since the install keeps each asset's release name.
+- `registry/github_release_files.go:18` — the comment names `<name>_<version>_index.xcl`.
+- `internal/testutil/github_release.go:294-305` — a `WithSeparator(sep string) FakeReleaseOption` (default `_`) used by `IndexName`, `SignatureName` and `ZipName`. Also `WithExtraIndex()` (or similar), which publishes the index under the other separator too, for the "both" refusal. Each option gets tests in `github_release_test.go`.
+- `registry/github_release_files_test.go:105-113` — tests for `indexNames` and `signatureName`.
+- `registry/github_install_test.go`, `registry/github_signature_test.go`, `registry/github_verify_test.go` — a hyphenated release installs, verifies its signature and starts; it re-verifies from the cache; one holding both indexes is refused with no build fetched. Keep the existing `_` tests as they are.
+- `docs/plugins.md:415-430`, `docs/plugin-layout.md:225-231` — say the separator is `_` or `-`, used throughout a release.
+**Complexity**: Low
+**Token estimate**: ~25k
+**Agent strategy**: single agent, sequential.
+
+### Task: Name the template's release assets with hyphens
+
+- `xcl-plugin-template:Makefile` `dist` — the zip names `$(PLUGIN)-$(DIST_VERSION)-$$os-$$arch.zip`, the index `$(DIST_DIR)/$(PLUGIN)-$(DIST_VERSION)-index.xcl`, and each platform's `asset` the hyphenated zip name. Leave the stage directory alone.
+- `xcl-plugin-template:.github/workflows/release.yml` — the signing step finds `dist/*index.xcl` (no `_`), and signs into `$index.sig`.
+- `xcl-plugin-template:README.md` — the release asset list, install and verifying sections use the hyphenated names, and say that installing a hyphenated release needs the xcl release from "Release xcl with either separator".
+- Check: run `make dist VERSION=v0.0.0-snapshot`, then confirm the names, that the index's assets match the zips, and that the checksums agree. Then `make test`.
+**Complexity**: Low
+**Token estimate**: ~10k
+**Agent strategy**: single agent, sequential.
+
+### Task: Release xcl with either separator
+
+Human task. Open a PR from the implement branch to `main` with the separator change. It's backwards compatible, so label it by what it adds (`minor` or `patch`, per the release-chain knowledge). Merge it, then check that the GitHub release exists for the new tag. The xcl-python engine bump is dispatched as usual; the CoreService proto is unchanged.
+
 ### Task: Publish a template release in the new layout
 
-Human task. In xcl-plugin-template, run `make release VERSION=vX.Y.Z` (next version after the template's current release) to push the tag. `release.yml` builds, signs the index with the `GPG_PRIVATE_KEY`/`GPG_PASSPHRASE` secrets and publishes. Check: the release has `xcl-plugin-template_<v>_index.xcl`, `.sig`, and six zips, and the signature verifies with `gpg --verify` against https://xcl.dev/keys/jumppad-labs-releases.asc.
+Human task. In xcl-plugin-template, run `make release VERSION=vX.Y.Z` (next version after the template's current release) to push the tag. `release.yml` builds, signs the index with the `GPG_PRIVATE_KEY`/`GPG_PASSPHRASE` secrets and publishes. Check: the release has `xcl-plugin-template-go-<v>-index.xcl`, `.sig`, and six zips, and the signature verifies with `gpg --verify` against https://xcl.dev/keys/jumppad-labs-releases.asc.
 
 ### Task: Move the Docker plugin to the new release layout
 
