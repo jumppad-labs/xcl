@@ -151,14 +151,15 @@ earlier one applied.
 ### With plugins
 
 Plugins come from registries, the same place Go types are declared. The local
-registry holds plugins compiled into the program, plugin binaries named by path, and directories searched for
-plugin binaries. Registering only records a plugin, nothing is started until
+registry holds plugins compiled into the program, external plugins run from a
+binary or a command, and directories searched for plugin binaries. Registering only records a plugin, nothing is started until
 the first operation needs it:
 
 ```go
 local := registry.NewLocal()
 local.RegisterPlugin(&template.TemplatePlugin{})        // an in-process plugin
 local.RegisterExternalPlugin("./bin/xcl-plugin-docker") // an external plugin binary
+local.RegisterExternalPlugin("python3", "plugin.py")    // an external plugin run from a command
 local.RegisterPluginDirectory("~/.xcl/plugins")         // a directory to search
 
 c, err := xcl.NewConfig(

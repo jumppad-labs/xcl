@@ -131,3 +131,83 @@ func TestDefaultChangedIgnoresDependencies(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, entity.NoChange, change)
 }
+
+// replaceOnName replaces a resource whose name changes
+var replaceOnName = DefaultChanged[*testResource]{
+	ReplaceOn: []entity.Path{entity.Path{}.Attribute("name")},
+}
+
+func TestDefaultChangedReplacesWhenAChangeIsAReplaceOnSetting(t *testing.T) {
+	old := &testResource{Name: "web", Count: 2}
+	new := &testResource{Name: "api", Count: 2}
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("name"), Before: "web", After: "api"},
+	}
+
+	change, err := replaceOnName.Changed(context.Background(), old, new, changes, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestDefaultChangedReplacesWhenAChangeIsUnderAReplaceOnSetting(t *testing.T) {
+	provider := DefaultChanged[*testResource]{
+		ReplaceOn: []entity.Path{entity.Path{}.Attribute("network")},
+	}
+	old := &testResource{Name: "web", Count: 2}
+	new := &testResource{Name: "web", Count: 2}
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("network").Index(0).Attribute("name"), Before: "a", After: "b"},
+	}
+
+	change, err := provider.Changed(context.Background(), old, new, changes, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestDefaultChangedReplacesWhenAReplaceOnSettingIsUnknown(t *testing.T) {
+	old := &testResource{Name: "web", Count: 2}
+	new := &testResource{Name: "web", Count: 2}
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("name"), Before: "web", Unknown: true},
+	}
+
+	change, err := replaceOnName.Changed(context.Background(), old, new, changes, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Replace, change)
+}
+
+func TestDefaultChangedUpdatesWhenNoChangeIsAReplaceOnSetting(t *testing.T) {
+	old := &testResource{Name: "web", Count: 2}
+	new := &testResource{Name: "web", Count: 3}
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("count"), Before: 2, After: 3},
+	}
+
+	change, err := replaceOnName.Changed(context.Background(), old, new, changes, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Update, change)
+}
+
+func TestDefaultChangedWithoutReplaceOnUpdatesARenamedResource(t *testing.T) {
+	old := &testResource{Name: "web", Count: 2}
+	new := &testResource{Name: "api", Count: 2}
+	changes := []entity.PropertyChange{
+		{Path: entity.Path{}.Attribute("name"), Before: "web", After: "api"},
+	}
+
+	change, err := DefaultChanged[*testResource]{}.Changed(context.Background(), old, new, changes, nil)
+	require.NoError(t, err)
+	require.Equal(t, entity.Update, change)
+}
+
+func TestDefaultChangedWithReplaceOnIgnoresAReplacedDependency(t *testing.T) {
+	old := &testResource{Name: "web", Count: 2}
+	new := &testResource{Name: "web", Count: 2}
+	dependencies := []entity.DependencyChange{
+		{Address: "resource.network.main", Change: entity.Replace},
+	}
+
+	change, err := replaceOnName.Changed(context.Background(), old, new, nil, dependencies)
+	require.NoError(t, err)
+	require.Equal(t, entity.NoChange, change)
+}

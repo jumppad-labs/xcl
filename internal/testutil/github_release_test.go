@@ -1,6 +1,8 @@
 package testutil
 
 import (
+	"archive/zip"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -13,11 +15,15 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/stretchr/testify/require"
+
+	hcl "github.com/jumppad-labs/xcl/internal/xcl"
+	"github.com/jumppad-labs/xcl/internal/xcl/hclsyntax"
 )
 
 const (
 	testRepository = "acme/xcl-plugin-widget"
 	testTag        = "v1.0.0"
+	testBinary     = "not really a plugin"
 )
 
 type testRelease struct {
@@ -57,7 +63,7 @@ func newTestRelease(t *testing.T, options ...FakeReleaseOption) *FakeGitHubRelea
 	t.Helper()
 
 	binary := filepath.Join(t.TempDir(), "xcl-plugin-widget")
-	require.NoError(t, os.WriteFile(binary, []byte("not really a plugin"), 0755))
+	require.NoError(t, os.WriteFile(binary, []byte(testBinary), 0755))
 
 	return NewFakeGitHubRelease(t, testRepository, testTag, binary, options...)
 }
@@ -110,18 +116,83 @@ func download(t *testing.T, fake *FakeGitHubRelease, name string) []byte {
 	return body
 }
 
-func checksumLine(t *testing.T, checksums, name string) string {
+func downloadIndex(t *testing.T, fake *FakeGitHubRelease) string {
 	t.Helper()
 
-	for _, line := range strings.Split(checksums, "\n") {
-		if strings.HasSuffix(line, "  "+name) {
-			return line
+	return string(download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl"))
+}
+
+// platformBlock is the text of the index's platform block for os/arch, from
+// its opening line to its closing brace
+func platformBlock(t *testing.T, index, os, arch string) string {
+	t.Helper()
+
+	opening := "  platform \"" + os + "\" \"" + arch + "\" {\n"
+
+	start := strings.Index(index, opening)
+	require.NotEqual(t, -1, start, "no platform block for %s/%s in\n%s", os, arch, index)
+
+	end := strings.Index(index[start:], "\n  }\n")
+	require.NotEqual(t, -1, end, "unterminated platform block for %s/%s", os, arch)
+
+	return index[start : start+end+len("\n  }\n")]
+}
+
+func sha256Checksum(data []byte) string {
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func readZip(t *testing.T, data []byte) *zip.Reader {
+	t.Helper()
+
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	require.NoError(t, err)
+
+	return reader
+}
+
+func zipEntry(t *testing.T, data []byte, name string) (*zip.File, []byte) {
+	t.Helper()
+
+	for _, file := range readZip(t, data).File {
+		if file.Name != name {
+			continue
 		}
+
+		reader, err := file.Open()
+		require.NoError(t, err)
+
+		defer reader.Close()
+
+		contents, err := io.ReadAll(reader)
+		require.NoError(t, err)
+
+		return file, contents
 	}
 
-	require.FailNow(t, "no checksum line", name)
+	require.FailNow(t, "zip entry not found", name)
 
-	return ""
+	return nil, nil
+}
+
+func zipManifest(t *testing.T, fake *FakeGitHubRelease, os, arch string) string {
+	t.Helper()
+
+	_, manifest := zipEntry(t, download(t, fake, fake.ZipName(os, arch)), "xcl-plugin.xcl")
+
+	return string(manifest)
+}
+
+func verifySignature(t *testing.T, armoredKey string, index, signature []byte) error {
+	t.Helper()
+
+	keyring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armoredKey))
+	require.NoError(t, err)
+
+	_, err = openpgp.CheckArmoredDetachedSignature(keyring, bytes.NewReader(index), bytes.NewReader(signature), nil)
+
+	return err
 }
 
 func TestFakeReleaseListsAllAssets(t *testing.T) {
@@ -131,84 +202,257 @@ func TestFakeReleaseListsAllAssets(t *testing.T) {
 
 	require.Equal(t, "v1.0.0", release.TagName)
 	require.ElementsMatch(t, []string{
-		"xcl-plugin-widget_1.0.0_linux_amd64.tar.gz",
-		"xcl-plugin-widget_1.0.0_linux_arm64.tar.gz",
-		"xcl-plugin-widget_1.0.0_darwin_amd64.tar.gz",
-		"xcl-plugin-widget_1.0.0_darwin_arm64.tar.gz",
+		"xcl-plugin-widget_1.0.0_linux_amd64.zip",
+		"xcl-plugin-widget_1.0.0_linux_arm64.zip",
+		"xcl-plugin-widget_1.0.0_darwin_amd64.zip",
+		"xcl-plugin-widget_1.0.0_darwin_arm64.zip",
 		"xcl-plugin-widget_1.0.0_windows_amd64.zip",
 		"xcl-plugin-widget_1.0.0_windows_arm64.zip",
-		"xcl-plugin-widget_1.0.0_checksums.txt",
-		"xcl-plugin-widget_1.0.0_checksums.txt.sig",
+		"xcl-plugin-widget_1.0.0_index.xcl",
+		"xcl-plugin-widget_1.0.0_index.xcl.sig",
 	}, release.names())
 }
 
 func TestFakeReleaseNamesMatchContract(t *testing.T) {
 	fake := newTestRelease(t)
 
-	require.Equal(t, "xcl-plugin-widget_1.0.0_linux_amd64.tar.gz", fake.ArchiveName("linux", "amd64"))
-	require.Equal(t, "xcl-plugin-widget_1.0.0_windows_arm64.zip", fake.ArchiveName("windows", "arm64"))
-	require.Equal(t, "xcl-plugin-widget_1.0.0_checksums.txt", fake.ChecksumsName())
-	require.Equal(t, "xcl-plugin-widget_1.0.0_checksums.txt.sig", fake.SignatureName())
+	require.Equal(t, "xcl-plugin-widget_1.0.0_linux_amd64.zip", fake.ZipName("linux", "amd64"))
+	require.Equal(t, "xcl-plugin-widget_1.0.0_windows_arm64.zip", fake.ZipName("windows", "arm64"))
+	require.Equal(t, "xcl-plugin-widget_1.0.0_index.xcl", fake.IndexName())
+	require.Equal(t, "xcl-plugin-widget_1.0.0_index.xcl.sig", fake.SignatureName())
 }
 
-func TestFakeReleaseServesArchiveBytes(t *testing.T) {
+func TestFakeReleaseServesZipBytes(t *testing.T) {
 	fake := newTestRelease(t)
 
-	body := download(t, fake, "xcl-plugin-widget_1.0.0_linux_amd64.tar.gz")
+	body := download(t, fake, "xcl-plugin-widget_1.0.0_linux_amd64.zip")
 
 	require.NotEmpty(t, body)
-	require.Equal(t, fake.Archive("linux", "amd64"), body)
+	require.Equal(t, fake.Zip("linux", "amd64"), body)
+}
+
+func TestFakeReleaseServesIndexBytes(t *testing.T) {
+	fake := newTestRelease(t)
+
+	body := download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl")
+
+	require.NotEmpty(t, body)
+	require.Equal(t, fake.Index(), body)
 }
 
 func TestFakeReleaseAssetWithoutOctetStreamAcceptIsMetadata(t *testing.T) {
 	fake := newTestRelease(t)
 	release := fetchRelease(t, fake)
 
-	status, body := get(t, release.assetURL(t, fake.ChecksumsName()), "", "")
+	status, body := get(t, release.assetURL(t, fake.IndexName()), "", "")
 
 	require.Equal(t, http.StatusOK, status)
-	require.Contains(t, string(body), `"name":"xcl-plugin-widget_1.0.0_checksums.txt"`)
+	require.Contains(t, string(body), `"name":"xcl-plugin-widget_1.0.0_index.xcl"`)
 }
 
-func TestFakeReleaseChecksumsListArchiveSum(t *testing.T) {
+func TestFakeReleaseIndexIsValidXcl(t *testing.T) {
+	fake := newTestRelease(t, WithUnknownKind(), WithContainer("ghcr.io/acme/widget@sha256:0000000000000000000000000000000000000000000000000000000000000000", "linux/amd64", "linux/arm64"))
+
+	_, diagnostics := hclsyntax.ParseConfig(fake.Index(), fake.IndexName(), hcl.InitialPos)
+
+	require.False(t, diagnostics.HasErrors(), diagnostics.Error())
+}
+
+func TestFakeReleaseIndexNamesPluginAndVersion(t *testing.T) {
 	fake := newTestRelease(t)
 
-	checksums := string(download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt"))
+	index := downloadIndex(t, fake)
 
-	sum := sha256.Sum256(fake.Archive("linux", "amd64"))
-	expected := hex.EncodeToString(sum[:]) + "  xcl-plugin-widget_1.0.0_linux_amd64.tar.gz"
-
-	require.Equal(t, expected, checksumLine(t, checksums, "xcl-plugin-widget_1.0.0_linux_amd64.tar.gz"))
+	require.True(t, strings.HasPrefix(index, "plugin {\n  name    = \"xcl-plugin-widget\"\n  version = \"1.0.0\"\n}\n"), index)
 }
 
-func TestFakeReleaseWithoutPlatformOmitsArchive(t *testing.T) {
+func TestFakeReleaseIndexListsExecutableProtocolOne(t *testing.T) {
+	fake := newTestRelease(t)
+
+	index := downloadIndex(t, fake)
+
+	require.Contains(t, index, "\nexecutable {\n  protocol = [1]\n")
+}
+
+func TestFakeReleaseIndexListsEveryPlatform(t *testing.T) {
+	fake := newTestRelease(t)
+
+	index := downloadIndex(t, fake)
+
+	for _, platform := range FakeReleasePlatforms {
+		os, arch, _ := strings.Cut(platform, "/")
+		require.Contains(t, platformBlock(t, index, os, arch), "asset    = \"xcl-plugin-widget_1.0.0_"+os+"_"+arch+".zip\"")
+	}
+}
+
+func TestFakeReleaseIndexChecksumMatchesZip(t *testing.T) {
+	fake := newTestRelease(t)
+
+	index := downloadIndex(t, fake)
+	zip := download(t, fake, "xcl-plugin-widget_1.0.0_linux_amd64.zip")
+
+	require.Contains(t, platformBlock(t, index, "linux", "amd64"), "checksum = \""+sha256Checksum(zip)+"\"")
+}
+
+func TestFakeReleaseIndexChecksumsMatchEveryZip(t *testing.T) {
+	fake := newTestRelease(t)
+
+	index := downloadIndex(t, fake)
+
+	for _, platform := range FakeReleasePlatforms {
+		os, arch, _ := strings.Cut(platform, "/")
+		require.Contains(t, platformBlock(t, index, os, arch), "checksum = \""+sha256Checksum(fake.Zip(os, arch))+"\"")
+	}
+}
+
+func TestFakeReleaseIndexHasNoContainerByDefault(t *testing.T) {
+	fake := newTestRelease(t)
+
+	require.NotContains(t, downloadIndex(t, fake), "container {")
+}
+
+func TestFakeReleaseZipHoldsBinaryManifestAndReadme(t *testing.T) {
+	fake := newTestRelease(t)
+
+	names := []string{}
+	for _, file := range readZip(t, fake.Zip("linux", "amd64")).File {
+		names = append(names, file.Name)
+	}
+
+	require.ElementsMatch(t, []string{"xcl-plugin-widget", "xcl-plugin.xcl", "README.md"}, names)
+}
+
+func TestFakeReleaseZipBinaryIsExecutable(t *testing.T) {
+	fake := newTestRelease(t)
+
+	file, contents := zipEntry(t, fake.Zip("linux", "amd64"), "xcl-plugin-widget")
+
+	require.Equal(t, testBinary, string(contents))
+	require.Equal(t, os.FileMode(0755), file.Mode().Perm())
+}
+
+func TestFakeReleaseWindowsZipBinaryEndsInExe(t *testing.T) {
+	fake := newTestRelease(t)
+
+	_, contents := zipEntry(t, fake.Zip("windows", "amd64"), "xcl-plugin-widget.exe")
+
+	require.Equal(t, testBinary, string(contents))
+}
+
+func TestFakeReleaseZipManifestDescribesBuild(t *testing.T) {
+	fake := newTestRelease(t)
+
+	expected := `plugin {
+  name    = "xcl-plugin-widget"
+  version = "1.0.0"
+}
+
+executable {
+  protocol = [1]
+  command  = ["xcl-plugin-widget"]
+
+  platform "linux" "amd64" {}
+}
+`
+
+	require.Equal(t, expected, zipManifest(t, fake, "linux", "amd64"))
+}
+
+func TestFakeReleaseWindowsZipManifestCommandEndsInExe(t *testing.T) {
+	fake := newTestRelease(t)
+
+	manifest := zipManifest(t, fake, "windows", "arm64")
+
+	require.Contains(t, manifest, "command  = [\"xcl-plugin-widget.exe\"]")
+	require.Contains(t, manifest, "platform \"windows\" \"arm64\" {}")
+}
+
+func TestFakeReleaseSignatureVerifiesAgainstPublicKey(t *testing.T) {
+	fake := newTestRelease(t)
+
+	index := download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl")
+	signature := download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl.sig")
+
+	require.NoError(t, verifySignature(t, fake.PublicKey(), index, signature))
+}
+
+func TestFakeReleaseSignatureDoesNotVerifyAgainstOtherKey(t *testing.T) {
+	fake := newTestRelease(t)
+
+	index := download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl")
+	signature := download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl.sig")
+
+	require.Error(t, verifySignature(t, fake.OtherPublicKey(), index, signature))
+}
+
+func TestFakeReleaseSignedByOtherKeyDoesNotVerifyAgainstPublicKey(t *testing.T) {
+	fake := newTestRelease(t, SignedByOtherKey())
+
+	index := download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl")
+	signature := download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl.sig")
+
+	require.Error(t, verifySignature(t, fake.PublicKey(), index, signature))
+}
+
+func TestFakeReleaseSignedByOtherKeyVerifiesAgainstOtherPublicKey(t *testing.T) {
+	fake := newTestRelease(t, SignedByOtherKey())
+
+	index := download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl")
+	signature := download(t, fake, "xcl-plugin-widget_1.0.0_index.xcl.sig")
+
+	require.NoError(t, verifySignature(t, fake.OtherPublicKey(), index, signature))
+}
+
+func TestFakeReleaseWithoutPlatformOmitsZip(t *testing.T) {
 	fake := newTestRelease(t, WithoutPlatform("darwin", "arm64"))
 
 	release := fetchRelease(t, fake)
 
-	require.NotContains(t, release.names(), "xcl-plugin-widget_1.0.0_darwin_arm64.tar.gz")
-	require.Contains(t, release.names(), "xcl-plugin-widget_1.0.0_darwin_amd64.tar.gz")
-	require.Nil(t, fake.Archive("darwin", "arm64"))
+	require.NotContains(t, release.names(), "xcl-plugin-widget_1.0.0_darwin_arm64.zip")
+	require.Contains(t, release.names(), "xcl-plugin-widget_1.0.0_darwin_amd64.zip")
+	require.Nil(t, fake.Zip("darwin", "arm64"))
 	require.Len(t, release.Assets, 7)
 }
 
-func TestFakeReleaseWithoutPlatformOmitsChecksumLine(t *testing.T) {
+func TestFakeReleaseWithoutPlatformOmitsIndexPlatform(t *testing.T) {
 	fake := newTestRelease(t, WithoutPlatform("darwin", "arm64"))
 
-	checksums := string(download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt"))
+	index := downloadIndex(t, fake)
 
-	require.NotContains(t, checksums, "darwin_arm64")
+	require.NotContains(t, index, `platform "darwin" "arm64"`)
+	require.Contains(t, index, `platform "darwin" "amd64"`)
 }
 
-func TestFakeReleaseWithoutChecksumsOmitsChecksumsAndSignature(t *testing.T) {
-	fake := newTestRelease(t, WithoutChecksums())
+func TestFakeReleaseWithoutExecutableOmitsZips(t *testing.T) {
+	fake := newTestRelease(t, WithoutExecutable())
 
 	release := fetchRelease(t, fake)
 
-	require.NotContains(t, release.names(), "xcl-plugin-widget_1.0.0_checksums.txt")
-	require.NotContains(t, release.names(), "xcl-plugin-widget_1.0.0_checksums.txt.sig")
-	require.Contains(t, release.names(), "xcl-plugin-widget_1.0.0_linux_amd64.tar.gz")
+	require.ElementsMatch(t, []string{
+		"xcl-plugin-widget_1.0.0_index.xcl",
+		"xcl-plugin-widget_1.0.0_index.xcl.sig",
+	}, release.names())
+}
+
+func TestFakeReleaseWithoutExecutableOmitsExecutableBlock(t *testing.T) {
+	fake := newTestRelease(t, WithoutExecutable())
+
+	index := downloadIndex(t, fake)
+
+	require.NotContains(t, index, "executable {")
+	require.Contains(t, index, "plugin {")
+}
+
+func TestFakeReleaseWithoutIndexOmitsIndexAndSignature(t *testing.T) {
+	fake := newTestRelease(t, WithoutIndex())
+
+	release := fetchRelease(t, fake)
+
+	require.NotContains(t, release.names(), "xcl-plugin-widget_1.0.0_index.xcl")
+	require.NotContains(t, release.names(), "xcl-plugin-widget_1.0.0_index.xcl.sig")
+	require.Contains(t, release.names(), "xcl-plugin-widget_1.0.0_linux_amd64.zip")
 	require.Len(t, release.Assets, 6)
+	require.Nil(t, fake.Index())
 }
 
 func TestFakeReleaseWithoutSignatureOmitsOnlySignature(t *testing.T) {
@@ -216,95 +460,151 @@ func TestFakeReleaseWithoutSignatureOmitsOnlySignature(t *testing.T) {
 
 	release := fetchRelease(t, fake)
 
-	require.NotContains(t, release.names(), "xcl-plugin-widget_1.0.0_checksums.txt.sig")
-	require.Contains(t, release.names(), "xcl-plugin-widget_1.0.0_checksums.txt")
+	require.NotContains(t, release.names(), "xcl-plugin-widget_1.0.0_index.xcl.sig")
+	require.Contains(t, release.names(), "xcl-plugin-widget_1.0.0_index.xcl")
 	require.Len(t, release.Assets, 7)
 }
 
-func TestFakeReleaseSignatureVerifiesAgainstPublicKey(t *testing.T) {
+func TestFakeReleaseWithoutChecksumOmitsChecksumForPlatform(t *testing.T) {
+	fake := newTestRelease(t, WithoutChecksum("linux", "arm64"))
+
+	block := platformBlock(t, downloadIndex(t, fake), "linux", "arm64")
+
+	require.NotContains(t, block, "checksum")
+	require.Contains(t, block, "asset    = \"xcl-plugin-widget_1.0.0_linux_arm64.zip\"")
+}
+
+func TestFakeReleaseWithoutChecksumKeepsOtherChecksums(t *testing.T) {
+	fake := newTestRelease(t, WithoutChecksum("linux", "arm64"))
+
+	block := platformBlock(t, downloadIndex(t, fake), "linux", "amd64")
+
+	require.Contains(t, block, "checksum = \""+sha256Checksum(fake.Zip("linux", "amd64"))+"\"")
+}
+
+func TestFakeReleaseWithoutChecksumStillServesZip(t *testing.T) {
+	fake := newTestRelease(t, WithoutChecksum("linux", "arm64"))
+
+	require.Contains(t, fetchRelease(t, fake).names(), "xcl-plugin-widget_1.0.0_linux_arm64.zip")
+}
+
+func TestFakeReleaseTamperZipDiffersFromChecksum(t *testing.T) {
+	fake := newTestRelease(t, TamperZip("linux", "arm64"))
+
+	served := download(t, fake, "xcl-plugin-widget_1.0.0_linux_arm64.zip")
+	block := platformBlock(t, downloadIndex(t, fake), "linux", "arm64")
+
+	require.Contains(t, block, "checksum = \"sha256:")
+	require.NotContains(t, block, sha256Checksum(served))
+}
+
+func TestFakeReleaseTamperZipLeavesOtherZipsIntact(t *testing.T) {
+	fake := newTestRelease(t, TamperZip("linux", "arm64"))
+
+	block := platformBlock(t, downloadIndex(t, fake), "linux", "amd64")
+
+	require.Contains(t, block, "checksum = \""+sha256Checksum(fake.Zip("linux", "amd64"))+"\"")
+}
+
+func TestFakeReleaseManifestDisagreesOnName(t *testing.T) {
+	fake := newTestRelease(t, ManifestDisagrees("linux", "amd64", ManifestName))
+
+	manifest := zipManifest(t, fake, "linux", "amd64")
+
+	require.Contains(t, manifest, "name    = \"xcl-plugin-widget-other\"")
+}
+
+func TestFakeReleaseManifestDisagreesOnVersion(t *testing.T) {
+	fake := newTestRelease(t, ManifestDisagrees("linux", "amd64", ManifestVersion))
+
+	manifest := zipManifest(t, fake, "linux", "amd64")
+
+	require.Contains(t, manifest, "version = \"1.0.0-other\"")
+}
+
+func TestFakeReleaseManifestDisagreesOnProtocol(t *testing.T) {
+	fake := newTestRelease(t, ManifestDisagrees("linux", "amd64", ManifestProtocol))
+
+	manifest := zipManifest(t, fake, "linux", "amd64")
+
+	require.Contains(t, manifest, "protocol = [2]")
+}
+
+func TestFakeReleaseManifestDisagreesOnPlatform(t *testing.T) {
+	fake := newTestRelease(t, ManifestDisagrees("linux", "amd64", ManifestPlatform))
+
+	manifest := zipManifest(t, fake, "linux", "amd64")
+
+	require.Contains(t, manifest, "platform \"darwin\" \"arm64\" {}")
+	require.NotContains(t, manifest, "platform \"linux\" \"amd64\"")
+}
+
+func TestFakeReleaseManifestDisagreesKeepsZipMatchingChecksum(t *testing.T) {
+	fake := newTestRelease(t, ManifestDisagrees("linux", "amd64", ManifestName))
+
+	block := platformBlock(t, downloadIndex(t, fake), "linux", "amd64")
+
+	require.Contains(t, block, "checksum = \""+sha256Checksum(fake.Zip("linux", "amd64"))+"\"")
+}
+
+func TestFakeReleaseManifestDisagreesLeavesOtherManifestsAgreeing(t *testing.T) {
+	fake := newTestRelease(t, ManifestDisagrees("linux", "amd64", ManifestName))
+
+	manifest := zipManifest(t, fake, "linux", "arm64")
+
+	require.Contains(t, manifest, "name    = \"xcl-plugin-widget\"\n")
+}
+
+func TestFakeReleaseWithUnknownKindAddsBlock(t *testing.T) {
+	fake := newTestRelease(t, WithUnknownKind())
+
+	require.Contains(t, downloadIndex(t, fake), "\nwasm {\n  protocol = [3]\n}\n")
+}
+
+func TestFakeReleaseWithoutUnknownKindHasNoBlock(t *testing.T) {
 	fake := newTestRelease(t)
 
-	checksums := download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt")
-	signature := download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt.sig")
-
-	keyring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(fake.PublicKey()))
-	require.NoError(t, err)
-
-	_, err = openpgp.CheckArmoredDetachedSignature(keyring, strings.NewReader(string(checksums)), strings.NewReader(string(signature)), nil)
-	require.NoError(t, err)
+	require.NotContains(t, downloadIndex(t, fake), "wasm")
 }
 
-func TestFakeReleaseSignatureDoesNotVerifyAgainstOtherKey(t *testing.T) {
-	fake := newTestRelease(t)
+func TestFakeReleaseWithContainerAddsContainerBlock(t *testing.T) {
+	image := "ghcr.io/acme/widget@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	fake := newTestRelease(t, WithContainer(image, "linux/amd64", "linux/arm64"))
 
-	checksums := download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt")
-	signature := download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt.sig")
+	expected := `
+container {
+  protocol = [1]
+  image    = "ghcr.io/acme/widget@sha256:1111111111111111111111111111111111111111111111111111111111111111"
 
-	keyring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(fake.OtherPublicKey()))
-	require.NoError(t, err)
+  platform "linux" "amd64" {}
 
-	_, err = openpgp.CheckArmoredDetachedSignature(keyring, strings.NewReader(string(checksums)), strings.NewReader(string(signature)), nil)
-	require.Error(t, err)
+  platform "linux" "arm64" {}
+}
+`
+
+	require.Contains(t, downloadIndex(t, fake), expected)
 }
 
-func TestFakeReleaseSignedByOtherKeyDoesNotVerifyAgainstPublicKey(t *testing.T) {
-	fake := newTestRelease(t, SignedByOtherKey())
+func TestFakeReleaseWithContainerWritesImageAndPlatformsAsGiven(t *testing.T) {
+	fake := newTestRelease(t, WithContainer("ghcr.io/acme/widget:latest", "darwin/arm64"))
 
-	checksums := download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt")
-	signature := download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt.sig")
+	index := downloadIndex(t, fake)
 
-	keyring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(fake.PublicKey()))
-	require.NoError(t, err)
-
-	_, err = openpgp.CheckArmoredDetachedSignature(keyring, strings.NewReader(string(checksums)), strings.NewReader(string(signature)), nil)
-	require.Error(t, err)
+	require.Contains(t, index, "image    = \"ghcr.io/acme/widget:latest\"")
+	require.Contains(t, index, "platform \"darwin\" \"arm64\" {}")
 }
 
-func TestFakeReleaseSignedByOtherKeyVerifiesAgainstOtherPublicKey(t *testing.T) {
-	fake := newTestRelease(t, SignedByOtherKey())
+func TestFakeReleaseWithContainerKeepsExecutable(t *testing.T) {
+	fake := newTestRelease(t, WithContainer("ghcr.io/acme/widget@sha256:1111111111111111111111111111111111111111111111111111111111111111", "linux/amd64"))
 
-	checksums := download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt")
-	signature := download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt.sig")
-
-	keyring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(fake.OtherPublicKey()))
-	require.NoError(t, err)
-
-	_, err = openpgp.CheckArmoredDetachedSignature(keyring, strings.NewReader(string(checksums)), strings.NewReader(string(signature)), nil)
-	require.NoError(t, err)
+	require.Len(t, fetchRelease(t, fake).Assets, 8)
+	require.Contains(t, downloadIndex(t, fake), "executable {")
 }
 
-func TestFakeReleaseUntamperedArchiveMatchesChecksum(t *testing.T) {
-	fake := newTestRelease(t)
+func TestFakeReleaseIndexExpressionWritesFunctionCall(t *testing.T) {
+	fake := newTestRelease(t, IndexExpression())
 
-	checksums := string(download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt"))
-
-	sum := sha256.Sum256(fake.Archive("linux", "arm64"))
-	line := checksumLine(t, checksums, "xcl-plugin-widget_1.0.0_linux_arm64.tar.gz")
-
-	require.True(t, strings.HasPrefix(line, hex.EncodeToString(sum[:])))
-}
-
-func TestFakeReleaseTamperArchiveDiffersFromChecksum(t *testing.T) {
-	fake := newTestRelease(t, TamperArchive("linux", "arm64"))
-
-	checksums := string(download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt"))
-
-	served := download(t, fake, "xcl-plugin-widget_1.0.0_linux_arm64.tar.gz")
-	sum := sha256.Sum256(served)
-	line := checksumLine(t, checksums, "xcl-plugin-widget_1.0.0_linux_arm64.tar.gz")
-
-	require.False(t, strings.HasPrefix(line, hex.EncodeToString(sum[:])))
-}
-
-func TestFakeReleaseTamperArchiveLeavesOtherArchivesIntact(t *testing.T) {
-	fake := newTestRelease(t, TamperArchive("linux", "arm64"))
-
-	checksums := string(download(t, fake, "xcl-plugin-widget_1.0.0_checksums.txt"))
-
-	sum := sha256.Sum256(fake.Archive("linux", "amd64"))
-	line := checksumLine(t, checksums, "xcl-plugin-widget_1.0.0_linux_amd64.tar.gz")
-
-	require.True(t, strings.HasPrefix(line, hex.EncodeToString(sum[:])))
+	require.Contains(t, downloadIndex(t, fake), "version = upper(\"1.0.0\")")
 }
 
 func TestFakeReleaseRequireTokenRejectsRequestWithoutToken(t *testing.T) {
@@ -341,14 +641,14 @@ func TestFakeReleaseRequireTokenGuardsAssetDownload(t *testing.T) {
 	var release testRelease
 	require.NoError(t, json.Unmarshal(body, &release))
 
-	url := release.assetURL(t, fake.ArchiveName("linux", "amd64"))
+	url := release.assetURL(t, fake.ZipName("linux", "amd64"))
 
 	status, _ = get(t, url, "", "application/octet-stream")
 	require.Equal(t, http.StatusNotFound, status)
 
 	status, body = get(t, url, "s3cret", "application/octet-stream")
 	require.Equal(t, http.StatusOK, status)
-	require.Equal(t, fake.Archive("linux", "amd64"), body)
+	require.Equal(t, fake.Zip("linux", "amd64"), body)
 }
 
 func TestFakeReleaseLastTokenRecordsToken(t *testing.T) {

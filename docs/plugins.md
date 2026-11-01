@@ -67,9 +67,11 @@ it, is in the [Plugin Developer Guide](plugin-developer-guide.md). In short:
   or replace, each an `entity.DependencyChange{Address, Change}`. Embed
   `plugins.DefaultChanged[T]` ([`plugins/changed.go`](../plugins/changed.go))
   to get a comparison of the JSON form of both copies that ignores `meta`,
-  `depends_on` and `disabled`, answering update or no change, and ignores
-  both lists; define `Changed` on the provider to override it, for example
-  to answer replace
+  `depends_on` and `disabled`, answering update or no change; set its
+  `ReplaceOn` field to the settings that can't change in place, and a change
+  at or under any of them answers replace. It ignores `dependencies`; define
+  `Changed` on the provider to override it, for example to react to a
+  replaced dependency
   (see [Overriding `Changed`](plugin-developer-guide.md#overriding-changed)).
 - `Update(ctx, resource, changes, dependencies)` changes the entity in
   place. `changes` is the same comparison run again when the apply reaches
@@ -317,9 +319,8 @@ a `Name()`, declares plain Go types through `Types() []registry.Type` (nil for
 a registry with none) and provides plugins through `Plugins(ctx, emit)`, and a
 `Plugin`, which starts itself and returns the
 `plugins.PluginHost` xcl talks to it through. `registry.InProcess(p)` starts a
-compiled-in plugin with the direct host, and `registry.Executable(path)` starts
-a plugin binary over gRPC. Third parties write registries of their own against
-the same interfaces.
+compiled-in plugin with the direct host. Third parties write registries of
+their own against the same interfaces.
 
 The local registry, [`registry/local.go`](../registry/local.go), takes no
 logger, and registering only records:
@@ -330,13 +331,18 @@ registry.Register[resources.Deployment](local, "deployment")
 local.RegisterFunction("slugify", slugify)
 local.RegisterPlugin(&template.TemplatePlugin{})
 local.RegisterExternalPlugin("./bin/xcl-plugin-docker")
+local.RegisterExternalPlugin("python3", "plugin.py")
 local.RegisterPluginDirectory("~/.xcl/plugins")
 ```
 
 `registry.Register` declares a Go type, `RegisterFunction` offers a Go func
 to configuration (see [Application functions](#application-functions)),
 `RegisterPlugin` is for in-process plugins, `RegisterExternalPlugin` for a
-gRPC plugin binary, and `RegisterPluginDirectory` for a directory to search
+gRPC plugin xcl starts as a separate process, either a plugin binary on its
+own or a command, a program and its arguments such as an interpreter and a
+script. A plugin started from a binary is named after the binary in load
+events and errors, one started from a command by its whole command line.
+`RegisterPluginDirectory` is for a directory to search
 for executables named like the registry's pattern, `xcl-plugin-*` unless the
 registry was created with `registry.NewLocal(registry.PluginPattern("acme-plugin-*"))`.
 A directory that does not exist provides no plugins.
@@ -357,36 +363,78 @@ exact release tag, panics at `RegisterPlugin`.
 repository, does its work in `Start`
 ([`registry/github_install.go`](../registry/github_install.go)): it finds the
 cache entry `<cache>/github.com/<owner>/<repo>/<tag>/<os>_<arch>/`, and on a
-miss reads the release by tag through the REST API, downloads the platform's
-archive, the checksums file and, when the release has one, the signature
-through the asset endpoint (which serves private repositories with a token)
-into a `.install-*` directory beside the entry, verifies the archive, extracts
-the binary and renames the directory into place, so a failed or interrupted
-install leaves nothing usable. On a hit or a fresh install alike it then
-verifies the entry offline
-([`registry/github_verify.go`](../registry/github_verify.go)): the detached
-signature over the checksums file against the registry's current trusted keys
-when any are given, the archive against its line in the checksums file, and
-the binary against the archive's copy. Only then does it return
-`registry.Executable(binary).Start(emit)`, the ordinary external-plugin host,
-so every start of the plugin is verified and the catalog restarts it as any
-other. Because the work happens in `Start`, every failure reaches the
-application as a `*xcl.PluginLoadError` naming the plugin and `github.com`,
-wrapping a `*xcl.PluginInstallError` (`Repository`, `Version`, `Platform`)
-that matches `xcl.ErrPluginNotFound` or `xcl.ErrPluginVerification`. Cache
-hits, downloads and verification are reported as `load` log events.
+miss reads the release by tag through the REST API and downloads, through the
+asset endpoint (which serves private repositories with a token), into a
+`.install-*` directory beside the entry, only the release's index and, when the
+release has one, the signature over it. It checks the signature against the
+registry's trusted keys when any are given, checks the index is complete and
+chooses the build for this platform, all before downloading any build, so an
+unsigned or incomplete release, or one with nothing this platform can run, is
+refused without fetching one. It then downloads only this platform's zip,
+checks it against its checksum in the index, checks the zip's manifest agrees
+with the index, extracts the zip, marks the binary the manifest names
+executable and renames the directory into place, so a failed or interrupted
+install leaves nothing usable. The entry holds the index, the signature when
+the release had one, the zip and the zip's extracted files.
 
-The release layout it installs is fixed by the plugin release asset contract,
-encoded in [`registry/github_assets.go`](../registry/github_assets.go): the tag
-is `v<major>.<minor>.<patch>` with an optional pre-release suffix; each of
-linux, darwin and windows on amd64 and arm64 has an archive
-`<name>_<version>_<os>_<arch>.tar.gz` (`.zip` on windows), `<version>` being
-the tag without its `v`, holding the binary `<name>` (`<name>.exe` on windows)
-at its root; `<name>_<version>_checksums.txt` lists every archive's SHA-256 in
-`sha256sum` format and is required; and `<name>_<version>_checksums.txt.sig`,
-optional, is an ASCII-armoured detached OpenPGP signature over the checksums
-file. `<name>` is the repository name. Signatures are checked with
-`github.com/ProtonMail/go-crypto`.
+On a hit or a fresh install alike it then verifies the entry offline
+([`registry/github_verify.go`](../registry/github_verify.go)): the signature
+over the index against the registry's current trusted keys when any are
+given, the index again, the zip against its checksum in the index, the zip's
+manifest against the index, and the extracted binary against its copy in the
+zip. Only then does it return
+the ordinary external-plugin host started with the command the manifest
+names, so every
+start of the plugin is verified and the catalog restarts it as any other.
+Because the work happens in `Start`, every failure reaches the application as
+a `*xcl.PluginLoadError` naming the plugin and `github.com`, wrapping a
+`*xcl.PluginInstallError` (`Repository`, `Version`, `Platform`) that matches
+one of two errors:
+
+- `xcl.ErrPluginNotFound`: the release doesn't exist, is a draft, or the
+  repository is private and no token was given; the release has no index, so
+  it isn't a plugin release in the supported layout; or it offers no build for
+  this platform, including a release that offers only a container. The error
+  names the platforms the release offers and this one.
+- `xcl.ErrPluginVerification`: with trusted keys, the index is unsigned or its
+  signature doesn't verify against any of them (naming the key that signed
+  it); the index names another plugin or version, leaves out a checksum,
+  names a container image by tag rather than digest, lists a container
+  platform other than Linux, offers no kind the registry knows, or uses an
+  expression rather than a literal; the build doesn't speak plugin protocol 1;
+  the zip doesn't match its checksum; the zip's manifest disagrees with the
+  index on name, version, protocol or platform; or a cached file was changed.
+
+Cache hits, downloads and verification are reported as `load` log events.
+
+The release layout it installs is version 2 of the plugin release asset
+contract. The tag is `v<major>.<minor>.<patch>` with an optional pre-release
+suffix, `<name>` is the repository name and `<version>` the tag without its
+`v`. A release holds:
+
+- `<name>_<version>_index.xcl`, required: the plugin's `name` and `version`,
+  and the package kinds the release offers. An `executable` block lists its
+  `protocol` versions and a `platform "<os>" "<arch>"` block for each of
+  linux, darwin and windows on amd64 and arm64 it is built for, naming its zip
+  as `asset` and the zip's SHA-256 as `checksum = "sha256:<hex>"`. A
+  `container` block names a multi-platform image pinned by digest,
+  `<repository>@sha256:<hex>`, and lists only Linux platforms; the registry
+  validates it but doesn't start containers yet. A top-level block of a kind
+  the registry doesn't know is skipped, so a later release can offer new
+  kinds.
+- `<name>_<version>_<os>_<arch>.zip`, one for each executable platform, with
+  `xcl-plugin.xcl` at its root: the same `plugin` block and an `executable`
+  block with its `protocol`, the `command` that starts it (the binary's path
+  inside the zip, `.exe` on windows, then any arguments) and its one
+  `platform`.
+- `<name>_<version>_index.xcl.sig`, optional: an ASCII-armoured detached
+  OpenPGP signature over the index. The index holds every zip's checksum and
+  the image's digest, so one signature vouches for the whole release.
+
+The index and the manifest are static xcl files, read in
+[`registry/github_release_files.go`](../registry/github_release_files.go) with
+xcl's own decoder and no evaluation context, so literal values only.
+Signatures are checked with `github.com/ProtonMail/go-crypto`.
 
 A `Config` is given registries with `xcl.WithRegistry(local)`, any number of
 times; it is the one way in for types and plugins alike. `NewConfig` builds

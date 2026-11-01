@@ -1,0 +1,6 @@
+- A TypeScript developer goes from installing the package to a working apply against a Go plugin by following the package README alone.
+- Every operation and lookup in the Go API has a TypeScript equivalent, checked against the parity record at each release.
+- The Go parity fixtures show zero differences on every release, on all eight platforms.
+- A web service using the package keeps serving other requests during a long apply, with event-loop delay staying under 50 ms at the 99th percentile.
+- The first configuration in a process is created within one second on the CI runners.
+- No open issue reports an orphaned engine process after a Node program exits.

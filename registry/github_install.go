@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -33,11 +34,12 @@ func (p *githubPlugin) Name() string {
 }
 
 // Start installs the plugin, or finds it in the cache, verifies it and starts
-// it, returning the host Executable starts for the cached binary. A plugin
-// that cannot be installed or verified is never started, and the error is a
-// PluginInstallError naming the repository, version and platform.
+// it, returning the host started for the cached binary with the arguments
+// its manifest names. A plugin that cannot be installed or verified
+// is never started, and the error is a PluginInstallError naming the
+// repository, version and platform.
 func (p *githubPlugin) Start(emit events.Emit) (plugins.PluginHost, error) {
-	binary, err := p.install(emit)
+	binary, args, err := p.install(emit)
 	if err != nil {
 		return nil, &xclerrors.PluginInstallError{
 			Repository: p.repository,
@@ -47,28 +49,28 @@ func (p *githubPlugin) Start(emit events.Emit) (plugins.PluginHost, error) {
 		}
 	}
 
-	return Executable(binary).Start(emit)
+	return executablePlugin(binary, args...).Start(emit)
 }
 
-// install returns the path of the plugin's verified binary in the cache,
-// installing the release first when the cache has no entry for it
-func (p *githubPlugin) install(emit events.Emit) (string, error) {
+// install returns the path of the plugin's verified binary in the cache and
+// the arguments its manifest starts it with, installing the release first
+// when the cache has no entry for it
+func (p *githubPlugin) install(emit events.Emit) (string, []string, error) {
 	current := p.registry.platform
-	names := namesFor(p.repository, p.tag, current)
 
 	log := logger.New(emit, events.Event{
 		Source:    events.SourceCore,
 		Operation: events.OperationLoad,
-		Meta:      map[string]any{"registry": GitHubName, "plugin": names.plugin},
+		Meta:      map[string]any{"registry": GitHubName, "plugin": pluginName(p.repository)},
 	})
 
 	if !current.supported() {
-		return "", fmt.Errorf("%w: no build is published for %s", xclerrors.ErrPluginNotFound, current)
+		return "", nil, fmt.Errorf("%w: no build is published for %s", xclerrors.ErrPluginNotFound, current)
 	}
 
 	entry, err := p.entry()
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	_, err = os.Stat(entry)
@@ -77,20 +79,21 @@ func (p *githubPlugin) install(emit events.Emit) (string, error) {
 	case err == nil:
 		log.Debug("using cached plugin", "repository", p.repository, "version", p.tag, "entry", entry)
 	case errors.Is(err, fs.ErrNotExist):
-		if err := p.download(log, entry, names); err != nil {
-			return "", err
+		if err := p.download(log, entry); err != nil {
+			return "", nil, err
 		}
 	default:
-		return "", err
+		return "", nil, err
 	}
 
-	if err := verifyEntry(entry, names, p.registry.trusted()); err != nil {
-		return "", err
+	command, err := verifyEntry(entry, p.repository, p.tag, current, p.registry.trusted())
+	if err != nil {
+		return "", nil, err
 	}
 
 	log.Debug("verified plugin", "repository", p.repository, "version", p.tag, "entry", entry)
 
-	return filepath.Join(entry, names.binary), nil
+	return filepath.Join(entry, filepath.FromSlash(path.Clean(command[0]))), command[1:], nil
 }
 
 // entry is the plugin's cache entry,
@@ -107,12 +110,16 @@ func (p *githubPlugin) entry() (string, error) {
 	return filepath.Join(root, GitHubName, owner, repo, p.tag, current.os+"_"+current.arch), nil
 }
 
-// download installs the release into entry as one step: everything is
-// downloaded into a temporary directory beside the entry, verified there, the
-// binary extracted, and the directory renamed into place. A failure at any
+// download installs the release into entry as one step, into a temporary
+// directory beside the entry. It downloads the index, and its signature, and
+// checks them before downloading anything else, so a release that is
+// unsigned when keys are trusted, or whose index is incomplete or offers no
+// build for this platform, is refused without a build being fetched. Only
+// this platform's zip is then downloaded and checked against the index, its
+// files extracted, and the directory renamed into place. A failure at any
 // point removes the temporary directory, so nothing unverified is ever left
 // where a later start would find it.
-func (p *githubPlugin) download(log logger.Logger, entry string, names assetNames) error {
+func (p *githubPlugin) download(log logger.Logger, entry string) error {
 	parent := filepath.Dir(entry)
 	if err := os.MkdirAll(parent, 0755); err != nil {
 		return fmt.Errorf("unable to create the plugin cache: %w", err)
@@ -126,34 +133,30 @@ func (p *githubPlugin) download(log logger.Logger, entry string, names assetName
 
 	ctx := p.registry.requestContext()
 	client := p.registry.client()
+	current := p.registry.platform
 
-	log.Info("downloading plugin", "repository", p.repository, "version", p.tag, "platform", p.registry.platform.String())
+	log.Info("downloading plugin", "repository", p.repository, "version", p.tag, "platform", current.String())
 
 	release, err := client.release(ctx, p.repository, p.tag)
 	if err != nil {
 		return err
 	}
 
-	archive, found := release.asset(names.archive)
+	index, found := release.asset(indexName(p.repository, p.tag))
 	if !found {
 		return fmt.Errorf(
-			"%w: release %s of %s has no build for %s, %s",
-			xclerrors.ErrPluginNotFound, p.tag, p.repository, p.registry.platform, names.archive,
+			"%w: release %s of %s is not a plugin release in the supported layout, it has no index %s",
+			xclerrors.ErrPluginNotFound, p.tag, p.repository, indexName(p.repository, p.tag),
 		)
 	}
 
-	checksums, found := release.asset(names.checksums)
-	if !found {
-		return fmt.Errorf("%w: release has no checksums file %s", xclerrors.ErrPluginVerification, names.checksums)
-	}
-
-	assets := []githubAsset{archive, checksums}
+	assets := []githubAsset{index}
 
 	// the signature is kept whenever the release has one, so a later run
 	// that trusts keys can check it offline, but it is required only when
 	// keys are trusted
 	keys := p.registry.trusted()
-	signature, signed := release.asset(names.signature)
+	signature, signed := release.asset(indexSignatureName(p.repository, p.tag))
 
 	switch {
 	case signed:
@@ -168,11 +171,29 @@ func (p *githubPlugin) download(log logger.Logger, entry string, names assetName
 		}
 	}
 
-	if err := verifyArchive(staging, names, keys); err != nil {
+	releaseIndex, build, err := checkIndex(staging, p.repository, p.tag, current, keys)
+	if err != nil {
 		return err
 	}
 
-	if err := extractBinary(filepath.Join(staging, names.archive), names, filepath.Join(staging, names.binary)); err != nil {
+	zipAsset, found := release.asset(build.Asset)
+	if !found {
+		return fmt.Errorf(
+			"%w: release %s of %s has no asset %s, which its index lists for %s",
+			xclerrors.ErrPluginNotFound, p.tag, p.repository, build.Asset, current,
+		)
+	}
+
+	if err := downloadTo(ctx, client, zipAsset, filepath.Join(staging, zipAsset.Name)); err != nil {
+		return err
+	}
+
+	manifest, err := checkBuild(staging, releaseIndex, build, current)
+	if err != nil {
+		return err
+	}
+
+	if err := extractZip(filepath.Join(staging, build.Asset), build.Asset, staging, manifest.Executable.Command[0]); err != nil {
 		return err
 	}
 

@@ -1,0 +1,9 @@
+- Follow the three layers `libxcl.md` gives every SDK: a byte transport that starts the engine and frames calls, a typed client over messages generated from xcl's protos at the bundled tag, and a hand-written public API. The SDK's tests can then run against a fake transport with no engine.
+- Read engine frames on the event loop, so nothing blocks it and polling needs no special handling; let go of the engine's hold on the event loop whenever no call is outstanding, so an idle engine never keeps the process alive.
+- Carry functions, events and state-store calls through the poll loop as tasks the host completes, as Python does; run tasks concurrently on the event loop.
+- Offer Ctrl-C cancellation as a ready-made abort signal from the package, passed as the operation's signal in one argument, whose interrupt listener lasts only as long as that operation.
+- Derive each registered type's schema v1 at registration, so a definition the engine would refuse fails there rather than on the first operation.
+- Keep the package's runtime dependencies to the protobuf runtime, as the Python package keeps to protobuf.
+- Mirror xcl-python's release flow: xcl's release dispatches an engine bump to xcl-typescript, a merged bump tags and publishes, and publishing uses npm trusted publishing. The bindings CI in xcl gains a job running the TypeScript suite against the engine built from each change.
+- Reuse the parity approach and fixtures xcl-python uses to compare with Go, rather than inventing a second one.
+- Risks to watch: the engine outliving a host on Windows, where Node has no job object without a native addon, so the engine's exit on end of input is the safeguard; the optional-dependency install being skipped by some package managers or flags; and keeping the schema derived from a TypeScript type identical to what the same Go type gives.

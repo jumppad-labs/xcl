@@ -443,7 +443,7 @@ func TestInProcessStartReturnsHostWithPluginTypes(t *testing.T) {
 }
 
 func TestExecutableNameIsTheBinaryName(t *testing.T) {
-	plugin := Executable("/opt/plugins/xcl-plugin-docker")
+	plugin := executablePlugin("/opt/plugins/xcl-plugin-docker")
 
 	require.Equal(t, "xcl-plugin-docker", plugin.Name())
 }
@@ -451,7 +451,7 @@ func TestExecutableNameIsTheBinaryName(t *testing.T) {
 func TestExecutableStartFailsForMissingPath(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "xcl-plugin-missing")
 
-	host, err := Executable(missing).Start(nil)
+	host, err := executablePlugin(missing).Start(nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, missing)
 	require.Nil(t, host)
@@ -527,4 +527,64 @@ func TestFunctionsReturnsACopy(t *testing.T) {
 	registered[0].Name = "changed"
 
 	require.Equal(t, "slugify", local.Functions()[0].Name)
+}
+
+// startLocalPlugin starts the only plugin local provides and returns the
+// block types its host offers, stopping the plugin when the test ends
+func startLocalPlugin(t *testing.T, local *Local) []string {
+	t.Helper()
+
+	found, err := local.Plugins(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, found, 1)
+
+	host, err := found[0].Start(nil)
+	require.NoError(t, err)
+	t.Cleanup(host.Stop)
+
+	offered := []string{}
+	for _, registered := range host.GetTypes() {
+		offered = append(offered, registered.Type)
+	}
+
+	return offered
+}
+
+func TestLocalExternalPluginStartsFromACommand(t *testing.T) {
+	plugin := testutil.BuildFixturePlugin(t, "..")
+	launcher := testutil.BuildProgram(t, "../internal/test_fixtures/plugins/launcher")
+
+	local := NewLocal()
+	local.RegisterExternalPlugin(launcher, plugin)
+
+	require.Equal(t, []string{"widget"}, startLocalPlugin(t, local))
+}
+
+func TestLocalExternalPluginStartsFromASinglePath(t *testing.T) {
+	plugin := testutil.BuildFixturePlugin(t, "..")
+
+	local := NewLocal()
+	local.RegisterExternalPlugin(plugin)
+
+	require.Equal(t, []string{"widget"}, startLocalPlugin(t, local))
+}
+
+func TestLocalExternalPluginFromACommandIsNamedByItsCommandLine(t *testing.T) {
+	local := NewLocal()
+	local.RegisterExternalPlugin("python3", "plugin.py", "--verbose")
+
+	found, err := local.Plugins(context.Background(), nil)
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"python3 plugin.py --verbose"}, pluginNames(found))
+}
+
+func TestLocalExternalPluginFromASinglePathIsNamedAfterTheBinary(t *testing.T) {
+	local := NewLocal()
+	local.RegisterExternalPlugin("/opt/plugins/xcl-plugin-docker")
+
+	found, err := local.Plugins(context.Background(), nil)
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"xcl-plugin-docker"}, pluginNames(found))
 }

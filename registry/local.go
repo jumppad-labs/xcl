@@ -59,6 +59,7 @@ func PluginPattern(pattern string) LocalOption {
 //	local.RegisterType(&resources.Deployment{}, "deployment")
 //	local.RegisterPlugin(&template.TemplatePlugin{})
 //	local.RegisterExternalPlugin("./bin/xcl-plugin-docker")
+//	local.RegisterExternalPlugin("python3", "plugin.py")
 //	local.RegisterPluginDirectory("~/.xcl/plugins")
 func NewLocal(options ...LocalOption) *Local {
 	l := &Local{pattern: DefaultPluginPattern}
@@ -175,10 +176,14 @@ func (l *Local) RegisterPlugin(p plugins.Plugin) {
 	l.add(localEntry{plugin: InProcess(p)})
 }
 
-// RegisterExternalPlugin registers the plugin binary at path. A path that
-// does not exist is reported when plugins load, not here.
-func (l *Local) RegisterExternalPlugin(path string) {
-	l.add(localEntry{plugin: Executable(path)})
+// RegisterExternalPlugin registers an external plugin that xcl starts as a
+// separate process by running command with args: a plugin binary on its own,
+// or a program and its arguments, such as an interpreter and a script. A
+// plugin started from a binary alone is named after the binary, one started
+// with arguments by its whole command line. A command that does not exist is
+// reported when plugins load, not here.
+func (l *Local) RegisterExternalPlugin(command string, args ...string) {
+	l.add(localEntry{plugin: executablePlugin(command, args...)})
 }
 
 // RegisterPluginDirectory registers dir to be searched, when plugins load,
@@ -220,7 +225,7 @@ func (l *Local) Plugins(ctx context.Context, emit events.Emit) ([]Plugin, error)
 		}
 
 		for _, path := range paths {
-			found = append(found, Executable(path))
+			found = append(found, executablePlugin(path))
 		}
 	}
 

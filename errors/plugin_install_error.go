@@ -7,16 +7,19 @@ import (
 )
 
 // ErrPluginNotFound means a remote registry could not find a plugin to
-// install: the release does not exist, it has no build for the current
+// install: the release does not exist, it is not a plugin release in the
+// supported layout (it has no index), it offers no build for the current
 // platform, or the repository is private and no token was given. The GitHub
 // registry returns it, inside a PluginInstallError, when a plugin it was asked
 // to install cannot be found. Check for it with errors.Is.
 var ErrPluginNotFound = errors.New("plugin release not found")
 
 // ErrPluginVerification means a plugin a remote registry downloaded, or one it
-// kept in its cache, failed verification: the release has no checksums file,
-// a file does not match its checksum, or, when trusted keys were given, the
-// release is not signed or its signature does not verify against any of them.
+// kept in its cache, failed verification: the release's index is incomplete
+// or uses an expression, a build does not match its checksum in the index or
+// its manifest disagrees with the index, the build doesn't speak a supported
+// plugin protocol, or, when trusted keys were given, the index is not signed
+// or its signature does not verify against any of them.
 // The GitHub registry returns it, inside a PluginInstallError, and never
 // starts a plugin that fails verification. Check for it with errors.Is.
 var ErrPluginVerification = errors.New("plugin failed verification")

@@ -109,7 +109,7 @@ func TestCreateConfigRegistersExternalPlugin(t *testing.T) {
 	c := newTestClient(t)
 	handle := c.createConfig(&corepb.CreateConfigRequest{
 		Registries: []*corepb.Registry{localRegistry(&corepb.LocalRegistry{
-			ExternalPlugins: []string{binary},
+			ExternalPluginCommands: []*corepb.ExternalPlugin{{Command: []string{binary}}},
 		})},
 		StateStore: statePath(t),
 	})
@@ -118,6 +118,39 @@ func TestCreateConfigRegistersExternalPlugin(t *testing.T) {
 
 	entity := c.find(handle, "widget.app")
 	require.Contains(t, string(entity), `"size":1`)
+}
+
+func TestCreateConfigRegistersExternalPluginFromACommand(t *testing.T) {
+	binary := testutil.BuildFixturePlugin(t, "..")
+	launcher := testutil.BuildProgram(t, "../internal/test_fixtures/plugins/launcher")
+	t.Setenv("HOME", t.TempDir())
+
+	c := newTestClient(t)
+	handle := c.createConfig(&corepb.CreateConfigRequest{
+		Registries: []*corepb.Registry{localRegistry(&corepb.LocalRegistry{
+			ExternalPluginCommands: []*corepb.ExternalPlugin{{Command: []string{launcher, binary}}},
+		})},
+		StateStore: statePath(t),
+	})
+
+	c.apply(handle, writeConfig(t, widgetConfig))
+
+	entity := c.find(handle, "widget.app")
+	require.Contains(t, string(entity), `"size":1`)
+}
+
+func TestCreateConfigRefusesAnEmptyExternalPluginCommand(t *testing.T) {
+	c := newTestClient(t)
+
+	out := c.fail(0, "CreateConfig", &corepb.CreateConfigRequest{
+		Registries: []*corepb.Registry{localRegistry(&corepb.LocalRegistry{
+			ExternalPluginCommands: []*corepb.ExternalPlugin{{Command: []string{}}},
+		})},
+	})
+
+	require.Equal(t, CodeInvalidArgument, out.GetCode())
+	require.Equal(t, "0", out.GetDetails()["registry"])
+	require.Contains(t, out.GetMessage(), "external plugin 0")
 }
 
 func TestCreateConfigGitHubRegistryUsesAPIURL(t *testing.T) {
@@ -139,7 +172,7 @@ func TestCreateConfigGitHubRegistryUsesAPIURL(t *testing.T) {
 func TestCreateConfigGitHubTamperedReleaseFails(t *testing.T) {
 	binary := testutil.BuildFixturePlugin(t, "..")
 	fake := testutil.NewFakeGitHubRelease(t, githubWidgetRepository, githubWidgetTag, binary,
-		testutil.TamperArchive(runtime.GOOS, runtime.GOARCH))
+		testutil.TamperZip(runtime.GOOS, runtime.GOARCH))
 	t.Setenv("HOME", t.TempDir())
 
 	c := newTestClient(t)

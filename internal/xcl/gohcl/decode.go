@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/jumppad-labs/xcl/internal/cty"
 	ctyjson "github.com/jumppad-labs/xcl/internal/cty/json"
@@ -236,10 +238,11 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 
 			for i, block := range blocks {
 				if len(block.Labels) > 0 {
-					if first, seen := named[block.Labels[0]]; seen {
-						diags = append(diags, duplicateBlockNameDiagnostic(typeName, first, block))
+					key := listBlockKey(block)
+					if first, seen := named[key]; seen {
+						diags = append(diags, duplicateBlockNameDiagnostic(typeName, first, block, len(block.Labels)))
 					} else {
-						named[block.Labels[0]] = block
+						named[key] = block
 					}
 				}
 
@@ -335,7 +338,7 @@ func decodeBlocksToMap(blocks hcl.Blocks, ctx *hcl.EvalContext, field reflect.Va
 
 		name := block.Labels[0]
 		if first, seen := named[name]; seen {
-			diags = append(diags, duplicateBlockNameDiagnostic(typeName, first, block))
+			diags = append(diags, duplicateBlockNameDiagnostic(typeName, first, block, 1))
 			continue
 		}
 		named[name] = block
@@ -372,8 +375,11 @@ func missingBlockNameDiagnostic(typeName string, block *hcl.Block) *hcl.Diagnost
 // checkBlockNames reports the name problems decoding the blocks of one type
 // would find: a block without a name when named is set, as for a map of
 // blocks, and a second block carrying a name already used, for maps and
-// lists alike. It is shared by the decoder and CheckBody, so validation
-// reports them without decoding.
+// lists alike. A map is keyed by each block's first label, so that is the
+// name compared; in a list a block is named by all of its labels, so
+// platform "linux" "amd64" and platform "linux" "arm64" are two names. It is
+// shared by the decoder and CheckBody, so validation reports them without
+// decoding.
 func checkBlockNames(typeName string, blocks hcl.Blocks, named bool) hcl.Diagnostics {
 	var diags hcl.Diagnostics
 	seen := map[string]*hcl.Block{}
@@ -386,27 +392,47 @@ func checkBlockNames(typeName string, blocks hcl.Blocks, named bool) hcl.Diagnos
 			continue
 		}
 
-		if first, dup := seen[block.Labels[0]]; dup {
-			diags = append(diags, duplicateBlockNameDiagnostic(typeName, first, block))
+		key, labels := block.Labels[0], 1
+		if !named {
+			key, labels = listBlockKey(block), len(block.Labels)
+		}
+
+		if first, dup := seen[key]; dup {
+			diags = append(diags, duplicateBlockNameDiagnostic(typeName, first, block, labels))
 			continue
 		}
-		seen[block.Labels[0]] = block
+		seen[key] = block
 	}
 
 	return diags
 }
 
+// listBlockKey is the name a block in a list of blocks is known by: all of
+// its labels together, joined by a byte no label written in configuration
+// carries, so "a b" "c" and "a" "b c" stay apart
+func listBlockKey(block *hcl.Block) string {
+	return strings.Join(block.Labels, "\x00")
+}
+
 // duplicateBlockNameDiagnostic reports second, which carries the name first
-// already took, at its name.
-func duplicateBlockNameDiagnostic(typeName string, first, second *hcl.Block) *hcl.Diagnostic {
+// already took, at its name. The name is the first labels of second's labels,
+// each quoted, i.e. "http" or "linux" "amd64".
+func duplicateBlockNameDiagnostic(typeName string, first, second *hcl.Block, labels int) *hcl.Diagnostic {
+	quoted := make([]string, labels)
+	for i, label := range second.Labels[:labels] {
+		quoted[i] = strconv.Quote(label)
+	}
+
+	subject := hcl.RangeBetween(second.LabelRanges[0], second.LabelRanges[labels-1])
+
 	return &hcl.Diagnostic{
 		Severity: hcl.DiagError,
 		Summary:  fmt.Sprintf("Duplicate %s name", typeName),
 		Detail: fmt.Sprintf(
-			"A %s named %q was already defined at %s. Each %s needs its own name.",
-			typeName, second.Labels[0], first.DefRange.String(), typeName,
+			"A %s named %s was already defined at %s. Each %s needs its own name.",
+			typeName, strings.Join(quoted, " "), first.DefRange.String(), typeName,
 		),
-		Subject: second.LabelRanges[0].Ptr(),
+		Subject: subject.Ptr(),
 	}
 }
 

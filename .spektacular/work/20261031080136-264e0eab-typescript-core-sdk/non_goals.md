@@ -1,0 +1,6 @@
+- Printing, highlighting and the pretty logger for TypeScript: the next spec in this epic.
+- The TypeScript SDK reference and guide on xcl.dev, and TypeScript tabs on the site: a later spec in this epic.
+- Providers written in TypeScript, TypeScript plugins and a plugin SDK.
+- Generating TypeScript types for a plugin's entity types.
+- Support guarantees for Bun and Deno.
+- A separate CommonJS build.

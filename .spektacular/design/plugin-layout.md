@@ -70,11 +70,19 @@ Every source file keeps its public surface together at the top, followed by its 
 
 ## Deciding and updating
 
-- **`Changed` is always explicit.**
-  - It answers replace when a setting that can't change in place has changed, matched with `change.Within(entity.Path{}.Attribute("<setting>"))`, or when a dependency the resource is built on is replaced.
-  - Otherwise it answers update when any setting changed, and defers to `DefaultChanged` when nothing did.
-  - The settings that need a replace are listed in one place.
-  - A provider never diffs the resource itself in another method; the decision lives in `Changed`.
+- **Replace settings are declared.**
+  - The settings that can't change in place are listed once, as the `ReplaceOn` field of the provider's embedded `DefaultChanged`, set by its constructor:
+    ```go
+    return &networkProvider{
+        DefaultChanged: plugins.DefaultChanged[*entities.Network]{
+            ReplaceOn: []entity.Path{entity.Path{}.Attribute("subnet")},
+        },
+        tasks: tasks,
+    }
+    ```
+  - `DefaultChanged` answers replace when a change falls within a `ReplaceOn` path, whether its new value is known yet or not. Otherwise it compares the JSON form of the two copies, ignoring `meta`, `depends_on` and `disabled`, and answers update when they differ and no change when they don't. It ignores dependencies. A zero-value `DefaultChanged` has no replace settings, and behaves as it always has.
+- **`Changed` is written only for rules beyond the replace settings,** such as what a replaced dependency means for the resource. It handles those rules and defers to `p.DefaultChanged.Changed(...)` for the rest, so the replace settings are never repeated in it.
+- **A provider never diffs the resource itself in another method;** the decision lives in `Changed`, whether declared or written.
 - **`Update` works only from what it is told.**
   - It acts on the `changes` and `dependencies` it is given, and works out previous values from each change's `Before`.
   - It never calls the backend to rediscover previous state. It may read back outputs, such as an assigned address, after acting.
@@ -83,7 +91,7 @@ Every source file keeps its public surface together at the top, followed by its 
 
 ## Tests
 
-- **Unit tests** sit beside each provider. They build it through its constructor with strict Mockery doubles, so an unexpected backend call fails the test. They cover the `Changed` rules, and show that `Update` makes only the calls the reported changes require.
+- **Unit tests** sit beside each provider. They build it through its constructor with strict Mockery doubles, so an unexpected backend call fails the test. They cover the `ReplaceOn` settings and any `Changed` rules, and show that `Update` makes only the calls the reported changes require.
 - **Client packages** have their own tests against doubles of the layer beneath them.
 - **Real-backend tests** skip when no backend is available.
 - **`e2e/`** builds the plugin, applies sample configurations, confirms the next plan reports no changes, and destroys them. It can run against more than one runtime, such as Docker and Podman.

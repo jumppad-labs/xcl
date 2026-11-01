@@ -82,13 +82,16 @@ func (p *GRPCPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, 
 	return proto.NewPluginServiceClient(c), nil
 }
 
-// Handshake configuration for go-plugin. The protocol version stays at 1:
-// the function RPCs, GetFunctions and CallFunction, were added to the
-// service without changing any existing message, and a plugin built before
-// them answers Unimplemented, which the host reads as offering no functions.
+// Handshake configuration for go-plugin. The host starts a plugin with
+// XCL_PLUGIN=xcl in its environment, and a plugin serves only when it is set,
+// so a plugin binary run by hand says it is not meant to be run directly. The
+// protocol version stays at 1: the function RPCs, GetFunctions and
+// CallFunction, were added to the service without changing any existing
+// message, and a plugin built before them answers Unimplemented, which the
+// host reads as offering no functions.
 var HandshakeConfig = plugin.HandshakeConfig{
 	ProtocolVersion:  1,
-	MagicCookieKey:   "HCLCONFIG_PLUGIN",
+	MagicCookieKey:   "XCL_PLUGIN",
 	MagicCookieValue: "xcl",
 }
 

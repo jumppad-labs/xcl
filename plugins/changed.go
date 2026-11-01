@@ -19,19 +19,44 @@ var resourceBaseKeys = []string{"meta", "depends_on", "disabled"}
 // Embed it in a provider to get a Changed method; defining Changed on the
 // provider overrides it.
 //
-//	type MyProvider struct {
-//		plugins.DefaultChanged[*MyResource]
+// The settings a provider can't change in place are listed once, in
+// ReplaceOn, which the provider's constructor sets:
+//
+//	type NetworkProvider struct {
+//		plugins.DefaultChanged[*Network]
 //	}
-type DefaultChanged[T any] struct{}
+//
+//	func NewNetworkProvider() *NetworkProvider {
+//		return &NetworkProvider{
+//			DefaultChanged: plugins.DefaultChanged[*Network]{
+//				ReplaceOn: []entity.Path{entity.Path{}.Attribute("subnet")},
+//			},
+//		}
+//	}
+//
+// The zero value replaces on nothing.
+type DefaultChanged[T any] struct {
+	// ReplaceOn lists the settings that can't change in place: a change at
+	// or under any of them, as entity.Path.Within matches it, answers
+	// entity.Replace
+	ReplaceOn []entity.Path
+}
 
-// Changed answers entity.Update when old and new differ and entity.NoChange
-// when they do not. It compares the JSON form of both resources, ignoring xcl's
+// Changed answers entity.Replace when one of the changes is at or under a
+// ReplaceOn setting, whether its new value is known yet or not. Otherwise it
+// answers entity.Update when old and new differ and entity.NoChange when they
+// do not, comparing the JSON form of both resources and ignoring xcl's
 // resource metadata (meta, depends_on and disabled).
 //
-// It ignores both the changes and the dependencies lists, and never answers entity.Replace: a provider that
-// cannot change some settings in place, or that must react to a replaced
-// dependency, defines its own Changed and defers to this one for the rest.
-func (DefaultChanged[T]) Changed(ctx context.Context, old T, new T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
+// It ignores the dependencies list: what a replaced or updated dependency
+// means is the provider's to decide, so a provider that must react to one
+// defines its own Changed, handles its dependencies there and defers to this
+// one for the rest, so its replace settings are never repeated.
+func (d DefaultChanged[T]) Changed(ctx context.Context, old T, new T, changes []entity.PropertyChange, dependencies []entity.DependencyChange) (entity.Change, error) {
+	if d.replaces(changes) {
+		return entity.Replace, nil
+	}
+
 	oldValue, err := comparableJSON(old)
 	if err != nil {
 		return entity.NoChange, fmt.Errorf("unable to compare old resource: %w", err)
@@ -47,6 +72,20 @@ func (DefaultChanged[T]) Changed(ctx context.Context, old T, new T, changes []en
 	}
 
 	return entity.Update, nil
+}
+
+// replaces returns true when any of changes is at or under a ReplaceOn
+// setting
+func (d DefaultChanged[T]) replaces(changes []entity.PropertyChange) bool {
+	for _, change := range changes {
+		for _, setting := range d.ReplaceOn {
+			if change.Within(setting) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // comparableJSON returns the JSON form of a resource with xcl's metadata removed.

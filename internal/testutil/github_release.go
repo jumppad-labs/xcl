@@ -1,10 +1,8 @@
 package testutil
 
 import (
-	"archive/tar"
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -35,11 +33,25 @@ var FakeReleasePlatforms = []string{
 	"windows/arm64",
 }
 
-// FakeGitHubRelease is one plugin release laid out by the plugin release
-// asset contract, served by a local HTTP server that answers like GitHub's
-// release API. It encodes the contract's names itself, rather than asking the
-// registry for them, so a test catches the registry drifting from the
-// contract.
+// The fields of a build's manifest that ManifestDisagrees can make disagree
+// with the release index
+const (
+	ManifestName     = "name"
+	ManifestVersion  = "version"
+	ManifestProtocol = "protocol"
+	ManifestPlatform = "platform"
+)
+
+// FakeManifestName is the name of the manifest at the root of every zip
+const FakeManifestName = "xcl-plugin.xcl"
+
+// FakeGitHubRelease is one plugin release laid out by version 2 of the plugin
+// release asset contract (plugin-release-assets-v2.md), served by a local
+// HTTP server that answers like GitHub's release API: a zip per platform,
+// each holding the plugin binary and its manifest, an index carrying every
+// zip's checksum, and a detached signature over the index. It encodes the
+// contract's names and formats itself, rather than asking the registry for
+// them, so a test catches the registry drifting from the contract.
 type FakeGitHubRelease struct {
 	repository string
 	tag        string
@@ -48,8 +60,9 @@ type FakeGitHubRelease struct {
 	key      *openpgp.Entity
 	otherKey *openpgp.Entity
 
-	assets   []fakeAsset
-	archives map[string][]byte
+	assets []fakeAsset
+	zips   map[string][]byte
+	index  []byte
 
 	server   *httptest.Server
 	requests atomic.Int64
@@ -65,47 +78,102 @@ type fakeAsset struct {
 	data []byte
 }
 
+// fakeContainer is the container entry a release's index offers
+type fakeContainer struct {
+	image     string
+	platforms []string
+}
+
 // fakeReleaseSettings are what the options change about a fake release
 type fakeReleaseSettings struct {
-	withoutPlatforms map[string]bool
-	tampered         map[string]bool
-	withoutChecksums bool
-	withoutSignature bool
-	signedByOther    bool
-	token            string
-	draft            bool
+	withoutPlatforms  map[string]bool
+	withoutChecksums  map[string]bool
+	tampered          map[string]bool
+	disagreements     map[string]string
+	withoutExecutable bool
+	withoutIndex      bool
+	withoutSignature  bool
+	signedByOther     bool
+	unknownKind       bool
+	indexExpression   bool
+	container         *fakeContainer
+	token             string
+	draft             bool
 }
 
 // FakeReleaseOption changes how a fake release is built or served
 type FakeReleaseOption func(*fakeReleaseSettings)
 
-// WithoutPlatform leaves the build for os/arch out of the release
+// WithoutPlatform leaves the build for os/arch out of the release: no zip is
+// attached and the index lists no platform for it
 func WithoutPlatform(os, arch string) FakeReleaseOption {
 	return func(s *fakeReleaseSettings) { s.withoutPlatforms[os+"/"+arch] = true }
 }
 
-// WithoutChecksums leaves the checksums file, and so its signature, out of
-// the release
-func WithoutChecksums() FakeReleaseOption {
-	return func(s *fakeReleaseSettings) { s.withoutChecksums = true }
+// WithoutExecutable leaves the executable out of the release: no zip is
+// attached and the index has no executable block. With WithContainer it
+// makes a container-only release.
+func WithoutExecutable() FakeReleaseOption {
+	return func(s *fakeReleaseSettings) { s.withoutExecutable = true }
 }
 
-// WithoutSignature leaves the signature over the checksums file out of the
-// release
+// WithoutIndex leaves the index, and so its signature, out of the release.
+// The zips are still attached.
+func WithoutIndex() FakeReleaseOption {
+	return func(s *fakeReleaseSettings) { s.withoutIndex = true }
+}
+
+// WithoutChecksum leaves the checksum out of the index's platform entry for
+// os/arch. The zip is still attached.
+func WithoutChecksum(os, arch string) FakeReleaseOption {
+	return func(s *fakeReleaseSettings) { s.withoutChecksums[os+"/"+arch] = true }
+}
+
+// WithoutSignature leaves the signature over the index out of the release
 func WithoutSignature() FakeReleaseOption {
 	return func(s *fakeReleaseSettings) { s.withoutSignature = true }
 }
 
-// SignedByOtherKey signs the checksums file with a key other than the one
-// PublicKey returns, the one OtherPublicKey returns
+// SignedByOtherKey signs the index with a key other than the one PublicKey
+// returns, the one OtherPublicKey returns
 func SignedByOtherKey() FakeReleaseOption {
 	return func(s *fakeReleaseSettings) { s.signedByOther = true }
 }
 
-// TamperArchive changes the build for os/arch after its checksum was taken,
-// so it no longer matches the checksums file
-func TamperArchive(os, arch string) FakeReleaseOption {
+// TamperZip changes the zip for os/arch after its checksum was written to the
+// index, so it no longer matches
+func TamperZip(os, arch string) FakeReleaseOption {
 	return func(s *fakeReleaseSettings) { s.tampered[os+"/"+arch] = true }
+}
+
+// ManifestDisagrees writes the manifest in the zip for os/arch so that field
+// (ManifestName, ManifestVersion, ManifestProtocol or ManifestPlatform)
+// disagrees with the index. The index and the zip's checksum are still
+// consistent with each other.
+func ManifestDisagrees(os, arch, field string) FakeReleaseOption {
+	return func(s *fakeReleaseSettings) { s.disagreements[os+"/"+arch] = field }
+}
+
+// WithUnknownKind adds a top-level block of a package kind no registry knows,
+// `wasm { protocol = [3] }`, to the index
+func WithUnknownKind() FakeReleaseOption {
+	return func(s *fakeReleaseSettings) { s.unknownKind = true }
+}
+
+// WithContainer adds a container entry to the index naming image and listing
+// platforms, each as os/arch. The image and platforms are written as given,
+// so a test can offer a tag instead of a digest or a platform other than
+// Linux.
+func WithContainer(image string, platforms ...string) FakeReleaseOption {
+	return func(s *fakeReleaseSettings) {
+		s.container = &fakeContainer{image: image, platforms: platforms}
+	}
+}
+
+// IndexExpression writes the index's plugin version as a function call,
+// `upper("<version>")`, instead of a literal
+func IndexExpression() FakeReleaseOption {
+	return func(s *fakeReleaseSettings) { s.indexExpression = true }
 }
 
 // RequireToken serves the release only to requests carrying token, as
@@ -121,15 +189,20 @@ func Draft() FakeReleaseOption {
 }
 
 // NewFakeGitHubRelease builds a release of repository (owner/repo) at tag
-// from the plugin binary at binary, packed for every platform in
-// FakeReleasePlatforms, with a checksums file and a signature made with a
-// key generated for the test, and serves it until the test ends. Every
-// platform's archive holds the same binary, so only the host platform's
-// build can be started.
+// from the plugin binary at binary, zipped with its manifest for every
+// platform in FakeReleasePlatforms, with an index carrying every zip's
+// checksum and a signature over the index made with a key generated for the
+// test, and serves it until the test ends. Every platform's zip holds the
+// same binary, so only the host platform's build can be started.
 func NewFakeGitHubRelease(t testing.TB, repository, tag, binary string, options ...FakeReleaseOption) *FakeGitHubRelease {
 	t.Helper()
 
-	settings := fakeReleaseSettings{withoutPlatforms: map[string]bool{}, tampered: map[string]bool{}}
+	settings := fakeReleaseSettings{
+		withoutPlatforms: map[string]bool{},
+		withoutChecksums: map[string]bool{},
+		tampered:         map[string]bool{},
+		disagreements:    map[string]string{},
+	}
 	for _, option := range options {
 		option(&settings)
 	}
@@ -143,7 +216,7 @@ func NewFakeGitHubRelease(t testing.TB, repository, tag, binary string, options 
 		settings:   settings,
 		key:        newFakeSigningKey(t, "xcl plugin release"),
 		otherKey:   newFakeSigningKey(t, "someone else"),
-		archives:   map[string][]byte{},
+		zips:       map[string][]byte{},
 	}
 
 	f.build(t, contents)
@@ -217,31 +290,31 @@ func (f *FakeGitHubRelease) OtherKeyID() string {
 	return fmt.Sprintf("%016X", key.PublicKey.KeyId)
 }
 
-// Archive is the build for os/arch as it is served, nil when the release has
-// none
-func (f *FakeGitHubRelease) Archive(os, arch string) []byte {
-	return f.archives[os+"/"+arch]
+// IndexName is the contract's name for the release's index
+func (f *FakeGitHubRelease) IndexName() string {
+	return fmt.Sprintf("%s_%s_index.xcl", f.pluginName(), f.version())
 }
 
-// ArchiveName is the contract's name for the build for os/arch
-func (f *FakeGitHubRelease) ArchiveName(os, arch string) string {
-	name := fmt.Sprintf("%s_%s_%s_%s.tar.gz", f.pluginName(), f.version(), os, arch)
-	if os == "windows" {
-		name = fmt.Sprintf("%s_%s_%s_%s.zip", f.pluginName(), f.version(), os, arch)
-	}
-
-	return name
-}
-
-// ChecksumsName is the contract's name for the release's checksums file
-func (f *FakeGitHubRelease) ChecksumsName() string {
-	return fmt.Sprintf("%s_%s_checksums.txt", f.pluginName(), f.version())
-}
-
-// SignatureName is the contract's name for the signature over the checksums
-// file
+// SignatureName is the contract's name for the signature over the index
 func (f *FakeGitHubRelease) SignatureName() string {
-	return f.ChecksumsName() + ".sig"
+	return f.IndexName() + ".sig"
+}
+
+// ZipName is the contract's name for the zip of the build for os/arch
+func (f *FakeGitHubRelease) ZipName(os, arch string) string {
+	return fmt.Sprintf("%s_%s_%s_%s.zip", f.pluginName(), f.version(), os, arch)
+}
+
+// Zip is the zip of the build for os/arch as it is served, nil when the
+// release has none
+func (f *FakeGitHubRelease) Zip(os, arch string) []byte {
+	return f.zips[os+"/"+arch]
+}
+
+// Index is the release's index as it is served, nil when the release has
+// none
+func (f *FakeGitHubRelease) Index() []byte {
+	return f.index
 }
 
 // pluginName is the repository's name, the contract's plugin name
@@ -255,43 +328,47 @@ func (f *FakeGitHubRelease) version() string {
 	return strings.TrimPrefix(f.tag, "v")
 }
 
-// build packs the binary for every platform and writes the checksums file
-// and the signature
+// build zips the binary with its manifest for every platform, then writes
+// the index and the signature over it
 func (f *FakeGitHubRelease) build(t testing.TB, binary []byte) {
 	t.Helper()
 
-	var checksums strings.Builder
+	checksums := map[string]string{}
 
-	for _, platform := range FakeReleasePlatforms {
-		if f.settings.withoutPlatforms[platform] {
-			continue
+	if !f.settings.withoutExecutable {
+		for _, platform := range FakeReleasePlatforms {
+			if f.settings.withoutPlatforms[platform] {
+				continue
+			}
+
+			os, arch, _ := strings.Cut(platform, "/")
+
+			command := f.pluginName()
+			if os == "windows" {
+				command += ".exe"
+			}
+
+			manifest := f.manifest(command, os, arch, f.settings.disagreements[platform])
+			archive := zipArchive(t, command, binary, manifest)
+
+			sum := sha256.Sum256(archive)
+			checksums[platform] = "sha256:" + hex.EncodeToString(sum[:])
+
+			if f.settings.tampered[platform] {
+				archive = append(append([]byte{}, archive...), []byte("tampered")...)
+			}
+
+			f.zips[platform] = archive
+			f.addAsset(f.ZipName(os, arch), archive)
 		}
-
-		os, arch, _ := strings.Cut(platform, "/")
-
-		var archive []byte
-		if os == "windows" {
-			archive = zipArchive(t, f.pluginName()+".exe", binary)
-		} else {
-			archive = tarGzArchive(t, f.pluginName(), binary)
-		}
-
-		sum := sha256.Sum256(archive)
-		fmt.Fprintf(&checksums, "%s  %s\n", hex.EncodeToString(sum[:]), f.ArchiveName(os, arch))
-
-		if f.settings.tampered[platform] {
-			archive = append(append([]byte{}, archive...), []byte("tampered")...)
-		}
-
-		f.archives[platform] = archive
-		f.addAsset(f.ArchiveName(os, arch), archive)
 	}
 
-	if f.settings.withoutChecksums {
+	if f.settings.withoutIndex {
 		return
 	}
 
-	f.addAsset(f.ChecksumsName(), []byte(checksums.String()))
+	f.index = f.indexFile(checksums)
+	f.addAsset(f.IndexName(), f.index)
 
 	if f.settings.withoutSignature {
 		return
@@ -303,10 +380,101 @@ func (f *FakeGitHubRelease) build(t testing.TB, binary []byte) {
 	}
 
 	var signature bytes.Buffer
-	err := openpgp.ArmoredDetachSign(&signature, signer, strings.NewReader(checksums.String()), nil)
+	err := openpgp.ArmoredDetachSign(&signature, signer, bytes.NewReader(f.index), nil)
 	require.NoError(t, err)
 
 	f.addAsset(f.SignatureName(), signature.Bytes())
+}
+
+// manifest writes the xcl-plugin.xcl for the build of command for os/arch,
+// with disagree, when set, naming the field that must not match the index
+func (f *FakeGitHubRelease) manifest(command, os, arch, disagree string) []byte {
+	name := f.pluginName()
+	version := f.version()
+	protocol := "1"
+	platformOS, platformArch := os, arch
+
+	switch disagree {
+	case ManifestName:
+		name += "-other"
+	case ManifestVersion:
+		version += "-other"
+	case ManifestProtocol:
+		protocol = "2"
+	case ManifestPlatform:
+		platformOS, platformArch = otherPlatform(os, arch)
+	}
+
+	var out strings.Builder
+
+	fmt.Fprintf(&out, "plugin {\n  name    = %q\n  version = %q\n}\n\n", name, version)
+	fmt.Fprintf(&out, "executable {\n  protocol = [%s]\n  command  = [%q]\n\n", protocol, command)
+	fmt.Fprintf(&out, "  platform %q %q {}\n}\n", platformOS, platformArch)
+
+	return []byte(out.String())
+}
+
+// indexFile writes the release's index, listing every zip with its checksum
+// from checksums (keyed by os/arch) and any container or unknown kind the
+// options add
+func (f *FakeGitHubRelease) indexFile(checksums map[string]string) []byte {
+	var out strings.Builder
+
+	version := strconv.Quote(f.version())
+	if f.settings.indexExpression {
+		version = fmt.Sprintf("upper(%q)", f.version())
+	}
+
+	fmt.Fprintf(&out, "plugin {\n  name    = %q\n  version = %s\n}\n", f.pluginName(), version)
+
+	if !f.settings.withoutExecutable {
+		out.WriteString("\nexecutable {\n  protocol = [1]\n")
+
+		for _, platform := range FakeReleasePlatforms {
+			checksum, ok := checksums[platform]
+			if !ok {
+				continue
+			}
+
+			os, arch, _ := strings.Cut(platform, "/")
+
+			fmt.Fprintf(&out, "\n  platform %q %q {\n    asset    = %q\n", os, arch, f.ZipName(os, arch))
+
+			if !f.settings.withoutChecksums[platform] {
+				fmt.Fprintf(&out, "    checksum = %q\n", checksum)
+			}
+
+			out.WriteString("  }\n")
+		}
+
+		out.WriteString("}\n")
+	}
+
+	if container := f.settings.container; container != nil {
+		fmt.Fprintf(&out, "\ncontainer {\n  protocol = [1]\n  image    = %q\n", container.image)
+
+		for _, platform := range container.platforms {
+			os, arch, _ := strings.Cut(platform, "/")
+			fmt.Fprintf(&out, "\n  platform %q %q {}\n", os, arch)
+		}
+
+		out.WriteString("}\n")
+	}
+
+	if f.settings.unknownKind {
+		out.WriteString("\nwasm {\n  protocol = [3]\n}\n")
+	}
+
+	return []byte(out.String())
+}
+
+// otherPlatform is a supported platform other than os/arch
+func otherPlatform(os, arch string) (string, string) {
+	if os == "linux" && arch == "amd64" {
+		return "darwin", "arm64"
+	}
+
+	return "linux", "amd64"
 }
 
 // addAsset attaches a file to the release
@@ -436,62 +604,36 @@ func armoredPublicKey(entity *openpgp.Entity) string {
 	return out.String()
 }
 
-// tarGzArchive packs binary at the root of a gzipped tar under name. The
-// gzip stream is stored without compression: every test builds a release of
-// a plugin binary for every platform, and compressing it is what made the
-// registry tests outlast go test's timeout under the race detector.
-func tarGzArchive(t testing.TB, name string, binary []byte) []byte {
-	t.Helper()
-
-	var out bytes.Buffer
-	compressed, err := gzip.NewWriterLevel(&out, gzip.NoCompression)
-	require.NoError(t, err)
-
-	archive := tar.NewWriter(compressed)
-
-	err = archive.WriteHeader(&tar.Header{Name: name, Mode: 0755, Size: int64(len(binary)), Typeflag: tar.TypeReg})
-	require.NoError(t, err)
-
-	_, err = archive.Write(binary)
-	require.NoError(t, err)
-
-	readme := []byte("# " + name + "\n")
-	err = archive.WriteHeader(&tar.Header{Name: "README.md", Mode: 0644, Size: int64(len(readme)), Typeflag: tar.TypeReg})
-	require.NoError(t, err)
-
-	_, err = archive.Write(readme)
-	require.NoError(t, err)
-
-	require.NoError(t, archive.Close())
-	require.NoError(t, compressed.Close())
-
-	return out.Bytes()
-}
-
-// zipArchive packs binary at the root of a zip under name, stored without
-// compression for the same reason as tarGzArchive
-func zipArchive(t testing.TB, name string, binary []byte) []byte {
+// zipArchive packs binary under command, marked executable, a README and the
+// manifest at the root of a zip. Entries are stored without compression:
+// every test builds a release of a plugin binary for every platform, and
+// compressing it is what made the registry tests outlast go test's timeout
+// under the race detector.
+func zipArchive(t testing.TB, command string, binary, manifest []byte) []byte {
 	t.Helper()
 
 	var out bytes.Buffer
 	archive := zip.NewWriter(&out)
 
-	header := &zip.FileHeader{Name: name, Method: zip.Store}
-	header.SetMode(0755)
-
-	writer, err := archive.CreateHeader(header)
-	require.NoError(t, err)
-
-	_, err = writer.Write(binary)
-	require.NoError(t, err)
-
-	readme, err := archive.Create("README.md")
-	require.NoError(t, err)
-
-	_, err = readme.Write([]byte("# " + name + "\n"))
-	require.NoError(t, err)
+	writeZipEntry(t, archive, command, 0755, binary)
+	writeZipEntry(t, archive, FakeManifestName, 0644, manifest)
+	writeZipEntry(t, archive, "README.md", 0644, []byte("# "+command+"\n"))
 
 	require.NoError(t, archive.Close())
 
 	return out.Bytes()
+}
+
+// writeZipEntry stores data in archive under name with mode
+func writeZipEntry(t testing.TB, archive *zip.Writer, name string, mode os.FileMode, data []byte) {
+	t.Helper()
+
+	header := &zip.FileHeader{Name: name, Method: zip.Store}
+	header.SetMode(mode)
+
+	writer, err := archive.CreateHeader(header)
+	require.NoError(t, err)
+
+	_, err = writer.Write(data)
+	require.NoError(t, err)
 }

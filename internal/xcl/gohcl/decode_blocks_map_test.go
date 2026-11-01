@@ -247,6 +247,52 @@ listener "tcp" "a" {
 	require.Equal(t, 1, app.Listeners[0].Port)
 }
 
+func TestDecodeMultiLabelBlocksSharingTheirFirstLabelIntoList(t *testing.T) {
+	body := parseDecodeBody(t, `
+listener "tcp" "a" {
+  port = 1
+}
+
+listener "tcp" "b" {
+  port = 2
+}
+`)
+
+	var app twoLabelsApp
+	diags := DecodeBody(body, nil, &app)
+	require.False(t, diags.HasErrors(), diags.Error())
+
+	require.Len(t, app.Listeners, 2)
+	require.Equal(t, "tcp", app.Listeners[0].Kind)
+	require.Equal(t, "a", app.Listeners[0].Name)
+	require.Equal(t, "tcp", app.Listeners[1].Kind)
+	require.Equal(t, "b", app.Listeners[1].Name)
+}
+
+func TestDecodeDuplicateMultiLabelBlockInListFails(t *testing.T) {
+	body := parseDecodeBody(t, `
+listener "tcp" "a" {
+  port = 1
+}
+
+listener "tcp" "a" {
+  port = 2
+}
+`)
+
+	var app twoLabelsApp
+	diags := DecodeBody(body, nil, &app)
+	require.True(t, diags.HasErrors())
+
+	require.Len(t, diags, 1)
+	require.Equal(t, "Duplicate listener name", diags[0].Summary)
+	require.Contains(t, diags[0].Detail, `A listener named "tcp" "a" was already defined at test.xcl:2,1`)
+	require.NotNil(t, diags[0].Subject)
+	require.Equal(t, 6, diags[0].Subject.Start.Line)
+	require.Equal(t, 10, diags[0].Subject.Start.Column)
+	require.Equal(t, 19, diags[0].Subject.End.Column)
+}
+
 func TestDecodeSingleBlockKeepsStrictLabelCount(t *testing.T) {
 	body := parseDecodeBody(t, `
 listener {

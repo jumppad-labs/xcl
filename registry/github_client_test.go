@@ -17,7 +17,7 @@ import (
 const (
 	clientTestRepository = "acme/xcl-plugin-widget"
 	clientTestTag        = "v1.0.0"
-	clientTestArchive    = "xcl-plugin-widget_1.0.0_linux_amd64.tar.gz"
+	clientTestZip        = "xcl-plugin-widget_1.0.0_linux_amd64.zip"
 )
 
 func newClientTestRelease(t *testing.T, options ...testutil.FakeReleaseOption) *testutil.FakeGitHubRelease {
@@ -39,7 +39,7 @@ func TestReleaseReadsExistingRelease(t *testing.T) {
 	require.Equal(t, "v1.0.0", release.TagName)
 	require.False(t, release.Draft)
 
-	_, found := release.asset(clientTestArchive)
+	_, found := release.asset(clientTestZip)
 	require.True(t, found)
 }
 
@@ -50,9 +50,9 @@ func TestReleaseAssetFindsByExactName(t *testing.T) {
 	release, err := client.release(context.Background(), clientTestRepository, clientTestTag)
 	require.NoError(t, err)
 
-	asset, found := release.asset(clientTestArchive)
+	asset, found := release.asset(clientTestZip)
 	require.True(t, found)
-	require.Equal(t, clientTestArchive, asset.Name)
+	require.Equal(t, clientTestZip, asset.Name)
 	require.NotEmpty(t, asset.URL)
 }
 
@@ -63,23 +63,23 @@ func TestReleaseAssetUnknownNameIsNotFound(t *testing.T) {
 	release, err := client.release(context.Background(), clientTestRepository, clientTestTag)
 	require.NoError(t, err)
 
-	_, found := release.asset("xcl-plugin-widget_1.0.0_plan9_amd64.tar.gz")
+	_, found := release.asset("xcl-plugin-widget_1.0.0_plan9_amd64.zip")
 	require.False(t, found)
 }
 
-func TestDownloadWritesArchiveBytes(t *testing.T) {
+func TestDownloadWritesZipBytes(t *testing.T) {
 	fake := newClientTestRelease(t)
 	client := &releaseClient{baseURL: fake.URL(), http: http.DefaultClient}
 
 	release, err := client.release(context.Background(), clientTestRepository, clientTestTag)
 	require.NoError(t, err)
 
-	asset, found := release.asset(clientTestArchive)
+	asset, found := release.asset(clientTestZip)
 	require.True(t, found)
 
 	var written bytesBuffer
 	require.NoError(t, client.download(context.Background(), asset, &written))
-	require.Equal(t, fake.Archive("linux", "amd64"), written.data)
+	require.Equal(t, fake.Zip("linux", "amd64"), written.data)
 }
 
 func TestDownloadToWritesFile(t *testing.T) {
@@ -89,15 +89,15 @@ func TestDownloadToWritesFile(t *testing.T) {
 	release, err := client.release(context.Background(), clientTestRepository, clientTestTag)
 	require.NoError(t, err)
 
-	asset, found := release.asset(clientTestArchive)
+	asset, found := release.asset(clientTestZip)
 	require.True(t, found)
 
-	path := filepath.Join(t.TempDir(), "plugin.tar.gz")
+	path := filepath.Join(t.TempDir(), "plugin.zip")
 	require.NoError(t, downloadTo(context.Background(), client, asset, path))
 
 	contents, err := os.ReadFile(path)
 	require.NoError(t, err)
-	require.Equal(t, fake.Archive("linux", "amd64"), contents)
+	require.Equal(t, fake.Zip("linux", "amd64"), contents)
 }
 
 func TestReleaseMissingTagIsPluginNotFound(t *testing.T) {
@@ -159,7 +159,7 @@ func TestDownloadSendsOctetStreamAccept(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := &releaseClient{baseURL: server.URL, http: http.DefaultClient}
-	asset := githubAsset{ID: 1, Name: clientTestArchive, URL: server.URL + "/asset"}
+	asset := githubAsset{ID: 1, Name: clientTestZip, URL: server.URL + "/asset"}
 
 	var written bytesBuffer
 	require.NoError(t, client.download(context.Background(), asset, &written))

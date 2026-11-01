@@ -102,7 +102,7 @@ func TestGitHubPluginInstallWithoutTrustedKeysInstallsUnsignedRelease(t *testing
 	gh := newSignatureTestRegistry(t, fake.URL(), cache)
 	plugin := widgetPlugin(t, gh)
 
-	binary, err := plugin.install(nil)
+	binary, _, err := plugin.install(nil)
 	require.NoError(t, err)
 	require.Equal(t, filepath.Join(hostEntryDirectory(cache), hostBinaryName()), binary)
 	require.FileExists(t, binary)
@@ -115,7 +115,7 @@ func TestGitHubPluginInstallWithoutTrustedKeysKeepsSignatureOfSignedRelease(t *t
 	gh := newSignatureTestRegistry(t, fake.URL(), cache)
 	plugin := widgetPlugin(t, gh)
 
-	_, err := plugin.install(nil)
+	_, _, err := plugin.install(nil)
 	require.NoError(t, err)
 
 	require.FileExists(t, filepath.Join(hostEntryDirectory(cache), fake.SignatureName()))
@@ -126,7 +126,7 @@ func TestGitHubPluginStartRefusesCachedEntryNotSignedByNowTrustedKeyOffline(t *t
 	cache := t.TempDir()
 
 	installer := newSignatureTestRegistry(t, fake.URL(), cache)
-	_, err := widgetPlugin(t, installer).install(nil)
+	_, _, err := widgetPlugin(t, installer).install(nil)
 	require.NoError(t, err)
 
 	fake.Close()
@@ -145,7 +145,7 @@ func TestGitHubPluginStartUsesCachedEntrySignedByTrustedKeyOffline(t *testing.T)
 	cache := t.TempDir()
 
 	installer := newSignatureTestRegistry(t, fake.URL(), cache, fake.PublicKey())
-	_, err := widgetPlugin(t, installer).install(nil)
+	_, _, err := widgetPlugin(t, installer).install(nil)
 	require.NoError(t, err)
 
 	fake.Close()
@@ -175,7 +175,7 @@ func TestGitHubPluginStartRefusesCachedEntryWithAlteredSignature(t *testing.T) {
 	gh := newSignatureTestRegistry(t, fake.URL(), cache, fake.PublicKey())
 	plugin := widgetPlugin(t, gh)
 
-	_, err := plugin.install(nil)
+	_, _, err := plugin.install(nil)
 	require.NoError(t, err)
 
 	signaturePath := filepath.Join(hostEntryDirectory(cache), fake.SignatureName())
@@ -187,4 +187,62 @@ func TestGitHubPluginStartRefusesCachedEntryWithAlteredSignature(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, host)
 	require.ErrorIs(t, err, xclerrors.ErrPluginVerification)
+}
+
+func TestGitHubPluginStartWithTrustedKeyDownloadsNothingFromAnUnsignedRelease(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithoutSignature())
+	gh := newSignatureTestRegistry(t, fake.URL(), t.TempDir(), fake.PublicKey())
+	plugin := widgetPlugin(t, gh)
+
+	_, err := plugin.Start(nil)
+	require.Error(t, err)
+
+	// only the release is read, neither the index nor a build is downloaded
+	require.Equal(t, 1, fake.Requests())
+}
+
+func TestGitHubPluginStartWithTrustedKeyDownloadsNoBuildOfAReleaseSignedByOtherKey(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.SignedByOtherKey())
+	gh := newSignatureTestRegistry(t, fake.URL(), t.TempDir(), fake.PublicKey())
+	plugin := widgetPlugin(t, gh)
+
+	_, err := plugin.Start(nil)
+	require.Error(t, err)
+
+	// the release, the index and its signature, and no zip
+	require.Equal(t, 3, fake.Requests())
+}
+
+func TestGitHubPluginInstallWithTrustedKeyDownloadsTheReleaseIndexSignatureAndOneZip(t *testing.T) {
+	fake := newInstallTestRelease(t)
+	gh := newSignatureTestRegistry(t, fake.URL(), t.TempDir(), fake.PublicKey())
+	plugin := widgetPlugin(t, gh)
+
+	_, _, err := plugin.install(nil)
+	require.NoError(t, err)
+
+	require.Equal(t, 4, fake.Requests())
+}
+
+func TestGitHubPluginStartRefusesCachedEntryWithAlteredIndex(t *testing.T) {
+	fake := newInstallTestRelease(t)
+	cache := t.TempDir()
+	gh := newSignatureTestRegistry(t, fake.URL(), cache, fake.PublicKey())
+	plugin := widgetPlugin(t, gh)
+
+	_, _, err := plugin.install(nil)
+	require.NoError(t, err)
+
+	// a comment leaves the index meaning the same, but it is no longer the
+	// file that was signed
+	indexPath := filepath.Join(hostEntryDirectory(cache), "xcl-plugin-widget_1.0.0_index.xcl")
+	index, err := os.ReadFile(indexPath)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(indexPath, append(index, []byte("\n# altered\n")...), 0644))
+
+	host, err := plugin.Start(nil)
+	require.Error(t, err)
+	require.Nil(t, host)
+	require.ErrorIs(t, err, xclerrors.ErrPluginVerification)
+	require.ErrorContains(t, err, "does not verify against any trusted key")
 }

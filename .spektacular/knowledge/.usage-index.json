@@ -5,7 +5,16 @@
       "created": "2026-09-21T19:03:46Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 2,
+        "last": "2026-10-31T20:14:03.497910608Z",
+        "recent": [
+          {
+            "at": "2026-10-31T16:11:54.945655012Z"
+          },
+          {
+            "at": "2026-10-31T20:14:03.497910608Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -25,7 +34,13 @@
       "created": "2026-10-26T11:36:47.670775284Z",
       "tracked_since": "2026-10-26T11:36:47.670775284Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T16:11:54.945655012Z",
+        "recent": [
+          {
+            "at": "2026-10-31T16:11:54.945655012Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 2,
@@ -44,10 +59,30 @@
       "created": "2026-10-27T07:04:37.917295452Z",
       "tracked_since": "2026-10-27T07:04:37.917295452Z",
       "discoveries": {
-        "count": 0
+        "count": 3,
+        "last": "2026-11-01T08:50:41.122142879Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:38.840036435Z"
+          },
+          {
+            "at": "2026-10-31T19:38:32.701755945Z"
+          },
+          {
+            "at": "2026-11-01T08:50:41.122142879Z"
+          }
+        ]
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:45.132829444Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:45.132829444Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "architecture/shared-public-types-live-in-types.md": {
@@ -64,14 +99,20 @@
       "created": "2026-07-08T07:10:57Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 2,
-        "last": "2026-10-26T11:36:15.868615332Z",
+        "count": 4,
+        "last": "2026-10-31T20:14:03.497910608Z",
         "recent": [
           {
             "at": "2026-10-26T10:33:13.109889552Z"
           },
           {
             "at": "2026-10-26T11:36:15.868615332Z"
+          },
+          {
+            "at": "2026-10-31T16:11:54.945655012Z"
+          },
+          {
+            "at": "2026-10-31T20:14:03.497910608Z"
           }
         ]
       },
@@ -86,7 +127,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/code-style.md": {
@@ -96,7 +145,42 @@
         "count": 0
       },
       "retrievals": {
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
+      }
+    },
+    "conventions/config-files-are-xcl.md": {
+      "created": "2026-10-31T16:12:09.653812669Z",
+      "tracked_since": "2026-10-31T16:12:09.653812669Z",
+      "discoveries": {
         "count": 0
+      },
+      "retrievals": {
+        "count": 4,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T16:12:15.466655128Z"
+          },
+          {
+            "at": "2026-10-31T16:12:19.620531407Z"
+          },
+          {
+            "at": "2026-10-31T16:12:27.795305665Z"
+          },
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/config-parser-options-builder.md": {
@@ -106,7 +190,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/database-and-external-services.md": {
@@ -116,7 +208,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/dependencies.md": {
@@ -126,7 +226,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/development-standards.md": {
@@ -136,7 +244,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/find-references-with-hclsyntax-variables.md": {
@@ -146,12 +262,38 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/never-modify-dependencies.md": {
       "created": "2026-09-19T11:06:59Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
+      }
+    },
+    "conventions/no-compatibility-before-stable.md": {
+      "created": "2026-10-31T19:38:42.748710809Z",
+      "tracked_since": "2026-10-31T19:38:42.748710809Z",
       "discoveries": {
         "count": 0
       },
@@ -166,7 +308,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/project-structure.md": {
@@ -176,7 +326,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/release-plan-after-implementation.md": {
@@ -186,8 +344,8 @@
         "count": 0
       },
       "retrievals": {
-        "count": 2,
-        "last": "2026-10-27T07:41:18.92299762Z",
+        "count": 3,
+        "last": "2026-10-31T18:15:18.353153349Z",
         "recent": [
           {
             "at": "2026-10-27T07:37:48.379089606Z",
@@ -198,6 +356,11 @@
             "at": "2026-10-27T07:41:18.92299762Z",
             "workflow": "implement",
             "spec": "20261016064106-8931613a-python-encode-entity"
+          },
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
           }
         ]
       }
@@ -209,7 +372,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/shared-test-helpers.md": {
@@ -219,7 +390,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/test-state-from-real-apply.md": {
@@ -229,7 +408,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/testing-and-mocking.md": {
@@ -239,7 +426,15 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "conventions/testing-provider-changed-and-update.md": {
@@ -249,7 +444,31 @@
         "count": 0
       },
       "retrievals": {
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
+      }
+    },
+    "decisions/one-package-per-language.md": {
+      "created": "2026-10-31T17:51:36.085597089Z",
+      "tracked_since": "2026-10-31T17:51:36.085597089Z",
+      "discoveries": {
         "count": 0
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-10-31T17:53:46.591184768Z",
+        "recent": [
+          {
+            "at": "2026-10-31T17:53:46.591184768Z"
+          }
+        ]
       }
     },
     "decisions/own-hcl-fork-with-xcl-tags.md": {
@@ -266,8 +485,8 @@
       "created": "2026-07-08T07:10:57Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 4,
-        "last": "2026-10-26T11:36:15.868615332Z",
+        "count": 10,
+        "last": "2026-11-01T08:42:43.710694994Z",
         "recent": [
           {
             "at": "2026-10-26T08:33:09.576183409Z"
@@ -280,6 +499,24 @@
           },
           {
             "at": "2026-10-26T11:36:15.868615332Z"
+          },
+          {
+            "at": "2026-10-31T16:11:54.945655012Z"
+          },
+          {
+            "at": "2026-10-31T18:15:38.840036435Z"
+          },
+          {
+            "at": "2026-10-31T18:15:45.162407947Z"
+          },
+          {
+            "at": "2026-10-31T19:36:44.31315258Z"
+          },
+          {
+            "at": "2026-10-31T20:14:03.497910608Z"
+          },
+          {
+            "at": "2026-11-01T08:42:43.710694994Z"
           }
         ]
       },
@@ -291,19 +528,40 @@
       "created": "2026-10-11T15:34:21Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 2,
-        "last": "2026-10-26T11:36:15.868615332Z",
+        "count": 6,
+        "last": "2026-11-01T08:42:43.710694994Z",
         "recent": [
           {
             "at": "2026-10-26T11:36:15.862106556Z"
           },
           {
             "at": "2026-10-26T11:36:15.868615332Z"
+          },
+          {
+            "at": "2026-10-31T16:11:54.945655012Z"
+          },
+          {
+            "at": "2026-10-31T19:36:44.31315258Z"
+          },
+          {
+            "at": "2026-10-31T19:38:32.701755945Z"
+          },
+          {
+            "at": "2026-11-01T08:42:43.710694994Z"
           }
         ]
       },
       "retrievals": {
-        "count": 0
+        "count": 2,
+        "last": "2026-10-31T19:37:17.634696558Z",
+        "recent": [
+          {
+            "at": "2026-10-31T19:36:49.349565733Z"
+          },
+          {
+            "at": "2026-10-31T19:37:17.634696558Z"
+          }
+        ]
       }
     },
     "glossary/entity.md": {
@@ -313,21 +571,38 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T18:15:18.353153349Z",
+        "recent": [
+          {
+            "at": "2026-10-31T18:15:18.353153349Z",
+            "workflow": "plan",
+            "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          }
+        ]
       }
     },
     "gotchas/buf-field-no-delete.md": {
       "created": "2026-10-23T10:17:24Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 2,
-        "last": "2026-10-26T11:59:19.538696975Z",
+        "count": 5,
+        "last": "2026-10-31T19:38:32.701755945Z",
         "recent": [
           {
             "at": "2026-10-26T10:33:13.10339115Z"
           },
           {
             "at": "2026-10-26T11:59:19.538696975Z"
+          },
+          {
+            "at": "2026-10-31T19:33:55.612548134Z"
+          },
+          {
+            "at": "2026-10-31T19:33:59.30346763Z"
+          },
+          {
+            "at": "2026-10-31T19:38:32.701755945Z"
           }
         ]
       },
@@ -340,6 +615,22 @@
           },
           {
             "at": "2026-10-26T11:59:22.225944113Z"
+          }
+        ]
+      }
+    },
+    "gotchas/build-fixtures-before-isolating-home.md": {
+      "created": "2026-11-01T08:43:02.952721747Z",
+      "tracked_since": "2026-11-01T08:43:02.952721747Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-11-01T08:44:03.372955268Z",
+        "recent": [
+          {
+            "at": "2026-11-01T08:44:03.372955268Z"
           }
         ]
       }
@@ -425,7 +716,13 @@
       "created": "2026-10-06T12:43:27Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T20:14:03.497910608Z",
+        "recent": [
+          {
+            "at": "2026-10-31T20:14:03.497910608Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -510,6 +807,16 @@
     "gotchas/meta-type-holds-two-axes.md": {
       "created": "2026-09-21T09:07:43Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/nested-blocks-named-by-first-label.md": {
+      "created": "2026-10-31T17:00:46.899283735Z",
+      "tracked_since": "2026-10-31T17:00:46.899283735Z",
       "discoveries": {
         "count": 0
       },
@@ -746,7 +1053,13 @@
       "created": "2026-10-26T11:44:21.352630406Z",
       "tracked_since": "2026-10-26T11:44:21.352630406Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-10-31T16:11:54.945655012Z",
+        "recent": [
+          {
+            "at": "2026-10-31T16:11:54.945655012Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 3,
@@ -768,14 +1081,20 @@
       "created": "2026-10-11T15:34:21Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 2,
-        "last": "2026-10-27T07:04:12.366180951Z",
+        "count": 4,
+        "last": "2026-11-01T08:50:41.122142879Z",
         "recent": [
           {
             "at": "2026-10-27T07:04:08.535467063Z"
           },
           {
             "at": "2026-10-27T07:04:12.366180951Z"
+          },
+          {
+            "at": "2026-10-31T19:38:32.701755945Z"
+          },
+          {
+            "at": "2026-11-01T08:50:41.122142879Z"
           }
         ]
       },

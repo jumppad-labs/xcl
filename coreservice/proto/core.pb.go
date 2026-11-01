@@ -299,7 +299,7 @@ func (x StateTask_Kind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StateTask_Kind.Descriptor instead.
 func (StateTask_Kind) EnumDescriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{26, 0}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{27, 0}
 }
 
 // Error is every application error, crossing as one message. code is stable
@@ -866,14 +866,14 @@ func (*Registry_Local) isRegistry_Kind() {}
 func (*Registry_Github) isRegistry_Kind() {}
 
 type LocalRegistry struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	PluginPattern     string                 `protobuf:"bytes,1,opt,name=plugin_pattern,json=pluginPattern,proto3" json:"plugin_pattern,omitempty"`             // registry.PluginPattern, empty keeps the default
-	Types             []*DeclaredType        `protobuf:"bytes,2,rep,name=types,proto3" json:"types,omitempty"`                                                  // registry.TypeFromSchema + RegisterType
-	ExternalPlugins   []string               `protobuf:"bytes,3,rep,name=external_plugins,json=externalPlugins,proto3" json:"external_plugins,omitempty"`       // RegisterExternalPlugin
-	PluginDirectories []string               `protobuf:"bytes,4,rep,name=plugin_directories,json=pluginDirectories,proto3" json:"plugin_directories,omitempty"` // RegisterPluginDirectory
-	Functions         []*DeclaredFunction    `protobuf:"bytes,5,rep,name=functions,proto3" json:"functions,omitempty"`                                          // host-language functions, RegisterFunction
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	PluginPattern          string                 `protobuf:"bytes,1,opt,name=plugin_pattern,json=pluginPattern,proto3" json:"plugin_pattern,omitempty"`                              // registry.PluginPattern, empty keeps the default
+	Types                  []*DeclaredType        `protobuf:"bytes,2,rep,name=types,proto3" json:"types,omitempty"`                                                                   // registry.TypeFromSchema + RegisterType
+	PluginDirectories      []string               `protobuf:"bytes,4,rep,name=plugin_directories,json=pluginDirectories,proto3" json:"plugin_directories,omitempty"`                  // RegisterPluginDirectory
+	Functions              []*DeclaredFunction    `protobuf:"bytes,5,rep,name=functions,proto3" json:"functions,omitempty"`                                                           // host-language functions, RegisterFunction
+	ExternalPluginCommands []*ExternalPlugin      `protobuf:"bytes,6,rep,name=external_plugin_commands,json=externalPluginCommands,proto3" json:"external_plugin_commands,omitempty"` // RegisterExternalPlugin
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *LocalRegistry) Reset() {
@@ -920,13 +920,6 @@ func (x *LocalRegistry) GetTypes() []*DeclaredType {
 	return nil
 }
 
-func (x *LocalRegistry) GetExternalPlugins() []string {
-	if x != nil {
-		return x.ExternalPlugins
-	}
-	return nil
-}
-
 func (x *LocalRegistry) GetPluginDirectories() []string {
 	if x != nil {
 		return x.PluginDirectories
@@ -937,6 +930,60 @@ func (x *LocalRegistry) GetPluginDirectories() []string {
 func (x *LocalRegistry) GetFunctions() []*DeclaredFunction {
 	if x != nil {
 		return x.Functions
+	}
+	return nil
+}
+
+func (x *LocalRegistry) GetExternalPluginCommands() []*ExternalPlugin {
+	if x != nil {
+		return x.ExternalPluginCommands
+	}
+	return nil
+}
+
+// ExternalPlugin is an external plugin xcl starts as a separate process by
+// running its command: a plugin binary on its own, or a program and its
+// arguments, such as an interpreter and a script.
+type ExternalPlugin struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Command       []string               `protobuf:"bytes,1,rep,name=command,proto3" json:"command,omitempty"` // the program, then its arguments, never empty
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExternalPlugin) Reset() {
+	*x = ExternalPlugin{}
+	mi := &file_xcl_core_v1_core_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExternalPlugin) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExternalPlugin) ProtoMessage() {}
+
+func (x *ExternalPlugin) ProtoReflect() protoreflect.Message {
+	mi := &file_xcl_core_v1_core_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExternalPlugin.ProtoReflect.Descriptor instead.
+func (*ExternalPlugin) Descriptor() ([]byte, []int) {
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ExternalPlugin) GetCommand() []string {
+	if x != nil {
+		return x.Command
 	}
 	return nil
 }
@@ -954,7 +1001,7 @@ type DeclaredType struct {
 
 func (x *DeclaredType) Reset() {
 	*x = DeclaredType{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[10]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -966,7 +1013,7 @@ func (x *DeclaredType) String() string {
 func (*DeclaredType) ProtoMessage() {}
 
 func (x *DeclaredType) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[10]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -979,7 +1026,7 @@ func (x *DeclaredType) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeclaredType.ProtoReflect.Descriptor instead.
 func (*DeclaredType) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{10}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DeclaredType) GetType() string {
@@ -1016,7 +1063,7 @@ type DeclaredFunction struct {
 
 func (x *DeclaredFunction) Reset() {
 	*x = DeclaredFunction{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[11]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1028,7 +1075,7 @@ func (x *DeclaredFunction) String() string {
 func (*DeclaredFunction) ProtoMessage() {}
 
 func (x *DeclaredFunction) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[11]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1041,7 +1088,7 @@ func (x *DeclaredFunction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeclaredFunction.ProtoReflect.Descriptor instead.
 func (*DeclaredFunction) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{11}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DeclaredFunction) GetName() string {
@@ -1072,7 +1119,7 @@ type GitHubRegistry struct {
 
 func (x *GitHubRegistry) Reset() {
 	*x = GitHubRegistry{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[12]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1084,7 +1131,7 @@ func (x *GitHubRegistry) String() string {
 func (*GitHubRegistry) ProtoMessage() {}
 
 func (x *GitHubRegistry) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[12]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1097,7 +1144,7 @@ func (x *GitHubRegistry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubRegistry.ProtoReflect.Descriptor instead.
 func (*GitHubRegistry) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{12}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GitHubRegistry) GetPlugins() []*GitHubPlugin {
@@ -1152,7 +1199,7 @@ type GitHubPlugin struct {
 
 func (x *GitHubPlugin) Reset() {
 	*x = GitHubPlugin{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[13]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1164,7 +1211,7 @@ func (x *GitHubPlugin) String() string {
 func (*GitHubPlugin) ProtoMessage() {}
 
 func (x *GitHubPlugin) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[13]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1177,7 +1224,7 @@ func (x *GitHubPlugin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GitHubPlugin.ProtoReflect.Descriptor instead.
 func (*GitHubPlugin) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{13}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GitHubPlugin) GetRepository() string {
@@ -1207,7 +1254,7 @@ type StateStore struct {
 
 func (x *StateStore) Reset() {
 	*x = StateStore{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[14]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1219,7 +1266,7 @@ func (x *StateStore) String() string {
 func (*StateStore) ProtoMessage() {}
 
 func (x *StateStore) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[14]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1232,7 +1279,7 @@ func (x *StateStore) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateStore.ProtoReflect.Descriptor instead.
 func (*StateStore) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{14}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *StateStore) GetKind() isStateStore_Kind {
@@ -1291,7 +1338,7 @@ type Mask struct {
 
 func (x *Mask) Reset() {
 	*x = Mask{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[15]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1303,7 +1350,7 @@ func (x *Mask) String() string {
 func (*Mask) ProtoMessage() {}
 
 func (x *Mask) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[15]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1316,7 +1363,7 @@ func (x *Mask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Mask.ProtoReflect.Descriptor instead.
 func (*Mask) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{15}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Mask) GetKind() isMask_Kind {
@@ -1399,7 +1446,7 @@ type StartValidateRequest struct {
 
 func (x *StartValidateRequest) Reset() {
 	*x = StartValidateRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[16]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1411,7 +1458,7 @@ func (x *StartValidateRequest) String() string {
 func (*StartValidateRequest) ProtoMessage() {}
 
 func (x *StartValidateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[16]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1424,7 +1471,7 @@ func (x *StartValidateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartValidateRequest.ProtoReflect.Descriptor instead.
 func (*StartValidateRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{16}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *StartValidateRequest) GetPaths() []string {
@@ -1443,7 +1490,7 @@ type StartApplyRequest struct {
 
 func (x *StartApplyRequest) Reset() {
 	*x = StartApplyRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[17]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1455,7 +1502,7 @@ func (x *StartApplyRequest) String() string {
 func (*StartApplyRequest) ProtoMessage() {}
 
 func (x *StartApplyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[17]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1468,7 +1515,7 @@ func (x *StartApplyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartApplyRequest.ProtoReflect.Descriptor instead.
 func (*StartApplyRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{17}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StartApplyRequest) GetPaths() []string {
@@ -1488,7 +1535,7 @@ type StartDiffRequest struct {
 
 func (x *StartDiffRequest) Reset() {
 	*x = StartDiffRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[18]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1500,7 +1547,7 @@ func (x *StartDiffRequest) String() string {
 func (*StartDiffRequest) ProtoMessage() {}
 
 func (x *StartDiffRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[18]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1513,7 +1560,7 @@ func (x *StartDiffRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartDiffRequest.ProtoReflect.Descriptor instead.
 func (*StartDiffRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{18}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *StartDiffRequest) GetPaths() []string {
@@ -1538,7 +1585,7 @@ type StartDestroyRequest struct {
 
 func (x *StartDestroyRequest) Reset() {
 	*x = StartDestroyRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[19]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1550,7 +1597,7 @@ func (x *StartDestroyRequest) String() string {
 func (*StartDestroyRequest) ProtoMessage() {}
 
 func (x *StartDestroyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[19]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1563,7 +1610,7 @@ func (x *StartDestroyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartDestroyRequest.ProtoReflect.Descriptor instead.
 func (*StartDestroyRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{19}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{20}
 }
 
 type StartLoadRequest struct {
@@ -1574,7 +1621,7 @@ type StartLoadRequest struct {
 
 func (x *StartLoadRequest) Reset() {
 	*x = StartLoadRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[20]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1586,7 +1633,7 @@ func (x *StartLoadRequest) String() string {
 func (*StartLoadRequest) ProtoMessage() {}
 
 func (x *StartLoadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[20]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1599,7 +1646,7 @@ func (x *StartLoadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartLoadRequest.ProtoReflect.Descriptor instead.
 func (*StartLoadRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{20}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{21}
 }
 
 type StartOperationResponse struct {
@@ -1611,7 +1658,7 @@ type StartOperationResponse struct {
 
 func (x *StartOperationResponse) Reset() {
 	*x = StartOperationResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[21]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1623,7 +1670,7 @@ func (x *StartOperationResponse) String() string {
 func (*StartOperationResponse) ProtoMessage() {}
 
 func (x *StartOperationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[21]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1636,7 +1683,7 @@ func (x *StartOperationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartOperationResponse.ProtoReflect.Descriptor instead.
 func (*StartOperationResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{21}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *StartOperationResponse) GetOperationId() uint64 {
@@ -1655,7 +1702,7 @@ type CancelRequest struct {
 
 func (x *CancelRequest) Reset() {
 	*x = CancelRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[22]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1667,7 +1714,7 @@ func (x *CancelRequest) String() string {
 func (*CancelRequest) ProtoMessage() {}
 
 func (x *CancelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[22]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1680,7 +1727,7 @@ func (x *CancelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRequest.ProtoReflect.Descriptor instead.
 func (*CancelRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{22}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *CancelRequest) GetOperationId() uint64 {
@@ -1698,7 +1745,7 @@ type CancelResponse struct {
 
 func (x *CancelResponse) Reset() {
 	*x = CancelResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[23]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1710,7 +1757,7 @@ func (x *CancelResponse) String() string {
 func (*CancelResponse) ProtoMessage() {}
 
 func (x *CancelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[23]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1723,7 +1770,7 @@ func (x *CancelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelResponse.ProtoReflect.Descriptor instead.
 func (*CancelResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{23}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{24}
 }
 
 type PollRequest struct {
@@ -1737,7 +1784,7 @@ type PollRequest struct {
 
 func (x *PollRequest) Reset() {
 	*x = PollRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[24]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1749,7 +1796,7 @@ func (x *PollRequest) String() string {
 func (*PollRequest) ProtoMessage() {}
 
 func (x *PollRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[24]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1762,7 +1809,7 @@ func (x *PollRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollRequest.ProtoReflect.Descriptor instead.
 func (*PollRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{24}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *PollRequest) GetWaitMs() uint32 {
@@ -1787,7 +1834,7 @@ type PollResponse struct {
 
 func (x *PollResponse) Reset() {
 	*x = PollResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[25]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1799,7 +1846,7 @@ func (x *PollResponse) String() string {
 func (*PollResponse) ProtoMessage() {}
 
 func (x *PollResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[25]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1812,7 +1859,7 @@ func (x *PollResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollResponse.ProtoReflect.Descriptor instead.
 func (*PollResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{25}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *PollResponse) GetTask() isPollResponse_Task {
@@ -1900,7 +1947,7 @@ type StateTask struct {
 
 func (x *StateTask) Reset() {
 	*x = StateTask{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[26]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1912,7 +1959,7 @@ func (x *StateTask) String() string {
 func (*StateTask) ProtoMessage() {}
 
 func (x *StateTask) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[26]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1925,7 +1972,7 @@ func (x *StateTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateTask.ProtoReflect.Descriptor instead.
 func (*StateTask) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{26}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *StateTask) GetTaskId() uint64 {
@@ -1970,7 +2017,7 @@ type FunctionTask struct {
 
 func (x *FunctionTask) Reset() {
 	*x = FunctionTask{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[27]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1982,7 +2029,7 @@ func (x *FunctionTask) String() string {
 func (*FunctionTask) ProtoMessage() {}
 
 func (x *FunctionTask) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[27]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1995,7 +2042,7 @@ func (x *FunctionTask) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionTask.ProtoReflect.Descriptor instead.
 func (*FunctionTask) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{27}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *FunctionTask) GetTaskId() uint64 {
@@ -2046,7 +2093,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[28]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2058,7 +2105,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[28]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2071,7 +2118,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{28}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Event) GetTimeUnixNano() int64 {
@@ -2166,7 +2213,7 @@ type OperationFinished struct {
 
 func (x *OperationFinished) Reset() {
 	*x = OperationFinished{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[29]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2178,7 +2225,7 @@ func (x *OperationFinished) String() string {
 func (*OperationFinished) ProtoMessage() {}
 
 func (x *OperationFinished) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[29]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2191,7 +2238,7 @@ func (x *OperationFinished) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OperationFinished.ProtoReflect.Descriptor instead.
 func (*OperationFinished) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{29}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *OperationFinished) GetOperationId() uint64 {
@@ -2236,7 +2283,7 @@ type CompleteRequest struct {
 
 func (x *CompleteRequest) Reset() {
 	*x = CompleteRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[30]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2248,7 +2295,7 @@ func (x *CompleteRequest) String() string {
 func (*CompleteRequest) ProtoMessage() {}
 
 func (x *CompleteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[30]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2261,7 +2308,7 @@ func (x *CompleteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteRequest.ProtoReflect.Descriptor instead.
 func (*CompleteRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{30}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *CompleteRequest) GetTaskId() uint64 {
@@ -2320,7 +2367,7 @@ type CompleteResponse struct {
 
 func (x *CompleteResponse) Reset() {
 	*x = CompleteResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[31]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2332,7 +2379,7 @@ func (x *CompleteResponse) String() string {
 func (*CompleteResponse) ProtoMessage() {}
 
 func (x *CompleteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[31]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2345,7 +2392,7 @@ func (x *CompleteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteResponse.ProtoReflect.Descriptor instead.
 func (*CompleteResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{31}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{32}
 }
 
 type StateResult struct {
@@ -2359,7 +2406,7 @@ type StateResult struct {
 
 func (x *StateResult) Reset() {
 	*x = StateResult{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[32]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2371,7 +2418,7 @@ func (x *StateResult) String() string {
 func (*StateResult) ProtoMessage() {}
 
 func (x *StateResult) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[32]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2384,7 +2431,7 @@ func (x *StateResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StateResult.ProtoReflect.Descriptor instead.
 func (*StateResult) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{32}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *StateResult) GetEntities() [][]byte {
@@ -2418,7 +2465,7 @@ type FunctionResult struct {
 
 func (x *FunctionResult) Reset() {
 	*x = FunctionResult{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[33]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2430,7 +2477,7 @@ func (x *FunctionResult) String() string {
 func (*FunctionResult) ProtoMessage() {}
 
 func (x *FunctionResult) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[33]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2443,7 +2490,7 @@ func (x *FunctionResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionResult.ProtoReflect.Descriptor instead.
 func (*FunctionResult) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{33}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *FunctionResult) GetResult() []byte {
@@ -2468,7 +2515,7 @@ type EntitiesRequest struct {
 
 func (x *EntitiesRequest) Reset() {
 	*x = EntitiesRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[34]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2480,7 +2527,7 @@ func (x *EntitiesRequest) String() string {
 func (*EntitiesRequest) ProtoMessage() {}
 
 func (x *EntitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[34]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2493,7 +2540,7 @@ func (x *EntitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EntitiesRequest.ProtoReflect.Descriptor instead.
 func (*EntitiesRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{34}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{35}
 }
 
 type EntitiesResponse struct {
@@ -2505,7 +2552,7 @@ type EntitiesResponse struct {
 
 func (x *EntitiesResponse) Reset() {
 	*x = EntitiesResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[35]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2517,7 +2564,7 @@ func (x *EntitiesResponse) String() string {
 func (*EntitiesResponse) ProtoMessage() {}
 
 func (x *EntitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[35]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2530,7 +2577,7 @@ func (x *EntitiesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EntitiesResponse.ProtoReflect.Descriptor instead.
 func (*EntitiesResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{35}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *EntitiesResponse) GetEntities() [][]byte {
@@ -2549,7 +2596,7 @@ type FindRequest struct {
 
 func (x *FindRequest) Reset() {
 	*x = FindRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[36]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2561,7 +2608,7 @@ func (x *FindRequest) String() string {
 func (*FindRequest) ProtoMessage() {}
 
 func (x *FindRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[36]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2574,7 +2621,7 @@ func (x *FindRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindRequest.ProtoReflect.Descriptor instead.
 func (*FindRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{36}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *FindRequest) GetAddress() string {
@@ -2593,7 +2640,7 @@ type EntityResponse struct {
 
 func (x *EntityResponse) Reset() {
 	*x = EntityResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[37]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2605,7 +2652,7 @@ func (x *EntityResponse) String() string {
 func (*EntityResponse) ProtoMessage() {}
 
 func (x *EntityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[37]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2618,7 +2665,7 @@ func (x *EntityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EntityResponse.ProtoReflect.Descriptor instead.
 func (*EntityResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{37}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *EntityResponse) GetEntity() []byte {
@@ -2637,7 +2684,7 @@ type FindByTypeRequest struct {
 
 func (x *FindByTypeRequest) Reset() {
 	*x = FindByTypeRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[38]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2649,7 +2696,7 @@ func (x *FindByTypeRequest) String() string {
 func (*FindByTypeRequest) ProtoMessage() {}
 
 func (x *FindByTypeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[38]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2662,7 +2709,7 @@ func (x *FindByTypeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindByTypeRequest.ProtoReflect.Descriptor instead.
 func (*FindByTypeRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{38}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *FindByTypeRequest) GetPath() []string {
@@ -2680,7 +2727,7 @@ type OutputsRequest struct {
 
 func (x *OutputsRequest) Reset() {
 	*x = OutputsRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[39]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2692,7 +2739,7 @@ func (x *OutputsRequest) String() string {
 func (*OutputsRequest) ProtoMessage() {}
 
 func (x *OutputsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[39]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2705,7 +2752,7 @@ func (x *OutputsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutputsRequest.ProtoReflect.Descriptor instead.
 func (*OutputsRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{39}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{40}
 }
 
 type OutputsResponse struct {
@@ -2717,7 +2764,7 @@ type OutputsResponse struct {
 
 func (x *OutputsResponse) Reset() {
 	*x = OutputsResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[40]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2729,7 +2776,7 @@ func (x *OutputsResponse) String() string {
 func (*OutputsResponse) ProtoMessage() {}
 
 func (x *OutputsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[40]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2742,7 +2789,7 @@ func (x *OutputsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutputsResponse.ProtoReflect.Descriptor instead.
 func (*OutputsResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{40}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *OutputsResponse) GetOutputsJson() []byte {
@@ -2766,7 +2813,7 @@ type EncodeOptions struct {
 
 func (x *EncodeOptions) Reset() {
 	*x = EncodeOptions{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[41]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2778,7 +2825,7 @@ func (x *EncodeOptions) String() string {
 func (*EncodeOptions) ProtoMessage() {}
 
 func (x *EncodeOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[41]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2791,7 +2838,7 @@ func (x *EncodeOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncodeOptions.ProtoReflect.Descriptor instead.
 func (*EncodeOptions) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{41}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *EncodeOptions) GetIncludeComputed() bool {
@@ -2834,7 +2881,7 @@ type EncodeSavedEntityRequest struct {
 
 func (x *EncodeSavedEntityRequest) Reset() {
 	*x = EncodeSavedEntityRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[42]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2846,7 +2893,7 @@ func (x *EncodeSavedEntityRequest) String() string {
 func (*EncodeSavedEntityRequest) ProtoMessage() {}
 
 func (x *EncodeSavedEntityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[42]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2859,7 +2906,7 @@ func (x *EncodeSavedEntityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncodeSavedEntityRequest.ProtoReflect.Descriptor instead.
 func (*EncodeSavedEntityRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{42}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *EncodeSavedEntityRequest) GetEntity() []byte {
@@ -2895,7 +2942,7 @@ type EncodeSavedEntityResponse struct {
 
 func (x *EncodeSavedEntityResponse) Reset() {
 	*x = EncodeSavedEntityResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[43]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2907,7 +2954,7 @@ func (x *EncodeSavedEntityResponse) String() string {
 func (*EncodeSavedEntityResponse) ProtoMessage() {}
 
 func (x *EncodeSavedEntityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[43]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2920,7 +2967,7 @@ func (x *EncodeSavedEntityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncodeSavedEntityResponse.ProtoReflect.Descriptor instead.
 func (*EncodeSavedEntityResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{43}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *EncodeSavedEntityResponse) GetText() []byte {
@@ -2954,7 +3001,7 @@ type EncodeEntityRequest struct {
 
 func (x *EncodeEntityRequest) Reset() {
 	*x = EncodeEntityRequest{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[44]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2966,7 +3013,7 @@ func (x *EncodeEntityRequest) String() string {
 func (*EncodeEntityRequest) ProtoMessage() {}
 
 func (x *EncodeEntityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[44]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2979,7 +3026,7 @@ func (x *EncodeEntityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncodeEntityRequest.ProtoReflect.Descriptor instead.
 func (*EncodeEntityRequest) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{44}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *EncodeEntityRequest) GetEntity() []byte {
@@ -3015,7 +3062,7 @@ type EncodeEntityResponse struct {
 
 func (x *EncodeEntityResponse) Reset() {
 	*x = EncodeEntityResponse{}
-	mi := &file_xcl_core_v1_core_proto_msgTypes[45]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3027,7 +3074,7 @@ func (x *EncodeEntityResponse) String() string {
 func (*EncodeEntityResponse) ProtoMessage() {}
 
 func (x *EncodeEntityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_xcl_core_v1_core_proto_msgTypes[45]
+	mi := &file_xcl_core_v1_core_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3040,7 +3087,7 @@ func (x *EncodeEntityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncodeEntityResponse.ProtoReflect.Descriptor instead.
 func (*EncodeEntityResponse) Descriptor() ([]byte, []int) {
-	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{45}
+	return file_xcl_core_v1_core_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *EncodeEntityResponse) GetText() []byte {
@@ -3107,13 +3154,15 @@ const file_xcl_core_v1_core_proto_rawDesc = "" +
 	"\bRegistry\x122\n" +
 	"\x05local\x18\x01 \x01(\v2\x1a.xcl.core.v1.LocalRegistryH\x00R\x05local\x125\n" +
 	"\x06github\x18\x02 \x01(\v2\x1b.xcl.core.v1.GitHubRegistryH\x00R\x06githubB\x06\n" +
-	"\x04kind\"\xfe\x01\n" +
+	"\x04kind\"\xc2\x02\n" +
 	"\rLocalRegistry\x12%\n" +
 	"\x0eplugin_pattern\x18\x01 \x01(\tR\rpluginPattern\x12/\n" +
-	"\x05types\x18\x02 \x03(\v2\x19.xcl.core.v1.DeclaredTypeR\x05types\x12)\n" +
-	"\x10external_plugins\x18\x03 \x03(\tR\x0fexternalPlugins\x12-\n" +
+	"\x05types\x18\x02 \x03(\v2\x19.xcl.core.v1.DeclaredTypeR\x05types\x12-\n" +
 	"\x12plugin_directories\x18\x04 \x03(\tR\x11pluginDirectories\x12;\n" +
-	"\tfunctions\x18\x05 \x03(\v2\x1d.xcl.core.v1.DeclaredFunctionR\tfunctions\"`\n" +
+	"\tfunctions\x18\x05 \x03(\v2\x1d.xcl.core.v1.DeclaredFunctionR\tfunctions\x12U\n" +
+	"\x18external_plugin_commands\x18\x06 \x03(\v2\x1b.xcl.core.v1.ExternalPluginR\x16externalPluginCommandsJ\x04\b\x03\x10\x04R\x10external_plugins\"*\n" +
+	"\x0eExternalPlugin\x12\x18\n" +
+	"\acommand\x18\x01 \x03(\tR\acommand\"`\n" +
 	"\fDeclaredType\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x18\n" +
 	"\asubtype\x18\x02 \x01(\tR\asubtype\x12\x16\n" +
@@ -3336,7 +3385,7 @@ func file_xcl_core_v1_core_proto_rawDescGZIP() []byte {
 }
 
 var file_xcl_core_v1_core_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_xcl_core_v1_core_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
+var file_xcl_core_v1_core_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
 var file_xcl_core_v1_core_proto_goTypes = []any{
 	(TokenKind)(0),                    // 0: xcl.core.v1.TokenKind
 	(EventDataLevel)(0),               // 1: xcl.core.v1.EventDataLevel
@@ -3351,119 +3400,121 @@ var file_xcl_core_v1_core_proto_goTypes = []any{
 	(*CreateConfigResponse)(nil),      // 10: xcl.core.v1.CreateConfigResponse
 	(*Registry)(nil),                  // 11: xcl.core.v1.Registry
 	(*LocalRegistry)(nil),             // 12: xcl.core.v1.LocalRegistry
-	(*DeclaredType)(nil),              // 13: xcl.core.v1.DeclaredType
-	(*DeclaredFunction)(nil),          // 14: xcl.core.v1.DeclaredFunction
-	(*GitHubRegistry)(nil),            // 15: xcl.core.v1.GitHubRegistry
-	(*GitHubPlugin)(nil),              // 16: xcl.core.v1.GitHubPlugin
-	(*StateStore)(nil),                // 17: xcl.core.v1.StateStore
-	(*Mask)(nil),                      // 18: xcl.core.v1.Mask
-	(*StartValidateRequest)(nil),      // 19: xcl.core.v1.StartValidateRequest
-	(*StartApplyRequest)(nil),         // 20: xcl.core.v1.StartApplyRequest
-	(*StartDiffRequest)(nil),          // 21: xcl.core.v1.StartDiffRequest
-	(*StartDestroyRequest)(nil),       // 22: xcl.core.v1.StartDestroyRequest
-	(*StartLoadRequest)(nil),          // 23: xcl.core.v1.StartLoadRequest
-	(*StartOperationResponse)(nil),    // 24: xcl.core.v1.StartOperationResponse
-	(*CancelRequest)(nil),             // 25: xcl.core.v1.CancelRequest
-	(*CancelResponse)(nil),            // 26: xcl.core.v1.CancelResponse
-	(*PollRequest)(nil),               // 27: xcl.core.v1.PollRequest
-	(*PollResponse)(nil),              // 28: xcl.core.v1.PollResponse
-	(*StateTask)(nil),                 // 29: xcl.core.v1.StateTask
-	(*FunctionTask)(nil),              // 30: xcl.core.v1.FunctionTask
-	(*Event)(nil),                     // 31: xcl.core.v1.Event
-	(*OperationFinished)(nil),         // 32: xcl.core.v1.OperationFinished
-	(*CompleteRequest)(nil),           // 33: xcl.core.v1.CompleteRequest
-	(*CompleteResponse)(nil),          // 34: xcl.core.v1.CompleteResponse
-	(*StateResult)(nil),               // 35: xcl.core.v1.StateResult
-	(*FunctionResult)(nil),            // 36: xcl.core.v1.FunctionResult
-	(*EntitiesRequest)(nil),           // 37: xcl.core.v1.EntitiesRequest
-	(*EntitiesResponse)(nil),          // 38: xcl.core.v1.EntitiesResponse
-	(*FindRequest)(nil),               // 39: xcl.core.v1.FindRequest
-	(*EntityResponse)(nil),            // 40: xcl.core.v1.EntityResponse
-	(*FindByTypeRequest)(nil),         // 41: xcl.core.v1.FindByTypeRequest
-	(*OutputsRequest)(nil),            // 42: xcl.core.v1.OutputsRequest
-	(*OutputsResponse)(nil),           // 43: xcl.core.v1.OutputsResponse
-	(*EncodeOptions)(nil),             // 44: xcl.core.v1.EncodeOptions
-	(*EncodeSavedEntityRequest)(nil),  // 45: xcl.core.v1.EncodeSavedEntityRequest
-	(*EncodeSavedEntityResponse)(nil), // 46: xcl.core.v1.EncodeSavedEntityResponse
-	(*EncodeEntityRequest)(nil),       // 47: xcl.core.v1.EncodeEntityRequest
-	(*EncodeEntityResponse)(nil),      // 48: xcl.core.v1.EncodeEntityResponse
-	nil,                               // 49: xcl.core.v1.Error.DetailsEntry
-	nil,                               // 50: xcl.core.v1.ConvertThemeResponse.StylesEntry
+	(*ExternalPlugin)(nil),            // 13: xcl.core.v1.ExternalPlugin
+	(*DeclaredType)(nil),              // 14: xcl.core.v1.DeclaredType
+	(*DeclaredFunction)(nil),          // 15: xcl.core.v1.DeclaredFunction
+	(*GitHubRegistry)(nil),            // 16: xcl.core.v1.GitHubRegistry
+	(*GitHubPlugin)(nil),              // 17: xcl.core.v1.GitHubPlugin
+	(*StateStore)(nil),                // 18: xcl.core.v1.StateStore
+	(*Mask)(nil),                      // 19: xcl.core.v1.Mask
+	(*StartValidateRequest)(nil),      // 20: xcl.core.v1.StartValidateRequest
+	(*StartApplyRequest)(nil),         // 21: xcl.core.v1.StartApplyRequest
+	(*StartDiffRequest)(nil),          // 22: xcl.core.v1.StartDiffRequest
+	(*StartDestroyRequest)(nil),       // 23: xcl.core.v1.StartDestroyRequest
+	(*StartLoadRequest)(nil),          // 24: xcl.core.v1.StartLoadRequest
+	(*StartOperationResponse)(nil),    // 25: xcl.core.v1.StartOperationResponse
+	(*CancelRequest)(nil),             // 26: xcl.core.v1.CancelRequest
+	(*CancelResponse)(nil),            // 27: xcl.core.v1.CancelResponse
+	(*PollRequest)(nil),               // 28: xcl.core.v1.PollRequest
+	(*PollResponse)(nil),              // 29: xcl.core.v1.PollResponse
+	(*StateTask)(nil),                 // 30: xcl.core.v1.StateTask
+	(*FunctionTask)(nil),              // 31: xcl.core.v1.FunctionTask
+	(*Event)(nil),                     // 32: xcl.core.v1.Event
+	(*OperationFinished)(nil),         // 33: xcl.core.v1.OperationFinished
+	(*CompleteRequest)(nil),           // 34: xcl.core.v1.CompleteRequest
+	(*CompleteResponse)(nil),          // 35: xcl.core.v1.CompleteResponse
+	(*StateResult)(nil),               // 36: xcl.core.v1.StateResult
+	(*FunctionResult)(nil),            // 37: xcl.core.v1.FunctionResult
+	(*EntitiesRequest)(nil),           // 38: xcl.core.v1.EntitiesRequest
+	(*EntitiesResponse)(nil),          // 39: xcl.core.v1.EntitiesResponse
+	(*FindRequest)(nil),               // 40: xcl.core.v1.FindRequest
+	(*EntityResponse)(nil),            // 41: xcl.core.v1.EntityResponse
+	(*FindByTypeRequest)(nil),         // 42: xcl.core.v1.FindByTypeRequest
+	(*OutputsRequest)(nil),            // 43: xcl.core.v1.OutputsRequest
+	(*OutputsResponse)(nil),           // 44: xcl.core.v1.OutputsResponse
+	(*EncodeOptions)(nil),             // 45: xcl.core.v1.EncodeOptions
+	(*EncodeSavedEntityRequest)(nil),  // 46: xcl.core.v1.EncodeSavedEntityRequest
+	(*EncodeSavedEntityResponse)(nil), // 47: xcl.core.v1.EncodeSavedEntityResponse
+	(*EncodeEntityRequest)(nil),       // 48: xcl.core.v1.EncodeEntityRequest
+	(*EncodeEntityResponse)(nil),      // 49: xcl.core.v1.EncodeEntityResponse
+	nil,                               // 50: xcl.core.v1.Error.DetailsEntry
+	nil,                               // 51: xcl.core.v1.ConvertThemeResponse.StylesEntry
 }
 var file_xcl_core_v1_core_proto_depIdxs = []int32{
-	49, // 0: xcl.core.v1.Error.details:type_name -> xcl.core.v1.Error.DetailsEntry
+	50, // 0: xcl.core.v1.Error.details:type_name -> xcl.core.v1.Error.DetailsEntry
 	3,  // 1: xcl.core.v1.Error.causes:type_name -> xcl.core.v1.Error
 	4,  // 2: xcl.core.v1.Error.report:type_name -> xcl.core.v1.Token
 	0,  // 3: xcl.core.v1.Token.kind:type_name -> xcl.core.v1.TokenKind
-	50, // 4: xcl.core.v1.ConvertThemeResponse.styles:type_name -> xcl.core.v1.ConvertThemeResponse.StylesEntry
+	51, // 4: xcl.core.v1.ConvertThemeResponse.styles:type_name -> xcl.core.v1.ConvertThemeResponse.StylesEntry
 	11, // 5: xcl.core.v1.CreateConfigRequest.registries:type_name -> xcl.core.v1.Registry
-	17, // 6: xcl.core.v1.CreateConfigRequest.state_store:type_name -> xcl.core.v1.StateStore
-	18, // 7: xcl.core.v1.CreateConfigRequest.state_mask:type_name -> xcl.core.v1.Mask
+	18, // 6: xcl.core.v1.CreateConfigRequest.state_store:type_name -> xcl.core.v1.StateStore
+	19, // 7: xcl.core.v1.CreateConfigRequest.state_mask:type_name -> xcl.core.v1.Mask
 	1,  // 8: xcl.core.v1.CreateConfigRequest.event_data:type_name -> xcl.core.v1.EventDataLevel
-	18, // 9: xcl.core.v1.CreateConfigRequest.event_mask:type_name -> xcl.core.v1.Mask
+	19, // 9: xcl.core.v1.CreateConfigRequest.event_mask:type_name -> xcl.core.v1.Mask
 	12, // 10: xcl.core.v1.Registry.local:type_name -> xcl.core.v1.LocalRegistry
-	15, // 11: xcl.core.v1.Registry.github:type_name -> xcl.core.v1.GitHubRegistry
-	13, // 12: xcl.core.v1.LocalRegistry.types:type_name -> xcl.core.v1.DeclaredType
-	14, // 13: xcl.core.v1.LocalRegistry.functions:type_name -> xcl.core.v1.DeclaredFunction
-	16, // 14: xcl.core.v1.GitHubRegistry.plugins:type_name -> xcl.core.v1.GitHubPlugin
-	13, // 15: xcl.core.v1.GitHubRegistry.types:type_name -> xcl.core.v1.DeclaredType
-	29, // 16: xcl.core.v1.PollResponse.state:type_name -> xcl.core.v1.StateTask
-	31, // 17: xcl.core.v1.PollResponse.event:type_name -> xcl.core.v1.Event
-	32, // 18: xcl.core.v1.PollResponse.finished:type_name -> xcl.core.v1.OperationFinished
-	30, // 19: xcl.core.v1.PollResponse.function:type_name -> xcl.core.v1.FunctionTask
-	2,  // 20: xcl.core.v1.StateTask.kind:type_name -> xcl.core.v1.StateTask.Kind
-	3,  // 21: xcl.core.v1.Event.error:type_name -> xcl.core.v1.Error
-	3,  // 22: xcl.core.v1.OperationFinished.error:type_name -> xcl.core.v1.Error
-	4,  // 23: xcl.core.v1.OperationFinished.diff_tokens:type_name -> xcl.core.v1.Token
-	35, // 24: xcl.core.v1.CompleteRequest.state:type_name -> xcl.core.v1.StateResult
-	36, // 25: xcl.core.v1.CompleteRequest.function:type_name -> xcl.core.v1.FunctionResult
-	3,  // 26: xcl.core.v1.StateResult.error:type_name -> xcl.core.v1.Error
-	3,  // 27: xcl.core.v1.FunctionResult.error:type_name -> xcl.core.v1.Error
-	44, // 28: xcl.core.v1.EncodeSavedEntityRequest.options:type_name -> xcl.core.v1.EncodeOptions
-	4,  // 29: xcl.core.v1.EncodeSavedEntityResponse.tokens:type_name -> xcl.core.v1.Token
-	44, // 30: xcl.core.v1.EncodeEntityRequest.options:type_name -> xcl.core.v1.EncodeOptions
-	4,  // 31: xcl.core.v1.EncodeEntityResponse.tokens:type_name -> xcl.core.v1.Token
-	5,  // 32: xcl.core.v1.CoreService.GetVersion:input_type -> xcl.core.v1.GetVersionRequest
-	9,  // 33: xcl.core.v1.CoreService.CreateConfig:input_type -> xcl.core.v1.CreateConfigRequest
-	7,  // 34: xcl.core.v1.CoreService.ConvertTheme:input_type -> xcl.core.v1.ConvertThemeRequest
-	19, // 35: xcl.core.v1.CoreService.StartValidate:input_type -> xcl.core.v1.StartValidateRequest
-	20, // 36: xcl.core.v1.CoreService.StartApply:input_type -> xcl.core.v1.StartApplyRequest
-	21, // 37: xcl.core.v1.CoreService.StartDiff:input_type -> xcl.core.v1.StartDiffRequest
-	22, // 38: xcl.core.v1.CoreService.StartDestroy:input_type -> xcl.core.v1.StartDestroyRequest
-	23, // 39: xcl.core.v1.CoreService.StartLoad:input_type -> xcl.core.v1.StartLoadRequest
-	25, // 40: xcl.core.v1.CoreService.Cancel:input_type -> xcl.core.v1.CancelRequest
-	27, // 41: xcl.core.v1.CoreService.Poll:input_type -> xcl.core.v1.PollRequest
-	33, // 42: xcl.core.v1.CoreService.Complete:input_type -> xcl.core.v1.CompleteRequest
-	37, // 43: xcl.core.v1.CoreService.Entities:input_type -> xcl.core.v1.EntitiesRequest
-	39, // 44: xcl.core.v1.CoreService.Find:input_type -> xcl.core.v1.FindRequest
-	41, // 45: xcl.core.v1.CoreService.FindByType:input_type -> xcl.core.v1.FindByTypeRequest
-	41, // 46: xcl.core.v1.CoreService.FindOne:input_type -> xcl.core.v1.FindByTypeRequest
-	42, // 47: xcl.core.v1.CoreService.Outputs:input_type -> xcl.core.v1.OutputsRequest
-	45, // 48: xcl.core.v1.CoreService.EncodeSavedEntity:input_type -> xcl.core.v1.EncodeSavedEntityRequest
-	47, // 49: xcl.core.v1.CoreService.EncodeEntity:input_type -> xcl.core.v1.EncodeEntityRequest
-	6,  // 50: xcl.core.v1.CoreService.GetVersion:output_type -> xcl.core.v1.GetVersionResponse
-	10, // 51: xcl.core.v1.CoreService.CreateConfig:output_type -> xcl.core.v1.CreateConfigResponse
-	8,  // 52: xcl.core.v1.CoreService.ConvertTheme:output_type -> xcl.core.v1.ConvertThemeResponse
-	24, // 53: xcl.core.v1.CoreService.StartValidate:output_type -> xcl.core.v1.StartOperationResponse
-	24, // 54: xcl.core.v1.CoreService.StartApply:output_type -> xcl.core.v1.StartOperationResponse
-	24, // 55: xcl.core.v1.CoreService.StartDiff:output_type -> xcl.core.v1.StartOperationResponse
-	24, // 56: xcl.core.v1.CoreService.StartDestroy:output_type -> xcl.core.v1.StartOperationResponse
-	24, // 57: xcl.core.v1.CoreService.StartLoad:output_type -> xcl.core.v1.StartOperationResponse
-	26, // 58: xcl.core.v1.CoreService.Cancel:output_type -> xcl.core.v1.CancelResponse
-	28, // 59: xcl.core.v1.CoreService.Poll:output_type -> xcl.core.v1.PollResponse
-	34, // 60: xcl.core.v1.CoreService.Complete:output_type -> xcl.core.v1.CompleteResponse
-	38, // 61: xcl.core.v1.CoreService.Entities:output_type -> xcl.core.v1.EntitiesResponse
-	40, // 62: xcl.core.v1.CoreService.Find:output_type -> xcl.core.v1.EntityResponse
-	38, // 63: xcl.core.v1.CoreService.FindByType:output_type -> xcl.core.v1.EntitiesResponse
-	40, // 64: xcl.core.v1.CoreService.FindOne:output_type -> xcl.core.v1.EntityResponse
-	43, // 65: xcl.core.v1.CoreService.Outputs:output_type -> xcl.core.v1.OutputsResponse
-	46, // 66: xcl.core.v1.CoreService.EncodeSavedEntity:output_type -> xcl.core.v1.EncodeSavedEntityResponse
-	48, // 67: xcl.core.v1.CoreService.EncodeEntity:output_type -> xcl.core.v1.EncodeEntityResponse
-	50, // [50:68] is the sub-list for method output_type
-	32, // [32:50] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	16, // 11: xcl.core.v1.Registry.github:type_name -> xcl.core.v1.GitHubRegistry
+	14, // 12: xcl.core.v1.LocalRegistry.types:type_name -> xcl.core.v1.DeclaredType
+	15, // 13: xcl.core.v1.LocalRegistry.functions:type_name -> xcl.core.v1.DeclaredFunction
+	13, // 14: xcl.core.v1.LocalRegistry.external_plugin_commands:type_name -> xcl.core.v1.ExternalPlugin
+	17, // 15: xcl.core.v1.GitHubRegistry.plugins:type_name -> xcl.core.v1.GitHubPlugin
+	14, // 16: xcl.core.v1.GitHubRegistry.types:type_name -> xcl.core.v1.DeclaredType
+	30, // 17: xcl.core.v1.PollResponse.state:type_name -> xcl.core.v1.StateTask
+	32, // 18: xcl.core.v1.PollResponse.event:type_name -> xcl.core.v1.Event
+	33, // 19: xcl.core.v1.PollResponse.finished:type_name -> xcl.core.v1.OperationFinished
+	31, // 20: xcl.core.v1.PollResponse.function:type_name -> xcl.core.v1.FunctionTask
+	2,  // 21: xcl.core.v1.StateTask.kind:type_name -> xcl.core.v1.StateTask.Kind
+	3,  // 22: xcl.core.v1.Event.error:type_name -> xcl.core.v1.Error
+	3,  // 23: xcl.core.v1.OperationFinished.error:type_name -> xcl.core.v1.Error
+	4,  // 24: xcl.core.v1.OperationFinished.diff_tokens:type_name -> xcl.core.v1.Token
+	36, // 25: xcl.core.v1.CompleteRequest.state:type_name -> xcl.core.v1.StateResult
+	37, // 26: xcl.core.v1.CompleteRequest.function:type_name -> xcl.core.v1.FunctionResult
+	3,  // 27: xcl.core.v1.StateResult.error:type_name -> xcl.core.v1.Error
+	3,  // 28: xcl.core.v1.FunctionResult.error:type_name -> xcl.core.v1.Error
+	45, // 29: xcl.core.v1.EncodeSavedEntityRequest.options:type_name -> xcl.core.v1.EncodeOptions
+	4,  // 30: xcl.core.v1.EncodeSavedEntityResponse.tokens:type_name -> xcl.core.v1.Token
+	45, // 31: xcl.core.v1.EncodeEntityRequest.options:type_name -> xcl.core.v1.EncodeOptions
+	4,  // 32: xcl.core.v1.EncodeEntityResponse.tokens:type_name -> xcl.core.v1.Token
+	5,  // 33: xcl.core.v1.CoreService.GetVersion:input_type -> xcl.core.v1.GetVersionRequest
+	9,  // 34: xcl.core.v1.CoreService.CreateConfig:input_type -> xcl.core.v1.CreateConfigRequest
+	7,  // 35: xcl.core.v1.CoreService.ConvertTheme:input_type -> xcl.core.v1.ConvertThemeRequest
+	20, // 36: xcl.core.v1.CoreService.StartValidate:input_type -> xcl.core.v1.StartValidateRequest
+	21, // 37: xcl.core.v1.CoreService.StartApply:input_type -> xcl.core.v1.StartApplyRequest
+	22, // 38: xcl.core.v1.CoreService.StartDiff:input_type -> xcl.core.v1.StartDiffRequest
+	23, // 39: xcl.core.v1.CoreService.StartDestroy:input_type -> xcl.core.v1.StartDestroyRequest
+	24, // 40: xcl.core.v1.CoreService.StartLoad:input_type -> xcl.core.v1.StartLoadRequest
+	26, // 41: xcl.core.v1.CoreService.Cancel:input_type -> xcl.core.v1.CancelRequest
+	28, // 42: xcl.core.v1.CoreService.Poll:input_type -> xcl.core.v1.PollRequest
+	34, // 43: xcl.core.v1.CoreService.Complete:input_type -> xcl.core.v1.CompleteRequest
+	38, // 44: xcl.core.v1.CoreService.Entities:input_type -> xcl.core.v1.EntitiesRequest
+	40, // 45: xcl.core.v1.CoreService.Find:input_type -> xcl.core.v1.FindRequest
+	42, // 46: xcl.core.v1.CoreService.FindByType:input_type -> xcl.core.v1.FindByTypeRequest
+	42, // 47: xcl.core.v1.CoreService.FindOne:input_type -> xcl.core.v1.FindByTypeRequest
+	43, // 48: xcl.core.v1.CoreService.Outputs:input_type -> xcl.core.v1.OutputsRequest
+	46, // 49: xcl.core.v1.CoreService.EncodeSavedEntity:input_type -> xcl.core.v1.EncodeSavedEntityRequest
+	48, // 50: xcl.core.v1.CoreService.EncodeEntity:input_type -> xcl.core.v1.EncodeEntityRequest
+	6,  // 51: xcl.core.v1.CoreService.GetVersion:output_type -> xcl.core.v1.GetVersionResponse
+	10, // 52: xcl.core.v1.CoreService.CreateConfig:output_type -> xcl.core.v1.CreateConfigResponse
+	8,  // 53: xcl.core.v1.CoreService.ConvertTheme:output_type -> xcl.core.v1.ConvertThemeResponse
+	25, // 54: xcl.core.v1.CoreService.StartValidate:output_type -> xcl.core.v1.StartOperationResponse
+	25, // 55: xcl.core.v1.CoreService.StartApply:output_type -> xcl.core.v1.StartOperationResponse
+	25, // 56: xcl.core.v1.CoreService.StartDiff:output_type -> xcl.core.v1.StartOperationResponse
+	25, // 57: xcl.core.v1.CoreService.StartDestroy:output_type -> xcl.core.v1.StartOperationResponse
+	25, // 58: xcl.core.v1.CoreService.StartLoad:output_type -> xcl.core.v1.StartOperationResponse
+	27, // 59: xcl.core.v1.CoreService.Cancel:output_type -> xcl.core.v1.CancelResponse
+	29, // 60: xcl.core.v1.CoreService.Poll:output_type -> xcl.core.v1.PollResponse
+	35, // 61: xcl.core.v1.CoreService.Complete:output_type -> xcl.core.v1.CompleteResponse
+	39, // 62: xcl.core.v1.CoreService.Entities:output_type -> xcl.core.v1.EntitiesResponse
+	41, // 63: xcl.core.v1.CoreService.Find:output_type -> xcl.core.v1.EntityResponse
+	39, // 64: xcl.core.v1.CoreService.FindByType:output_type -> xcl.core.v1.EntitiesResponse
+	41, // 65: xcl.core.v1.CoreService.FindOne:output_type -> xcl.core.v1.EntityResponse
+	44, // 66: xcl.core.v1.CoreService.Outputs:output_type -> xcl.core.v1.OutputsResponse
+	47, // 67: xcl.core.v1.CoreService.EncodeSavedEntity:output_type -> xcl.core.v1.EncodeSavedEntityResponse
+	49, // 68: xcl.core.v1.CoreService.EncodeEntity:output_type -> xcl.core.v1.EncodeEntityResponse
+	51, // [51:69] is the sub-list for method output_type
+	33, // [33:51] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_xcl_core_v1_core_proto_init() }
@@ -3475,23 +3526,23 @@ func file_xcl_core_v1_core_proto_init() {
 		(*Registry_Local)(nil),
 		(*Registry_Github)(nil),
 	}
-	file_xcl_core_v1_core_proto_msgTypes[14].OneofWrappers = []any{
+	file_xcl_core_v1_core_proto_msgTypes[15].OneofWrappers = []any{
 		(*StateStore_Path)(nil),
 		(*StateStore_Host)(nil),
 	}
-	file_xcl_core_v1_core_proto_msgTypes[15].OneofWrappers = []any{
+	file_xcl_core_v1_core_proto_msgTypes[16].OneofWrappers = []any{
 		(*Mask_Aes256GcmKey)(nil),
 		(*Mask_HmacSha256Key)(nil),
 		(*Mask_Redact)(nil),
 		(*Mask_Omit)(nil),
 	}
-	file_xcl_core_v1_core_proto_msgTypes[25].OneofWrappers = []any{
+	file_xcl_core_v1_core_proto_msgTypes[26].OneofWrappers = []any{
 		(*PollResponse_State)(nil),
 		(*PollResponse_Event)(nil),
 		(*PollResponse_Finished)(nil),
 		(*PollResponse_Function)(nil),
 	}
-	file_xcl_core_v1_core_proto_msgTypes[30].OneofWrappers = []any{
+	file_xcl_core_v1_core_proto_msgTypes[31].OneofWrappers = []any{
 		(*CompleteRequest_State)(nil),
 		(*CompleteRequest_Function)(nil),
 	}
@@ -3501,7 +3552,7 @@ func file_xcl_core_v1_core_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_xcl_core_v1_core_proto_rawDesc), len(file_xcl_core_v1_core_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   48,
+			NumMessages:   49,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

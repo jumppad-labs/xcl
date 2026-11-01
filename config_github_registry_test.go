@@ -48,6 +48,20 @@ func newGitHubWidgetRegistry(apiURL, cacheDir, tag string) *registry.GitHub {
 	return gh
 }
 
+// newTrustingGitHubWidgetRegistry returns a GitHub registry like
+// newGitHubWidgetRegistry that also trusts the armoured public key trustedKey,
+// so it uses a release only when its index is signed by that key
+func newTrustingGitHubWidgetRegistry(apiURL, cacheDir, tag, trustedKey string) *registry.GitHub {
+	gh := registry.NewGitHub(
+		registry.GitHubAPIURL(apiURL),
+		registry.GitHubCacheDir(cacheDir),
+		registry.GitHubTrustedKeys(trustedKey),
+	)
+	gh.RegisterPlugin(githubWidgetRepository, tag)
+
+	return gh
+}
+
 // newGitHubConfig returns a Config using registries, keeping state in
 // stateDir, whose plugin hosts are stopped when the test ends
 func newGitHubConfig(t *testing.T, stateDir string, registries ...registry.Registry) *Config {
@@ -247,4 +261,142 @@ func TestApplyWithUnsignedGitHubReleaseAndNoTrustedKeysSucceeds(t *testing.T) {
 	widget, err := Find[subtypelessWidget](c, "widget.app")
 	require.NoError(t, err)
 	require.Equal(t, "a", widget.PartNames)
+}
+
+// githubWidgetContainerImage is the container image a fake widget release
+// offers, pinned by digest
+const githubWidgetContainerImage = "ghcr.io/acme/xcl-plugin-widget@sha256:" +
+	"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+func TestApplyWithContainerOnlyGitHubReleaseFailsNamingPlugin(t *testing.T) {
+	fake := newGitHubWidgetRelease(t,
+		testutil.WithoutExecutable(),
+		testutil.WithContainer(githubWidgetContainerImage, "linux/amd64", "linux/arm64"),
+	)
+	isolateHome(t)
+
+	gh := newGitHubWidgetRegistry(fake.URL(), t.TempDir(), githubWidgetTag)
+	c := newGitHubConfig(t, t.TempDir(), gh)
+
+	err := c.Apply(subtypelessFixture(t, "github"))
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPluginNotFound)
+
+	var loadErr *PluginLoadError
+	require.True(t, errors.As(err, &loadErr))
+	require.Equal(t, "xcl-plugin-widget", loadErr.Plugin)
+	require.Equal(t, "github.com", loadErr.Registry)
+
+	require.Equal(t, 0, c.ResourceCount())
+}
+
+func TestApplyWithContainerAndNativeGitHubReleaseSucceeds(t *testing.T) {
+	fake := newGitHubWidgetRelease(t,
+		testutil.WithContainer(githubWidgetContainerImage, "linux/amd64", "linux/arm64"),
+	)
+	isolateHome(t)
+
+	gh := newGitHubWidgetRegistry(fake.URL(), t.TempDir(), githubWidgetTag)
+	c := newGitHubConfig(t, t.TempDir(), gh)
+
+	err := c.Apply(subtypelessFixture(t, "github"))
+	require.NoError(t, err)
+
+	widget, err := Find[subtypelessWidget](c, "widget.app")
+	require.NoError(t, err)
+	require.Equal(t, "a", widget.PartNames)
+}
+
+func TestDestroyAfterApplyWithContainerAndNativeGitHubReleaseSucceeds(t *testing.T) {
+	fake := newGitHubWidgetRelease(t,
+		testutil.WithContainer(githubWidgetContainerImage, "linux/amd64", "linux/arm64"),
+	)
+	isolateHome(t)
+
+	gh := newGitHubWidgetRegistry(fake.URL(), t.TempDir(), githubWidgetTag)
+	c := newGitHubConfig(t, t.TempDir(), gh)
+
+	err := c.Apply(subtypelessFixture(t, "github"))
+	require.NoError(t, err)
+
+	err = c.Destroy()
+	require.NoError(t, err)
+
+	require.Equal(t, 0, c.ResourceCount())
+
+	_, err = Find[subtypelessWidget](c, "widget.app")
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestApplyWithGitHubReleaseWithoutIndexFails(t *testing.T) {
+	fake := newGitHubWidgetRelease(t, testutil.WithoutIndex())
+	isolateHome(t)
+
+	gh := newGitHubWidgetRegistry(fake.URL(), t.TempDir(), githubWidgetTag)
+	c := newGitHubConfig(t, t.TempDir(), gh)
+
+	err := c.Apply(subtypelessFixture(t, "github"))
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPluginNotFound)
+
+	var loadErr *PluginLoadError
+	require.True(t, errors.As(err, &loadErr))
+	require.Equal(t, "xcl-plugin-widget", loadErr.Plugin)
+
+	require.Equal(t, 0, c.ResourceCount())
+}
+
+func TestApplyWithTamperedGitHubReleaseZipFails(t *testing.T) {
+	fake := newGitHubWidgetRelease(t, testutil.TamperZip(runtime.GOOS, runtime.GOARCH))
+	isolateHome(t)
+
+	cacheDir := t.TempDir()
+	gh := newGitHubWidgetRegistry(fake.URL(), cacheDir, githubWidgetTag)
+	c := newGitHubConfig(t, t.TempDir(), gh)
+
+	err := c.Apply(subtypelessFixture(t, "github"))
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPluginVerification)
+
+	var loadErr *PluginLoadError
+	require.True(t, errors.As(err, &loadErr))
+	require.Equal(t, "xcl-plugin-widget", loadErr.Plugin)
+
+	require.Equal(t, 0, c.ResourceCount())
+
+	// the tampered build was never installed into the cache
+	require.NoFileExists(t, cachedWidgetBinary(cacheDir))
+}
+
+func TestApplyWithGitHubReleaseSignedByTrustedKeySucceeds(t *testing.T) {
+	fake := newGitHubWidgetRelease(t)
+	isolateHome(t)
+
+	gh := newTrustingGitHubWidgetRegistry(fake.URL(), t.TempDir(), githubWidgetTag, fake.PublicKey())
+	c := newGitHubConfig(t, t.TempDir(), gh)
+
+	err := c.Apply(subtypelessFixture(t, "github"))
+	require.NoError(t, err)
+
+	widget, err := Find[subtypelessWidget](c, "widget.app")
+	require.NoError(t, err)
+	require.Equal(t, "a", widget.PartNames)
+}
+
+func TestApplyWithGitHubReleaseSignedByUntrustedKeyFails(t *testing.T) {
+	fake := newGitHubWidgetRelease(t, testutil.SignedByOtherKey())
+	isolateHome(t)
+
+	gh := newTrustingGitHubWidgetRegistry(fake.URL(), t.TempDir(), githubWidgetTag, fake.PublicKey())
+	c := newGitHubConfig(t, t.TempDir(), gh)
+
+	err := c.Apply(subtypelessFixture(t, "github"))
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPluginVerification)
+
+	var loadErr *PluginLoadError
+	require.True(t, errors.As(err, &loadErr))
+	require.Equal(t, "xcl-plugin-widget", loadErr.Plugin)
+
+	require.Equal(t, 0, c.ResourceCount())
 }

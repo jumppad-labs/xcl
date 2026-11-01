@@ -184,8 +184,13 @@ func buildLocalRegistry(local *corepb.LocalRegistry, conf *configuration) (regis
 		}
 	}
 
-	for _, path := range local.GetExternalPlugins() {
-		h.Local.RegisterExternalPlugin(path)
+	for i, external := range local.GetExternalPluginCommands() {
+		command := external.GetCommand()
+		if len(command) == 0 || command[0] == "" {
+			return nil, fmt.Errorf("external plugin %d: command must name a program", i)
+		}
+
+		h.Local.RegisterExternalPlugin(command[0], command[1:]...)
 	}
 
 	for _, dir := range local.GetPluginDirectories() {
