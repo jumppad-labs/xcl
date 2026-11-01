@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
@@ -53,18 +54,17 @@ func verifyEntry(dir, repository, tag string, host platform, keys openpgp.Entity
 // complete, and returns it with the build it offers for host. Nothing here
 // needs the build itself, so an install checks it before downloading one.
 func checkIndex(dir, repository, tag string, host platform, keys openpgp.EntityList) (*releaseIndex, chosenBuild, error) {
-	name := indexName(repository, tag)
-
-	data, err := os.ReadFile(filepath.Join(dir, name))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, chosenBuild{}, fmt.Errorf("%w: index %s is missing", xclerrors.ErrPluginVerification, name)
-	}
-
+	name, err := indexFile(dir, repository, tag)
 	if err != nil {
 		return nil, chosenBuild{}, err
 	}
 
-	if err := verifySignature(dir, indexSignatureName(repository, tag), data, keys); err != nil {
+	data, err := os.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		return nil, chosenBuild{}, err
+	}
+
+	if err := verifySignature(dir, signatureName(name), data, keys); err != nil {
 		return nil, chosenBuild{}, err
 	}
 
@@ -363,4 +363,34 @@ func fileSHA256(path string) ([32]byte, error) {
 	copy(sum[:], hash.Sum(nil))
 
 	return sum, nil
+}
+
+// indexFile is the name of the index of the release of repository at tag kept
+// in dir, under either of the names it may have. dir holds the release's
+// files under their release names, so it holds exactly one of them.
+func indexFile(dir, repository, tag string) (string, error) {
+	names := indexNames(repository, tag)
+
+	found := []string{}
+	for _, name := range names {
+		_, err := os.Stat(filepath.Join(dir, name))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+
+		if err != nil {
+			return "", err
+		}
+
+		found = append(found, name)
+	}
+
+	switch len(found) {
+	case 0:
+		return "", fmt.Errorf("%w: index %s is missing", xclerrors.ErrPluginVerification, strings.Join(names, " or "))
+	case 1:
+		return found[0], nil
+	default:
+		return "", fmt.Errorf("%w: there are two indexes, %s and %s, and must be one", xclerrors.ErrPluginVerification, found[0], found[1])
+	}
 }

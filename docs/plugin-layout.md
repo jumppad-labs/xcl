@@ -3,7 +3,7 @@
 Every xcl plugin, whether it runs inside an application or as a separate
 program, uses one layout. A plugin groups the entity types of one domain,
 such as containers, Kubernetes or templates. The
-[plugin template](https://github.com/jumppad-labs/xcl-plugin-template) is the
+[plugin template](https://github.com/jumppad-labs/xcl-plugin-template-go) is the
 worked example of this layout, the
 [Docker plugin example](../example/plugin/plugins/docker) follows it, and it
 is the shape jumppad's resources take when they are ported to xcl plugins.
@@ -57,7 +57,7 @@ which an application registers by its binary, or by a command that runs it,
 such as `go run` while developing:
 
 ```go
-local.RegisterExternalPlugin("./build/xcl-plugin-template")
+local.RegisterExternalPlugin("./build/xcl-plugin-template-go")
 local.RegisterExternalPlugin("go", "run", "./cmd/notes")
 ```
 
@@ -202,11 +202,11 @@ fills in. When the object is gone, `Read` returns `plugins.ErrNotFound`.
 
 The quickest way to a plugin in this layout is the template. Click **Use this
 template** on
-[jumppad-labs/xcl-plugin-template](https://github.com/jumppad-labs/xcl-plugin-template),
+[jumppad-labs/xcl-plugin-template-go](https://github.com/jumppad-labs/xcl-plugin-template-go),
 or:
 
 ```shell
-gh repo create <you>/xcl-plugin-<name> --template jumppad-labs/xcl-plugin-template --public --clone
+gh repo create <you>/xcl-plugin-<name> --template jumppad-labs/xcl-plugin-template-go --public --clone
 ```
 
 Unchanged, it builds, tests and applies its sample with nothing else running.
@@ -222,17 +222,19 @@ installs. Pushing a version tag (`make release VERSION=v0.1.0`) builds the
 plugin for linux, darwin and windows on amd64 and arm64 with `make dist`, and
 publishes a GitHub release holding:
 
-- `<name>_<version>_<os>_<arch>.zip` for each platform, holding the binary,
+- `<name>-<version>-<os>-<arch>.zip` for each platform, holding the binary,
   marked executable, the README, the LICENSE and an `xcl-plugin.xcl` manifest
   naming the plugin, its version, its protocol, the command that starts it
   and its platform;
-- `<name>_<version>_index.xcl`, the release's index, listing every zip with
+- `<name>-<version>-index.xcl`, the release's index, listing every zip with
   its `sha256:` checksum;
-- `<name>_<version>_index.xcl.sig`, an armoured detached OpenPGP signature
+- `<name>-<version>-index.xcl.sig`, an armoured detached OpenPGP signature
   over the index, made with the key in the repository's secrets.
 
 `<name>` is the repository name and `<version>` the tag without its leading
-`v`. An application installs the release with the GitHub registry, see
+`v`. The template separates the parts of each name with `-`, like its
+repository name. The GitHub registry also installs releases that use `_`
+throughout (`<name>_<version>_index.xcl`), so a plugin can use either. An application installs the release with the GitHub registry, see
 [Installing plugins from GitHub](https://xcl.dev/github-registry/).
 
 ## Not covered by this layout

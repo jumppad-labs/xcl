@@ -142,12 +142,9 @@ func (p *githubPlugin) download(log logger.Logger, entry string) error {
 		return err
 	}
 
-	index, found := release.asset(indexName(p.repository, p.tag))
-	if !found {
-		return fmt.Errorf(
-			"%w: release %s of %s is not a plugin release in the supported layout, it has no index %s",
-			xclerrors.ErrPluginNotFound, p.tag, p.repository, indexName(p.repository, p.tag),
-		)
+	index, err := indexAsset(release, p.repository, p.tag)
+	if err != nil {
+		return err
 	}
 
 	assets := []githubAsset{index}
@@ -156,7 +153,7 @@ func (p *githubPlugin) download(log logger.Logger, entry string) error {
 	// that trusts keys can check it offline, but it is required only when
 	// keys are trusted
 	keys := p.registry.trusted()
-	signature, signed := release.asset(indexSignatureName(p.repository, p.tag))
+	signature, signed := release.asset(signatureName(index.Name))
 
 	switch {
 	case signed:
@@ -210,4 +207,34 @@ func (p *githubPlugin) download(log logger.Logger, entry string) error {
 	log.Info("installed plugin", "repository", p.repository, "version", p.tag, "entry", entry)
 
 	return nil
+}
+
+// indexAsset is the index among the assets of release, the release of
+// repository at tag, under either of the names it may have. A release with
+// neither is not a plugin release, and one with both is refused, since the
+// registry can't tell which of them describes the release.
+func indexAsset(release *githubRelease, repository, tag string) (githubAsset, error) {
+	names := indexNames(repository, tag)
+
+	found := []githubAsset{}
+	for _, name := range names {
+		if asset, ok := release.asset(name); ok {
+			found = append(found, asset)
+		}
+	}
+
+	switch len(found) {
+	case 0:
+		return githubAsset{}, fmt.Errorf(
+			"%w: release %s of %s is not a plugin release in the supported layout, it has no index %s",
+			xclerrors.ErrPluginNotFound, tag, repository, strings.Join(names, " or "),
+		)
+	case 1:
+		return found[0], nil
+	default:
+		return githubAsset{}, fmt.Errorf(
+			"%w: release %s of %s has two indexes, %s and %s, and must have one",
+			xclerrors.ErrPluginVerification, tag, repository, found[0].Name, found[1].Name,
+		)
+	}
 }

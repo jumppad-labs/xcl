@@ -29,6 +29,14 @@ const (
 	// installTestIndex
 	installTestSignature = "xcl-plugin-widget_1.0.0_index.xcl.sig"
 
+	// installTestHyphenIndex is the name of the index of acme/xcl-plugin-widget
+	// v1.0.0 when its asset names are separated with -
+	installTestHyphenIndex = "xcl-plugin-widget-1.0.0-index.xcl"
+
+	// installTestHyphenSignature is the name of the signature over
+	// installTestHyphenIndex
+	installTestHyphenSignature = "xcl-plugin-widget-1.0.0-index.xcl.sig"
+
 	// installTestImage is a container image pinned by digest
 	installTestImage = "ghcr.io/acme/widget@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 )
@@ -844,4 +852,142 @@ func TestGitHubPluginStartOnUnsupportedPlatformMakesNoRequests(t *testing.T) {
 	require.Error(t, err)
 
 	require.Equal(t, 0, fake.Requests())
+}
+
+func TestGitHubPluginStartInstallsAndStartsAHyphenatedRelease(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithSeparator("-"))
+	gh, _ := newInstallTestRegistry(t, fake)
+	plugin := widgetPlugin(t, gh)
+
+	host, err := plugin.Start(nil)
+	require.NoError(t, err)
+	require.NotNil(t, host)
+	t.Cleanup(host.Stop)
+
+	require.NotEmpty(t, host.GetTypes())
+}
+
+func TestGitHubPluginStartKeepsAHyphenatedReleasesFilesInTheEntry(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithSeparator("-"))
+	gh, cache := newInstallTestRegistry(t, fake)
+	plugin := widgetPlugin(t, gh)
+
+	host, err := plugin.Start(nil)
+	require.NoError(t, err)
+	t.Cleanup(host.Stop)
+
+	entry := hostEntryDirectory(cache)
+	require.FileExists(t, filepath.Join(entry, installTestHyphenIndex))
+	require.FileExists(t, filepath.Join(entry, installTestHyphenSignature))
+	require.FileExists(t, filepath.Join(entry, fake.ZipName(runtime.GOOS, runtime.GOARCH)))
+	require.FileExists(t, filepath.Join(entry, hostBinaryName()))
+	require.NoFileExists(t, filepath.Join(entry, installTestIndex))
+}
+
+func TestGitHubPluginStartVerifiesACachedHyphenatedReleaseWithoutRequests(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithSeparator("-"))
+	gh, _ := newInstallTestRegistry(t, fake)
+	plugin := widgetPlugin(t, gh)
+
+	first, err := plugin.Start(nil)
+	require.NoError(t, err)
+	t.Cleanup(first.Stop)
+
+	requests := fake.Requests()
+	fake.Close()
+
+	second, err := plugin.Start(nil)
+	require.NoError(t, err)
+	require.NotNil(t, second)
+	t.Cleanup(second.Stop)
+
+	require.Equal(t, requests, fake.Requests())
+}
+
+func TestGitHubPluginStartWithMissingCachedHyphenIndexFailsVerification(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithSeparator("-"))
+	gh, cache := newInstallTestRegistry(t, fake)
+	plugin := widgetPlugin(t, gh)
+
+	_, _, err := plugin.install(nil)
+	require.NoError(t, err)
+
+	require.NoError(t, os.Remove(filepath.Join(hostEntryDirectory(cache), installTestHyphenIndex)))
+
+	host, err := plugin.Start(nil)
+	require.Error(t, err)
+	require.Nil(t, host)
+
+	require.ErrorIs(t, err, xclerrors.ErrPluginVerification)
+	require.ErrorContains(t, err, "is missing")
+}
+
+func TestGitHubPluginStartWithoutIndexNamesBothIndexNames(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithoutIndex())
+	gh, _ := newInstallTestRegistry(t, fake)
+	plugin := widgetPlugin(t, gh)
+
+	_, err := plugin.Start(nil)
+	require.Error(t, err)
+
+	require.ErrorContains(t, err, installTestIndex)
+	require.ErrorContains(t, err, installTestHyphenIndex)
+}
+
+func TestGitHubPluginStartWithBothIndexesFailsVerification(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithBothIndexes())
+	gh, _ := newInstallTestRegistry(t, fake)
+	plugin := widgetPlugin(t, gh)
+
+	host, err := plugin.Start(nil)
+	require.Error(t, err)
+	require.Nil(t, host)
+
+	require.ErrorIs(t, err, xclerrors.ErrPluginVerification)
+	require.ErrorContains(t, err, "two indexes")
+	require.ErrorContains(t, err, installTestIndex)
+	require.ErrorContains(t, err, installTestHyphenIndex)
+}
+
+func TestGitHubPluginStartWithBothIndexesDownloadsNothing(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithBothIndexes())
+	gh, _ := newInstallTestRegistry(t, fake)
+	plugin := widgetPlugin(t, gh)
+
+	_, err := plugin.Start(nil)
+	require.Error(t, err)
+
+	// only the release is read
+	require.Equal(t, 1, fake.Requests())
+}
+
+func TestGitHubPluginStartWithBothIndexesLeavesNothingInTheCache(t *testing.T) {
+	fake := newInstallTestRelease(t, testutil.WithBothIndexes())
+	gh, cache := newInstallTestRegistry(t, fake)
+	plugin := widgetPlugin(t, gh)
+
+	_, err := plugin.Start(nil)
+	require.Error(t, err)
+
+	require.NoDirExists(t, hostEntryDirectory(cache))
+	requireNoStagingDirectories(t, cache)
+}
+
+func TestGitHubPluginStartWithBothIndexesInTheCacheFailsVerification(t *testing.T) {
+	fake := newInstallTestRelease(t)
+	gh, cache := newInstallTestRegistry(t, fake)
+	plugin := widgetPlugin(t, gh)
+
+	_, _, err := plugin.install(nil)
+	require.NoError(t, err)
+
+	entry := hostEntryDirectory(cache)
+	require.NoError(t, os.WriteFile(filepath.Join(entry, installTestHyphenIndex), fake.Index(), 0644))
+
+	host, err := plugin.Start(nil)
+	require.Error(t, err)
+	require.Nil(t, host)
+
+	require.ErrorIs(t, err, xclerrors.ErrPluginVerification)
+	require.ErrorContains(t, err, "two indexes")
 }

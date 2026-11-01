@@ -584,6 +584,306 @@
       "decisions": [],
       "attempts": 1,
       "state": "accepted"
+    },
+    {
+      "item": "58dc2f75-6b38-4013-827e-d4b6af4e8c52",
+      "title": "Release xcl with the new registry",
+      "checks": [
+        {
+          "at": "2026-11-01T09:05:31Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "58dc2f75-6b38-4013-827e-d4b6af4e8c52",
+            "title": "Release xcl with the new registry",
+            "criteria": [
+              "An xcl release containing the new registry, `ReplaceOn` and the nested-block fix is published on GitHub.",
+              "The Python SDK's engine bump to that release has been opened."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "tag.yml"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "release.yml"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "engine-bump.yml"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Release v0.13.0 is published on GitHub for jumppad-labs/xcl (published 2026-11-01T09:03:38Z, target main, with platform archives and checksums plus .sig, per the quoted `gh release view` output). The tag resolves to 27da7d5, a merge of PR #40 from f-python-plugin. The quoted `git merge-base --is-ancestor` checks show 9e9893d (nested-block fix), 348ec83 (ReplaceOn via DefaultChanged.ReplaceOn), 78e1d61 (v2 layout install, the registry) and fb3fb3c are all ancestors of v0.13.0. In the worktree at /home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261031180836-7529c085-plugin-release-contract-v2/xcl, the registry files exist (registry/github_install.go, github_verify.go, github_release_files.go, github_assets.go) and ReplaceOn is defined in plugins/changed.go. I could not run git myself (no shell tool), so the tag-ancestry evidence rests on the quoted command output."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "The quoted `gh pr list -R jumppad-labs/xcl-python` output shows PR #25 'Use xcl engine v0.13.0' (branch engine/v0.13.0), state OPEN, created 2026-11-01T09:04:13Z, opened by the 'Engine bump' workflow via repository_dispatch xcl-release. That is the Python SDK engine bump to the v0.13.0 release. I could not query GitHub directly (no shell or network tool), so this rests on the quoted output."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "bc7d2bfe-aec4-4314-a880-e1320ae7cd0a",
+      "title": "Publish releases in the new layout from the plugin template",
+      "checks": [
+        {
+          "at": "2026-11-01T09:11:53Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "bc7d2bfe-aec4-4314-a880-e1320ae7cd0a",
+            "title": "Publish releases in the new layout from the plugin template",
+            "criteria": [
+              "The release build produces one zip per supported platform, each with its manifest and an executable binary, and an index whose checksums match the zips.",
+              "The release workflow signs the index and publishes the index, its signature and the zips.",
+              "The note provider answers replace and update for exactly the same changes as before.",
+              "The README describes the new release layout and no longer describes the old one."
+            ],
+            "scope": {
+              "repo": "xcl-plugin-template",
+              "files": [
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": "xcl-plugin.xcl"
+                },
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": ".github/workflows/ci.yml"
+                },
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": "go.mod"
+                },
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": "github.com/jumppad-labs/xcl"
+                },
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": "providers/note.go"
+                },
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": "providers/note_test.go"
+                },
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Makefile:15 sets PLATFORMS to linux, darwin and windows on amd64 and arm64 (six pairs). The dist target (Makefile:70-93) builds ./cmd/notes per platform, copies README.md and LICENSE, writes xcl-plugin.xcl into the stage dir before zipping (Makefile:82-83), zips it as \u003cPLUGIN\u003e_\u003cversion\u003e_\u003cos\u003e_\u003carch\u003e.zip with -X (Makefile:84-85), and writes \u003cPLUGIN\u003e_\u003cversion\u003e_index.xcl with one platform block per zip, asset and checksum=\"sha256:\u003csha256sum of zip\u003e\" (Makefile:86-91). The binary is built with the .exe suffix on windows (Makefile:70). The lead's verification (unzip -Z shows binary at -rwxr-xr-x, sha256 of each zip matches the index, the index reads through xcl's registry reader) was run by them and I could not re-run it because I am read-only. Scope caveat, not a verdict driver: Makefile and go.sum are modified in the diff but Makefile is not in this item's listed files; go.sum follows the go.mod bump."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "release.yml:49-55 'Sign the index' step selects dist/*_index.xcl and runs gpg --detach-sign --armor, producing \u003cindex\u003e.sig in dist/. release.yml:57-60 'Publish the release' runs gh release create ... dist/*, which after the build holds the six zips, the index and the .sig (the Makefile removes only dist/stage). The unchanged publish glob therefore publishes index, signature and zips."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Old behaviour (HEAD note.go, xcl v0.9.0 DefaultChanged): replace if any change is Within ReplaceSettings, replace if a dependency is Replace, update if len(changes)\u003e0, else DefaultChanged which is pure JSON comparison (v0.9.0 plugins/changed.go:34-49). New note.go:112-132: dependency Replace returns Replace; DefaultChanged (v0.13.0 plugins/changed.go:55-75) returns Replace on ReplaceOn match, else Update/NoChange by JSON comparison; NoChange with len(changes)\u003e0 becomes Update; otherwise the result passes through. Each input yields the same answer: name/directory change gives Replace, dependency Replace gives Replace, any other change gives Update, no change with empty changes gives the JSON comparison result. The only difference is that comparableJSON can now error on a non-empty change list, a marshal failure that is practically unreachable for this struct. ReplaceSettings (note.go:32-35) is unchanged and wired via note.go:54. Tests added at providers/note_test.go:187-206."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "README.md:320-349 describes the release as \u003cPLUGIN\u003e_0.1.0_\u003cos\u003e_\u003carch\u003e.zip per platform with xcl-plugin.xcl, \u003cPLUGIN\u003e_0.1.0_index.xcl and index.xcl.sig, and the packaging tools are go, zip, sha256sum, gpg and gh. README.md:353-357 describes the install flow in the new terms (index first, then zip, checked against the index). A search of README.md for tar.gz, .tar, checksums.txt and checksums returns no old-layout references. README.md:105-125 documents the new Changed order and the DefaultChanged/ReplaceOn wiring, which matches note.go."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "f5117cfa-895f-4311-8696-96f5f04d7347",
+      "title": "Find a release's index under either separator",
+      "checks": [
+        {
+          "at": "2026-11-01T10:38:11Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "f5117cfa-895f-4311-8696-96f5f04d7347",
+            "title": "Find a release's index under either separator",
+            "criteria": [
+              "A release whose assets are named with `-` installs, verifies against its signature and starts, and is verified again from the cache.",
+              "A release whose assets are named with `_` still installs, verifies against its signature and starts.",
+              "A release holding both an `_` index and a `-` index is refused before any build is downloaded.",
+              "xcl's docs say either separator may be used."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "plugin-release-assets-v2.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_assets.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".sig"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_install.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_verify.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_release_files.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/testutil/github_release.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "github_release_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_release_files_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_install_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_signature_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_verify_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "docs/plugins.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "docs/plugin-layout.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "registry/github_install.go:145-156 finds the index with indexAsset and takes the signature name from index.Name via signatureName, so a `-` index is downloaded with its `.sig`. Cache re-verification goes through verifyEntry -\u003e checkIndex -\u003e indexFile (registry/github_verify.go:57-67, 368-393), which accepts whichever index name is present. Tests added in registry/github_install_test.go:405-453 cover install-and-start (TestGitHubPluginStartInstallsAndStartsAHyphenatedRelease) and a cached re-verify with no new requests (TestGitHubPluginStartVerifiesACachedHyphenatedReleaseWithoutRequests). Signed-start for `-` is covered in registry/github_signature_test.go:608-617. Tests were judged from the code and test names, not run; the reported go test run passed."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "registry/github_assets.go:44-52 returns the `_` name first in indexNames, and registry/github_install.go:216-224 and registry/github_verify.go:371-393 match either name. The pre-existing `_` tests are untouched by the diff: installTestIndex and installTestSignature remain at registry/github_install_test.go:27-30 and the existing install and signature tests still use them. Nothing in the diff removes the `_` path."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "registry/github_install.go:145-148 calls indexAsset, which returns ErrPluginVerification when two index names are present (lines 234-239). This runs before the signature and zip downloads at lines 150-186, and the staging directory is removed by the defer at line 132. Test TestGitHubPluginStartWithBothIndexesDownloadsNothing (registry/github_install_test.go, added in the diff) asserts only the release request is made, and TestGitHubPluginStartWithBothIndexesLeavesNothingInTheCache checks the cache is left empty."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "docs/plugins.md, diff hunk at lines 410-423: \"The parts of each asset name are separated by `_`, as below, or by `-` (`\u003cname\u003e-\u003cversion\u003e-index.xcl`), whichever the plugin's author prefers\", and the registry \"looks for the index under either name and refuses a release that has both\". docs/plugin-layout.md, diff hunk around line 222-106: \"The GitHub registry also installs releases that use `_` throughout ... so a plugin can use either.\""
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": false
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "634d6213-8606-4a17-83b5-3f5604a10c60",
+      "title": "Name the template's release assets with hyphens",
+      "checks": [
+        {
+          "at": "2026-11-01T10:41:21Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "634d6213-8606-4a17-83b5-3f5604a10c60",
+            "title": "Name the template's release assets with hyphens",
+            "criteria": [
+              "`make dist` produces `\u003cname\u003e-\u003cversion\u003e-index.xcl` and one `\u003cname\u003e-\u003cversion\u003e-\u003cos\u003e-\u003carch\u003e.zip` per platform, and the index names those zips with matching checksums.",
+              "The README describes the hyphenated asset names."
+            ],
+            "scope": {
+              "repo": "xcl-plugin-template",
+              "files": [
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Makefile:76 sets index=\"$(DIST_DIR)/$(PLUGIN)-$(DIST_VERSION)-index.xcl\" and Makefile:87 sets archive=\"$(PLUGIN)-$(DIST_VERSION)-$$os-$$arch.zip\", one per entry in PLATFORMS (Makefile:15). Makefile:88-90 hashes each zip and writes its name and sha256 into the index as asset and checksum, so the index names each zip with its matching checksum. The snapshot run in the verification results shows the expected six zips and index. The Makefile is not in the goal's listed files, but the hyphenated names come from it and nothing else produces them, so the criterion can only be met through it. The scope-rule question is separate from this verdict."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "README.md:332-346 describes the hyphenated names: `\u003cPLUGIN\u003e-0.1.0-\u003cos\u003e-\u003carch\u003e.zip`, `\u003cPLUGIN\u003e-0.1.0-index.xcl` and `\u003cPLUGIN\u003e-0.1.0-index.xcl.sig`. Line 342 states the parts are separated with `-`, and lines 343-346 note the `_` form and that a `-` release needs xcl newer than v0.13.0. The diff hunk at README.md line 329 shows the old `_` names were replaced."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
     }
   ]
 }

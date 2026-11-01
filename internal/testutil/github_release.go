@@ -99,6 +99,8 @@ type fakeReleaseSettings struct {
 	container         *fakeContainer
 	token             string
 	draft             bool
+	separator         string
+	bothIndexes       bool
 }
 
 // FakeReleaseOption changes how a fake release is built or served
@@ -188,6 +190,19 @@ func Draft() FakeReleaseOption {
 	return func(s *fakeReleaseSettings) { s.draft = true }
 }
 
+// WithSeparator separates the parts of every asset's name with separator, _
+// or -, instead of _: the index, its signature and the zips
+func WithSeparator(separator string) FakeReleaseOption {
+	return func(s *fakeReleaseSettings) { s.separator = separator }
+}
+
+// WithBothIndexes attaches the index a second time, under the name the other
+// separator gives it, so the release holds both
+// <name>_<version>_index.xcl and <name>-<version>-index.xcl
+func WithBothIndexes() FakeReleaseOption {
+	return func(s *fakeReleaseSettings) { s.bothIndexes = true }
+}
+
 // NewFakeGitHubRelease builds a release of repository (owner/repo) at tag
 // from the plugin binary at binary, zipped with its manifest for every
 // platform in FakeReleasePlatforms, with an index carrying every zip's
@@ -202,6 +217,7 @@ func NewFakeGitHubRelease(t testing.TB, repository, tag, binary string, options 
 		withoutChecksums: map[string]bool{},
 		tampered:         map[string]bool{},
 		disagreements:    map[string]string{},
+		separator:        "_",
 	}
 	for _, option := range options {
 		option(&settings)
@@ -290,9 +306,10 @@ func (f *FakeGitHubRelease) OtherKeyID() string {
 	return fmt.Sprintf("%016X", key.PublicKey.KeyId)
 }
 
-// IndexName is the contract's name for the release's index
+// IndexName is the contract's name for the release's index, its parts
+// separated by the release's separator
 func (f *FakeGitHubRelease) IndexName() string {
-	return fmt.Sprintf("%s_%s_index.xcl", f.pluginName(), f.version())
+	return f.indexNameWith(f.settings.separator)
 }
 
 // SignatureName is the contract's name for the signature over the index
@@ -300,9 +317,16 @@ func (f *FakeGitHubRelease) SignatureName() string {
 	return f.IndexName() + ".sig"
 }
 
-// ZipName is the contract's name for the zip of the build for os/arch
+// ZipName is the contract's name for the zip of the build for os/arch, its
+// parts separated by the release's separator
 func (f *FakeGitHubRelease) ZipName(os, arch string) string {
-	return fmt.Sprintf("%s_%s_%s_%s.zip", f.pluginName(), f.version(), os, arch)
+	return strings.Join([]string{f.pluginName(), f.version(), os, arch}, f.settings.separator) + ".zip"
+}
+
+// indexNameWith is the contract's name for the release's index, its parts
+// separated by separator
+func (f *FakeGitHubRelease) indexNameWith(separator string) string {
+	return strings.Join([]string{f.pluginName(), f.version(), "index.xcl"}, separator)
 }
 
 // Zip is the zip of the build for os/arch as it is served, nil when the
@@ -369,6 +393,15 @@ func (f *FakeGitHubRelease) build(t testing.TB, binary []byte) {
 
 	f.index = f.indexFile(checksums)
 	f.addAsset(f.IndexName(), f.index)
+
+	if f.settings.bothIndexes {
+		other := "-"
+		if f.settings.separator == "-" {
+			other = "_"
+		}
+
+		f.addAsset(f.indexNameWith(other), f.index)
+	}
 
 	if f.settings.withoutSignature {
 		return

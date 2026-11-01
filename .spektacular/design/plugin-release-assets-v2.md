@@ -1,6 +1,7 @@
 ---
 created_date: "2026-10-31"
 document_status: draft
+spec: 20261031180836-7529c085-plugin-release-contract-v2
 specs:
     - 20261031180836-7529c085-plugin-release-contract-v2
 ---
@@ -21,16 +22,18 @@ How the host and plugin talk to each other is a separate design. This contract o
 ## Assets
 
 ```
-<name>_<version>_index.xcl          which packages the release offers, with their checksums
-<name>_<version>_index.xcl.sig      optional detached OpenPGP signature over the index
-<name>_<version>_<os>_<arch>.zip    one per platform of the executable
+<name><sep><version><sep>index.xcl              which packages the release offers, with their checksums
+<name><sep><version><sep>index.xcl.sig          optional detached OpenPGP signature over the index
+<name><sep><version><sep><os><sep><arch>.zip    one per platform of the executable
 ```
+
+`<sep>` is `_` or `-`, whichever the plugin's author prefers. A release should use one separator throughout, but the registry doesn't check that. The registry looks for the index as `<name>_<version>_index.xcl` or `<name>-<version>-index.xcl`, and refuses a release that holds both. The signature's name is the index's name plus `.sig`. Zip names are never parsed: each zip is the asset the index names, so the zip pattern above is a convention.
 
 A release offers an executable, a container, or both. A container ships no zip, because the index names its image. A release with no index isn't an xcl plugin release, and the registry refuses it.
 
 ## The index
 
-`<name>_<version>_index.xcl` is written by the release tooling, never by hand. The registry reads it before downloading anything. It describes every package and verifies every one.
+The index is written by the release tooling, never by hand. The registry reads it before downloading anything. It describes every package and verifies every one.
 
 ```hcl
 plugin {
@@ -122,7 +125,7 @@ The index and the manifest hold literal values only, with no variables, function
 
 ## Signature
 
-- **`<name>_<version>_index.xcl.sig`** is an ASCII-armoured detached OpenPGP signature over the index. The index holds every zip's checksum and the image's digest, so signing it signs every package in the release.
+- **The index's signature, its name plus `.sig`,** is an ASCII-armoured detached OpenPGP signature over the index. The index holds every zip's checksum and the image's digest, so signing it signs every package in the release.
 - **Optional in a release:**
   - An application that supplies trusted keys accepts a release only when the signature verifies against one of them.
   - An application with no trusted keys doesn't check signatures, and trusts the index because it came from the pinned release over TLS.
