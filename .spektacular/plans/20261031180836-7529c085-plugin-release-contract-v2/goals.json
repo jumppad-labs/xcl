@@ -1,0 +1,589 @@
+{
+  "plan": "20261031180836-7529c085-plugin-release-contract-v2",
+  "items": [
+    {
+      "item": "7c1f4231-863f-4795-8602-84df2df92afc",
+      "title": "Serve the new release layout from the fake release server",
+      "checks": [
+        {
+          "at": "2026-10-31T19:49:15Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "7c1f4231-863f-4795-8602-84df2df92afc",
+            "title": "Serve the new release layout from the fake release server",
+            "criteria": [
+              "A fake release serves an index, a zip per platform and, when asked, a signature, named as the design fixes them.",
+              "The checksums in a fake index match the zips it serves, and its signature verifies against the fake's public key.",
+              "Each switch (dropped platform, no index, no signature, missing checksum, tampered zip, disagreeing manifest, unknown kind, container entry, expression, other signing key, token, draft) changes the served release as named."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "internal/testutil/github_release.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".exe"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "xcl-plugin.xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/testutil/github_release_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "internal/testutil/github_release.go:294-306 names the index `\u003cname\u003e_\u003cversion\u003e_index.xcl`, the signature `\u003cindex\u003e.sig` and the zip `\u003cname\u003e_\u003cversion\u003e_\u003cos\u003e_\u003carch\u003e.zip`. The build loop at :337-363 attaches one zip per FakeReleasePlatforms entry, :366-371 attaches the index, and :373-387 attaches the signature unless WithoutSignature is set. github_release_test.go:198-223 checks the served names and the ZipName/IndexName/SignatureName output."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "The checksum is sha256 of the zip before tampering (github_release.go:354-355, written into the index at :443-445 as `checksum = \"sha256:\u003chex\u003e\"`). The index is signed with f.key (:377-384), and PublicKey() returns the armoured f.key (:270-273). github_release_test.go:288-306 checks the checksums against the served zips, and :370-377 checks the signature verifies against PublicKey()."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Each switch is defined and wired into the build or index code: dropped platform (WithoutPlatform :109-111; no zip at :340-342, no index platform block at :395-410); no index (WithoutIndex :122-124; return at :366-368, so no index or sig, zips kept); no signature (WithoutSignature :133-135; return at :373-375, index kept); missing checksum (WithoutChecksum :128-130; checksum line omitted at :443-445); tampered zip (TamperZip :145-147; bytes appended after the checksum is taken at :357-359); disagreeing manifest (ManifestDisagrees :153-155; manifest() :397-407 changes one field while the checksum stays consistent); unknown kind (WithUnknownKind :159-161; wasm block at :464-466); container entry (WithContainer :167-172; container block at :453-462, image and platforms written as given); expression (IndexExpression :175-177; upper(\"...\") at :423-426); other signing key (SignedByOtherKey :139-141; signer switch at :377-381); token (RequireToken :182-184; enforced in authorized() at :558-560); draft (Draft :187-189; sets draft at :502). Tests cover these in github_release_test.go:406-652 and :672-682. Note for the caller: go vet on the whole module fails in other packages' callers of the old API (registry, coreservice). Those files are outside this item's scope, and no criterion covers go vet, so this does not change any verdict here."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "75c63fab-8b06-4f97-a174-5ab17d41dfb5",
+      "title": "Read and validate release indexes and build manifests",
+      "checks": [
+        {
+          "at": "2026-10-31T19:56:15Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "75c63fab-8b06-4f97-a174-5ab17d41dfb5",
+            "title": "Read and validate release indexes and build manifests",
+            "criteria": [
+              "A valid index decodes, including two platforms that share an operating system.",
+              "An index naming the wrong plugin or version, missing or malforming a checksum, naming a container by tag, listing a non-Linux container platform, or offering no known kind is refused with an error naming the problem.",
+              "An index or manifest using a variable or a function call is refused.",
+              "An index with an extra unknown kind decodes, and the unknown kind is ignored.",
+              "The host's native build is chosen. A release with no build for the host, or with only a container, is refused with an error listing the platforms offered and the host's platform.",
+              "A manifest that disagrees with its index on name, version, protocol or platform is refused."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_release_files.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "plugin.name"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_assets.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_release_files_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_assets_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "registry/github_release_files.go:126-133 readIndex decodes via decodeStatic into releaseIndex; indexPlatform carries OS and Arch as labels (github_release_files.go:73-78). registry/github_release_files_test.go:116-140 TestReadIndexDecodesValidIndex and TestReadIndexDecodesTwoPlatformsSharingAnOS decode validIndex, which offers linux/amd64 and linux/arm64 plus darwin/arm64, and assert all three platforms and their fields."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "github_release_files.go:178-206 validate refuses a wrong plugin name ('index names plugin ...', line 181), a wrong version (line 186), and an index with no known kind (line 189-190). indexExecutable.validate (lines 210-235) refuses a missing checksum (line 226) and a malformed checksum via checksumPattern (line 229-231). indexContainer.validate (lines 239-260) refuses a tag instead of a digest (line 241) and a non-Linux container platform (line 250-252). Tests at github_release_files_test.go:293-551 cover each refusal and assert the error text."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "decodeStatic (github_release_files.go:158-170) decodes with a nil evaluation context, so variables and function calls are rejected by xcl's own diagnostics. Tests github_release_files_test.go:163-200 cover a variable, a reference and a function call in an index (asserting 'Variables not allowed' and 'Function calls not allowed'), and :694-773 cover a variable and a function call in a manifest. Caveat: blocks of unknown kinds are captured by the remain field (github_release_files.go:52-54) and never evaluated, so a variable inside an unknown kind's body is not refused. That is the intended consequence of criterion 4, but it is a literal gap against criterion 3's wording."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "github_release_files.go:52-54 and :101-103 add a remain body that collects unknown top-level blocks, so decoding does not fail. github_release_files_test.go:151-161 TestReadIndexSkipsUnknownKind decodes validIndex plus a wasm block and asserts the three platforms and a passing validate. Test :535-551 shows that an index whose only block is wasm is still refused for offering no known kind."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "github_release_files.go:268-298 choose returns the build whose os and arch equal the host, and never returns a container. When nothing matches it returns ErrPluginNotFound with 'release offers no build for \u003chost\u003e, it offers \u003cplatforms\u003e' (line 294-297). offered() (lines 302-322) lists executable platforms as os/arch and container platforms as os/arch (container). Tests github_release_files_test.go:553-608 cover the host build, a sibling architecture, a refused unoffered platform, and a container-only release whose message names the host and both container platforms. registry/github_assets.go:177-180 supplies platform.String() used in the message."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "github_release_files.go:327-357 agrees compares the manifest's name (line 328), version (line 332), protocol with slices.Equal (line 340), and the single platform against the host (lines 347-355). Each refusal is an ErrPluginVerification naming the field. Tests github_release_files_test.go:791-907 cover agreement and each of name, version, protocol and platform disagreeing. Caveat: the goal's file list does not include the internal/testutil changes in the diff (github_release.go and github_release_test.go), and registry/github_client_test.go:82 still calls fake.Archive, so the registry test package does not compile as a whole. The criterion's code is met, but the new tests cannot currently run in the package together with the existing github_client_test.go."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "1ee47308-1326-4819-b3be-ad6364436024",
+      "title": "Install plugins from releases in the new layout",
+      "checks": [
+        {
+          "at": "2026-10-31T20:13:29Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "1ee47308-1326-4819-b3be-ad6364436024",
+            "title": "Install plugins from releases in the new layout",
+            "criteria": [
+              "A plugin installs from a fake release in the new layout and is used by a real apply and destroy.",
+              "A release with no index, or with an incomplete index, fails to load, and no build is downloaded.",
+              "With trusted keys, a release whose index signature is missing or from another key fails to load and no build is downloaded. Without keys, an unsigned release installs.",
+              "Installing a release offering six platforms downloads exactly one build.",
+              "A tampered zip, or a manifest that disagrees with its index, fails to load and leaves nothing in the cache.",
+              "A second load uses the cache with no requests, and a cached build altered on disk fails the next load.",
+              "A release with a container alongside native builds installs the native build. A container-only release fails with the no-build error.",
+              "Failures are reported as one of the two existing error kinds: not found, or failed verification."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_install.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": ".sig"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "xcl-plugin.xcl"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_verify.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/registry.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "plugins/grpc_plugin_host.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_install_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_signature_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_verify_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "config_github_registry_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/config_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/remoteplugin/release_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/registry_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_live_test.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "config_github_registry_test.go (the diff's new tests) installs a fake release built by testutil.NewFakeGitHubRelease, which now writes the index, zips and signature, through c.Apply. TestApplyWithContainerAndNativeGitHubReleaseSucceeds reads the widget back with Find, and TestDestroyAfterApplyWithContainerAndNativeGitHubReleaseSucceeds calls c.Destroy() and checks ResourceCount is 0. The Apply-only and Destroy-only paths are also covered by the existing github registry tests in that file. Verified by reading only; the tests were not run. Note: the goal's scope lists registry/github_live_test.go and example/remoteplugin/release_test.go, but neither appears in the diff."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "registry/github_install.go download(): the index is fetched first and a missing index returns ErrPluginNotFound ('is not a plugin release in the supported layout') before any zip is requested. checkIndex runs before the zip download, and index.validate (registry/github_release_files.go:178-264) rejects a missing checksum, a missing asset or a non-sha256 checksum. Tests: registry/github_install_test.go TestGitHubPluginStartWithoutIndexIsNotFound and TestGitHubPluginStartWithoutIndexDownloadsNothing (asserts 1 request), TestGitHubPluginStartWithoutChecksumDownloadsNoBuild."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "registry/github_install.go download(): with keys trusted and no signature asset the install returns ErrPluginVerification ('release is not signed, and trusted keys were supplied') before any zip download. verifySignature in registry/github_verify.go rejects a signature from another key. Unsigned without keys installs: registry/github_install.go only errors on a missing signature when len(keys) \u003e 0. Tests: registry/github_signature_test.go TestGitHubPluginStartWithTrustedKeyRefusesUnsignedRelease, TestGitHubPluginStartWithTrustedKeyDownloadsNothingFromAnUnsignedRelease, TestGitHubPluginStartWithTrustedKeyDownloadsNoBuildOfAReleaseSignedByOtherKey, TestGitHubPluginInstallWithoutTrustedKeysInstallsUnsignedRelease."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "registry/github_install.go download(): only the index, the optional .sig and the single zip for the host platform (build.Asset, chosen by index.choose) are downloaded. Test registry/github_install_test.go TestGitHubPluginInstallOfASixPlatformReleaseDownloadsExactlyOneBuild asserts fake.Requests() == 4 (release, index, signature, one zip) and exactly one zip in the entry directory."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "A tampered zip fails at checkBuild's SHA-256 comparison ('does not match its checksum in the index'). A manifest disagreeing with the index fails at buildManifest.agrees (registry/github_release_files.go:331-361) for name, version, protocol or platform. Both happen in staging, and the deferred os.RemoveAll(staging) in download() plus the rename-only-on-success means no entry is left. Tests: registry/github_install_test.go TestGitHubPluginStartWithTamperedZipLeavesNoEntry, TestGitHubPluginStartWithManifestNamingAnotherPluginFailsVerificationAndLeavesNoEntry, ...AnotherVersion..., ...AnotherProtocol..., ...AnotherPlatform...; config_github_registry_test.go TestApplyWithTamperedGitHubReleaseZipFails asserts NoFileExists on the cached binary."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "A cache hit (os.Stat on entry succeeds) skips all requests in install(), and the second load only calls verifyEntry offline. Test registry/github_install_test.go TestGitHubPluginStartUsesTheCacheWithoutRequests closes the fake server and asserts the request count does not change. verifyExtracted compares the cached binary with its copy in the cached zip, so TestGitHubPluginStartWithAlteredCachedBinaryFailsVerification covers the altered-on-disk case. The zip and index are also re-checked offline (TestGitHubPluginStartWithAlteredCachedZipFailsVerification, TestGitHubPluginStartWithAlteredCachedIndexFailsVerification)."
+            },
+            {
+              "criterion": 7,
+              "verdict": "met",
+              "evidence": "registry/github_release_files.go choose() skips container entries and returns the first executable platform matching the host. A container-only release has no matching executable, so choose() returns ErrPluginNotFound ('release offers no build for \u003chost\u003e, it offers ... (container)'). Tests: registry/github_install_test.go TestGitHubPluginInstallsTheNativeBuildOfAReleaseAlsoOfferingAContainer (line 590) and TestGitHubPluginStartOfAContainerOnlyReleaseIsNotFound (line 602); config_github_registry_test.go TestApplyWithContainerOnlyGitHubReleaseFailsNamingPlugin asserts ErrPluginNotFound."
+            },
+            {
+              "criterion": 8,
+              "verdict": "met",
+              "evidence": "The new failure paths wrap one of the two kinds: index missing and no build for the host are ErrPluginNotFound (github_install.go download, github_release_files.go choose); incomplete index, digest mismatch, manifest disagreement, tampered zip, untrusted or missing signature and cache alteration are ErrPluginVerification (github_release_files.go validate/agrees/decodeStatic, github_verify.go checkIndex/checkBuild/verifySignature/verifyExtracted). errors/plugin_install_error.go documents both kinds. Caveat: some transport and local I/O errors are returned without either kind, e.g. github_client.go 'unable to read release' and 'unable to download', and github_install.go 'unable to create the plugin cache'. These are pre-existing and not install verdicts, so a strict reading of 'reported as one of the two kinds' would fail on them."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "54638801-3f11-4d89-b644-fe9eb29e69e2",
+      "title": "Describe the new release layout in xcl's docs",
+      "checks": [
+        {
+          "at": "2026-10-31T20:16:09Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "54638801-3f11-4d89-b644-fe9eb29e69e2",
+            "title": "Describe the new release layout in xcl's docs",
+            "criteria": [
+              "xcl's docs describe the release index, per-platform zips, checksums in the index and the optional index signature.",
+              "No xcl doc describes per-platform tar.gz archives, a checksums file or a signature over a checksums file."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "docs/plugins.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "docs/plugin-layout.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "docs/plugin-layout.md:223-230 lists the release as `\u003cname\u003e_\u003cversion\u003e_\u003cos\u003e_\u003carch\u003e.zip` per platform, `\u003cname\u003e_\u003cversion\u003e_index.xcl` listing every zip with its `sha256:` checksum, and `\u003cname\u003e_\u003cversion\u003e_index.xcl.sig` as an armoured detached OpenPGP signature over the index. docs/plugins.md:312-334 describes the same layout: the index with `checksum = \"sha256:\u003chex\u003e\"` per platform block, one zip per executable platform, and the optional `index.xcl.sig` over the index. The README does not describe the plugin layout; it links to docs/plugin-layout.md at line 190, which is consistent."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Grepped all of docs/ for checksums, tar.gz, tarball, archive, signature and .sig. The only hits in plugin-release wording are docs/plugins.md:365-428 and docs/plugin-layout.md:229, which all describe the index signature, not a checksums file. Nothing in docs/ mentions tar.gz or a checksums file. README.md:268 mentions 'engine archives' for xcl's own release process, which is not a per-platform plugin tar.gz and not a checksums file or a signature over one, so it does not violate the criterion. Note that the staged xcl diff also touches many Go files and tests (config.go, internal/testutil, errors/), which are outside this item's listed files. That is a scope concern for the caller, not a verdict on these two criteria."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "34d3cb96-35c9-4208-aabf-3edf0d5efd68",
+      "title": "Name the plugin handshake cookie XCL_PLUGIN",
+      "checks": [
+        {
+          "at": "2026-10-31T20:20:55Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "34d3cb96-35c9-4208-aabf-3edf0d5efd68",
+            "title": "Name the plugin handshake cookie XCL_PLUGIN",
+            "criteria": [
+              "The host starts external plugins with `XCL_PLUGIN=xcl`, and a plugin built from this xcl serves only when it is set.",
+              "No code, test or doc in xcl names `HCLCONFIG_PLUGIN`."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "plugins/grpc_plugin.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "plugins/grpc_plugin_host.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "plugins/serve.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/test_fixtures"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/testdata"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "libxcl.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "plugins/grpc_plugin.go:94-95 sets HandshakeConfig MagicCookieKey \"XCL_PLUGIN\" and MagicCookieValue \"xcl\"; plugins/grpc_plugin_host.go connect() (diff hunk at line ~106) passes HandshakeConfig to plugin.NewClient, and go-plugin adds MagicCookieKey=MagicCookieValue to the child environment (/home/nicj/go/pkg/mod/github.com/hashicorp/go-plugin@v1.7.0/client.go:639), so the host starts plugins with XCL_PLUGIN=xcl. plugins/serve.go passes the same HandshakeConfig to plugin.Serve, so a plugin serves only when the variable is set. plugins/handshake_test.go:36-93 covers serving with XCL_PLUGIN=xcl, refusing without it, and refusing with XCL_PLUGIN=other."
+            },
+            {
+              "criterion": 2,
+              "verdict": "impossible",
+              "evidence": "The name is gone from all code and tests in xcl: the case-insensitive grep of the worktree xcl tree finds no hclconfig_plugin outside the store, and plugins/grpc_plugin.go now uses XCL_PLUGIN (the diff removes the HCLCONFIG_PLUGIN line at grpc_plugin.go:1552). But one doc in xcl still names it: xcl/.spektacular/design/libxcl.md:1077 contains HCLCONFIG_PLUGIN. That file is outside the goal's allowed files, and it is a store file that agents may not edit by hand (AGENTS.md store-access rule). So the criterion cannot be met within the scope rule. If the criterion is read as covering only the listed files and user-facing docs, it would be met."
+            }
+          ],
+          "decision": "impossible",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-10-31T20:28:54Z",
+          "round": 2,
+          "attempt": 1,
+          "goal": {
+            "item": "34d3cb96-35c9-4208-aabf-3edf0d5efd68",
+            "title": "Name the plugin handshake cookie XCL_PLUGIN",
+            "criteria": [
+              "The host starts external plugins with `XCL_PLUGIN=xcl`, and a plugin built from this xcl serves only when it is set.",
+              "No code, test or repository doc in xcl names `HCLCONFIG_PLUGIN` (the `libxcl.md` design is revised by the protocol 2 transport design)."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "plugins/grpc_plugin.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "plugins/grpc_plugin_host.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "plugins/serve.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/test_fixtures"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/testdata"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "libxcl.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "plugins/grpc_plugin.go:85-96 sets HandshakeConfig MagicCookieKey to \"XCL_PLUGIN\" and MagicCookieValue to \"xcl\", and the doc comment says the host starts a plugin with XCL_PLUGIN=xcl and a plugin serves only when it is set. plugins/grpc_plugin_host.go:106-110 builds the go-plugin client from that same HandshakeConfig, and nothing in it overrides the environment, so the cookie is passed on the host's exec. plugins/serve.go:21-28 passes the same HandshakeConfig to plugin.Serve. plugins/handshake_test.go:30-34 checks the key and value, :36-69 checks a binary started with XCL_PLUGIN=xcl prints a grpc handshake line, and :71-93 checks it refuses to serve without the variable or with XCL_PLUGIN=other. I did not run the tests. The host-side env injection relies on go-plugin's standard behaviour, which I did not open in the module cache."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "A grep for HCLCONFIG across the xcl worktree, excluding .spektacular/, returns no files. The only remaining occurrence in the worktree is inside .spektacular/design/libxcl.md, which is a Spektacular store design file rather than a repository doc, and the criterion itself says that design is revised by the protocol 2 transport design. The staged xcl.diff shows plugins/grpc_plugin.go:1552-1553 changing MagicCookieKey from \"HCLCONFIG_PLUGIN\" to \"XCL_PLUGIN\" as the only HCLCONFIG-related edit in code. No repo-root libxcl.md exists in the worktree, so there is nothing to change there."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-31T20:27:28Z",
+          "round": 1,
+          "decision": "recheck",
+          "reason": "Criterion 2 corrected to repository docs; the libxcl.md design is revised by the protocol 2 transport design, as the plan states."
+        }
+      ],
+      "attempts": 2,
+      "state": "accepted"
+    },
+    {
+      "item": "dd77c6c7-7518-42a7-b9d3-f9ee7e84b752",
+      "title": "Register a local plugin as a command",
+      "checks": [
+        {
+          "at": "2026-11-01T08:42:24Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "dd77c6c7-7518-42a7-b9d3-f9ee7e84b752",
+            "title": "Register a local plugin as a command",
+            "criteria": [
+              "A plugin registered as a launcher program plus arguments starts, and a configuration applies and destroys through it.",
+              "A plugin registered by a single path starts.",
+              "A plugin started with arguments is named by its full command line, and one started without arguments keeps its binary name.",
+              "`Executable` is no longer part of the `registry` package's public API.",
+              "The core service starts a plugin from a command sent in its local registry message."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "registry/local.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/plugin/main.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "bindings/libxcl/cmd/parity/main.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/registry.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/github_install.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "docs/plugins.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "proto/xcl/core/v1/core.proto"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/config.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "internal/test_fixtures/plugins/launcher"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "registry/local_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "coreservice/config_test.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "docs/plugin-layout.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "plugins/plugin.proto"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "config_command_plugin_test.go (code root) TestApplyWithPluginStartedFromACommandStoresItsResource applies a config through local.RegisterExternalPlugin(launcher, plugin) and checks widget.app's PartNames is \"a\"; TestDestroyAfterApplyWithPluginStartedFromACommandSucceeds applies, calls c.Destroy(), and asserts ResourceCount()==0 and Find returns ErrNotFound. Launcher fixture is internal/test_fixtures/plugins/launcher/main.go with run_unix.go (syscall.Exec) and run_windows.go. Verification reports go test ./... passing."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "registry/local_test.go TestLocalExternalPluginStartsFromASinglePath (diff hunk @@ -528) registers RegisterExternalPlugin(plugin) with one path, then startLocalPlugin starts it and asserts the offered type is \"widget\"."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "registry/registry.go executable.Name (diff hunk @@ -110,23): returns plugins.PluginBinaryName(p.path) when len(p.args)==0, else strings.Join of path and args with spaces. Tests: registry/local_test.go TestLocalExternalPluginFromACommandIsNamedByItsCommandLine expects \"python3 plugin.py --verbose\"; TestLocalExternalPluginFromASinglePathIsNamedAfterTheBinary expects \"xcl-plugin-docker\". config_command_plugin_test.go TestPluginStartedFromACommandIsNamedByItsCommandLineInLoadEvents also checks launcher+\" \"+plugin in load events."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "The public function is now the unexported executablePlugin in registry/registry.go (diff: `func executablePlugin(path string, args ...string) Plugin`). Grep of the code root for `registry.Executable` and `Executable(` finds no Go call sites; the only hits are os.Executable in bindings/libxcl/cmd/parity/main.go:383 and example/plugin/main.go:126, and those are the standard library function. Remaining mentions are only in .spektacular design/plan/epic docs, which are not API."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "coreservice/config.go buildLocalRegistry (diff @@ -184,8 +184,13): iterates local.GetExternalPluginCommands(), rejects an empty command with an error, and calls h.Local.RegisterExternalPlugin(command[0], command[1:]...). proto/xcl/core/v1/core.proto adds `repeated ExternalPlugin external_plugin_commands = 6` with `message ExternalPlugin { repeated string command = 1; }`. coreservice/config_test.go TestCreateConfigRegistersExternalPluginFromACommand sends the command {launcher, binary} over CreateConfig and asserts widget.app is created with size 1."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    }
+  ]
+}

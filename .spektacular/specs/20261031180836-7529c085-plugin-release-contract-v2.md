@@ -5,6 +5,11 @@ closed_date: "2026-10-31"
 designs:
     - source: design
       path: plugin-release-assets-v2.md
+epic: 20261031193434-108db6a4-language-neutral-plugins
+amendments:
+    - at: "2026-11-01T08:34:57Z"
+      sections: [Acceptance Criteria]
+      hash: sha256:1f7f48a38b91874c1238d2461700710f14467ffd69a327783063b72e06bbbd32
 ---
 
 # Feature: 20261031180836-7529c085-plugin-release-contract-v2
@@ -19,7 +24,7 @@ designs:
 -->
 ## Overview
 
-Plugins installed from GitHub releases move to a new release layout that works for a plugin written in any language, with each release described by one index listing the native builds and container image it offers. Installs are verified end to end and fetch only what the machine needs. This is the first step towards plugins written in Python, TypeScript and other languages, so plugin authors in any language and the applications that install their plugins get one way to publish and install. It doesn't depend on Go.
+Plugins installed from GitHub releases move to a new release layout that works for a plugin written in any language, with each release described by one index listing the native builds and container image it offers. Installs are verified end to end and fetch only what the machine needs. This is the first step towards plugins written in Python, TypeScript and other languages, so plugin authors in any language and the applications that install their plugins get one way to publish and install. It doesn't depend on Go. It ends with local plugins that run from a command, such as an interpreter and a script, so a plugin written in another language can be tried from its source before any SDK or release exists.
 
 <!--
   REQUIREMENTS
@@ -61,6 +66,8 @@ Plugins installed from GitHub releases move to a new release layout that works f
   The Docker plugin and the test plugin each publish a new release in the new layout, built with the updated template tooling.
 - [ ] **Users of the existing plugins move to the new releases**
   Every test, example and document that pins a release of the Docker plugin or the test plugin pins its new release, across the core library, the Python SDK and the documentation site.
+- [ ] **Local plugins run from a command**
+  An application can register a local plugin as a command (a program and its arguments, such as an interpreter and a script) instead of a single binary, in Go and through the Python SDK. A single binary path is a command with no arguments. A plugin run this way speaks protocol 1, as every external plugin does.
 - [ ] **Documentation describes the new layout**
   The plugin, registry and plugin-template documentation, in the repository and on the documentation site, describe the new release layout and no longer describe the old one.
 
@@ -80,10 +87,10 @@ Plugins installed from GitHub releases move to a new release layout that works f
 - **No backwards compatibility.** Releases in the first layout (`plugin-release-assets.md`, now superseded) are not installed, and no code path reads them.
 - **Release descriptions are xcl files, read through xcl itself.**
 - **No checksum, no install.** Every native build has a checksum in the index and every container image is pinned by digest, or the release is refused.
-- **This work supports only two package kinds:** native executables and container images. No package kind runs source code on a runtime installed on the host.
+- **This work supports only two package kinds:** native executables and container images. No release package kind runs source code on a runtime installed on the host. A local plugin registered as a command is the application's own choice, not a package kind.
 - **Plugin releases are GitHub releases.**
 - **The plugin protocol doesn't change.** Existing plugins keep speaking protocol 1.
-- **The registry's public API doesn't change.** Registering a plugin by repository and tag, trusted keys, tokens and the cache directory are configured exactly as today, in Go and through the Python SDK.
+- **Breaking changes are allowed.** xcl has no stable release yet, so public APIs, the CoreService protocol and the plugin handshake may change wherever that makes the result simpler. Nothing is kept only for compatibility. (Decided with the user after planning.)
 - **Signatures stay optional.** An application without trusted keys installs unsigned releases. With trusted keys, an unverified release is never installed.
 - **Rebuilding the existing plugins must not change their behaviour.** For the same setting changes, they replace and update exactly the resources they did before.
 - **Project test rules apply.** Unit tests use testify `require`, never table-driven tests, and never mix positive and negative cases in one test function.
@@ -137,6 +144,12 @@ Plugins installed from GitHub releases move to a new release layout that works f
   The plugin, registry and plugin-template documentation, in the repository and on the documentation site, each describe the release index, the per-platform builds, checksums in the index, and the optional signature over the index.
 - [ ] **No old-layout references remain**
   Neither the repository docs nor the documentation site describe the old layout's per-platform tar.gz archives, its checksums file, or a signature over the checksums file, and no test, example or doc pins a release of the Docker or test plugin made in the old layout.
+- [ ] **A local plugin starts from a command in Go**
+  Registering a local external plugin as a program plus arguments, where the program is a launcher and the arguments name the plugin, starts the plugin, and a configuration applies and destroys through it. Registering a single binary path starts the plugin too.
+- [ ] **A local plugin starts from a command through the Python SDK**
+  Registering a local external plugin with a list (a program plus its arguments) through the Python SDK starts the plugin, and a configuration applies through it. Registering a single path starts the plugin too.
+- [ ] **A plugin started from a command is named by its command**
+  Load events and errors for a plugin started as a program plus arguments name it by its full command line (for example `python3 plugin.py`). A plugin registered by a single path keeps its binary's file name.
 - [ ] **Existing plugin behaviour is unchanged by the rebuild**
   For the same setting changes as before the rebuild, the Docker plugin and the template's plugin still replace the resources they replaced and update the ones they updated.
 
@@ -186,7 +199,13 @@ Plugins installed from GitHub releases move to a new release layout that works f
 
 - **Starting container plugins.** How a container plugin is started (mounts, network, user, what it can reach) and the transport it speaks are separate designs.
 - **Plugin protocol 2 and its stdin/stdout transport.** These are a separate design.
-- **Plugins written in Python or TypeScript.** The Python plugin SDK (`python-plugins.md`) and a TypeScript counterpart follow in their own specs, once the transport is designed.
+- **Plugins written in Python or TypeScript.** The Python plugin SDK (`python-plugins.md`) and a TypeScript counterpart follow in their own specs, once the transport is designed. Running a plugin from a command is in scope; an SDK for writing one is not.
+- **An example Python plugin repository and its documentation.** These are follow-up specs in the language-neutral plugins epic.
 - **The types a plugin provides in the index.** The registry still learns a plugin's types by running it. Fetching only the plugins a configuration uses, and generating code from an index, are later work.
 - **Publishing plugins to OCI registries.**
 - **A command-line tool for building or publishing plugins.** The template's release tooling is the supported way to produce a release. Any other tool producing the same layout also works.
+
+## Amendments
+
+- **2026-11-01: Acceptance Criteria** (interactive implement run, task Register a local plugin as a command)
+  A plugin's name is only a label in load events and errors; the last-argument rule is a guess that fails for commands such as npx some-plugin --verbose, while the full command line is always accurate
