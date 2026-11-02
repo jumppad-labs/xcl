@@ -180,7 +180,7 @@ platform, see [Installing plugins from GitHub](https://xcl.dev/github-registry/)
 
 ```go
 gh := registry.NewGitHub(registry.GitHubTrustedKeys(publicKey))
-gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v0.2.0")
+gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v0.4.1")
 ```
 
 **Writing a plugin.** Start from the
