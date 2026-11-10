@@ -1,6 +1,7 @@
 ---
 created_date: "2026-11-02"
-document_status: draft
+document_status: final
+closed_date: "2026-11-02"
 ---
 
 # Test plan: plugin release contract v2
