@@ -1,44 +1,39 @@
-# Working context: 20261031080136-264e0eab-typescript-core-sdk
+# Working context: typescript-sdk-reference (spec 4 of the TypeScript SDK epic)
 
-Epic: 20261031080131-8c2a58ec-typescript-sdk (created 2026-10-31).
+User request 2026-11-10: create the epic's remaining specs while away, then "just go straight to planning them. If we need to make changes then that will be quicker than me waiting to review the specs". No user questions in this run; assumptions listed for review afterwards.
 
-## Motivation (user's words)
+Decision (2026-10-31): generated reference (TypeDoc) at xcl.dev/reference/typescript, a per-language guide section, CodeTabs gains a TypeScript tab. Depends on the TS core SDK and TS printing specs.
 
-- "start looking at building a typescript language similar to the python one. We should create a spec that defines the features based on previous specs for python."
-- "We should also create a design document that would show the api and some code snippets."
-- "One thing that I find is missing from the python is the SDK docs, they don't seem to exist. We have examples but no SDK so we should look at that too"
+Learnings: CodeTabs has fixed Go and Python tabs, 107 boxes on 19 pages. The choice is page-wide data-lang, remembered in localStorage key xcl-lang; Head.astro only recognises "python".
 
-## Decisions (user answers)
+# Epic planning run 2026-11-10: 20261031080131-8c2a58ec-typescript-sdk
 
-- Organisation: new epic "TypeScript SDK" with four specs: (1) TypeScript core SDK (this spec), (2) TS printing, highlighting and pretty logger, (3) Python SDK reference and guide on xcl.dev, (4) TS SDK reference and guide on xcl.dev + TypeScript tabs in CodeTabs.
-- Entity types described with **Zod** (user: "seems like it has gained traction in the industry ... better to use a standard rather than invent"). Rejected: own xcl schema builder, decorated classes. Zod 4 as peer dependency (metadata registry / introspection).
-- Runtimes: Node 22, 24, 26. Bun/Deno not promised. (Node 20 EOL April 2026.)
-- SDK docs (for spec 3/4): generated reference (TypeDoc for TS, equivalent for Python) published on xcl.dev/reference/{typescript,python} + per-language guide section on xcl.dev; CodeTabs gains TS tab.
-- npm package name: `xcl-lang` (unscoped `xcl` taken on npm; `@xcl` scope unverifiable). Engine packages `xcl-lang-<os>-<arch>[-<libc>]`.
-- Repo: `jumppad-labs/xcl-typescript`, cloned at /home/nicj/code/github.com/jumppad-labs/xcl-typescript (LICENSE + README only). NOT yet in the spektacular registry — suggest registering with spek-manage-repos before planning.
-- User approved the synthesis: Promise-only API, AbortSignal cancellation, ESM, bundled xcl-core subprocess, esbuild-style optionalDependencies, npm provenance/trusted publishing, version == xcl tag, parity fixtures vs Go.
-- Design doc: `typescript-sdk.md` in source `design` (user explicitly asked for it). libxcl.md's Node section (xcl-node, @xcl/core) is stale — update it to point at the new doc.
+User: create the remaining specs, then "just go straight to planning them" while away. Plan-epic covers all four specs, including the core SDK the others build on. Recorded depends_on from the epic overview (printing on core; TS reference on core and printing). Registered xcl-typescript (repo add). Assumptions to report: see final message.
 
-## Learnings
+All four plans done 2026-11-10. Added depends_on: TS reference on Python reference (its plan reuses the Python pipeline). Open before writing the epic summary: PyRef strict vs TsRef lenient (Step 6 disagreement), then `epic order`, then review.
+Orchestrator-made decisions to report: entities() typed (option A); platform packages vs one-package; uncaught report plain in err.stack, printing spec amended.
 
-- Python today: plain dataclasses + `local.register_type(App, "app")` (the `@xcl.entity`/`xcl.Resource` form was removed). `meta: xcl.Meta | None` field, `xcl.field(label=True)`, singletons when no label.
-- Python lookups: entities(), entity_count(), find(cls|None, addr), find_by_type, find_one, all(cls), outputs(), encode_entity, encode_saved_entity (4 choices: include_computed, include_empty, reveal_sensitive, show_references).
-- Python custom state store: load/save/exists/clear. Events: EventDataLevel NONE/RAW/PROCESSED; event.entity().
-- Printing design (printing-and-highlighting.md) already sketches TS surface: printError/formatError, cfg.printEntity, entityTokens, printDiff, XclError util.inspect.custom, events.toLogger(pino) — that's spec 2.
-- libxcl.md Node section: child_process.spawn, frames read on event loop, optionalDependencies with os/cpu/libc, camelCase<->snake_case single rule, Promise-only, cluster/fork spawn so no fork problem.
+Link strictness settled by the user (both lenient); Python plan updated, epic summary written, epic order run. epic order added Python reference -> core and -> printing, a false positive: those plans only cite xcl-python files as models and have no xcl-python tasks. Asking the user whether to unorder.
+- User agreed: removed the false Python reference dependencies on core and printing via epic order unorder.
 
-## Interview round 3 (2026-10-31)
+# Epic implement run 2026-11-10: 20261031080131-8c2a58ec-typescript-sdk
 
-- Ctrl-C: user chose option C, an opt-in `xcl.interruptSignal()`-style helper; the SDK installs no SIGINT listener unless asked. Requirement + two ACs added.
-- Gaps 2 (idle engine doesn't keep Node alive, workers, missing platform package error) and 3 (xcl release.yml dispatches xcl-typescript; bindings.yml runs TS suite) were proposed; user didn't object. Confirm at section steps.
-- User expected to see the spec in the store; explained it is assembled from working files at verification. Show full drafts in chat at each section step.
-- Overview and Requirements confirmed by the user. User then said: "I would much rather just check everything at once" — draft remaining sections without per-section confirmation; present the whole spec once at verification.
-- Design doc drafted at .spektacular/tmp/typescript-sdk.md (NOT yet written to the store). Present it with the full spec at verification; on approval: `spektacular design author --data '{"source":"design","path":"typescript-sdk.md"}' --spec 20261031080136-264e0eab-typescript-core-sdk --from .spektacular/tmp/typescript-sdk.md`, then `design ref add`, and revise libxcl.md's "Node and TypeScript" section to point at it (present the replaced section).
-- Constraints: dropped "only runtime dep is protobuf" (moved to Technical Approach) and "Go/Python behaviour must not change" (to Non-Goals) — not user-imposed. Added async-only and no-SIGINT-unless-asked constraints (user decisions).
-- Verification step: reviewer findings triaged and applied to working files (staged spec at .spektacular/tmp/spec_template.md). Full package (spec + design draft + libxcl diff) shown to user.
-- User then REJECTED the Zod approach: "I really dislike that method of defining types with zod"; asked for three alternatives, then said all previews "look horrible" and asked for a professionally formatted markdown comparison. User's framing: "XCL Types are closer to orm entities than anything". Asked why entities don't use Zod / how React does it.
-- Wrote .spektacular/work/20261031080136-264e0eab-typescript-core-sdk/entity-type-options.md: Option 1 entity builder (Drizzle-style, recommended), Option 2 decorated classes (TypeORM-style), Option 3 xcl schema files + codegen (Prisma-style, needs core feature), Zod for reference. Awaiting the user's choice; the Zod decision in spec (constraints, requirements wording "schema", TA, AC "Zod schema") and design draft must be revised once chosen. Nothing written to stores yet.
-- 2026-10-31: User prefers Option 2 (decorated classes), finds the others "visually repulsive". Asked for a design doc to share with Erik and for the specs saved as draft so they can open a draft PR.
-- Done: design typescript-entity-types.md (draft; proposal = decorated classes, alternatives = builder, schema files, Zod; 4 open questions) and typescript-sdk.md (draft, reworked to classes, no Zod) authored and referenced from the spec along with libxcl.md. Spec written to store as document_status draft with Zod removed (neutral "type" wording; constraint points at typescript-entity-types.md, "draft until decided"). Epic overview updated.
-- Workflow deliberately left at the verification step (split/finish not run) so it can resume after Erik's review; working files kept. libxcl.md NOT revised (user never approved those edits; its Node section still says xcl-node/@xcl/core).
-- xcl-typescript repo still not in the spektacular registry.
+Started via /spek-implement-epic with no epic named; this is the only epic with work left. No dirty repos, so no commit question. User told code is committed on spek/<spec> branches. Main checkouts at start: xcl on f-python-plugin, xcl-python on fix-install-check, xcl-website and xcl-typescript on main.
+- Python reference, task 1 goal check, criterion 1 (attributes not checked by the doc comment tool): user chose to correct the plan criterion to match the spec definition of a member, attributes listed but not checked. Code unchanged.
+- Python reference, task 2 goal check exhausted on criterion 2 (engine start-up errors undocumented): user chose keep_fixing. Add the two engine errors to engine_version and both Config classes; if the reviewer then wants them on every method, the child comes back to the user. Leftover for the final report: staged goal-check files under .spektacular/tmp/<spec>/goal-check, child could not rm them.
+- Python reference, human task "Give the website the release bot access": user chose to do the App and secrets themselves now; child waits at check_goal until the user says done, then records accept on their word. Two final human tasks (release, first pin) need the merge first.
+- TypeScript core: user approved (1) typescript-sdk.md design amendment (entities returns registered class instance else generic Entity; drop ", as for xcl-lang on PyPI" from Releases) and (2) spec amend of cancellation criterion to "within two seconds, once any provider call in flight has returned".
+- TypeScript core: design typescript-sdk.md and the spec Cancellation criterion amended (spec amend, approved by user). Children share the scratchpad and collided once; further children told to keep working files under .spektacular/tmp/<spec>/.
+- TypeScript core, human task 23 (npm and GitHub setup): user chose accept the shortfall; setup goes in the release plan. Tell the user at the end: push xcl change only after xcl-typescript test.yml is on its main and XCL_TYPESCRIPT_DISPATCH_TOKEN exists.
+- TypeScript core merged: xcl into f-python-plugin (c2860fd), xcl-typescript into main (ccee545). 22 agent tasks accepted; task 23 accepted shortfall. Nine spec checkboxes remain that need a real CI run or release. Children must use .spektacular/tmp/<spec>/ for working files.
+- TypeScript printing: user approved the printing-and-highlighting.md TypeScript paragraph correction (uncaught report via err.stack). Applied with design author (kept final), added the design ref to the printing spec, recorded with spec amend.
+- TypeScript printing merged into xcl-typescript main (0fd791a, from e76a9f9); no xcl commit (design change lives in the project store). 13/13 tasks, 1276 strict tests. Its repo changelog was written into the main xcl-typescript checkout as untracked .spektacular/ (not in the commit). Only the Python reference remains in flight, waiting on the user (App + secrets on xcl-website); TS SDK reference blocked on it.
+- 2026-11-13 user tried the TS SDK and decided: new Config({...}) replaces createConfig (no alias), lazy CreateConfig on first call, optional setup() (documented why; Python aio calls it open()). Route: amend core spec (Constraints) + typescript-sdk.md design, then change code directly in xcl-typescript main checkout (uncommitted). Must be committed before the TS SDK reference spec starts.
+- Config change done in xcl-typescript main checkout, uncommitted: Config class, lazy create, setup(), configWith internal; tests converted; 18 new unit tests; README/PARITY/example/install-check/doc comments. Strict suite 1294/1294. TS SDK reference plan context updated (guide uses new Config + setup note).
+- 2026-11-13 user installed the release bot App on xcl-website and xcl-typescript; secrets RELEASE_APP_ID and RELEASE_APP_PRIVATE_KEY verified on xcl-website via gh secret list (xcl-typescript has none yet). Python reference child told to record accept on the user word for the human task.
+- Python reference: user chose skip for the two release-time human tasks (release xcl-python, set the site first pin); they go in the release plan, in order: release xcl-python, then pin and push xcl-website.
+- Python reference merged 2026-11-13: xcl into f-python-plugin (29b1942), xcl-python into fix-install-check (5ed49cf), xcl-website into main (6958de1). Status still in_progress (13/15: two skipped release tasks), so TS reference stays blocked. Do NOT restart the Python reference although status says ready. Asking user: unorder TS ref from Python ref, or release first.
+- User chose to drop the dependency: epic order unorder removed TS reference -> Python reference. TS reference now ready, waiting on the user to commit the xcl-typescript Config/example changes (repo dirty) before creating its worktrees. Python reference shows ready but must not be restarted: only its two skipped release tasks remain.
+- 2026-11-13 npm spam detection refused unscoped xcl-lang-win32-*; user chose @jumppad-labs/ scoped platform packages. Spec Constraints + typescript-sdk.md amended; xcl-typescript code/tests/workflows/README changed (uncommitted, with Config change). Unit 1060/1060; scoped install verified locally on linux-x64-gnu. Placeholder script rewritten for scoped names.
+- User: SDKs must always be consistent. TS release process to match Python (own version line, release labels, auto-tag, labelled engine bump, engineVersion()). Spec (Requirements, AC, Constraints) + typescript-sdk.md amended. Helper agent launched to change xcl-typescript workflows/code (uncommitted).
+- TS reference plan updated (context, plan) for the own-version-line release process. xcl-typescript committed on f-update (b7879b0), PR #1 labelled minor and building. Starting the TS reference.

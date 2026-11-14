@@ -884,6 +884,581 @@
       "decisions": [],
       "attempts": 1,
       "state": "accepted"
+    },
+    {
+      "item": "42367878-ee15-4daf-ad60-da0359dbab5d",
+      "title": "Release xcl with either separator",
+      "checks": [
+        {
+          "at": "2026-11-01T11:17:45Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "42367878-ee15-4daf-ad60-da0359dbab5d",
+            "title": "Release xcl with either separator",
+            "criteria": [
+              "An xcl release that finds an index under either separator is published on GitHub."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "The release v0.13.1 is published and not a draft (gh release view result supplied in the verification results, published 2026-11-01T11:16:41Z). Commit ac9990a, \"Find a plugin release's index under either separator\", is an ancestor of v0.13.1 (merge-base result supplied). The released code has the two-name lookup: registry/github_assets.go:44-52 indexNames returns \u003cname\u003e_\u003cversion\u003e_index.xcl and \u003cname\u003e-\u003cversion\u003e-index.xcl, and both lookups use it: registry/github_install.go:216-217 indexAsset and registry/github_verify.go:371-372 indexFile. Test coverage for both names is in registry/github_release_files_test.go:104-116. The verification results also show indexNames at line 44 of v0.13.1:registry/github_assets.go. Read-only review: I could not re-run the gh or git commands (no shell tool), so the release state rests on the supplied verification results."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "0f9236c4-3d3d-449e-9a01-d6cd28d77794",
+      "title": "Publish a template release in the new layout",
+      "checks": [
+        {
+          "at": "2026-11-01T11:37:57Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "0f9236c4-3d3d-449e-9a01-d6cd28d77794",
+            "title": "Publish a template release in the new layout",
+            "criteria": [
+              "The template's new release is published with an index, its signature and a zip per platform."
+            ],
+            "scope": {
+              "repo": "xcl-plugin-template",
+              "files": [
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": "release.yml"
+                },
+                {
+                  "repo": "xcl-plugin-template",
+                  "path": ".sig"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "The release assets are present as local copies in /tmp/claude-1000/-home-nicj-code-github-com-jumppad-labs-xcl/bb30df07-ff88-4848-8925-1220a558af79/scratchpad/release-v0.1.0/assets/: six zips (linux, darwin, windows x amd64, arm64), the index xcl-plugin-template-go-0.1.0-index.xcl, and its .sig. The index lists the six zips with sha256 checksums, matching the platform entries. The release workflow at xcl-plugin-template/.github/workflows/release.yml (lines 49-60) signs the index with a detached armoured signature and publishes dist/* via gh release create, so the workflow produces exactly these assets. The verification results report the v0.1.0 release as published with draft=false and these assets, and the signature verified as good against the published key. The release state itself was not re-queried by me; that rests on the supplied verification output."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "40cff90a-96e2-417f-bfab-8a31ff5ce7d5",
+      "title": "Move the Docker plugin to the new release layout",
+      "checks": [
+        {
+          "at": "2026-11-01T11:42:44Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "40cff90a-96e2-417f-bfab-8a31ff5ce7d5",
+            "title": "Move the Docker plugin to the new release layout",
+            "criteria": [
+              "The release build produces zips and an index in the new layout.",
+              "The network and container providers answer replace and update for exactly the same changes and dependencies as before.",
+              "The README describes the new release layout."
+            ],
+            "scope": {
+              "repo": "xcl-plugin-docker",
+              "files": [
+                {
+                  "repo": "xcl-plugin-docker",
+                  "path": "./cmd/docker"
+                },
+                {
+                  "repo": "xcl-plugin-docker",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-plugin-docker",
+                  "path": "go.mod"
+                },
+                {
+                  "repo": "xcl-plugin-docker",
+                  "path": "providers/network.go"
+                },
+                {
+                  "repo": "xcl-plugin-docker",
+                  "path": "providers/container.go"
+                },
+                {
+                  "repo": "xcl-plugin-docker",
+                  "path": "providers/network_test.go"
+                },
+                {
+                  "repo": "xcl-plugin-docker",
+                  "path": "container_test.go"
+                },
+                {
+                  "repo": "xcl-plugin-docker",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Makefile dist target (diff lines 50-95) now writes \u003cPLUGIN\u003e-\u003cversion\u003e-\u003cos\u003e-\u003carch\u003e.zip for all six platforms, each holding the binary, README.md, LICENSE and a generated xcl-plugin.xcl manifest, plus \u003cPLUGIN\u003e-\u003cversion\u003e-index.xcl listing each zip with its sha256 checksum. The old tar.gz/checksums.txt steps are removed. release.yml (diff lines 6-12, 38-53) signs the index instead of the checksums file. The reported snapshot dist run and the registry read-back check cover the produced files."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Old and new code compared with xcl v0.9.0 DefaultChanged (module cache .../xcl@v0.9.0/plugins/changed.go, which never answers Replace and ignores changes and dependencies) and v0.13.1 DefaultChanged (.../xcl@v0.13.1/plugins/changed.go:55-75, same JSON comparison plus ReplaceOn). Network: subnet change gives Replace in both; any other property change gives Update in both; no changes falls to the same JSON comparison. Container: a replace setting (image, command, environment, init_script) or a non-network Replace dependency gives Replace in both; property changes give Update in both; with no property changes, a network dependency gives Update and otherwise the JSON comparison decides, in both. Existing and new tests in providers/network_test.go and providers/container_test.go cover these cases."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "README.md lines 176-188 describe the new release layout: xcl-plugin-docker-\u003cversion\u003e-\u003cos\u003e-\u003carch\u003e.zip per platform with binary, README.md, LICENSE and xcl-plugin.xcl; xcl-plugin-docker-\u003cversion\u003e-index.xcl with sha256 checksums; the index .sig; and the xcl v0.13.1 requirement. Lines 114-121 and 136-150 also describe the new install flow and the dist/release commands."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "a6d3deb6-98ce-4830-ab07-b6d328ac2a1b",
+      "title": "Move the test plugin to the new release layout",
+      "checks": [
+        {
+          "at": "2026-11-01T11:44:33Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "a6d3deb6-98ce-4830-ab07-b6d328ac2a1b",
+            "title": "Move the test plugin to the new release layout",
+            "criteria": [
+              "The release build produces zips and an index in the new layout.",
+              "The test plugin's tests pass unchanged on the new xcl release.",
+              "The README describes the new release layout."
+            ],
+            "scope": {
+              "repo": "xcl-plugin-test",
+              "files": [
+                {
+                  "repo": "xcl-plugin-test",
+                  "path": "./cmd/xcl-plugin-test"
+                },
+                {
+                  "repo": "xcl-plugin-test",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-plugin-test",
+                  "path": "go.mod"
+                },
+                {
+                  "repo": "xcl-plugin-test",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl-plugin-test",
+                  "path": "providers/item.go"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Makefile:72-96 (the dist target, in the staged diff) now writes \u003cPLUGIN\u003e-\u003cversion\u003e-\u003cos\u003e-\u003carch\u003e.zip per platform, each holding the binary, README.md, LICENSE and a generated xcl-plugin.xcl manifest (Makefile:85-88), and writes \u003cPLUGIN\u003e-\u003cversion\u003e-index.xcl with one platform block per zip carrying its sha256 checksum (Makefile:90-94). The old tar.gz and checksums.txt steps are removed. The verification run produced xcl-plugin-test-0.0.0-snapshot-index.xcl plus six zips, and the registry-code read passed for all six platforms. Caveat: Makefile is not in this item's listed Files, so the build-layout change is outside the stated scope. The criterion itself is satisfied by the files, so I am not marking it impossible."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "go.mod:6 bumps github.com/jumppad-labs/xcl from v0.9.0 to v0.13.1, with matching go.sum hashes (go.sum:163-166). The staged diff contains no *_test.go or providers/ changes, so the test files are unchanged. The verification run reports make test passing on xcl v0.13.1 across 5 packages."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "README.md:83 shows the new dist output as 'release zips and index'. README.md:94-103 describes the release layout: a zip per platform named xcl-plugin-test-\u003cversion\u003e-\u003cos\u003e-\u003carch\u003e.zip holding the binary, README.md, LICENSE and xcl-plugin.xcl; an index named xcl-plugin-test-\u003cversion\u003e-index.xcl with sha256 checksums; a detached signature over the index; and the xcl v0.13.1 requirement with the old-layout note. README.md:116-117 in the diff also matches."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "e6f9e274-3cfe-43d9-b28f-cc99fe8fd1a0",
+      "title": "Publish the Docker plugin's new release",
+      "checks": [
+        {
+          "at": "2026-11-01T12:30:45Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "e6f9e274-3cfe-43d9-b28f-cc99fe8fd1a0",
+            "title": "Publish the Docker plugin's new release",
+            "criteria": [
+              "The Docker plugin's new release is published with an index, its signature and a zip per platform."
+            ],
+            "scope": {
+              "repo": "xcl-plugin-docker",
+              "files": [],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "The local copies of the v0.4.1 release assets are present at /tmp/claude-1000/-home-nicj-code-github-com-jumppad-labs-xcl/bb30df07-ff88-4848-8925-1220a558af79/scratchpad/release-xcl-plugin-docker-v0.4.1/assets/: an index (xcl-plugin-docker-0.4.1-index.xcl), its signature (xcl-plugin-docker-0.4.1-index.xcl.sig), and six zips (linux, darwin, windows, each amd64 and arm64). The index file lists exactly those six platform entries, each with an asset name and sha256 checksum that match a zip name (index.xcl lines 9-37). The verification results report gh release view v0.4.1 with draft=false and these 8 assets, and a good gpg signature on the index. I could not re-query GitHub myself, so the published state rests on that gh output and the local copies."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "db0022b3-b45f-4beb-a5df-108e8dc59b27",
+      "title": "Publish the test plugin's new release",
+      "checks": [
+        {
+          "at": "2026-11-01T12:31:26Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "db0022b3-b45f-4beb-a5df-108e8dc59b27",
+            "title": "Publish the test plugin's new release",
+            "criteria": [
+              "The test plugin's new release is published with an index, its signature and a zip per platform."
+            ],
+            "scope": {
+              "repo": "xcl-plugin-test",
+              "files": [],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Local copies of the v0.3.1 release assets exist at /tmp/claude-1000/-home-nicj-code-github-com-jumppad-labs-xcl/bb30df07-ff88-4848-8925-1220a558af79/scratchpad/release-xcl-plugin-test-v0.3.1/assets/: six zips (xcl-plugin-test-0.3.1-{linux,darwin,windows}-{amd64,arm64}.zip), xcl-plugin-test-0.3.1-index.xcl and xcl-plugin-test-0.3.1-index.xcl.sig. The index lines 1-38 declare version 0.3.1, protocol [1], and a platform block for each of the six os/arch pairs, each pointing at the matching zip with a sha256 checksum. The gh release view result in the verification results reports draft=false with those 8 assets; I could not re-run gh here (no shell tool), so the draft flag and asset list rest on that recorded output. The gpg verification and sha256 checks are also taken from the recorded results, not re-run. The xcl-plugin-test.status file in goal-check is empty, so no untracked or stray files are staged for that repo."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "9e007f42-f82d-43ea-b968-755c8e8c6ebc",
+      "title": "Point xcl's remote-plugin example at the Docker plugin's new release",
+      "checks": [
+        {
+          "at": "2026-11-01T12:33:57Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "9e007f42-f82d-43ea-b968-755c8e8c6ebc",
+            "title": "Point xcl's remote-plugin example at the Docker plugin's new release",
+            "criteria": [
+              "The remote-plugin example and xcl's docs pin the Docker plugin's new release, and none pins an old-layout release."
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "example/remoteplugin/main.go"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "jumppad-labs/xcl-plugin-docker"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "example/remoteplugin/README.md"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "The staged xcl.diff changes example/remoteplugin/main.go:168 from dockerPluginVersion = \"v0.3.0\" to \"v0.4.1\" and README.md:183 from gh.RegisterPlugin(\"jumppad-labs/xcl-plugin-docker\", \"v0.2.0\") to \"v0.4.1\". Current content confirms both: main.go:149 calls RegisterPlugin(dockerPluginRepository, dockerPluginVersion) and README.md:183 reads v0.4.1. A repo-wide search (excluding CHANGELOG.md and .spektacular) finds no xcl-plugin-docker pin at v0.0.x-v0.3.x or v0.4.0. The only other RegisterPlugin hits are the illustrative v1.2.0 in registry/github.go:106 and docs/plugins.md:353, which is a generic owner/repo example, not a Docker pin. The scoped path example/remoteplugin/README.md does not exist in the code root, so it cannot pin anything. docs/plugins.md:333 uses a local binary path, not a release pin."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "a90a1c0b-3c63-4957-a539-62b880d54c86",
+      "title": "Move the Python SDK's tests and README to the new releases",
+      "checks": [
+        {
+          "at": "2026-11-02T10:48:34Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "a90a1c0b-3c63-4957-a539-62b880d54c86",
+            "title": "Move the Python SDK's tests and README to the new releases",
+            "criteria": [
+              "The integration tests install the test plugin's new release, verified against the jumppad-labs key, and apply through it.",
+              "A tampered index or zip is refused, an untrusted signature is refused, and an unsigned release installs without keys.",
+              "The README pins the Docker plugin's new release and describes no old-layout files."
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/plugins.toml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/release_helpers.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl-plugin.xcl"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_test_plugin.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_github_tamper.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "v0.4.0"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "tests/plugins.toml:6-8 pins repository jumppad-labs/xcl-plugin-test at version v0.3.1. tests/integration/release_helpers.py:37-41 sets RELEASE_SIGNING_KEY_ID F775DA00AFD4B502 and trusted_key() (lines 63-65) reads tests/keys/jumppad-labs.asc. release_files() (lines 113-136) builds the v0.3.1 asset names (\u003cname\u003e-\u003cversion\u003e-index.xcl, .sig, \u003cname\u003e-\u003cversion\u003e-\u003cos\u003e-\u003carch\u003e.zip). tests/integration/test_test_plugin.py:70-86 test_test_plugin_from_github_registry installs through github_registry(...trusted_keys=[trusted_key()]) and calls c.apply(TEST_PLUGIN_CONFIG), then checks the applied items. The recorded verification run reports these 16 tests passing with v0.3.1 installed, none skipped."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Tampered index: tests/integration/test_github_tamper.py:159-171 tampered_index() and :200-230 test_tampered_index_refused, which expects xcl.PluginVerificationError with the signature named in the message. Tampered zip: :174-179 tampered_zip() and :228-248 test_tampered_zip_refused, which expects PluginVerificationError naming the zip checksum mismatch. Untrusted signature: :251-264 test_untrusted_key_refused, which trusts a gpg-generated key and expects PluginVerificationError saying the signature does not verify against any trusted key. Unsigned release: :267-285 test_no_trusted_keys_installs_unsigned_release deletes the .sig, trusts no keys, and asserts the binary, index and zip are installed with no signature file."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "README.md:66 reads github.register_plugin(\"jumppad-labs/xcl-plugin-docker\", \"v0.4.1\"), so the Docker plugin's new release is pinned (the diff replaces v0.3.0 at README.md hunk line 9-10). README.md:708-713 describes refusal in the new layout: a signature over the index, or a zip that does not match the index checksum. A grep of README.md for checksums, tar.gz and _index.xcl finds nothing, so no old-layout files are described."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "eb8666c3-a7fa-4bbd-a0ef-ad5514aeec53",
+      "title": "Describe the new release layout on the documentation site",
+      "checks": [
+        {
+          "at": "2026-11-02T10:54:21Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "eb8666c3-a7fa-4bbd-a0ef-ad5514aeec53",
+            "title": "Describe the new release layout on the documentation site",
+            "criteria": [
+              "The site's registry and plugin-template pages describe the new release layout, cache and errors.",
+              "No page describes per-platform tar.gz archives, a checksums file or a signature over a checksums file, or pins an old-layout release.",
+              "The replacement page shows replace settings declared with `ReplaceOn`.",
+              "The site builds."
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/github-registry.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": ".sig"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/plugin-template.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/registries.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "index.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/replacement.mdx"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/pages/github-registry.mdx (diff hunks at lines 110-125) describes the new layout: index.xcl, the per-platform zip, an optional index .sig, and the naming rules. Its cache section (around line 233) shows ~/.xcl/cache/plugins/.../v0.4.1/linux_arm64 with the index, sig, zip and extracted files, and its errors section (around lines 284-300) documents ErrPluginNotFound and ErrPluginVerification against the index. src/pages/plugin-template.mdx (around lines 166-184) describes the new release contents (zips, index.xcl, index.xcl.sig, make dist) and links to the registry page's layout section. The template page itself does not describe the cache or errors; that coverage sits on the registry page, so this reads the criterion as covering both pages together."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Grep of src/pages (case-insensitive) for checksums, tar.gz, .tar, archive, sha256sum and v0.3.0/v0.2.x/v0.1.x finds no matches for the old layout. The only version pins are v0.4.1 (github-registry.mdx lines 23, 32, 34, 50, 86, 96, 113, 233; index.mdx line 287; registries.mdx line 330) and the template's v0.1.0 (plugin-template.mdx lines 165, 199, 209, 250, 262). v0.5.0-rc.1 at github-registry.mdx:73 is an illustrative pre-release form, not an old-layout pin. The diff removes every old-layout line in the listed hunks."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "src/pages/replacement.mdx (diff lines 73-86) shows NewMyProvider with DefaultChanged: plugins.DefaultChanged[*MyEntity]{ReplaceOn: []entity.Path{entity.Path{}.Attribute(\"subnet\")}} and explains ReplaceOn semantics. The Docker worked example (diff lines 426-432) uses ReplaceOn: networkReplaceSettings, and the container example (diff line 506 onwards) uses ReplaceOn: replaceSettings. These match xcl-plugin-docker/providers/network.go:30 and container.go:31 and xcl/plugins/changed.go:23-42."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "Not re-run, since this review is read-only. The implementer's npm run build output reports 23 pages built, Complete!, exit 0. The mdx hunks in the staged diff (github-registry.mdx, plugin-template.mdx, replacement.mdx, registries.mdx, index.mdx) show no unclosed JSX or code fences, and the anchor the template page links to, #what-a-release-must-contain, comes from the '## What a release must contain' heading in github-registry.mdx. Disclosed side note: src/config/site.ts (outside the listed files) changes templateURL, which the plugin-template page's Use this template button reads; this does not affect the build."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "62535499-cc16-409c-858b-587dce3f4ebe",
+      "title": "Register a local plugin as a command from Python",
+      "checks": [
+        {
+          "at": "2026-11-02T11:00:10Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "62535499-cc16-409c-858b-587dce3f4ebe",
+            "title": "Register a local plugin as a command from Python",
+            "criteria": [
+              "A plugin registered with a list (the Python interpreter, a launcher script and the plugin) starts, and a configuration applies through it, in the sync and the asyncio API.",
+              "A plugin registered by a single path starts.",
+              "The README shows registering a plugin as a command."
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/registry.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "os.fspath"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl-ref.txt"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "launcher.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "os.execv"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "tests/integration/test_plugin_command.py:64-82 registers [sys.executable, LAUNCHER, marker, plugin] via command_registry (lines 51-55), applies recording_config, asserts the marker, the create step and the applied output 'one-launched', then destroys it. test_plugin_command.py:85-107 repeats the flow through xcl.aio.Config under asyncio.run. The launcher at tests/integration/launcher.py:18-31 writes the marker and execs the plugin. xcl/registry.py:97-102 accepts a list and forwards it as an ExternalPlugin command (registry.py:122). The implementer reports these 3 tests pass."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "tests/integration/test_plugin_command.py:110-127 registers the bare plugin path with register_external_plugin(recording_plugin) and asserts the apply, the create step and the output. registry.py:93-95 sends a path or PathLike as a one-word command. The implementer reports the test passes."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "README.md:222-248 is the new '### Local plugins' section. It shows register_external_plugin with a binary path, with ['python3', 'plugin.py'] and with ['go', 'run', './cmd/notes'], and says a list holds a program and its arguments. The diff hunk at README.md:27-48 confirms these lines are added."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
     }
   ]
 }

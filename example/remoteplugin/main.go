@@ -165,7 +165,7 @@ func newConfig(handler xcl.EventHandler, stateDir string) (*xcl.Config, error) {
 // release the example installs
 const (
 	dockerPluginRepository = "jumppad-labs/xcl-plugin-docker"
-	dockerPluginVersion    = "v0.3.0"
+	dockerPluginVersion    = "v0.4.1"
 )
 
 // releaseKeyURL is where the public key that signs jumppad-labs plugin

@@ -1,6 +1,7 @@
 ---
 created_date: "2026-10-31"
-document_status: draft
+document_status: final
+closed_date: "2026-11-10"
 spec: 20261031080136-264e0eab-typescript-core-sdk
 specs:
     - 20261031080136-264e0eab-typescript-core-sdk
@@ -8,9 +9,8 @@ specs:
 
 # TypeScript SDK: defining entity types
 
-**Status:** proposal, for review  
-**Decision needed:** how a TypeScript program describes its xcl entity types  
-**Proposal:** decorated entity classes (Option 2)
+**Status:** decided 2026-11-10  
+**Decision:** decorated entity classes (Option 2)
 
 The TypeScript SDK (`xcl-lang` on npm) runs the same engine as Go and Python. A program registers its entity types, the engine checks configuration against them, and lookups return typed values. This document settles how those types are written in TypeScript. Everything else about the SDK (operations, lookups, events, state, packaging) follows the Python package and is covered by the SDK's main design.
 
@@ -19,10 +19,10 @@ The TypeScript SDK (`xcl-lang` on npm) runs the same engine as Go and Python. A 
 1. [The problem](#the-problem)
 2. [How comparable tools solve it](#how-comparable-tools-solve-it)
 3. [The example](#the-example)
-4. [Proposal: decorated entity classes](#proposal-decorated-entity-classes)
+4. [Decision: decorated entity classes](#decision-decorated-entity-classes)
 5. [Alternatives considered](#alternatives-considered)
 6. [Comparison](#comparison)
-7. [Open questions](#open-questions)
+7. [Decisions](#decisions)
 
 ## The problem
 
@@ -133,7 +133,7 @@ database "postgres" "main" {
 }
 ```
 
-## Proposal: decorated entity classes
+## Decision: decorated entity classes
 
 An entity type is a class. `@Entity` names its type and subtype, and a decorator on each field says what it is in configuration. Lookups return instances of the class.
 
@@ -419,9 +419,9 @@ It describes xcl's concepts in a general validation library's terms: named block
 | New dependency for users | No | No | No | Zod |
 | Changes needed in the xcl core | No | No | Yes | No |
 
-## Open questions
+## Decisions
 
-1. **Instances or plain objects.** Lookups returning class instances is the point of the proposal, but it means a class must be constructible with no arguments. Is that acceptable for every entity type we expect?
-2. **Both decorator forms.** Supporting both standard and legacy decorators makes the SDK work in NestJS-style projects unchanged, at the cost of a second code path in each decorator. Is that worth it for the first release?
-3. **Decorator names.** `@Attribute`, `@Block`, `@Blocks`, `@NamedBlocks` and `@Func` are proposals. `@Block`, `@List` and `@Map` would be shorter; `@Attribute` could be `@Field`.
-4. **Sensitive values.** The proposal types a sensitive field as `Sensitive<string>`, whose text form is `(sensitive)` and whose `reveal()` returns the value, as in Python. Typing it as plain `string` would be simpler to use but easier to leak into a log.
+1. **Instances.** Lookups return class instances, so an entity class must be constructible with no arguments.
+2. **Both decorator forms.** The first release supports standard and legacy decorators, so NestJS-style projects work unchanged.
+3. **Decorator names.** `@Attribute`, `@Block`, `@Blocks`, `@NamedBlocks` and `@Func`.
+4. **Sensitive values.** A sensitive field is typed `Sensitive<string>`, whose text form is `(sensitive)` and whose `reveal()` returns the value, as in Python.

@@ -1,0 +1,131 @@
+{
+  "plan": "20261110084722-9e301981-typescript-sdk-reference",
+  "items": [
+    {
+      "item": "0dbad344-2aff-483d-a1ef-7bdadfa40f8d",
+      "title": "Add the API reference tool",
+      "checks": [
+        {
+          "at": "2026-11-13T09:38:34Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "0dbad344-2aff-483d-a1ef-7bdadfa40f8d",
+            "title": "Add the API reference tool",
+            "criteria": [
+              "The tool lists every public name and member lacking a doc comment and exits with a failure",
+              "With every name documented it exits successfully",
+              "The tool writes reference data holding every public name, its signature, description, parameters, return value, errors and members, and the package version",
+              "Inherited members appear on a class, and names outside the entry point, protected members and `@internal` members do not",
+              "A name that is both a value and a type is one entry, and overloads are each listed",
+              "TypeDoc is not a runtime dependency of `xcl-lang`"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": ".github/scripts/api-reference.mjs"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "config.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "registry.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "decorators.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "sensitive.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "hydrate.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "diff.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "events.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "interrupt.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "print.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "mask.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "errors.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "package.json"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": ".github/scripts/api-reference.test.mjs"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "0.28.20"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "`.github/scripts/api-reference.mjs` main() (lines 794-826) collects `missing` from `generate()` when `--check` is set, prints `\u003cid\u003e: no doc comment` to stderr and returns 1. `undocumented()` (lines 330-356) reports every public name and member with no comment text. Test `the check fails, naming an undocumented public method` (`api-reference.test.mjs` lines 65-79) asserts status 1 and the line `xcl-lang.Widget.spin: no doc comment`. The supplied verification run of the Config.apply case (exit 1, `xcl-lang.Config.apply: no doc comment`) agrees with this code."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "With every name documented, `missing` is empty and main() returns 0 (lines 816-825). Test `the check passes on a package where every public name is documented` (`api-reference.test.mjs` lines 81-88) asserts status 0 and empty stderr. Supplied verification: `--check` on the package exits 0."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "`api-reference.mjs` generate() (lines 773-787) writes `version` from the package's package.json, plus sections of entries. Each entry() (lines 444-490) carries `signature` (declarationSignature/signatureText), `description` (description()), `parameters` (parameters()), `returns` (returns()), `raises` (errors from `@throws {@link}`), and `members` (members(), with constructor, own and inherited). Test `the data carries the package version, every entry and its members` (test lines 266-307) checks version, members, signature, parameters and returns; test at lines 164-181 checks `raises`. The supplied run wrote data with version 0.0.0-dev, matching package.json line 3."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "Inherited members: members() (lines 302-326) keeps `inheritedFrom`, and entry() sets `inheritedFrom` (lines 479-482). Test `an inherited member is listed on the class that inherits it` (test lines 90-109) asserts `xcl-lang.Derived.hello` with inheritedFrom `xcl-lang.Base`. Outside entry point: load() uses `entryPoints: src/index.ts` (lines 68-81), and test lines 128-138 asserts a non-exported class is absent. Protected, private and @internal: load() sets excludeInternal, excludeProtected, excludePrivate, and test lines 140-162 asserts only the public names are present. Note that the test for internal/protected only checks the listed keys, and the exclusion relies on TypeDoc options; the supplied verification did not run this test separately, but the 13-test pass covers it."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "`api-reference.mjs` byName() and primaryOf() (lines 139-154) group reflections by name, so a value and a type under one name form one item. entry() (lines 455-459) renders each form as an overload. Test `a value and a type exported under one name are one entry with both forms` (test lines 201-221) asserts one entry with kind type and overloads `type Shape = ...` and `Shape(sides: number): Shape`. Overloaded functions: callable() (lines 508-531) emits one overload per signature. Test `every signature of an overloaded function is listed` (test lines 223-244) asserts both `twice` signatures."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "xcl-typescript package.json lines 33-35: `dependencies` holds only `@bufbuild/protobuf` 2.17.0. typedoc 0.28.20 (line 42) and markdown-it 14.3.3 (line 40) sit in `devDependencies`. `src` has no import of typedoc or markdown-it (grep found no matches). The script imports both, but it is a dev-only script under .github/scripts. Side note, outside the criteria: the staged diff also modifies README.md (a new Development section), which is not in this item's file list. The rule to change only this item's files is not a criterion, so it does not change a verdict."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    }
+  ]
+}

@@ -8,16 +8,16 @@ specs:
 
 # xcl for TypeScript: the `xcl-lang` npm package
 
-The TypeScript SDK brings xcl to Node the way the Python package brought it to Python: it starts the bundled `xcl-core` engine and speaks `CoreService` to it over stdio, so nothing the engine does is reimplemented. This document fixes the SDK's public API and how the package is laid out and shipped. How entity types are defined is proposed in [typescript-entity-types.md](typescript-entity-types.md): decorated entity classes, under review. The engine, the protocol, the framing and the process lifecycle are those of [libxcl.md](libxcl.md) and are not repeated here; printing and highlighting are the TypeScript sections of [printing-and-highlighting.md](printing-and-highlighting.md).
+The TypeScript SDK brings xcl to Node the way the Python package brought it to Python: it starts the bundled `xcl-core` engine and speaks `CoreService` to it over stdio, so nothing the engine does is reimplemented. This document fixes the SDK's public API and how the package is laid out and shipped. How entity types are defined is settled in [typescript-entity-types.md](typescript-entity-types.md): decorated entity classes. The engine, the protocol, the framing and the process lifecycle are those of [libxcl.md](libxcl.md) and are not repeated here; printing and highlighting are the TypeScript sections of [printing-and-highlighting.md](printing-and-highlighting.md).
 
-Repository `jumppad-labs/xcl-typescript`. Package `xcl-lang` on npm. Node 22 and later, ES module only, Promise-only. Examples import names from `xcl-lang` directly.
+Repository `jumppad-labs/xcl-typescript`. Package `xcl-lang` on npm. Node 22.12 and later, Promise-only. One ES module build, which CommonJS code also loads with `require("xcl-lang")`: the package's `exports` adds a `default` condition beside `import`, and Node 22.12 and later can `require()` an ES module that has no top-level `await`. `examples/getting-started-commonjs` is the getting-started program as plain CommonJS, and CI runs it against the installed package. Examples import names from `xcl-lang` directly.
 
 ## At a glance
 
 ```ts
 import {
   Attribute,
-  createConfig,
+  Config,
   Entity,
   GitHubRegistry,
   Int,
@@ -43,7 +43,7 @@ github.registerPlugin("jumppad-labs/xcl-plugin-docker", "v0.3.0");
 const local = new LocalRegistry();
 local.register(Settings);
 
-await using config = await createConfig({
+await using config = new Config({
   registries: [local, github],
   statePath: ".xcl",
 });
@@ -63,7 +63,7 @@ await config.destroy();
 
 ## Entity types
 
-Entity types are proposed in [typescript-entity-types.md](typescript-entity-types.md): a class per type, named by `@Entity(type, subtype?)`, with a decorator on each field (`@Attribute`, `@Sensitive`, `@Computed`, `@Block`, `@Blocks`, `@NamedBlocks`, `@Label`, `@Meta`). Defaults come from field initializers, and lookups return instances of the class. That document also covers the alternatives considered (an entity builder, schema files, Zod) and the questions still open.
+Entity types are defined in [typescript-entity-types.md](typescript-entity-types.md): a class per type, named by `@Entity(type, subtype?)`, with a decorator on each field (`@Attribute`, `@Sensitive`, `@Computed`, `@Block`, `@Blocks`, `@NamedBlocks`, `@Label`, `@Meta`). Defaults come from field initializers, and lookups return instances of the class. That document also covers the alternatives considered (an entity builder, schema files, Zod) and the decisions on its open questions.
 
 Two rules from it matter to the rest of this design:
 
@@ -87,7 +87,7 @@ Registries are plain builders, holding no engine state, as in Python; a configur
 
 ### Functions
 
-A function's signature cannot be read from TypeScript at runtime, so it is declared with `@Func`, as typescript-entity-types.md proposes. The method name is the function's name in configuration, and the method may be synchronous or return a Promise:
+A function's signature cannot be read from TypeScript at runtime, so it is declared with `@Func`, as typescript-entity-types.md settles. The method name is the function's name in configuration, and the method may be synchronous or return a Promise:
 
 ```ts
 export class Functions {
@@ -107,12 +107,12 @@ app "web" {
 }
 ```
 
-Parameters and results are strings, booleans, numbers, and arrays and records of those, as in Python. A name a builtin or another function uses throws `xcl.FunctionNameClashError` when the configuration is created. A result computed from a sensitive argument is held as sensitive.
+Parameters and results are strings, booleans, numbers, and arrays and records of those, as in Python. A name a builtin or another function uses throws `xcl.FunctionNameClashError` when the configuration is created in the engine, at `setup()` or its first call. A result computed from a sensitive argument is held as sensitive.
 
 ## Creating a configuration
 
 ```ts
-const config = await createConfig({
+const config = new Config({
   registries: [local, github],
   variables: { region: "us" },
   statePath: "./.xcl",
@@ -124,7 +124,9 @@ const config = await createConfig({
 
 `variables` become `variable.<name>` in configuration. State goes to `statePath`, or to a custom `stateStore`, and `stateMask` encrypts sensitive values in it. `eventData` carries the entity on events, masked.
 
-`createConfig` is asynchronous because it is the `CreateConfig` call: it starts the engine on first use, checks its version, derives every registered type's schema and fails there, rather than on the first operation, for a schema or function the engine refuses. `xcl.Config` is exported as a type only; there is no constructor to call.
+`new Config(options)` does no I/O, as `xcl.aio.Config(...)` in Python's asyncio API does none: a JavaScript constructor cannot wait for the engine. Options that contradict each other, such as `statePath` with `stateStore`, throw from the constructor. The configuration is created in the engine, the `CreateConfig` call, on its first operation or lookup: that starts the engine on first use, checks its version and sends every registered type's schema and function, so a schema or function the engine refuses rejects that first call.
+
+`await config.setup()` does the same work early and resolves to the configuration; calling it again, or after the first call, does nothing more. Most programs never call it. It is for a program that wants to fail at start-up on a refused registration, a missing engine or a version mismatch, such as a service checking its configuration at boot, or that wants the engine's start-up cost paid before latency-sensitive work. Python's asyncio API calls it `open()`; TypeScript says `setup()` because nothing is opened. Every call after `close()`, `setup()` included, rejects with `xcl.InvalidArgumentError`, and closing a configuration that was never set up does nothing. There is no `createConfig` function.
 
 ### Custom state stores
 
@@ -185,7 +187,7 @@ const count = await config.entityCount();
 const outputs = await config.outputs();
 ```
 
-With a class as the first argument, the result is an instance of that class, checked against its registration on this configuration; a class this configuration did not register throws `xcl.NotRegisteredError`. `findByType` and `all` return arrays of instances, `entities` returns `Entity` values, and `outputs` returns a plain object. With no class, the result is an `xcl.Entity`:
+With a class as the first argument, the result is an instance of that class, checked against its registration on this configuration; a class this configuration did not register throws `xcl.NotRegisteredError`. `findByType` and `all` return arrays of instances, `entities` returns an instance of the registered class where there is one and a generic `Entity` otherwise, and `outputs` returns a plain object. With no class, the result is an `xcl.Entity`:
 
 ```ts
 interface Entity {
@@ -264,18 +266,18 @@ A `CancelledError` means the operation was stopped, with the state saved so far 
 
 ### Finding it
 
-Each platform's `xcl-core` ships in its own package, listed in `xcl-lang`'s `optionalDependencies` with `os`, `cpu` and `libc` fields, the pattern esbuild uses for its executable:
+Each platform's `xcl-core` ships in its own package, listed in `xcl-lang`'s `optionalDependencies` with `os`, `cpu` and `libc` fields, the pattern esbuild uses for its executable. The platform packages are scoped to the `jumppad-labs` npm organisation, as esbuild's are to `@esbuild`, so nobody else can publish under their names; `xcl-lang` itself stays unscoped, and it is the only package a user names.
 
 | Package | Platform |
 |---|---|
-| `xcl-lang-linux-x64-gnu` | Linux x86-64, glibc |
-| `xcl-lang-linux-x64-musl` | Linux x86-64, musl |
-| `xcl-lang-linux-arm64-gnu` | Linux arm64, glibc |
-| `xcl-lang-linux-arm64-musl` | Linux arm64, musl |
-| `xcl-lang-darwin-x64` | macOS x86-64 |
-| `xcl-lang-darwin-arm64` | macOS arm64 |
-| `xcl-lang-win32-x64` | Windows x86-64 |
-| `xcl-lang-win32-arm64` | Windows arm64 |
+| `@jumppad-labs/xcl-lang-linux-x64-gnu` | Linux x86-64, glibc |
+| `@jumppad-labs/xcl-lang-linux-x64-musl` | Linux x86-64, musl |
+| `@jumppad-labs/xcl-lang-linux-arm64-gnu` | Linux arm64, glibc |
+| `@jumppad-labs/xcl-lang-linux-arm64-musl` | Linux arm64, musl |
+| `@jumppad-labs/xcl-lang-darwin-x64` | macOS x86-64 |
+| `@jumppad-labs/xcl-lang-darwin-arm64` | macOS arm64 |
+| `@jumppad-labs/xcl-lang-win32-x64` | Windows x86-64 |
+| `@jumppad-labs/xcl-lang-win32-arm64` | Windows arm64 |
 
 `xcl-lang` resolves the package for `process.platform` and `process.arch`, and on Linux for the C library the running Node was built against (glibc when Node's report names a glibc version, musl otherwise). A package manager that ignores the `libc` field installs both Linux packages; the C library check picks the right one. When none is installed (`--omit=optional`, `--no-optional`, a lockfile made on another platform), the first call throws `xcl.EngineNotFoundError` naming the package and the command that installs it. `XCL_CORE_PATH` overrides the lookup with a path to an `xcl-core` binary, for a source build of xcl and for the SDK's own tests; nothing else changes which engine runs, and nothing is downloaded.
 
@@ -287,7 +289,7 @@ The transport follows libxcl.md's lifecycle with Node's tools:
 - Frames are read on the event loop, so a `Poll` that waits for seconds blocks nothing.
 - When no call is outstanding the child and its pipes are `unref`ed, so an idle engine never keeps Node alive; a script that forgets `close()` still exits, and the engine reads the end of its input and exits after it.
 - The last `close()` ends the engine with SIGTERM and a bounded wait.
-- If the engine exits with calls outstanding, each rejects with `xcl.EngineExitedError`; the next `createConfig` starts a fresh engine.
+- If the engine exits with calls outstanding, each rejects with `xcl.EngineExitedError`; the next call that needs the engine starts a fresh one.
 - Cluster workers and `child_process.fork` start new processes, each with its own engine; Node has no `fork(2)` hazard.
 
 ## Package layout
@@ -295,10 +297,10 @@ The transport follows libxcl.md's lifecycle with Node's tools:
 ```
 xcl-typescript/
   package.json          xcl-lang: "type": "module", "exports",
-                        dependencies @bufbuild/protobuf, optionalDependencies xcl-lang-*
+                        dependencies @bufbuild/protobuf, optionalDependencies @jumppad-labs/xcl-lang-*
   src/
     index.ts            the public API
-    config.ts           createConfig, Config, operations, lookups, encoding
+    config.ts           Config, setup, operations, lookups, encoding
     registry.ts         LocalRegistry, GitHubRegistry
     decorators.ts       Entity, Attribute, Block, Label, Meta, Func and the rest
     schema.ts           decorated classes -> schema v1
@@ -324,13 +326,14 @@ The three layers are libxcl.md's: a byte transport that alone knows about the pr
 
 ## Releases
 
-The npm version equals the xcl tag it bundles, as for `xcl-lang` on PyPI. xcl's release workflow dispatches an engine bump to `xcl-typescript` beside the one it sends `xcl-python`; the bump pull request pins the new tag, and when it merges the package is tagged and the nine packages are published with npm trusted publishing and provenance. Each platform package takes its `xcl-core` from the signed release assets of that xcl tag. xcl's bindings CI runs the TypeScript suite against the engine built from each change, as it runs Python's.
+`xcl-lang` has its own version line and follows xcl's shared release process exactly as `xcl-python` does. Every pull request carries one release label, `major`, `minor`, `patch` or `no-release`, checked by xcl's shared `release-label-check.yml`, and merging tags the next version with xcl's shared `auto-tag.yml`, so a fix to the package releases it with no xcl release. The engine it bundles is the xcl tag pinned in `xcl-ref.txt`; the package refuses any other engine, and `xcl.engineVersion()` reports the one it runs, as `xcl.engine_version()` does in Python. xcl's release workflow dispatches an engine bump to `xcl-typescript` beside the one it sends `xcl-python`, with the release's size: the bump pull request pins the new tag, carries the same size as its label, and merges by itself once its checks pass, which releases the package. The nine packages are published at the package's version with npm trusted publishing and provenance, and each platform package takes its `xcl-core` from the signed release assets of the pinned xcl tag. xcl's bindings CI runs the TypeScript suite against the engine built from each change, as it runs Python's.
 
 ## Parity with Go and Python
 
 | Go | Python | TypeScript |
 |---|---|---|
-| `xcl.New(options...)` | `xcl.Config(...)` | `await xcl.createConfig({...})` |
+| `xcl.New(options...)` | `xcl.Config(...)` | `new xcl.Config({...})` |
+| (none: `xcl.New` creates it) | `await cfg.open()` (asyncio only) | `await config.setup()`, optional |
 | `RegisterType[T](r, type, subtype)` | `local.register_type(App, "app")` | `@Entity("app")` and `local.register(App)` |
 | `RegisterFunction` | `local.register_function(slugify)` | `@Func` and `local.registerFunctions(functions)` |
 | `Validate` / `Apply` / `Diff` / `Load` / `Destroy` | `validate` / `apply` / `diff` / `load` / `destroy` | the same, awaited, with `{ signal }` |
@@ -349,11 +352,10 @@ The npm version equals the xcl tag it bundles, as for `xcl-lang` on PyPI. xcl's 
 - Printing errors, resources and diffs, themes, formatters and the pretty logger: the TypeScript sections of printing-and-highlighting.md, built by the next spec in the epic.
 - Providers written in TypeScript, and TypeScript plugins served over plugin protocol v2.
 - Generating entity classes from a plugin's types through `DescribeTypes`, the equivalent of the generator libxcl.md sketches for Python.
-- A synchronous API, a CommonJS build, browsers and edge isolates.
+- A synchronous API, a separate CommonJS build (one ES module serves both, above), browsers and edge isolates.
 
 ## Open questions
 
-- How entity types are defined: proposed in typescript-entity-types.md, under review.
 - Whether the name rule should keep a way to name a configuration attribute that does not follow it (an escape hatch like Python's `xcl.field(name=...)`), or refuse such names outright. The draft refuses them.
 - Whether `interruptSignal()` should also cover SIGTERM, for programs run under a process manager.
 - Whether npm's handling of the `libc` field in `optionalDependencies` is reliable across the npm, pnpm, yarn and bun versions in use, or whether the C library check has to carry the selection on its own.

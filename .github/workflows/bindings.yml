@@ -1,7 +1,8 @@
 # Runs every language binding's test suite against this pull request's own
 # commit, so an engine change that breaks a binding is caught before it
 # merges. Each binding publishes its suite as a reusable workflow that takes
-# the xcl ref to build the engine from; today that is xcl-python's test.yml.
+# the xcl ref to build the engine from; today those are xcl-python's and
+# xcl-typescript's test.yml.
 #
 # The required check is the bindings job. It always runs and passes when
 # every binding suite passed, or when the pull request carries the label
@@ -36,9 +37,16 @@ jobs:
       python-ref: main
       xcl-ref: ${{ github.event.pull_request.head.sha }}
 
+  typescript:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaks-bindings') }}
+    uses: jumppad-labs/xcl-typescript/.github/workflows/test.yml@main
+    with:
+      typescript-ref: main
+      xcl-ref: ${{ github.event.pull_request.head.sha }}
+
   bindings:
     name: bindings
-    needs: [python]
+    needs: [python, typescript]
     if: always()
     runs-on: ubuntu-latest
     steps:

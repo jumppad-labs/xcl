@@ -5,14 +5,17 @@
       "created": "2026-09-21T19:03:46Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 2,
-        "last": "2026-10-31T20:14:03.497910608Z",
+        "count": 3,
+        "last": "2026-11-10T08:50:50.293590369Z",
         "recent": [
           {
             "at": "2026-10-31T16:11:54.945655012Z"
           },
           {
             "at": "2026-10-31T20:14:03.497910608Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.293590369Z"
           }
         ]
       },
@@ -24,7 +27,13 @@
       "created": "2026-10-05T19:53:03Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T09:18:21.783871487Z",
+        "recent": [
+          {
+            "at": "2026-11-10T09:18:21.783871487Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -34,23 +43,49 @@
       "created": "2026-10-26T11:36:47.670775284Z",
       "tracked_since": "2026-10-26T11:36:47.670775284Z",
       "discoveries": {
-        "count": 1,
-        "last": "2026-10-31T16:11:54.945655012Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:21.783871487Z",
         "recent": [
           {
             "at": "2026-10-31T16:11:54.945655012Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.679712076Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.217926995Z"
+          },
+          {
+            "at": "2026-11-10T09:05:38.751630061Z"
+          },
+          {
+            "at": "2026-11-10T09:05:38.783798282Z"
+          },
+          {
+            "at": "2026-11-10T09:05:38.794882347Z"
+          },
+          {
+            "at": "2026-11-10T09:05:38.805438715Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.783871487Z"
           }
         ]
       },
       "retrievals": {
-        "count": 2,
-        "last": "2026-10-26T12:10:39.302624848Z",
+        "count": 3,
+        "last": "2026-11-10T09:08:17.129702363Z",
         "recent": [
           {
             "at": "2026-10-26T11:49:22.709294899Z"
           },
           {
             "at": "2026-10-26T12:10:39.302624848Z"
+          },
+          {
+            "at": "2026-11-10T09:08:17.129702363Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
           }
         ]
       }
@@ -59,15 +94,9 @@
       "created": "2026-10-27T07:04:37.917295452Z",
       "tracked_since": "2026-10-27T07:04:37.917295452Z",
       "discoveries": {
-        "count": 5,
-        "last": "2026-11-01T08:50:45.827523002Z",
+        "count": 22,
+        "last": "2026-11-13T09:02:32.85594215Z",
         "recent": [
-          {
-            "at": "2026-10-31T18:15:38.840036435Z"
-          },
-          {
-            "at": "2026-10-31T19:38:32.701755945Z"
-          },
           {
             "at": "2026-11-01T08:50:41.122142879Z"
           },
@@ -76,12 +105,63 @@
           },
           {
             "at": "2026-11-01T08:50:45.827523002Z"
+          },
+          {
+            "at": "2026-11-02T11:50:49.649619869Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.64521875Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.656866999Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.668011408Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.679712076Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.690556855Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.701607977Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.73430805Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.228552625Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.23930678Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.729904857Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.762735953Z"
+          },
+          {
+            "at": "2026-11-13T08:43:05.165510582Z"
+          },
+          {
+            "at": "2026-11-13T09:02:27.282683757Z"
+          },
+          {
+            "at": "2026-11-13T09:02:32.834916023Z"
+          },
+          {
+            "at": "2026-11-13T09:02:32.845052764Z"
+          },
+          {
+            "at": "2026-11-13T09:02:32.85594215Z"
           }
         ]
       },
       "retrievals": {
-        "count": 2,
-        "last": "2026-11-01T08:50:49.863398858Z",
+        "count": 5,
+        "last": "2026-11-10T09:21:06.366940941Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:45.132829444Z",
@@ -90,6 +170,21 @@
           },
           {
             "at": "2026-11-01T08:50:49.863398858Z"
+          },
+          {
+            "at": "2026-11-10T08:50:59.857869197Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:51:09.389032727Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:21:06.366940941Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -98,7 +193,19 @@
       "created": "2026-10-05T11:59:07Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 3,
+        "last": "2026-11-10T09:18:21.751959132Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.196857608Z"
+          },
+          {
+            "at": "2026-11-10T09:05:49.093327978Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.751959132Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -108,8 +215,8 @@
       "created": "2026-07-08T07:10:57Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 5,
-        "last": "2026-11-01T10:38:32.503185339Z",
+        "count": 9,
+        "last": "2026-11-10T09:18:21.794113867Z",
         "recent": [
           {
             "at": "2026-10-26T10:33:13.109889552Z"
@@ -125,6 +232,18 @@
           },
           {
             "at": "2026-11-01T10:38:32.503185339Z"
+          },
+          {
+            "at": "2026-11-10T08:31:16.671730653Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.293590369Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.783871487Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
           }
         ]
       },
@@ -139,13 +258,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -157,13 +311,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -175,8 +364,8 @@
         "count": 0
       },
       "retrievals": {
-        "count": 4,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 11,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T16:12:15.466655128Z"
@@ -191,6 +380,41 @@
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -202,13 +426,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -220,13 +479,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -238,13 +532,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -256,13 +585,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -274,13 +638,64 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
+          }
+        ]
+      }
+    },
+    "conventions/language-sdks-stay-consistent.md": {
+      "created": "2026-11-13T09:05:09.686493205Z",
+      "tracked_since": "2026-11-13T09:05:09.686493205Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-11-13T09:27:11.866222888Z",
+        "recent": [
+          {
+            "at": "2026-11-13T09:27:11.866222888Z"
           }
         ]
       }
@@ -292,13 +707,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -310,7 +760,45 @@
         "count": 0
       },
       "retrievals": {
-        "count": 0
+        "count": 7,
+        "last": "2026-11-10T09:18:12.409161408Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
+          }
+        ]
       }
     },
     "conventions/patterns-and-architecture.md": {
@@ -320,13 +808,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -338,13 +861,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -356,8 +914,8 @@
         "count": 0
       },
       "retrievals": {
-        "count": 3,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 10,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-27T07:37:48.379089606Z",
@@ -373,6 +931,41 @@
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -384,13 +977,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -402,13 +1030,99 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
+          }
+        ]
+      }
+    },
+    "conventions/spec-worktrees-belong-to-the-agent.md": {
+      "created": "2026-11-02T11:51:04.794338917Z",
+      "tracked_since": "2026-11-02T11:51:04.794338917Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
+        "recent": [
+          {
+            "at": "2026-11-02T11:51:10.319063259Z"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -420,13 +1134,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -438,13 +1187,51 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 9,
+        "last": "2026-11-10T10:16:22.938214449Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T10:16:22.938214449Z"
           }
         ]
       }
@@ -456,13 +1243,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -471,14 +1293,76 @@
       "created": "2026-10-31T17:51:36.085597089Z",
       "tracked_since": "2026-10-31T17:51:36.085597089Z",
       "discoveries": {
-        "count": 0
+        "count": 13,
+        "last": "2026-11-13T09:04:58.564655775Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:31:16.671730653Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.679712076Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.690556855Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.196857608Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.207451669Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.24968797Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.271799108Z"
+          },
+          {
+            "at": "2026-11-10T09:05:49.093327978Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.751959132Z"
+          },
+          {
+            "at": "2026-11-13T08:43:05.165510582Z"
+          },
+          {
+            "at": "2026-11-13T09:02:32.834916023Z"
+          },
+          {
+            "at": "2026-11-13T09:02:32.85594215Z"
+          },
+          {
+            "at": "2026-11-13T09:04:58.564655775Z"
+          }
+        ]
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T17:53:46.591184768Z",
+        "count": 5,
+        "last": "2026-11-10T09:21:06.377057954Z",
         "recent": [
           {
             "at": "2026-10-31T17:53:46.591184768Z"
+          },
+          {
+            "at": "2026-11-10T08:50:59.899651449Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:51:09.399448228Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:58:10.324547953Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:21:06.377057954Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -497,8 +1381,8 @@
       "created": "2026-07-08T07:10:57Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 12,
-        "last": "2026-11-01T10:38:32.503185339Z",
+        "count": 19,
+        "last": "2026-11-14T10:23:16.442202539Z",
         "recent": [
           {
             "at": "2026-10-26T08:33:09.576183409Z"
@@ -535,6 +1419,27 @@
           },
           {
             "at": "2026-11-01T10:38:32.503185339Z"
+          },
+          {
+            "at": "2026-11-10T08:31:16.671730653Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.744671297Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.293590369Z"
+          },
+          {
+            "at": "2026-11-10T09:05:49.086913937Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.783871487Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          },
+          {
+            "at": "2026-11-14T10:23:16.442202539Z"
           }
         ]
       },
@@ -546,8 +1451,8 @@
       "created": "2026-10-11T15:34:21Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 7,
-        "last": "2026-11-01T10:38:32.503185339Z",
+        "count": 12,
+        "last": "2026-11-13T09:04:58.564655775Z",
         "recent": [
           {
             "at": "2026-10-26T11:36:15.862106556Z"
@@ -569,18 +1474,46 @@
           },
           {
             "at": "2026-11-01T10:38:32.503185339Z"
+          },
+          {
+            "at": "2026-11-10T08:31:16.671730653Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.656866999Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.723679292Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.783871487Z"
+          },
+          {
+            "at": "2026-11-13T09:04:58.564655775Z"
           }
         ]
       },
       "retrievals": {
-        "count": 2,
-        "last": "2026-10-31T19:37:17.634696558Z",
+        "count": 5,
+        "last": "2026-11-10T11:25:34.631883636Z",
         "recent": [
           {
             "at": "2026-10-31T19:36:49.349565733Z"
           },
           {
             "at": "2026-10-31T19:37:17.634696558Z"
+          },
+          {
+            "at": "2026-11-10T08:50:59.889190212Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T09:21:06.387604798Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T11:25:34.631883636Z"
           }
         ]
       }
@@ -592,13 +1525,48 @@
         "count": 0
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-31T18:15:18.353153349Z",
+        "count": 8,
+        "last": "2026-11-10T09:18:12.409161408Z",
         "recent": [
           {
             "at": "2026-10-31T18:15:18.353153349Z",
             "workflow": "plan",
             "spec": "20261031180836-7529c085-plugin-release-contract-v2"
+          },
+          {
+            "at": "2026-11-10T08:50:32.306939496Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:36.593779023Z",
+            "workflow": "plan",
+            "spec": "20261110084343-9ebf34a1-python-sdk-reference"
+          },
+          {
+            "at": "2026-11-10T08:50:41.471254373Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T08:50:50.181769371Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          },
+          {
+            "at": "2026-11-10T09:05:15.55713767Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:05:21.752037716Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
+          },
+          {
+            "at": "2026-11-10T09:18:12.409161408Z",
+            "workflow": "plan",
+            "spec": "20261110084722-9e301981-typescript-sdk-reference"
           }
         ]
       }
@@ -669,7 +1637,13 @@
       "created": "2026-10-26T10:34:05.322439587Z",
       "tracked_since": "2026-10-26T10:34:05.322439587Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T09:18:21.794113867Z",
+        "recent": [
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 1,
@@ -679,6 +1653,16 @@
             "at": "2026-10-26T13:19:04.575008741Z"
           }
         ]
+      }
+    },
+    "gotchas/cancel-waits-for-in-flight-provider-call.md": {
+      "created": "2026-11-10T11:52:47.714944873Z",
+      "tracked_since": "2026-11-10T11:52:47.714944873Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
       }
     },
     "gotchas/cty-unknown-args-drop-marks.md": {
@@ -695,7 +1679,13 @@
       "created": "2026-10-05T11:59:07Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:50:50.293590369Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.293590369Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -705,11 +1695,17 @@
       "created": "2026-10-23T10:17:24Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 1,
-        "last": "2026-10-26T11:36:15.862106556Z",
+        "count": 3,
+        "last": "2026-11-10T09:05:38.794882347Z",
         "recent": [
           {
             "at": "2026-10-26T11:36:15.862106556Z"
+          },
+          {
+            "at": "2026-11-10T09:05:38.751630061Z"
+          },
+          {
+            "at": "2026-11-10T09:05:38.794882347Z"
           }
         ]
       },
@@ -775,7 +1771,13 @@
       "created": "2026-10-05T11:59:07Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T09:18:21.783871487Z",
+        "recent": [
+          {
+            "at": "2026-11-10T09:18:21.783871487Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -785,20 +1787,48 @@
       "created": "2026-10-05T19:53:03Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:50:50.293590369Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.293590369Z"
+          }
+        ]
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:51:09.483091367Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:51:09.483091367Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          }
+        ]
       }
     },
     "gotchas/go-plugin-inherits-stdin.md": {
       "created": "2026-10-12T09:26:48Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:50:50.26056475Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.26056475Z"
+          }
+        ]
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:51:09.451553073Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:51:09.451553073Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          }
+        ]
       }
     },
     "gotchas/go-vet-rejects-repeated-json-tags.md": {
@@ -831,15 +1861,15 @@
         "count": 0
       }
     },
-    "gotchas/meta-field-golden-schema.md": {
-      "created": "2026-09-19T17:01:57Z",
-      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+    "gotchas/implement-merge-dry-run-merges.md": {
+      "created": "2026-11-02T11:52:06.540031771Z",
+      "tracked_since": "2026-11-02T11:52:06.540031771Z",
       "discoveries": {
         "count": 1,
-        "last": "2026-10-26T11:36:15.868615332Z",
+        "last": "2026-11-10T08:50:48.73430805Z",
         "recent": [
           {
-            "at": "2026-10-26T11:36:15.868615332Z"
+            "at": "2026-11-10T08:50:48.73430805Z"
           }
         ]
       },
@@ -847,11 +1877,63 @@
         "count": 0
       }
     },
+    "gotchas/long-tmpdir-breaks-plugin-sockets.md": {
+      "created": "2026-11-10T10:57:11.469036822Z",
+      "tracked_since": "2026-11-10T10:57:11.469036822Z",
+      "discoveries": {
+        "count": 0
+      },
+      "retrievals": {
+        "count": 0
+      }
+    },
+    "gotchas/meta-field-golden-schema.md": {
+      "created": "2026-09-19T17:01:57Z",
+      "tracked_since": "2026-10-26T08:33:09.576183409Z",
+      "discoveries": {
+        "count": 3,
+        "last": "2026-11-10T09:05:38.783798282Z",
+        "recent": [
+          {
+            "at": "2026-10-26T11:36:15.868615332Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.271799108Z"
+          },
+          {
+            "at": "2026-11-10T09:05:38.783798282Z"
+          }
+        ]
+      },
+      "retrievals": {
+        "count": 1,
+        "last": "2026-11-10T08:51:09.473483248Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:51:09.473483248Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          }
+        ]
+      }
+    },
     "gotchas/meta-type-holds-two-axes.md": {
       "created": "2026-09-21T09:07:43Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 3,
+        "last": "2026-11-10T09:18:21.751959132Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.196857608Z"
+          },
+          {
+            "at": "2026-11-10T09:05:49.093327978Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.751959132Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -861,7 +1943,16 @@
       "created": "2026-10-31T17:00:46.899283735Z",
       "tracked_since": "2026-10-31T17:00:46.899283735Z",
       "discoveries": {
-        "count": 0
+        "count": 2,
+        "last": "2026-11-13T09:02:32.845052764Z",
+        "recent": [
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          },
+          {
+            "at": "2026-11-13T09:02:32.845052764Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -871,7 +1962,13 @@
       "created": "2026-10-05T11:59:07Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T09:18:21.783871487Z",
+        "recent": [
+          {
+            "at": "2026-11-10T09:18:21.783871487Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -881,21 +1978,47 @@
       "created": "2026-10-11T15:34:21Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:50:50.271799108Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.271799108Z"
+          }
+        ]
       },
       "retrievals": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:51:09.461369085Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:51:09.461369085Z",
+            "workflow": "plan",
+            "spec": "20261031080136-264e0eab-typescript-core-sdk"
+          }
+        ]
       }
     },
     "gotchas/orchestrated-goto-from-project-root.md": {
       "created": "2026-10-05T19:53:03Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 1,
-        "last": "2026-10-26T08:33:09.576183409Z",
+        "count": 5,
+        "last": "2026-11-10T08:50:48.73430805Z",
         "recent": [
           {
             "at": "2026-10-26T08:33:09.576183409Z"
+          },
+          {
+            "at": "2026-11-02T11:50:49.649619869Z"
+          },
+          {
+            "at": "2026-11-02T11:51:04.808198693Z"
+          },
+          {
+            "at": "2026-11-02T11:51:10.326835367Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.73430805Z"
           }
         ]
       },
@@ -907,7 +2030,13 @@
       "created": "2026-10-05T11:59:07Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:50:50.271799108Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.271799108Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -917,7 +2046,13 @@
       "created": "2026-10-11T15:34:21Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:50:48.73430805Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:48.73430805Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -927,7 +2062,22 @@
       "created": "2026-10-05T19:53:03Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 4,
+        "last": "2026-11-10T09:18:21.794113867Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.196857608Z"
+          },
+          {
+            "at": "2026-11-10T09:05:49.093327978Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.751959132Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -937,14 +2087,17 @@
       "created": "2026-10-07T19:48:49Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 2,
-        "last": "2026-10-26T11:36:15.868615332Z",
+        "count": 3,
+        "last": "2026-11-10T09:18:21.783871487Z",
         "recent": [
           {
             "at": "2026-10-26T10:33:13.109889552Z"
           },
           {
             "at": "2026-10-26T11:36:15.868615332Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.783871487Z"
           }
         ]
       },
@@ -956,7 +2109,13 @@
       "created": "2026-10-26T10:34:05.316241628Z",
       "tracked_since": "2026-10-26T10:34:05.316241628Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T09:18:21.794113867Z",
+        "recent": [
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 1,
@@ -972,7 +2131,16 @@
       "created": "2026-10-05T19:53:03Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 2,
+        "last": "2026-11-10T09:18:21.794113867Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.293590369Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -992,14 +2160,31 @@
       "created": "2026-10-26T11:36:34.291285093Z",
       "tracked_since": "2026-10-26T11:36:34.291285093Z",
       "discoveries": {
-        "count": 0
+        "count": 3,
+        "last": "2026-11-10T09:18:21.794113867Z",
+        "recent": [
+          {
+            "at": "2026-11-10T09:05:38.751630061Z"
+          },
+          {
+            "at": "2026-11-10T09:05:38.805438715Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          }
+        ]
       },
       "retrievals": {
-        "count": 1,
-        "last": "2026-10-26T12:10:39.313847719Z",
+        "count": 2,
+        "last": "2026-11-10T09:08:17.141120646Z",
         "recent": [
           {
             "at": "2026-10-26T12:10:39.313847719Z"
+          },
+          {
+            "at": "2026-11-10T09:08:17.141120646Z",
+            "workflow": "plan",
+            "spec": "20261110083940-53be9068-typescript-printing"
           }
         ]
       }
@@ -1024,7 +2209,16 @@
       "created": "2026-09-23T10:32:16Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 2,
+        "last": "2026-11-10T09:18:21.794113867Z",
+        "recent": [
+          {
+            "at": "2026-11-02T11:51:10.326835367Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -1034,7 +2228,13 @@
       "created": "2026-10-11T15:34:21Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T08:50:48.723679292Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:48.723679292Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -1054,7 +2254,13 @@
       "created": "2026-10-05T11:59:07Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 1,
+        "last": "2026-11-10T09:18:21.794113867Z",
+        "recent": [
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0
@@ -1074,11 +2280,14 @@
       "created": "2026-10-23T10:17:24Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 1,
-        "last": "2026-10-26T10:33:13.109889552Z",
+        "count": 2,
+        "last": "2026-11-10T08:50:50.293590369Z",
         "recent": [
           {
             "at": "2026-10-26T10:33:13.109889552Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.293590369Z"
           }
         ]
       },
@@ -1124,8 +2333,8 @@
       "created": "2026-10-11T15:34:21Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 4,
-        "last": "2026-11-01T08:50:41.122142879Z",
+        "count": 10,
+        "last": "2026-11-13T09:02:32.85594215Z",
         "recent": [
           {
             "at": "2026-10-27T07:04:08.535467063Z"
@@ -1138,6 +2347,24 @@
           },
           {
             "at": "2026-11-01T08:50:41.122142879Z"
+          },
+          {
+            "at": "2026-11-10T08:50:48.668011408Z"
+          },
+          {
+            "at": "2026-11-10T08:50:50.23930678Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.762735953Z"
+          },
+          {
+            "at": "2026-11-13T09:02:32.834916023Z"
+          },
+          {
+            "at": "2026-11-13T09:02:32.845052764Z"
+          },
+          {
+            "at": "2026-11-13T09:02:32.85594215Z"
           }
         ]
       },
@@ -1167,7 +2394,16 @@
       "created": "2026-10-05T11:59:07Z",
       "tracked_since": "2026-10-26T08:33:09.576183409Z",
       "discoveries": {
-        "count": 0
+        "count": 2,
+        "last": "2026-11-10T09:18:21.794113867Z",
+        "recent": [
+          {
+            "at": "2026-11-10T08:50:50.293590369Z"
+          },
+          {
+            "at": "2026-11-10T09:18:21.794113867Z"
+          }
+        ]
       },
       "retrievals": {
         "count": 0

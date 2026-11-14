@@ -41,37 +41,37 @@ Plugins installed from GitHub releases move to a new release layout that works f
 -->
 ## Requirements
 
-- [ ] **Releases are described by an index**
+- [x] **Releases are described by an index**
   The registry installs a plugin release only when the release carries an index describing the packages it offers. A release without an index is refused with an error saying it isn't a plugin release in the supported layout.
-- [ ] **Incomplete indexes are refused before any download**
+- [x] **Incomplete indexes are refused before any download**
   The registry refuses a release whose index names a different plugin or version from the one requested, or breaks the checksum rule. It refuses before downloading any build.
-- [ ] **A verified signature vouches for the whole release**
+- [x] **A verified signature vouches for the whole release**
   When the application trusts signing keys, the registry installs a release only when its index carries a signature that verifies against one of them. That one verified signature vouches for every build in the release.
-- [ ] **Only the build this machine needs is downloaded**
+- [x] **Only the build this machine needs is downloaded**
   The registry chooses the native build for this machine's operating system and architecture, and downloads only that build.
-- [ ] **Downloaded builds are verified**
+- [x] **Downloaded builds are verified**
   A downloaded build whose checksum doesn't match the index is refused and not installed.
-- [ ] **Each build agrees with its index**
+- [x] **Each build agrees with its index**
   The registry refuses a build whose own description disagrees with the index: a different plugin name, version or protocol, or a platform the index doesn't list for it.
-- [ ] **Unsupported machines get a clear error**
+- [x] **Unsupported machines get a clear error**
   When the release offers nothing this machine can run, the install fails with an error naming the platforms the release offers and the platform this machine has.
-- [ ] **Release descriptions are static**
+- [x] **Release descriptions are static**
   The registry refuses an index or build description that uses expressions (variables, functions or references) instead of literal values.
-- [ ] **New package kinds don't break older registries**
+- [x] **New package kinds don't break older registries**
   The registry ignores a package kind it doesn't know and chooses among the kinds it does know, so a later release can offer new kinds without breaking existing applications.
-- [ ] **Cached plugins are verified on every start**
+- [x] **Cached plugins are verified on every start**
   An installed plugin is used from the cache without contacting GitHub, and is verified again (including its signature, when keys are trusted) every time it starts.
-- [ ] **Container entries are validated but not yet run**
+- [x] **Container entries are validated but not yet run**
   The registry validates a release's container entry and refuses a release whose container entry lists a platform other than Linux. It doesn't choose or start container images. A release offering only a container fails on this machine with the "nothing this machine can run" error.
-- [ ] **Plugin authors can produce a release with one command**
+- [x] **Plugin authors can produce a release with one command**
   Plugin authors using the plugin template can produce and publish a complete release in the new layout, signed when a key is available, with a single release command and the release workflow.
-- [ ] **The existing plugins are re-released**
+- [x] **The existing plugins are re-released**
   The Docker plugin and the test plugin each publish a new release in the new layout, built with the updated template tooling.
 - [ ] **Users of the existing plugins move to the new releases**
   Every test, example and document that pins a release of the Docker plugin or the test plugin pins its new release, across the core library, the Python SDK and the documentation site.
-- [ ] **Local plugins run from a command**
+- [x] **Local plugins run from a command**
   An application can register a local plugin as a command (a program and its arguments, such as an interpreter and a script) instead of a single binary, in Go and through the Python SDK. A single binary path is a command with no arguments. A plugin run this way speaks protocol 1, as every external plugin does.
-- [ ] **Documentation describes the new layout**
+- [x] **Documentation describes the new layout**
   The plugin, registry and plugin-template documentation, in the repository and on the documentation site, describe the new release layout and no longer describe the old one.
 
 <!--
@@ -109,51 +109,51 @@ Plugins installed from GitHub releases move to a new release layout that works f
 -->
 ## Acceptance Criteria
 
-- [ ] **A release without an index is refused**
+- [x] **A release without an index is refused**
   Registering a plugin whose pinned release has builds but no index fails when plugins load. The error names the repository and tag and says the release isn't in the supported layout. Nothing is written to the plugin cache.
-- [ ] **An incomplete index is refused before download**
+- [x] **An incomplete index is refused before download**
   For a release whose index omits a checksum on one executable platform, names a container image by tag instead of digest, or names a different plugin or version than requested, plugins fail to load with an error naming the problem, and no build asset is requested from the server.
-- [ ] **A signed release installs with trusted keys**
+- [x] **A signed release installs with trusted keys**
   With a trusted key supplied, a release whose index signature verifies against it installs and its plugin starts.
-- [ ] **An unsigned or wrongly signed release is refused with trusted keys**
+- [x] **An unsigned or wrongly signed release is refused with trusted keys**
   With a trusted key supplied, a release with no index signature, or a signature from another key, fails to load with a signature error, and no build asset is requested.
-- [ ] **Signatures are not required without trusted keys**
+- [x] **Signatures are not required without trusted keys**
   With no trusted keys, an unsigned release installs and its plugin starts.
-- [ ] **Only this machine's build is fetched**
+- [x] **Only this machine's build is fetched**
   Installing a release offering builds for four platforms requests exactly one build asset from the server: the one for the running operating system and architecture.
-- [ ] **A tampered build is refused**
+- [x] **A tampered build is refused**
   When the server returns a build whose bytes don't match the index checksum, plugins fail to load with a checksum error naming the build, and the plugin isn't cached.
-- [ ] **A build that disagrees with its index is refused**
+- [x] **A build that disagrees with its index is refused**
   When a build's own description names a different plugin, version, protocol or platform from its index entry, plugins fail to load with an error naming the mismatch.
-- [ ] **No matching platform gives a clear error**
+- [x] **No matching platform gives a clear error**
   Installing a release that offers no build for the running platform fails with an error listing the platforms the release offers and the running platform.
-- [ ] **Expressions are refused**
+- [x] **Expressions are refused**
   An index or build description that uses a variable, function call or reference in place of a literal fails to load, with an error pointing at the expression.
-- [ ] **Unknown kinds are ignored**
+- [x] **Unknown kinds are ignored**
   A release whose index carries an extra package kind the registry doesn't know, alongside a valid native build, installs that native build without error.
-- [ ] **The cache is used and re-verified**
+- [x] **The cache is used and re-verified**
   A second load of the same pinned plugin makes no requests to the server. If the cached build is altered on disk between loads, the next load fails with a verification error.
-- [ ] **Container-only releases don't install yet**
+- [x] **Container-only releases don't install yet**
   A release offering only a valid, digest-pinned container image fails to install with the "nothing this machine can run" error. A release offering a container alongside native builds installs the native build.
-- [ ] **A container entry with a non-Linux platform is refused**
+- [x] **A container entry with a non-Linux platform is refused**
   A release whose container entry lists a platform other than Linux fails to load with an error naming that platform, and no build asset is requested.
-- [ ] **The template produces a complete release**
+- [x] **The template produces a complete release**
   Running the template's release build for a version produces one zip per supported platform, each with its description at the root and the binary marked executable, and an index whose checksums match the zips. With a key available it also produces a signature that verifies over the index.
-- [ ] **The new plugin releases install end to end**
+- [x] **The new plugin releases install end to end**
   The core library's live registry test, and the Python SDK's integration tests, install the new releases of the test plugin from GitHub, verify them against the published signing key, and apply configuration through them.
-- [ ] **The Docker plugin works from its new release**
+- [x] **The Docker plugin works from its new release**
   The documented getting-started example, pinned to the Docker plugin's new release, creates and destroys its network and container.
-- [ ] **The docs describe the new layout**
+- [x] **The docs describe the new layout**
   The plugin, registry and plugin-template documentation, in the repository and on the documentation site, each describe the release index, the per-platform builds, checksums in the index, and the optional signature over the index.
 - [ ] **No old-layout references remain**
   Neither the repository docs nor the documentation site describe the old layout's per-platform tar.gz archives, its checksums file, or a signature over the checksums file, and no test, example or doc pins a release of the Docker or test plugin made in the old layout.
-- [ ] **A local plugin starts from a command in Go**
+- [x] **A local plugin starts from a command in Go**
   Registering a local external plugin as a program plus arguments, where the program is a launcher and the arguments name the plugin, starts the plugin, and a configuration applies and destroys through it. Registering a single binary path starts the plugin too.
-- [ ] **A local plugin starts from a command through the Python SDK**
+- [x] **A local plugin starts from a command through the Python SDK**
   Registering a local external plugin with a list (a program plus its arguments) through the Python SDK starts the plugin, and a configuration applies through it. Registering a single path starts the plugin too.
-- [ ] **A plugin started from a command is named by its command**
+- [x] **A plugin started from a command is named by its command**
   Load events and errors for a plugin started as a program plus arguments name it by its full command line (for example `python3 plugin.py`). A plugin registered by a single path keeps its binary's file name.
-- [ ] **Existing plugin behaviour is unchanged by the rebuild**
+- [x] **Existing plugin behaviour is unchanged by the rebuild**
   For the same setting changes as before the rebuild, the Docker plugin and the template's plugin still replace the resources they replaced and update the ones they updated.
 
 <!--
