@@ -1,0 +1,1290 @@
+{
+  "plan": "20261110083940-53be9068-typescript-printing",
+  "items": [
+    {
+      "item": "8def2786-366e-4864-9f3a-0f3a9a00c4cf",
+      "title": "Add kinds, styles and themes",
+      "checks": [
+        {
+          "at": "2026-11-10T15:41:51Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "8def2786-366e-4864-9f3a-0f3a9a00c4cf",
+            "title": "Add kinds, styles and themes",
+            "criteria": [
+              "Every kind has the protocol's number and name, and a kind this package does not know falls back to its category",
+              "A kind given no style takes its category's style, then plain text's",
+              "A theme giving a new style for line comments alone changes only line comments",
+              "Validating a theme holding the word `blinky` reports that word",
+              "An unknown word is skipped rather than failing"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/highlight/kinds.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_kinds.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/highlight/style.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_style.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/highlight/theme.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_theme.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "errors.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/highlight/validate.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/errors.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_errors.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/index.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/highlight-kinds.test.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/highlight-style.test.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/highlight-theme.test.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-typescript src/highlight/kinds.ts:11-108 defines enum Kind with every value and name; all 49 entries match TOKEN_KIND_* in xcl/proto/xcl/core/v1/core.proto:94-149 (e.g. BlockType=101, LineComment=1101, Detail=1404). Unknown kinds fall back to their category: parentOf (kinds.ts:123-125) returns Math.floor(kind/100)*100, cssClassOf (kinds.ts:152-159) falls back to the category class, and styleFor (src/highlight/theme.ts:53-54) resolves through parentOf. test/unit/highlight-kinds.test.ts:12-28 checks names and numbers against the generated TokenKind in core_pb.ts."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "src/highlight/theme.ts:48-58 styleFor: own style if present, else theme[parentOf(kind)], else theme[Kind.Text] ?? \"\". Tests: test/unit/highlight-theme.test.ts:29-35 (category given no style takes plain text's) and :41-43 (unknown kind takes its category's style)."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "styleFor (theme.ts:48-58) checks theme[kind] first and consults the category only when the kind has no entry, so a theme with only [Kind.LineComment] set changes only Kind.LineComment. test/unit/highlight-theme.test.ts:52-58 asserts HashComment, BlockComment and Attribute are unchanged versus defaultTheme."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "src/highlight/validate.ts:14-28 validateTheme collects each unknown word and throws InvalidStyleError (src/errors.ts diff hunk at line ~290-313) whose words array and message name the word; message is `style \"...\" for \u003cKind\u003e: unknown word \"blinky\"`, and details.words joins the words. test/unit/highlight-theme.test.ts:103-108 asserts words, message and code invalid_style."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "src/highlight/style.ts:96-102 parseStyle calls applyWord for each word and ignores a false return; it never throws. test/unit/highlight-style.test.ts:54-56 asserts parseStyle(\"bold sparkly\") yields only bold. highlight-theme.test.ts:133-135 covers the same through styleFor."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "4b256612-342a-4e90-a626-40c4455ece0c",
+      "title": "Add the built-in formats",
+      "checks": [
+        {
+          "at": "2026-11-10T15:44:16Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "4b256612-342a-4e90-a626-40c4455ece0c",
+            "title": "Add the built-in formats",
+            "criteria": [
+              "Each of the five formats is byte-for-byte equal to Go's for the report, the entity and the change summary",
+              "HTML carries Go's class names",
+              "Terminal output resets before every line break",
+              "SVG widths count characters as Go counts them, including non-ASCII text"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/highlight/formatters.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_formatters.py"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "highlight/svg.go"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/index.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/highlight-reference.test.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_highlight_reference.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "highlight/testdata/reference"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/highlight-formatters.test.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/highlight/formatters.ts:23-27 (plain), 36-52 (terminal), 61-72 (html), 81-93 (htmlInline), 109-143 (svg) mirror xcl/highlight/terminal.go:18-41, html.go:16-63, svg.go:26-76 and formatter.go:26-33 step for step, including the empty-write skips, the escape order and the svg rect and xml:space output. test/unit/highlight-reference.test.ts:23-81 checks all five formats against the report, entity and diff reference outputs under highlight/testdata/reference (for example report.html, report.svg, report.terminal.txt). I could not run the suite here, and the summary does not say whether these tests were skipped, so this rests on code reading and the test wiring, not an executed comparison."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "src/highlight/kinds.ts:144-159 derives classes such as xcl-block-type and xcl-line-comment, matching highlight/kind.go:215-227 and kind_test.go:44-68. src/highlight/formatters.ts:157-172 puts the category class first, as html.go:65-87 does, and an unknown kind falls back to its category class. report.html:1 shows xcl-problem xcl-error, which classesOf produces. test/unit/highlight-formatters.test.ts:66-72 covers the child-kind and unknown-kind cases."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "src/highlight/formatters.ts:43-50 writes \\x1b[0m after every non-empty styled line and then the newline, so each line break is preceded by a reset, as terminal.go:28-38 does. test/unit/highlight-formatters.test.ts:26-30 asserts two resets before two line breaks, and test/unit/highlight-formatters.test.ts:36-40 checks the plain text after stripping the codes."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "src/highlight/formatters.ts:112-115 counts each line as the sum of [...piece.text].length, which counts code points as Go's utf8.RuneCountInString does in svg.go:29-37. The comment at formatters.ts:113 states the rule. test/unit/highlight-formatters.test.ts:91-93 checks that a string with an astral character and an accented character gives viewBox 34 wide, which is 16 + 3*6. The Go reference outputs contain no non-ASCII text, so this criterion is covered only by that unit test, not by the reference comparison."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "978f288c-2905-4e00-b8bc-54c254884d51",
+      "title": "Generate and ship the stylesheet",
+      "checks": [
+        {
+          "at": "2026-11-10T15:46:04Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "978f288c-2905-4e00-b8bc-54c254884d51",
+            "title": "Generate and ship the stylesheet",
+            "criteria": [
+              "The stylesheet from the default theme is byte-for-byte equal to Go's",
+              "A theme changing one kind's style differs from the default only in that kind's rule",
+              "`xcl-lang/xcl.css` resolves through the package's exports and holds the same text"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/highlight/css.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_css.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "scripts/write-css.mjs"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "dist/index.js"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "dist/xcl.css"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "package.json"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/index.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/highlight-css.test.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "default.css"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "classes.txt"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "The generated stylesheet at xcl-typescript/dist/xcl.css matches the Go reference xcl/highlight/testdata/reference/default.css line for line (17 rules, same text), and neither file contains a CR byte. The generator is xcl-typescript/scripts/write-css.mjs:9, which writes css(defaultTheme). test/unit/highlight-css.test.ts:13-15 asserts css(defaultTheme) equals referenceOutput(\"default.css\"), and the reported run executed it unskipped with 0 failures. src/highlight/css.ts:22-42 builds the output from the default theme's kinds."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "src/highlight/css.ts:28-40 emits one rule per kind, and each rule reads only that kind's own style plus its category's style (or Kind.Text for categories). Changing Kind.Attribute therefore alters only its own rule, since no other kind reads theme[Attribute] as its parent (parentOf in src/highlight/kinds.ts:123 is floor(kind/100)*100). test/unit/highlight-css.test.ts:29-35 changes Attribute to #ff8800 and asserts the line count is unchanged and the only differing line is the .xcl-attribute rule."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl-typescript/package.json:19 adds \"./xcl.css\": \"./dist/xcl.css\" to exports, and the package name is xcl-lang (package.json:2). xcl-typescript/dist/xcl.css exists (Glob hit) with the same text as default.css. test/unit/highlight-css.test.ts:56-60 resolves import.meta.resolve(\"xcl-lang/xcl.css\"), checks it ends in dist/xcl.css, and asserts the file's text equals css(defaultTheme). The build step in package.json:28 (write-css.mjs) regenerates the file on build."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "d5433aa6-08ce-410d-92ca-1002b09519a2",
+      "title": "Choose a format from the stream and load VS Code themes",
+      "checks": [
+        {
+          "at": "2026-11-10T15:47:38Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "d5433aa6-08ce-410d-92ca-1002b09519a2",
+            "title": "Choose a format from the stream and load VS Code themes",
+            "criteria": [
+              "A terminal stream gets terminal colour, a terminal stream with `NO_COLOR` set gets plain text, and a non-terminal stream gets plain text",
+              "Loading a VS Code colour theme gives a theme that renders a keyword in the file's keyword colour",
+              "A file that is not a colour theme throws the invalid-theme error"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/highlight/stream.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_stream.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/highlight/vscode.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_vscode.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "fs/promises"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/index.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/highlight-stream.test.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/vscode-theme.test.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-typescript worktree src/highlight/stream.ts:16-20 returns `plain` when `stream.isTTY !== true` or `(process.env.NO_COLOR ?? \"\") !== \"\"`, and `terminal` otherwise. test/unit/highlight-stream.test.ts:22-24 covers a terminal stream getting terminal, :26-29 a terminal stream with NO_COLOR=1 getting plain, and :36-38 a non-terminal stream getting plain. The unit suite passed (799 tests, 0 failures)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-typescript src/highlight/vscode.ts:23-31 calls the engine's convertTheme with the file's bytes and returns the styles. test/integration/vscode-theme.test.ts:11 uses a theme with a `keyword` tokenColors scope set to #ff0088, and :19-23 loads it from a file and asserts that the rendered text is `\\x1b[38;2;255;0;136m`. The engine's Kind.Operator scope is `keyword.operator.xcl` (xcl/highlight/kind.go:153), so the theme's `keyword` rule matches it. The test renders Operator text rather than a dedicated keyword kind, which is the closest the kind set allows. The integration test passed against a real engine, 5 tests and none skipped. Test :25-28 also covers the bytes form."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "test/integration/vscode-theme.test.ts:35-37 passes the bytes of \"not json at all\" to loadVSCodeTheme and asserts it rejects with InvalidThemeError. src/errors.ts:183-184 defines InvalidThemeError with code invalid_theme, and src/errors.ts:360 maps that code to the class. test/unit/errors.test.ts:103-104 covers the mapping. The integration test passed. The criterion says 'file' and the test passes bytes rather than a path, but the source parameter takes either and the engine receives the same contents."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "2e5b235a-3ab4-4ef9-81d9-d1284e23ce49",
+      "title": "Carry the report on errors",
+      "checks": [
+        {
+          "at": "2026-11-10T15:55:07Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "2e5b235a-3ab4-4ef9-81d9-d1284e23ce49",
+            "title": "Carry the report on errors",
+            "criteria": [
+              "An error's `message` holds no line break, including one with several problems",
+              "`console.error` shows the report, in colour only when Node's option asks for it",
+              "An error's `stack` holds the plain report between its first line and its frames",
+              "`report` and `problems` are enumerable, and `report` is present only when there is a report",
+              "An error with no report inspects as Node's default does",
+              "Detail wraps as Go wraps it at 80, at a chosen width and with no wrapping"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/internal/wrap.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_wrap.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/internal/render.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_render.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/errors.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "Error.report"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "errors/config_error.go"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "options.colors"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/errors-report.test.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/wrap.test.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_wrap.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-typescript/src/errors.ts:405 fromProto sets message = oneLine(error.message); oneLine (errors.ts:412-418) splits on \\r?\\n, trims, drops blank lines and joins with '; '. Every engine error is built through fromProto, and no other constructor in errors.ts passes a newline. test/unit/errors-report.test.ts:69-110 covers several problems, blank lines and CRLF, and asserts no \\n or \\r in the message."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-typescript/src/errors.ts:93-105 defines [inspect.custom] returning the stack with the report spliced in as coloured text only when options.colors === true and a report exists; otherwise it returns the plain stack. The test/unit/errors-report.test.ts:358-377 cases cover a Console with colorMode false (no escape codes, plain report) and colorMode true (coloured report)."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl-typescript/src/errors.ts:425-440 attachReport sets stack = `${name}: ${message}\\n${report}` followed by the original frames (slice from '\\n    at '), and the report is plainReport (plain text, 80-wide). test/unit/errors-report.test.ts:273-304 asserts the header, then the plain report, then only '    at ' frames, including the case with no frames."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "xcl-typescript/src/errors.ts:80 assigns this.problems = problemsOf(this), an ordinary enumerable own property. report is defined at errors.ts:435 via Object.defineProperty with enumerable: true, and attachReport returns early at errors.ts:426-428 when there are no tokens, so report is absent without a report. tokens is non-enumerable (errors.ts:83, 430). test/unit/errors-report.test.ts:209-247 and 230-235 cover this, and the JSON and Object.assign cases at 249-271."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "xcl-typescript/src/errors.ts:94-96: when tokens.length === 0 the custom inspect returns `this`, which Node treats as no custom output, so default formatting applies. test/unit/errors-report.test.ts:379-406 asserts equality with customInspect:false, with and without colors, and that output starts with 'NotFoundError: no such entity' and has no report or tokens keys."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "xcl-typescript/src/internal/wrap.ts:24-82 is a line-by-line port of go-wordwrap v1.0.1 WrapString, iterating code points. I checked the SPACES set against Go's unicode.IsSpace with grep: all 17 non-NBSP White_Space code points are present, and NBSP is excluded and handled as a word character as in Go. wrapDetail returns text unchanged for null, undefined, 0 or negative widths (wrap.ts:25-27). src/internal/render.ts:22-34 wraps only Kind.Detail tokens at a passed width, and errors.ts:429 uses plainReport at 80. test/unit/wrap.test.ts covers 80 and 40 widths, null/0/negative, and code points. xcl/errors/config_error.go is in scope but its diff is empty and the criterion needs no Go change, since the Go wrapping is the reference. Tests were not run by me; the verification summary reports 861 passing."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "7ce78661-4aff-42fd-974b-88ca23de6cb3",
+      "title": "Print errors, entities and change summaries",
+      "checks": [
+        {
+          "at": "2026-11-10T15:58:03Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "7ce78661-4aff-42fd-974b-88ca23de6cb3",
+            "title": "Print errors, entities and change summaries",
+            "criteria": [
+              "Printing an xcl error writes its report in the chosen format, and getting it as a string returns exactly what printing writes",
+              "A plain error prints its message, and any other value prints its text form, without throwing",
+              "Printing with no format chosen writes no colour on a terminal",
+              "Printing an entity gives Go's text under the four encoding choices, and a change summary gives Go's text",
+              "A user's own format receives the whole labelled text in one call for errors, entities and change summaries",
+              "Each of the three labelled texts concatenates to the plain text of that output"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/print.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_print.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "process.stderr"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "process.stdout"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/diff.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/config.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/index.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/print.test.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_print.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/print.test.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/print.ts:48-56 printError writes the XclError report through the formatter, and formatError (src/print.ts:62-68) returns render() of the same tokens with the same formatter, theme and width. test/unit/print.test.ts:63-74 checks the report text exactly and checks formatError(error) equals what printError wrote for a report with wrapped detail."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "src/print.ts:97-103 textOf returns err.message for an Error and String(err) otherwise, falling back to inspect() inside try/catch, so it does not throw. printError (src/print.ts:51-53) writes the text plus a newline when there are no tokens. test/unit/print.test.ts:123-127 covers a plain Error, :139-143 covers 42, :145-150 covers a null-prototype object whose String() throws, and :152-163 covers a throwing message getter."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "src/print.ts:55 uses options.formatter ?? plain when no format is given, and src/highlight/formatters.ts:23-27 plain writes only token.text with no escape codes. The writer's isTTY flag is never consulted. test/unit/print.test.ts:165-169 sets isTTY: true on the writer and asserts no ESC sequence in the output."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "src/config.ts:235-238 printEntity encodes through the engine (encodeEntity with tokens: true) and writes with plain by default. test/integration/print.test.ts:66-94 asserts Go's exact text for no options, includeComputed, includeEmpty, revealSensitive, showReferences, and all four together. test/integration/print.test.ts:125-131 and :133-145 assert the change summary text (DIFF_EXPECTED and the no-changes text). The verification summary reports these 32 integration and encoding tests passing with none skipped."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "Errors: src/print.ts:55 calls the formatter once with the whole wrapped token list. Entities: src/config.ts:236-237 calls the formatter once with all tokens from entityTokens. Change summaries: src/print.ts:85 calls it once with diff.tokens. Tests: test/unit/print.test.ts:177-191 (errors, one call with writer, theme and tokens), :231-241 (change summary, one call with the full token list); test/integration/print.test.ts:111-123 (entity, one call) and :147-161 (change summary, one call)."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "Entities: test/integration/print.test.ts:96-101 asserts the joined token text equals encodeEntity's text, and :163-172 does the same for an error report against formatError(error, { width: 0 }). Change summaries: test/integration/print.test.ts:133-145 asserts the joined diff.tokens equals the printed text. Wrapping (src/internal/render.ts:22-27) only rewraps Detail tokens, so the unwrapped text is exactly the token join. Caveat: printError at the default width of 80 wraps detail, so its output is not a plain token join; the criterion is judged on the unwrapped plain text, which the tests compare against."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "be7b8438-8077-435c-832f-a0ad86115573",
+      "title": "Test printed and uncaught errors against a real engine",
+      "checks": [
+        {
+          "at": "2026-11-10T16:01:00Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "be7b8438-8077-435c-832f-a0ad86115573",
+            "title": "Test printed and uncaught errors against a real engine",
+            "criteria": [
+              "The report for an unsupported block on line 7 equals Go's byte for byte",
+              "A program that lets the error go uncaught writes the report to standard error and exits with a failure status, on Node 22, 24 and 26",
+              "A rejected top-level await shows the report the same way",
+              "JSON from pino's standard error serializer and from winston's error format holds each problem's file, line, column, summary, entity and field, and the plain report, with no other configuration",
+              "pino and winston appear only as development dependencies"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "package.json"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/fixtures/unsupported-block/main.xcl"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_prettylog_engine.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/scripts/uncaught-throw.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/scripts/uncaught-await.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "tsconfig.test.json"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/error-report.test.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "console.error"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/helpers/script.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/json-logs.test.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-typescript test/integration/error-report.test.ts:25-36 defines GO_REPORT for fixture line 7 (the fixture at test/integration/fixtures/unsupported-block/main.xcl line 7 is `  nope {`), and line 49 asserts `formatError(await rejected(t))` equals it byte for byte. Line 56 asserts the same for printError. The layout matches Go's parity expectation at xcl/bindings/libxcl/cmd/parity/main_test.go:521-531 (header, blank line, location, gutter lines 5-9, blank, detail, trailing blank line). That expectation is for a different fixture, so the equality rests on the real-engine run in the verification summary, which passed on host Node 26 and in Podman on Node 22 and 24."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "test/integration/scripts/uncaught-throw.ts:11-15 rethrows the rejection from a setImmediate callback. error-report.test.ts:72-76 runs it in a fresh process via process.execPath and asserts the report is in stderr and the exit code is 1. The verification summary reports these tests passing with none skipped on host Node v26.13.0 and in Podman on node:22-slim and node:24-slim. Node 26 is covered by the host run."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "test/integration/scripts/uncaught-await.ts:11 has a top-level `await config.validate(configPath);` with no catch. error-report.test.ts:78-82 asserts the report appears in stderr and the exit code is 1. The verification summary reports this test passing on all three Node versions."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "test/integration/json-logs.test.ts:8-9 imports pino and winston with no other configuration. Lines 57-65 log through pino's default err serializer and lines 67-84 through winston.format.errors({stack:true}) plus json(). assertCarriesProblems (lines 42-55) checks the report equals GO_REPORT and that problems deep-equals one entry with file, line 7, column 3, summary, detail, entity 'resource.recording.two' and field 'nope[0]'. The report and problems come from src/errors.ts attachReport (report is an enumerable getter, tokens non-enumerable). The verification summary reports these tests passing on all three Node versions."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "xcl-typescript package.json:36-43: pino 9.14.0 and winston 3.19.0 sit under \"devDependencies\". They are not listed under \"dependencies\" (lines 33-35 contain only @bufbuild/protobuf). package-lock.json marks pino, winston and their transitive packages with \"dev\": true."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "14cc6528-63d2-43d8-b93b-965a21064bf1",
+      "title": "Correct the printing design document",
+      "checks": [
+        {
+          "at": "2026-11-11T09:35:40Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "14cc6528-63d2-43d8-b93b-965a21064bf1",
+            "title": "Correct the printing design document",
+            "criteria": [
+              "The design's TypeScript section describes the console route and the uncaught route as built",
+              "The design no longer says that an uncaught error goes through custom inspection, or leaves it to be confirmed"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": ".spektacular/design/printing-and-highlighting.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "design.read, section 'Errors and loggers', '### TypeScript' (lines 269-275): the console route is described as XclError implementing util.inspect.custom, with colour following Node's colors option. This matches the built [inspect.custom] in xcl-typescript/src/errors.ts (diff hunk at @@ -60,6 +66,10 and @@ -70,6 +80,28: returns the stack, or a coloured report when options.colors is true). The uncaught route is described as the plain report carried in the stack between the first line and the frames, with no process listener. This matches attachReport in the same diff (error.stack = header + report + frames), and the diff adds no process listener. Both routes are stated as the built behaviour, not as plans."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "design.read contains no 'To be confirmed' and no statement that an uncaught error prints the report through custom inspection. The TypeScript section (line 271) says the opposite: Node's fatal-exception path calls inspect with customInspect: false, so the custom method does not run for an uncaught error, and the report reaches the output through the stack instead. The code comment in errors.ts (diff lines 688-692) says the same."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "f5073bc8-600a-4daf-8352-c9d448708a4b",
+      "title": "Send events to an existing logger",
+      "checks": [
+        {
+          "at": "2026-11-11T09:38:20Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "f5073bc8-600a-4daf-8352-c9d448708a4b",
+            "title": "Send events to an existing logger",
+            "criteria": [
+              "A log event is written at its own level with its own message, and any other event as `\u003coperation\u003e \u003cphase\u003e`, at error for `error`, warn for `blocked` and info otherwise",
+              "Each record's fields hold the event's details under Go's names, and never the event object itself",
+              "With a pino and a winston logger set up in one line, an apply produces one record per event"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/internal/logbridge.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_logbridge.py"
+                },
+                {
+                  "repo": "xcl",
+                  "path": "events/slog.go"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/events.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/index.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/logbridge.test.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/logger-bridge.test.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-typescript/src/internal/logbridge.ts:15-36 gives eventLevel (log events take meta.level, falling back to info for unknown levels; phase error gives error; blocked gives warn; otherwise info) and eventMessage (a log event's own meta.message, otherwise `${operation} ${phase}`). xcl-typescript/src/events.ts:151-163 toLogger calls logger[level] with these. Unit tests in test/unit/logbridge.test.ts:32-70 and 112-128 cover each rule, and the integration test test/integration/logger-bridge.test.ts:45-55 and 57-95 checks the same rules against a real apply. The Go reference, xcl/events/slog.go:40-72, has the same rules and is unchanged in xcl.diff. Note: xcl-python/xcl/_logbridge.py does not exist in the worktree, but no criterion here concerns Python."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-typescript/src/internal/logbridge.ts:44-74 eventFields writes source, operation, phase, resource, type, file (when non-empty), duration in milliseconds (when non-zero), error (when set), then the meta keys sorted, skipping level and message on log events. Keys follow Go's names from xcl/events/slog.go:84-111. No path adds the Event object itself. The unit test at test/unit/logbridge.test.ts:72-98 checks the key order and that the fields never include the event."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "xcl-typescript/test/integration/logger-bridge.test.ts:57-73 sets up pino({level:'debug'}) in one line and passes events.toLogger(logger) to createConfig through apply(). It asserts records.length equals seen.length, with each record's msg, level and fields checked. Lines 75-95 do the same for a winston logger created in one line with order 'message-first'. The verification summary reports this file passing with 3 tests, none skipped, against a real engine."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "fe387bfd-f1aa-418f-8364-371c2ba23ad1",
+      "title": "Lay out event lines",
+      "checks": [
+        {
+          "at": "2026-11-11T09:40:20Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "fe387bfd-f1aa-418f-8364-371c2ba23ad1",
+            "title": "Lay out event lines",
+            "criteria": [
+              "A line has the time, level label, message and attributes in Go's order",
+              "Numbers, durations, lists and maps are written as Go writes them",
+              "A value needing quotes is quoted and escaped as Go's example does, and a multi-line value is indented",
+              "Source, operation and entity are styled, and the other parts as Go's example styles them"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/internal/prettyline.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_prettyline.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "2.0"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/prettyline.test.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_prettyline.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-typescript src/internal/prettyline.ts:107-133 (formatRecord) writes kitchen time, then level label, then message (only when non-empty, line 110), then attributes, then a newline. attributes() at lines 71-99 yields source, operation, phase, resource, type, file, duration, error, then sorted meta keys, skipping level and message on log events. Go's order is in events/slog.go:84-111 and the empty-message omission matches charmbracelet log/logger.go:107-109. Test prettyline.test.ts:87-101 checks the order. Python mirror xcl-python xcl/_prettyline.py:108-137 matches."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "prettyline.ts:167-188 goValue: strings as-is, booleans true/false, null/undefined as \u003cnil\u003e, safe integers as integers, other numbers via goFloat, arrays as [a b c], objects as map[k:v] with sorted keys. goFloat (195-221) applies Go's %v threshold (exponent when exp \u003c -4 or \u003e= 6, two-digit exponent). goDuration (224-251) and fraction (254-267) follow Go's time.Duration.String and fmtFrac. Checked against charmbracelet text.go writeIndent/textFormatter, which uses fmt %+v (text.go:223). Tests prettyline.test.ts:117-223 and 153-223 pin the expected Go output."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "prettyline.ts:123-129: a value holding a newline is written as a multi-line block; other values needing quotes are written as \"...\" with escape(text,true) (line 127); empty values are written as \"\" (lines 117-119). needsQuoting (275-282) and escape (287-311) match charmbracelet text.go needsQuoting/escapeStringForOutput (text.go:50-145, quotes \" and \\ escapes, \\a \\b \\f \\n \\r \\t \\v, \\xNN, \\uNNNN, \\UNNNNNNNN). indented (141-158) reproduces writeIndent (text.go:18-48): the \"  │ \" gutter per line, the final line in the value style, a trailing newline only when more attributes follow. Tests prettyline.test.ts:257-271 cover these cases."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "prettyline.ts:25-42 STYLES: key.source magenta and value.source bold magenta; key.resource cyan and value.resource bold cyan; key.operation yellow and value.operation bold yellow, matching xcl example/prettylog/prettylog.go:151-162 (colours 5, 6, 3, values bold). Other keys and separators are dim (key, separator), matching charmbracelet styles.go:45-51 (Key and Separator faint). Values are plain and the time and message unstyled (line 109, 117). Level labels are bold in the 16-colour approximations of the 63/86/192/204 colours (lines 28-31, styles.go:52-77). Tests prettyline.test.ts:283-309 check each styled piece."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "8d60434e-bf52-46d4-b4e4-2a9e170ece23",
+      "title": "Add the pretty logger",
+      "checks": [
+        {
+          "at": "2026-11-11T09:48:37Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "8d60434e-bf52-46d4-b4e4-2a9e170ece23",
+            "title": "Add the pretty logger",
+            "criteria": [
+              "Configuration appears beneath a creation line at info and below, and none at higher levels",
+              "A configuration mistake's report appears beneath its error line at every level, once per problem",
+              "With no entity data on events, the guidance is written exactly once per logger",
+              "A render failure writes one warning line and the following entities are still shown",
+              "Variables, outputs and modules show nothing and write no warning",
+              "`XCL_LOG_LEVEL` is read only when asked for, in any letter case, and an unknown word means info",
+              "Colour follows the stream, and a failing stream never affects the operation"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/prettylog.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/prettylog.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/internal/event-link.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/config.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/index.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/unit/prettylog.test.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_prettylog.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "prettylog.ts:156 writes the configuration only when `RANKS[this.level] \u003c= RANKS.info` and the event is a create success; the handler returns early below its level (line 148). test/unit/prettylog.test.ts:443-479 covers info and debug showing the block and warn and error showing none and making no EncodeSavedEntity call."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "prettylog.ts:159-162 appends the report beneath the error line through #report and #reportWanted, with no level gate beyond the line's own. #reportWanted (lines 216-224) counts problems per configuration so a closing error repeats only unshown problems. Tests at test/unit/prettylog.test.ts:761-954 cover parse, resource and closing errors at debug, warn and error, and the no-repeat cases."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "prettylog.ts:117 and 163-166 keep a `#guided` flag per handler, which is the logger here, and set guidance only when `event.data` is undefined and `link.eventData === EventDataLevel.None` (line 183). events.ts:73 makes data undefined when empty. Tests at test/unit/prettylog.test.ts:681-728 cover one guidance across operations and across two configurations sharing a handler, and one per handler, each written as its own chunk."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "prettylog.ts:191-192 writes exactly one warn line via formatRecord when the render throws, and the operation's other events still go through. #configuration (lines 188-197) turns any non-NotEncodable error into a warning. Tests at test/unit/prettylog.test.ts:593-607 check that the next entity's configuration is still shown, and lines 609-628 check two warnings with the apply completing."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "prettylog.ts:192-195 returns an empty block with no warning for NotEncodableError, which is what a variable, output or module raises. Tests at test/unit/prettylog.test.ts:568-589 use a `not_encodable` engine error and assert the output has no configuration and no warning, and the next entity is still shown. The error-to-class mapping for `not_encodable` is in src/errors.ts:199-200."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "prettylog.ts:68-71 reads `process.env[LEVEL_ENV]` only inside levelFromEnv, lowercases it, and maps via `Object.hasOwn(RANKS, ...)` with any other word falling back to \"info\". handler() (lines 95-107) never reads the variable. Tests at test/unit/prettylog.test.ts:295-393 cover each word, upper and mixed case, unset, unknown, and a read at each call."
+            },
+            {
+              "criterion": 7,
+              "verdict": "met",
+              "evidence": "prettylog.ts:104 picks the formatter with `forStream(out)`, and src/highlight/stream.ts:16-20 gives terminal colour only when `isTTY === true` and NO_COLOR is unset or empty. Writes go through `this.out?.write` at line 246, inside the try/catch in handle() (lines 131-137), so a failing stream is swallowed. Tests at prettylog.test.ts:968-996 cover terminal, NO_COLOR and non-terminal, and lines 1110-1128 cover a failing stream with no rejection and no stopped operation."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "7befb73c-c2c2-4f50-b398-61e73afbe116",
+      "title": "Test the pretty logger against a real engine",
+      "checks": [
+        {
+          "at": "2026-11-11T09:49:54Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "7befb73c-c2c2-4f50-b398-61e73afbe116",
+            "title": "Test the pretty logger against a real engine",
+            "criteria": [
+              "A run creating one entity writes one line per event at info or above, with the configuration, including a value a provider filled in, before the next event's line",
+              "The same run through an application's logger writes the same lines",
+              "At warn there is no configuration and no info line, and at debug debug events appear",
+              "An unsupported block writes the error line followed by the report",
+              "A terminal stream has colour codes, and `NO_COLOR` or a captured stream has none",
+              "Two entities with no entity data write the guidance once and no configuration or warning",
+              "A configuration with a variable, an output and a module writes no configuration and no warning for them",
+              "During a slow apply with the pretty logger on, a timer's 99th-percentile delay stays under 50 ms"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/prettylog.test.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/integration/test_prettylog_engine.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/integration/event-loop.test.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-typescript test/integration/prettylog.test.ts:94-111 asserts every event line matches the level/time prefix and that apply start, create success and apply success lines exist; lines 119-136 assert the configuration block follows the 'create success' line, contains output = \"one-a\" (the provider-filled value), and that the next event line follows the block. Python counterpart is in the xcl-python file (see criterion 2 evidence)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-typescript prettylog.test.ts:138-152 runs the same apply once with prettylog.handler({ out }) and once through a LevelLogger, then asserts normalised outputs are equal. xcl-python tests/integration/test_prettylog_engine.py:196-208 does the same with a logging.Logger (test_prettylog_through_application_logger). The python file is found at .spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-python/tests/integration/, not in the typescript-printing worktree, so it was read there."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "prettylog.test.ts:154-162 at level 'warn' asserts no line starts with a space (no configuration) and no ' INFO '; lines 164-170 at level 'debug' assert a ' DEBU ' line exists alongside an INFO create success line. Python test_prettylog_engine.py:214-221 and 238-245 mirror these."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "prettylog.test.ts:187-203 applies test/integration/fixtures/unsupported-block/main.xcl, expects ConfigError, and asserts the line after the ' ERRO ' line is '  Error: Unsupported block type' followed by the report lines (on ... line 7 and the '7 |   nope {' excerpt). Lines 205-217 check the report is written once and still follows the error line at warn. The fixture file exists as untracked in git status."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "prettylog.test.ts:219-226 uses captured(true) and asserts ANSI codes for core, create, resource.recording.one and the quoted \"recording\" value. Lines 228-234 set NO_COLOR=1 with a TTY stream and assert no \\x1b; lines 236-241 use a non-TTY capture and assert no \\x1b. Python test_prettylog_engine.py:310-339 covers pseudo-terminal colour, NO_COLOR and file output."
+            },
+            {
+              "criterion": 6,
+              "verdict": "met",
+              "evidence": "prettylog.test.ts:243-254 applies two resources with EventDataLevel.None and asserts 'configuration not shown' appears exactly once with the hint, no indented configuration lines, no 'unable to show configuration', and two ' INFO create success ' lines. Python test_prettylog_engine.py:345-360 mirrors it."
+            },
+            {
+              "criterion": 7,
+              "verdict": "met",
+              "evidence": "prettylog.test.ts:256-267 applies a config with a variable, an output and a module (builtins helper, lines 59-68). It asserts no 'unable to show configuration', that the only indented block header is '  resource \"recording\" \"one\" {', and that create success lines exist for resource=variable.name and resource=output.out. Python test_prettylog_engine.py:363-374 mirrors it."
+            },
+            {
+              "criterion": 8,
+              "verdict": "met",
+              "evidence": "xcl-typescript test/integration/event-loop.test.ts:81-90 runs the slow scenario with prettyLog=true (scenario builds onEvent: prettylog.handler() at line 31), asserts exit code 0, stderr contains 'create success', and asserts p99 \u003e 0 and p99 \u003c 50 ms. Verification reports these pass with none skipped."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "ee37549d-2913-49d6-bec0-2feb2817b377",
+      "title": "Compare printing with Go on the parity fixtures",
+      "checks": [
+        {
+          "at": "2026-11-11T09:52:44Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "ee37549d-2913-49d6-bec0-2feb2817b377",
+            "title": "Compare printing with Go on the parity fixtures",
+            "criteria": [
+              "For every fixture, the Node and Go records are equal with no keys left out",
+              "A difference names the fixture and the first path that differs"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/parity/run.ts"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/parity/run_python.py"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/parity/parity.test.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "test/parity/normaliser.test.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "test/parity/parity.test.ts:208-266 and 285-325 run every fixture under bindings/libxcl/testdata/parity through both programs (runParity, lines 107-122) and call assertSameRecord. The directory has 10 fixtures (annotations, basic_types, encode, functions, invalid, outputs, plugin_entities, singletons, unsupported_block, variables), and all 10 have a test; 7 also run with --typed-lookups, matching the verification summary. firstDifference (lines 48-83) walks the union of both sides' keys (line 50) and reports a key present on only one side as \u003cmissing\u003e (lines 52-56), so no key is left out of the comparison. The verification run reports the parity suite passing with none skipped. The summary's count of 11 fixtures does not match the 10 directories on disk, but every fixture present is covered."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "test/parity/parity.test.ts:86-92 (assertSameRecord) fails with `fixture ${name}: the records differ at ${path}: go=... node=...`, where path is the first difference from firstDifference, which walks keys in sorted order and arrays by index (lines 48-83). Lines 176-204 hold tests asserting that exact message for a nested value, a key missing on one side, a printed report and a pretty_log group. Every fixture test passes its own name to assertSameRecord (lines 211-325)."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "e046e730-d0cb-4488-8ddb-a8a4ce5e6ed3",
+      "title": "Document printing and the pretty logger",
+      "checks": [
+        {
+          "at": "2026-11-11T09:54:52Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "e046e730-d0cb-4488-8ddb-a8a4ce5e6ed3",
+            "title": "Document printing and the pretty logger",
+            "criteria": [
+              "The README covers every topic named above, with TypeScript examples",
+              "The parity record maps each Go printing and logging item to its TypeScript form",
+              "Every new public export has a doc comment"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "PARITY.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "PARITY.md"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/print.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/prettylog.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/events.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/errors.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/config.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-typescript README.md has sections for every named topic with TypeScript code: '## Printing errors' (lines 146-183: printError, formatError, uncaught and logged errors via stack, pino/winston problems and report fields), '## Printing entities and change summaries' (185-194), '## Formats and themes' (196-223), '## Stylesheets' (225-238, css(theme)), '## Custom formats' (240-256, a Formatter example), '## Logging' (258-271, events.toLogger with pino and winston), and '## Pretty logger' (273-301, prettylog.handler and levelFromEnv)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "not_met",
+              "evidence": "xcl-typescript PARITY.md maps most printing and logging items (Printing table lines 84-108, Logging table 110-115, prettylog table 119-124), but several Go highlight items have no row and no TypeScript form in that record. Go highlight/kind.go defines Kinds() (line 191), Kind.Scope() (line 234) and Kind.String() (line 203); PARITY.md has no row for Kinds() or Scope(), and src/highlight/kinds.ts has no scope or kinds-list export (only the internal knownKinds). Go highlight/style.go defines Style.IsZero() (line 22) and the Colour type with Hex() (lines 29, 59); neither appears in PARITY.md or as a TypeScript export. These should be mapped in the Printing table of xcl-typescript PARITY.md, or marked not applicable with a reason."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Every export in xcl-typescript src/index.ts re-exported from the printing and logging modules has a doc comment: print.ts lines 12-86 (FormatOptions, PrintOptions, printError, formatError, printDiff); prettylog.ts lines 1-108 (LogLevel, LEVEL_ENV, PrettyLogOptions, levelFromEnv, handler, with the module doc at lines 1-16); events.ts lines 11-163 (EventDataLevel, Event and its members, LevelLogger, ToLoggerOptions, toLogger); errors.ts (every XclError subclass and InvalidStyleWord, InvalidStyleError, fromProto each have a preceding /** */ line, grep lines 22-402); highlight/kinds.ts, style.ts, theme.ts, validate.ts, formatters.ts, css.ts, stream.ts and vscode.ts each export with a preceding doc comment (grep -B2 output); config.ts printEntity (line 249 with doc above), entityTokens (line 254), createConfig (line 360) and sharedEngineClient (line 322, marked @internal). The only undocumented-looking export is in events.ts, eventDataLevelMessage (line 24), which is marked @internal and is not a named index export."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-11T09:56:57Z",
+          "round": 1,
+          "attempt": 2,
+          "goal": {
+            "item": "e046e730-d0cb-4488-8ddb-a8a4ce5e6ed3",
+            "title": "Document printing and the pretty logger",
+            "criteria": [
+              "The README covers every topic named above, with TypeScript examples",
+              "The parity record maps each Go printing and logging item to its TypeScript form",
+              "Every new public export has a doc comment"
+            ],
+            "scope": {
+              "repo": "xcl-typescript",
+              "files": [
+                {
+                  "repo": "xcl-typescript",
+                  "path": "README.md"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "PARITY.md"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "PARITY.md"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/print.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/prettylog.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/events.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/errors.ts"
+                },
+                {
+                  "repo": "xcl-typescript",
+                  "path": "src/config.ts"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-typescript/README.md covers each named topic with TypeScript examples: error printing (lines 146-160, printError/formatError/forStream), how reports appear on uncaught and logged errors (lines 177-183: console.error, uncaught error stack, pino err serializer and winston format.errors), output formats (lines 196-208, table of plain/terminal/html/htmlInline/svg), themes (lines 210-223, defaultTheme spread, validateTheme, loadVSCodeTheme), stylesheet generation (lines 225-238, css() and xcl-lang/xcl.css), custom formats (lines 240-256, a Formatter function), logger integration (lines 258-271, events.toLogger with pino and winston), and the pretty logger (lines 273-301, prettylog.handler, levelFromEnv, options)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "xcl-typescript/PARITY.md lines 84-128 map the Go printing and logging items to TypeScript: print.go PrintOption/WithFormatter/WithTheme/WithWidth/PrintError/PrintEntity/PrintDiff (lines 88-93); diagnostics.go ErrorTokens (line 94); highlight Plain/Terminal/HTML/HTMLInline/SVG (line 98); Formatter/FormatterFunc (line 99); Kind/Token (line 100); Kinds, Parent, Class, String (lines 101-103); Theme/DefaultTheme/With/Style/Validate (lines 104-106, 109); Style/IsZero/Colour (lines 107-108); ParseStyle (line 106); WriteCSS (line 110); For (line 111); LoadVSCodeTheme (line 112); Tokenize, Kind.Scope and Colour.Hex marked not applicable with reasons (lines 137-139); events SlogHandler (line 118); example/prettylog Handler, LevelFromEnv, LevelEnv, slog.Level (lines 123-128). Compared against the Go declarations in xcl/highlight/*.go (non-test), xcl/print.go, xcl/diagnostics.go, xcl/events/slog.go and xcl/example/prettylog/prettylog.go; no Go printing or logging export lacks a row."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Every export in xcl-typescript/src/print.ts (FormatOptions, PrintOptions, printError, formatError, printDiff), src/prettylog.ts (LogLevel, LEVEL_ENV, PrettyLogOptions, levelFromEnv, handler), src/events.ts (EventDataLevel, Event, LevelLogger, ToLoggerOptions, toLogger), src/errors.ts (each error class, InvalidStyleWord, InvalidStyleError, InvalidThemeError, ConfigError and others) and src/highlight/*.ts (kinds, style, theme, formatters, stream, css, validate, vscode) is preceded by a /** */ doc comment, checked by reading the files and grepping with -B context. Exports in generated internal/core/*_pb.ts files are not hand-written and are outside this item."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 2,
+      "state": "accepted"
+    }
+  ]
+}

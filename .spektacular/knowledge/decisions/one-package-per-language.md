@@ -28,6 +28,11 @@ judged smaller than the cost of a second package in every language.
   release whose protocol it speaks), never an exact pin. A baked-in plugin
   shares its application's environment, and a loose minimum is what keeps that
   from clashing.
+- Platform engine packages do not count as separate packages. `xcl-lang` on npm
+  ships `xcl-core` in eight `xcl-lang-<os>-<arch>[-<libc>]` packages listed in
+  its `optionalDependencies`, the npm form of Python's per-platform wheels. A
+  user installs only `xcl-lang`, and the platform packages share its version
+  and release. The project lead approved this on 2026-10-31.
 - No package exists only to carry entity classes, neither one per plugin nor
   one an application installs to import a plugin's classes. An application
   that wants typed access to a plugin's types generates classes from its schema
