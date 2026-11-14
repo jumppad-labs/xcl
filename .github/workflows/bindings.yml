@@ -4,6 +4,12 @@
 # the xcl ref to build the engine from; today those are xcl-python's and
 # xcl-typescript's test.yml.
 #
+# The suites run with scope smoke: one runner per operating system
+# (ubuntu-latest, macos-latest, windows-latest) on one language version, with
+# the musl, packaging and install jobs skipped. An engine change breaks a
+# binding by operating system, not by language version, and packaging is each
+# binding's own concern, tested in full by its own pull requests and releases.
+#
 # The required check is the bindings job. It always runs and passes when
 # every binding suite passed, or when the pull request carries the label
 # breaks-bindings: a maintainer's statement that the change knowingly breaks
@@ -15,8 +21,8 @@
 # which costs time but means the gate can never pass because a job it
 # depends on was skipped.
 #
-# To add a language, call its suite as another job and add that job to the
-# needs of bindings.
+# To add a language, call its suite as another job with scope smoke, and add
+# that job to the needs of bindings. Its test.yml must accept the scope input.
 
 name: Bindings
 
@@ -36,6 +42,7 @@ jobs:
     with:
       python-ref: main
       xcl-ref: ${{ github.event.pull_request.head.sha }}
+      scope: smoke
 
   typescript:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaks-bindings') }}
@@ -43,6 +50,7 @@ jobs:
     with:
       typescript-ref: main
       xcl-ref: ${{ github.event.pull_request.head.sha }}
+      scope: smoke
 
   bindings:
     name: bindings
