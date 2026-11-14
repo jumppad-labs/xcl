@@ -7,6 +7,7 @@ specs:
     - 20261023075136-42c51a7d-printing-tokens-over-the-engine
     - 20261023075302-bad71237-printing-and-highlighting-python
     - 20261023075328-741138ee-python-prettylog
+    - 20261110083940-53be9068-typescript-printing
 ---
 
 # Printing and highlighting: tokens from the core, formatting in the language
@@ -267,7 +268,7 @@ handler.setFormatter(xcl.highlight.LogFormatter(formatter=highlight.for_stream(s
 
 ### TypeScript
 
-`XclError` implements `util.inspect.custom`, so `console.error(err)` and an uncaught error print the report. Colour follows the `colors` option Node's console already sets for its stream, so Node decides colour as it does for everything else. To be confirmed while implementing: that the supported Node versions print uncaught errors through `inspect`.
+`XclError` implements `util.inspect.custom`, so `console.error(err)` prints the report, and colour follows the `colors` option Node's console already sets for its stream, so Node decides colour as it does for everything else. An uncaught error takes a different route: Node's fatal-exception path calls `inspect` with `customInspect: false`, so the custom method does not run there. The plain report is also carried in the error's `stack`, between the first line and the stack frames, so an uncaught error shows the report as plain text, with no process listener.
 
 `XclError` has enumerable `problems` (file, line, column, summary, entity, field) and `report` (plain text). pino's standard `err` serializer and winston's `format.errors()` include enumerable properties, so JSON logs carry structured problems with no configuration.
 

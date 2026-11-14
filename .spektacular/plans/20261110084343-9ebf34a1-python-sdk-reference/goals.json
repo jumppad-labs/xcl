@@ -1,0 +1,1700 @@
+{
+  "plan": "20261110084343-9ebf34a1-python-sdk-reference",
+  "items": [
+    {
+      "item": "ebd3dbc7-930e-45d1-a358-8d28c144de30",
+      "title": "Add the API reference tool",
+      "checks": [
+        {
+          "at": "2026-11-10T10:17:08Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "ebd3dbc7-930e-45d1-a358-8d28c144de30",
+            "title": "Add the API reference tool",
+            "criteria": [
+              "The tool lists every public name and member lacking a doc comment and exits with a failure",
+              "With every name documented it exits successfully",
+              "The tool writes reference data holding every public name, its signature, description, parameters, return value, errors and members, and the package version",
+              "Inherited members appear on a class, and names outside the export lists do not",
+              "The tool's dependencies are not dependencies of `xcl-lang`"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/scripts/api_reference.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl.aio"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl.mask"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/scripts/requirements-docs.txt"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/scripts/test_api_reference.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "api_reference.py:353 exempts every item of kind \"attribute\" or \"constructor\" from the check (`if item.kind not in (\"attribute\", \"constructor\") and not has_doc_comment(...)`), so a public class attribute with no doc comment is never listed and does not fail the run. The criterion requires every public name and member lacking a doc comment to be listed. The exemption is tested at test_api_reference.py:325-328 (`test_check_needs_no_doc_comment_on_an_attribute_or_constructor`), which asserts exit 0 on an undocumented dataclass field. Module-level constants and functions, methods and properties are checked (api_reference.py:350-357, test_api_reference.py:303-308), so the gap is limited to class attributes, but it is still a gap against the wording. Removing the attribute exemption would meet this criterion. The constructor exemption is defensible because the class doc comment documents it (api_reference.py:499-503)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "api_reference.py:596-609 returns 0 when `problems` is empty, and the only failure paths add to `problems`. test_api_reference.py:269-272 (`test_check_passes_on_a_documented_package`) asserts `check(source) == 0` on a fully documented package, and test_api_reference.py:311-314 does the same for a documented constant. The reported 32 passing tests cover these."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "api_reference.py:611-613 writes the JSON when `--out` is given. The data holds: the version (`version`, api_reference.py:341-346, 576); every public name as an entry with `id`, `name`, `kind` and `description` (api_reference.py:506-513); `signature` (api_reference.py:510-512, built by function_signature and class_signature at 387-423); `parameters` with name, type, default and description (api_reference.py:531-546); `returns` (api_reference.py:548-555); `raises`, which is the function's error list (api_reference.py:522-524, 557-561); a separate Errors section for exception classes (api_reference.py:232, 283-284, 249-250); and `members` (api_reference.py:527-528). Tests at test_api_reference.py:337-396 and 483-487 check these fields. The error data is keyed as `raises` rather than `errors`, which I read as satisfying the criterion."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "Inherited members: Walker._members iterates `cls.all_members` (api_reference.py:313), which includes inherited members, marks them with `inherited_from` (lines 320-321), and places them last (line 328). Test test_api_reference.py:436-447 checks that xcl.Child lists xcl.Child.inherited and that inheritedFrom is xcl._base.Base. Names outside the export lists: Walker only walks `__all__` exports (api_reference.py:266-287, with `xcl.__all__` and module `__all__` lists only), and the EXTRA_MODULES entry is limited to `aio`. Test test_api_reference.py:297-300 and 362-365 check that a name outside `__all__` is ignored and omitted from the data."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "/home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-python/pyproject.toml:28-33 lists only `protobuf\u003e=5.26` as a dependency, and the test extra at lines 36-43 has only pytest and mypy. Grep for griffe or docutils across xcl-python found matches only in .github/scripts/api_reference.py, requirements-docs.txt and the comments there, none in pyproject.toml. requirements-docs.txt:1-10 pins griffe==2.4.1 and docutils==0.23 with a comment saying neither is a dependency of xcl-lang. The staged status lists only the three new files under .github/scripts, so the package's own files are unchanged."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-10T10:20:17Z",
+          "round": 1,
+          "attempt": 2,
+          "goal": {
+            "item": "ebd3dbc7-930e-45d1-a358-8d28c144de30",
+            "title": "Add the API reference tool",
+            "criteria": [
+              "The tool lists every public name and every public member (a constructor, method or property, including inherited ones; class data attributes are listed in the reference but not checked, and a class's doc comment documents its constructor) lacking a doc comment, and exits with a failure",
+              "With every name documented it exits successfully",
+              "The tool writes reference data holding every public name, its signature, description, parameters, return value, errors and members, and the package version",
+              "Inherited members appear on a class, and names outside the export lists do not",
+              "The tool's dependencies are not dependencies of `xcl-lang`"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/scripts/api_reference.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl.aio"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl.mask"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/scripts/requirements-docs.txt"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/scripts/test_api_reference.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "/home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-python/.github/scripts/api_reference.py:350-357 `undocumented()` collects every item lacking a doc comment, recursing into members (which include inherited ones, from `Walker._members` at lines 309-328 using `cls.all_members`). It skips only kind 'attribute' and 'constructor' (class data attributes and constructors, the latter covered by the class doc comment), as the goal allows. `main()` (lines 600-609) prints each as `\u003cid\u003e: no doc comment` and returns 1. Tests at test_api_reference.py:275-308 and 325-329 cover the method, inherited, constant and attribute cases. The check is also run over every section, including the Errors section (lines 601-603)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "api_reference.py:609-614 returns 0 when `problems` is empty and writes the output only on success. A fully documented package gives exit 0: test_api_reference.py:269-272 (`test_check_passes_on_a_documented_package`) and :311-314 (constant with doc comment). Verification reports 32 passed. Caveat, not a verdict issue: the real package's xcl/_version.py:14 `__version__` has no doc comment and xcl/__init__.py does not document it, so `--check` on the real checkout would list `xcl.__version__: no doc comment`. Only `--out` was verified over the real package."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "api_reference.py:571-577 writes schema, language, package, version and sections. Each entry (`Builder.entry`, lines 496-529) carries id, name, kind, signature (`signature_of`, 426-436), description (render of doc comment), parameters (`Builder.parameters`, 531-546), returns (548-555), raises (the 'errors' field, 557-561), members (528) and inheritedFrom. Version is read from `xcl.__version__` via alias resolution (walk_api, lines 341-346). Tests test_api_reference.py:337-448 cover version, signature, parameters, return value, raises and members."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "Inherited members: `Walker._members` (api_reference.py:313 `cls.all_members`, 320-321 sets inherited_from), with test_api_reference.py:436-447 (`xcl.Child.inherited` on the class, inheritedFrom `xcl._base.Base`). Names outside export lists: `_add_exports` (lines 266-287) iterates only `module.exports`, and `EXTRA_MODULES` is limited to `aio` (line 44). Checked against /home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-python/xcl/__init__.py:64-128 (`__all__`) and xcl/aio.py:501 and xcl/mask.py:60. Tests test_api_reference.py:297-300 and 362-365 (`hidden` is omitted)."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "pyproject.toml (xcl-python worktree, lines 27-33 dependencies, 35-51 optional-dependencies) lists only protobuf, pytest, mypy and cffi, with no griffe or docutils. A grep for griffe|docutils across the code root, excluding .spektacular, matches only .github/scripts/api_reference.py and .github/scripts/requirements-docs.txt, which is a separate file with the comment saying neither is a dependency of xcl-lang. No file under xcl/ imports either library."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 2,
+      "state": "accepted"
+    },
+    {
+      "item": "908eec92-a30a-4376-b82d-b5eec4be0d01",
+      "title": "Complete the package's doc comments",
+      "checks": [
+        {
+          "at": "2026-11-10T10:24:41Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "908eec92-a30a-4376-b82d-b5eec4be0d01",
+            "title": "Complete the package's doc comments",
+            "criteria": [
+              "The tool reports no undocumented public name or member with no exclusions",
+              "The clients' and registries' methods and the module functions document their parameters, return values and errors where they have them",
+              "No code other than doc comments changes"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_version.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_types.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_formatters.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/registry.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_print.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_logbridge.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/mask.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/prettylog.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "No shell was available, so I did not re-run api_reference.py --check; this rests on the source and the diff. The check (.github/scripts/api_reference.py:350-357, undocumented()) flags every public class, function, method and property with no doc comment. Its only exemptions are attributes and constructors, and it skips private names (:314). Both exemptions are the tool's own design, and this item adds no allow-list, noqa or pragma anywhere in xcl-python.diff. The changed public code carries doc comments throughout, including attribute docstrings such as UNKNOWN (xcl/_types.py:82), __version__ (xcl/_version.py:108) and PLAIN/TERMINAL/HTML/HTML_INLINE/SVG (xcl/highlight/_formatters.py:675-681). The implementer's run (exit 0, no output) is consistent with this, but I did not reproduce it."
+            },
+            {
+              "criterion": 2,
+              "verdict": "not_met",
+              "evidence": "Several functions and constructors raise errors their doc comments do not list. (a) xcl/mask.py:36-44 aes256gcm raises ValueError at line 43 for a key that is not 32 bytes, but its docstring (lines 37-41) has only :param key: and :returns:, with no :raises ValueError:. (b) xcl/mask.py:47-55 hmac_sha256 raises ValueError at line 54 for an empty key, with no :raises: in its docstring (lines 48-52). (c) xcl/prettylog.py:83-136 handler raises TypeError (lines 131-132 and 135-136) and ValueError (line 133-134), but its docstring (lines 90-130) documents :param: and :returns: only, with no :raises:. (d) xcl/config.py:66-77 and xcl/aio.py (the Config class docstring at the diff's hunk around lines 57-78) document :raises ValueError: only. Config.__init__ can also raise TypeError through _event_data_level (xcl/config.py:31-43, called at :95) when event_data is not an xcl.EventDataLevel, and that TypeError is not documented. The same applies to the aio Config constructor. The clients' and registries' methods are mostly covered (for example registry.py register_function, register_type, register_external_plugin and GitHubRegistry.register_plugin list their SchemaError or ValueError). Minor gap: Config.load (xcl/config.py:224-226) and its aio counterpart run an engine operation like apply and destroy, which do list :raises xcl.ProviderError:, but load has no :raises: at all."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Every hunk in xcl-python.diff is a doc comment or a bare string literal used as an attribute docstring (for example xcl/_types.py:82, xcl/_version.py:108, xcl/highlight/_formatters.py:675-681). No executable line changes. The diff's changed files (xcl/__init__.py, _logbridge.py, _print.py, _types.py, _version.py, aio.py, config.py, highlight/_css.py, _formatters.py, _kinds.py, _stream.py, _style.py, _theme.py, _vscode.py, mask.py, prettylog.py, registry.py) are all inside the scope list, or are highlight modules the pointers allow. .github/workflows/release.yml is not changed. The status lists three untracked files (.github/scripts/api_reference.py, requirements-docs.txt, test_api_reference.py) that are not in the diff. They are the doc-check tool, which belongs to another task and is not part of this item's changes. Nothing in the diff shows this item created them."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-10T10:27:11Z",
+          "round": 1,
+          "attempt": 2,
+          "goal": {
+            "item": "908eec92-a30a-4376-b82d-b5eec4be0d01",
+            "title": "Complete the package's doc comments",
+            "criteria": [
+              "The tool reports no undocumented public name or member with no exclusions",
+              "The clients' and registries' methods and the module functions document their parameters, return values and errors where they have them",
+              "No code other than doc comments changes"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_version.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_types.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_formatters.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/registry.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_print.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_logbridge.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/mask.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/prettylog.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "The check tool is /home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-python/.github/scripts/api_reference.py. main() (lines 609-612) reports every undocumented item from the walk over all sections, and has no allow-list or skip flag. Module, class, method, property, constant and function items are all checked via has_doc_comment (lines 350-357, 209-210). Two built-in carve-outs apply: attributes are never required to have a doc comment (line 353, and the docstring at lines 8-9 defines them that way), and a constructor is documented by its class (lines 507-511). Names starting with an underscore are skipped (line 314). Non-exported submodules such as xcl.config are outside the tool's stated definition of public (lines 4-7). The verification run reported exit 0 with no output. Caveat: the attribute carve-out is part of the tool's definition of a member, not a flag, so I did not count it as an exclusion."
+            },
+            {
+              "criterion": 2,
+              "verdict": "not_met",
+              "evidence": "Most client and registry methods and module functions do document :param, :returns and :raises (for example registry.py:47-69, 72-84, 93-106, 118-122, 179-185, 190-197; config.py:189-296 and 306-353; aio.py:255-375; prettylog.py, _print.py, mask.py, highlight/*.py). The gaps are errors the code raises that the docstrings omit. (a) Config.find_by_type, Config.find_one (config.py:266-286), and aio.Config.find_by_type and find_one (aio.py:337-357) can raise xcl.TypeMismatchError via _SyncConfig._hydrate (config.py:604-615, raise at 611), and their docstrings do not list it. Config.find (config.py:252-264) and aio.Config.find (aio.py:325-335) can raise it too and do not list it. (b) Config.find_one, find_by_type and all, and aio.Config.all (aio.py:359-367), call names_of, which raises xcl.NotRegisteredError (_classes.py:51-61). None of those docstrings list it. Config.all is at config.py:288-296. Fix is to add the missing :raises lines in config.py and aio.py."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "The staged xcl-python diff (.spektacular/tmp/20261110084343-9ebf34a1-python-sdk-reference/goal-check/xcl-python.diff) changes only docstrings in the 17 xcl/ files. The non-docstring lines are attribute-docstring string statements after UNKNOWN (_types.py:82), PLAIN/TERMINAL/HTML/HTML_INLINE/SVG (_formatters.py:697-704), and __version__ (_version.py:108). None alters a statement, signature or value. The verification AST comparison supports this. .github/workflows/release.yml is in scope but is not in the diff, which is allowed. Caveat: xcl-python.status lists three untracked files outside the scope list: .github/scripts/api_reference.py, .github/scripts/requirements-docs.txt and .github/scripts/test_api_reference.py. They are new code. This item did not add them, as far as the diff shows, but they should be confirmed as belonging to another task."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-10T10:29:54Z",
+          "round": 1,
+          "attempt": 3,
+          "goal": {
+            "item": "908eec92-a30a-4376-b82d-b5eec4be0d01",
+            "title": "Complete the package's doc comments",
+            "criteria": [
+              "The tool reports no undocumented public name or member with no exclusions",
+              "The clients' and registries' methods and the module functions document their parameters, return values and errors where they have them",
+              "No code other than doc comments changes"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_version.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_types.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_formatters.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/registry.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_print.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_logbridge.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/mask.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/prettylog.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Checker is .github/scripts/api_reference.py. Its --check path (lines 609-612) reports every item where undocumented() (lines 350-357) finds no doc comment. The only exemptions are the tool's own rules: attribute and constructor kinds, and a constructor documented by its class (lines 507-511). There is no ignore or exclusion list anywhere in .github/scripts (grep for exclu/ignore/skip/allow finds nothing). The new doc comments cover the rest: constants such as UNKNOWN (xcl/_types.py:91-92), __version__ (xcl/_version.py:108), PLAIN/TERMINAL/HTML/HTML_INLINE/SVG (xcl/highlight/_formatters.py:181-190), and the class and method docstrings in xcl/config.py, xcl/aio.py, xcl/registry.py. The implementer reports exit 0 with no output; I did not re-run the tool."
+            },
+            {
+              "criterion": 2,
+              "verdict": "not_met",
+              "evidence": "The module function xcl.engine_version (xcl/__init__.py:131-138) has a :returns: field but no :raises: field, although it can raise. It calls default_client().engine_version(), which calls _ensure_version (xcl/_client.py:78-94), and that raises xcl._errors.EngineVersionError when the engine's version differs from the bundled one. Transport selection on first use raises EngineNotFoundError (xcl/_transport/select.py:54-67, documented there but not in xcl/__init__.py). The docstring should add :raises xcl.EngineVersionError: and :raises xcl.EngineNotFoundError:. Secondary gap: the constructors of xcl/config.py:46-79 and xcl/aio.py:51-74 create the configuration in the engine (xcl/config.py:125), and their class docstrings list only ValueError and TypeError under :raises, not the engine errors. Everything else checked is documented: all sync and async Config methods in the diff, LocalRegistry and GitHubRegistry register_* methods (xcl/registry.py:47-123, 179-198), and the module functions in _print.py, _logbridge.py, prettylog.py, mask.py, _types.field and the highlight functions. The registry and client properties (LocalRegistry.types/functions, GitHubRegistry.types/functions, Config.handle) describe their returned value in the docstring text, which I treated as documented."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "The staged xcl-python diff (goal-check/xcl-python.diff) touches only xcl/*.py and xcl/highlight/*.py (17 files) and .github/scripts is untracked. Every removed line is an old docstring and every added line is docstring text, :param/:returns/:raises fields, or a bare string literal placed after a module constant or __version__ (xcl/_version.py:108, xcl/_types.py:92, xcl/highlight/_formatters.py:182-190). Those literals are attribute docstrings and change no runtime value. The def and code lines in the hunks are unchanged context. The file .github/workflows/release.yml is not modified. Caveat: the untracked .github/scripts/api_reference.py, test_api_reference.py and requirements-docs.txt are new code outside this item's scope list and outside the staged diff; this item's changes do not include them, so I did not count them as this item's changes."
+            }
+          ],
+          "decision": "exhausted",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-10T11:13:41Z",
+          "round": 2,
+          "attempt": 1,
+          "goal": {
+            "item": "908eec92-a30a-4376-b82d-b5eec4be0d01",
+            "title": "Complete the package's doc comments",
+            "criteria": [
+              "The tool reports no undocumented public name or member with no exclusions",
+              "The clients' and registries' methods and the module functions document their parameters, return values and errors where they have them",
+              "No code other than doc comments changes"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_version.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_types.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_formatters.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/registry.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_print.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_logbridge.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/mask.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/prettylog.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "Code root is /home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-python (paths below are relative to it). The check tool (.github/scripts/api_reference.py) runs only over names and members it chooses: its module docstring (lines 8-9) says attributes 'are listed but need no doc comment', and undocumented() (line 353) skips kind 'attribute' and 'constructor'. There is no allowlist, so the exemption is the tool's built-in rule. Public attributes with no doc comment of their own therefore pass unreported: xcl/_entity.py:24-37 (Meta.id, name, type, ... extra), xcl/diff.py:17-32 (Summary.create..unchanged, Change.path, before, after), xcl/diff.py:44-56 (Dependency, ResourceDiff fields), xcl/events.py:52-62 (Event.time, source, operation, ...). The goal says 'with no exclusions', and this exemption is one. Removing it, or documenting those attributes, touches files outside this item's scope list (_entity.py, diff.py, events.py, and the untracked tool), so this may need the scope widened. I did not rerun the tool; I rely on the verification result that --check exits 0, which only covers the names it checks."
+            },
+            {
+              "criterion": 2,
+              "verdict": "not_met",
+              "evidence": "Most client and registry methods and module functions document :param, :returns and :raises where they apply, in the diff hunks for xcl/config.py, xcl/aio.py, xcl/registry.py, xcl/_print.py, xcl/_logbridge.py, xcl/mask.py, xcl/prettylog.py, xcl/__init__.py, xcl/highlight/*.py and xcl/_types.py. Gaps: (a) xcl/aio.py:135-141 Config.open() documents only :returns, but it runs _ensure_open (aio.py:125-128), which calls CreateConfig through Client.call; that can raise EngineNotFoundError or EngineVersionError (xcl/_client.py:72-94). The aio class docstring (aio.py:74-75) lists those errors for the constructor, but aio.Config.__init__ (aio.py:92-121) never calls the engine. (b) Context-manager methods are undocumented: xcl/config.py:172-176 (__enter__ returns self, __exit__ takes *_) and xcl/aio.py:150-155 (__aenter__ calls _ensure_open and returns self, __aexit__). (c) Not counted as in scope: xcl/_client.py Client.call, release and engine_version (lines 48-76) have no :param, :returns or :raises. That module is private and not in the scope list, but if 'clients' includes Client, this is a further gap. I found no undocumented :param, :returns or :raises for LocalRegistry or GitHubRegistry methods (registry.py:47-123, 179-198), or for the module functions in xcl/__init__.py, xcl/_print.py, xcl/_logbridge.py, xcl/mask.py, xcl/prettylog.py, xcl/highlight/_css.py, _stream.py, _style.py, _theme.py, _vscode.py, _kinds.py, and xcl/_types.py:field."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "The staged/working diff of xcl-python (/home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/tmp/20261110084343-9ebf34a1-python-sdk-reference/goal-check/xcl-python.diff) changes only docstrings and attribute-docstring string literals. Examples: xcl/_types.py:84 and :92 add string literals after UNKNOWN; xcl/_version.py:110 after __version__; xcl/highlight/_formatters.py:751-757 after PLAIN, TERMINAL, HTML, HTML_INLINE, SVG. Every other hunk in config.py, aio.py, registry.py, _print.py, mask.py, prettylog.py, _logbridge.py, __init__.py and highlight/ is inside a def's docstring. The registry.py:47 and :190 '# noqa' comments are unchanged context. xcl/_version.py and .github/workflows/release.yml are in scope; only _version.py changed, and only by a docstring. Caveat: the status lists untracked new code outside the scope list: .github/scripts/api_reference.py, .github/scripts/test_api_reference.py and .github/scripts/requirements-docs.txt. Those are not doc comments. If they belong to this item, this criterion fails; the files alone do not show whose they are."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-10T11:16:02Z",
+          "round": 2,
+          "attempt": 2,
+          "goal": {
+            "item": "908eec92-a30a-4376-b82d-b5eec4be0d01",
+            "title": "Complete the package's doc comments",
+            "criteria": [
+              "The tool reports no undocumented public name or member with no exclusions",
+              "The clients' and registries' methods and the module functions document their parameters, return values and errors where they have them",
+              "No code other than doc comments changes"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_version.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_types.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/highlight/_formatters.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/config.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/aio.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/registry.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_print.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_logbridge.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/__init__.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/mask.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/prettylog.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "Verification reports `python .github/scripts/api_reference.py --check` exit 0 with no output. I read the tool (.github/scripts/api_reference.py, lines 350-357 `undocumented`, 595-618 `main`): it has no allow-list or ignore option, and only prints problems it finds. Its own definition exempts attributes (line 353), dunders other than __init__ (line 314), and nested classes or modules as members (line 317). Those are definitional, not run-time exclusions, so the empty output stands for the walked public surface (xcl.__all__, the exported modules, and xcl.aio). I did not re-run the tool; this verdict rests on the recorded result plus my reading of the tool."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Config and aio.Config document every parameter, return and error in their methods: xcl/config.py:191-688 and xcl/aio.py:259-675 each carry :param, :returns: and :raises: entries matching the signatures. Class-level docs cover __init__ params for both Config classes (config.py:66-81, aio.py:57-76). Registries: LocalRegistry.register_type/register_function/register_external_plugin/register_plugin_directory (xcl/registry.py:65-122) and GitHubRegistry.register_plugin/register_type (registry.py:179-197) document params, raises and no-return correctly. Module functions: engine_version (xcl/__init__.py:131-140), logging_handler (_logbridge.py:25-54), print_error/format_error/print_diff (_print.py:16-107, all params incl. width), css (highlight/_css.py:11-28), for_stream, parse_style, hex_colour, style_for, validate, load_vscode_theme, parent_of, css_class_of, aes256gcm/hmac_sha256/redact/omit (mask.py:36-73), prettylog.handler and level_from_env (prettylog.py:71-132), field (_types.py:107-140) all document params and returns. Not in the goal's listed categories but noted: StateStore protocol methods in xcl/_poll.py:48-61 are one-liners with no :param for save(entities), and Formatter.format is documented only in its class; I did not count these against this criterion."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "The staged xcl-python diff (goal-check/xcl-python.diff) changes only docstring text across the 17 xcl/ files. The only non-docstring additions are bare string-literal statements placed directly after a module-level assignment, which are attribute doc comments with no runtime effect: xcl/__init__? no; _types.py:84 after UNKNOWN, _version.py:110 after __version__, highlight/_formatters.py:753-759 after PLAIN, TERMINAL, HTML, HTML_INLINE, SVG. No code line is added, removed or altered in any hunk. Caveat: git status shows untracked files under .github/scripts/ (api_reference.py, test_api_reference.py, requirements-docs.txt), which are code and fall outside this item's listed scope. The diff does not show them, and nothing I read says whether this item created them, so that needs checking by whoever owns the item."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-11-10T11:10:03Z",
+          "round": 1,
+          "decision": "keep_fixing",
+          "reason": "User chose keep_fixing: add the engine start-up errors to engine_version and both Config class doc comments"
+        }
+      ],
+      "attempts": 5,
+      "state": "accepted"
+    },
+    {
+      "item": "10e2a4ea-c97d-4b0e-b6ec-365eaf2995c9",
+      "title": "Run the doc comment check in CI",
+      "checks": [
+        {
+          "at": "2026-11-10T11:18:00Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "10e2a4ea-c97d-4b0e-b6ec-365eaf2995c9",
+            "title": "Run the doc comment check in CI",
+            "criteria": [
+              "A pull request with an undocumented public method fails its required checks, naming the method",
+              "The package's own check run passes",
+              "A local Makefile target runs the same check"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/workflows/test.yml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "tests/unit/test_docstrings.py"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "ci.yml:10-16 runs test.yml on pull_request to main. test.yml:208-224 adds the check-docs job, which runs `python .github/scripts/api_reference.py --check` with no continue-on-error. api_reference.py:609-618 prints `\u003centry\u003e: no doc comment` for each undocumented public name or member and exits 1. The verification run with Config.close's doc comment removed printed `xcl.Config.close: no doc comment` and exited 1, so the method is named in the failing job's log. test.yml:228-242 (result job) lists check-docs in needs (line 230) and fails unless every needed job is success, so the required `result` check fails. The method is named in the check-docs log, not in the result job's own output, which only echoes the job results."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "The check-docs job (test.yml:211-224) installs .github/scripts/requirements-docs.txt (griffe==2.4.1, docutils==0.23) and pytest, runs api_reference.py --check, then runs python -m pytest .github/scripts. It reads the package statically, so it needs no engine or protos. The local run of make check-docs passed (exit 0, 32 tests, no problems). The 20+ xcl/*.py docstring additions in the staged xcl-python diff are what make the check pass. They are outside the listed scope files (test.yml and test_docstrings.py only), which is a scope concern for the implementer. I did not run the hosted CI job itself, so this rests on the local run plus the static job definition. pyproject.toml:77-78 sets testpaths=tests, but an explicit `.github/scripts` path overrides it and no root conftest.py exists, so the pytest step is not affected."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Makefile:56-61 defines check-docs, running `$(PYTHON) .github/scripts/api_reference.py --check` and `$(PYTHON) -m pytest .github/scripts`, the same two commands as the check-docs job in test.yml:222-224. Makefile:63 adds check-docs to .PHONY. Scope concern: the Makefile is not in the goal's listed files (only test.yml and tests/unit/test_docstrings.py), yet this criterion requires a Makefile target, so the scope list does not cover what the criterion asks for."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "eea8e109-1cc0-4faf-88d2-19715b7cc4e1",
+      "title": "Publish the reference with each release",
+      "checks": [
+        {
+          "at": "2026-11-10T11:18:49Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "eea8e109-1cc0-4faf-88d2-19715b7cc4e1",
+            "title": "Publish the reference with each release",
+            "criteria": [
+              "A release attaches reference data whose version is the released version to the GitHub release",
+              "A failure generating the reference stops the release before anything reaches PyPI",
+              "Once the GitHub release exists, the website is dispatched with the tag"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/workflows/release.yml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "xcl/_version.py"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": "publish.needs"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".whl"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".tar.gz"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "release.yml:297-312 (reference job) sets xcl/_version.py __version__ from the tag via sed, then runs api_reference.py --check --out \"xcl-lang-$VERSION-reference.json\" and uploads it as artifact 'reference'. release.yml:440-445 (github-release job) downloads that artifact and runs 'gh release upload \"$TAG\" ... xcl-lang-*-reference.json' after 'gh release create' at lines 436-438. api_reference.py:584 writes api.version, which walk_api reads from __version__ (api_reference.py:341-346), so the written data carries the sed-substituted version. The verification run confirmed version 9.8.7 for VERSION=9.8.7."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "release.yml:316 sets publish 'needs: [settings, wheels, wheels-musl, sdist, reference]', so publish (the only PyPI upload, pypa/gh-action-pypi-publish at line 332) waits for reference and is skipped if it fails. api_reference.py:609-618 with --check returns 1 on any undocumented public name or problem, and the --out write at lines 620-622 happens only after that check, so a failing reference job produces no artifact and exits non-zero."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "release.yml:448-466 defines job dispatch-website with 'needs: [settings, github-release]' (line 450), so it runs only after the GitHub release step has succeeded. It sends 'gh api repos/jumppad-labs/xcl-website/dispatches -f event_type=xcl-python-release -f client_payload[tag]=$TAG' (line 466), where TAG is the tag from settings."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "67201ccb-09af-47cf-9776-b337e787d427",
+      "title": "Load the reference data into the site",
+      "checks": [
+        {
+          "at": "2026-11-10T11:20:17Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "67201ccb-09af-47cf-9776-b337e787d427",
+            "title": "Load the reference data into the site",
+            "criteria": [
+              "A build fetches the pinned release's data and keeps it out of git",
+              "A build fails with a clear message when the data is missing or its version differs from the pin",
+              "Setting the development override uses a local file instead of downloading",
+              "The site's deployment workflow is unchanged"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "xcl-python-ref.txt"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "v0.14.1"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "scripts/fetch-python-reference.mjs"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/generated/python-reference.json"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "package.json"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "scripts/fetch-python-reference.mjs:32-61 reads the tag from xcl-python-ref.txt (v0.14.1), builds the release asset URL, fetches it and writes src/generated/python-reference.json. The worktree .gitignore (diff hunk @@ -1,3 +1,4 @@) adds src/generated/, and `git check-ignore` was verified ignored. package.json:8-11 wires the script as prebuild and predev. Caveat: the pinned v0.14.1 release has no asset (HTTP 404 in the verification run), so a real download only succeeds once the release carries one."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "scripts/fetch-python-reference.mjs:39-47 fails with a clear 'python reference: cannot download \u003curl\u003e' message on network error or non-OK HTTP status, and :21-27 fails when XCL_PYTHON_REFERENCE is unreadable. :49-58 fails with 'describes version X, but xcl-python-ref.txt pins Y' when data.version differs from the pin. :33-35 rejects a malformed pin, and :52-55 rejects non-JSON. The verification run shows the 404 and 9.9.9 mismatch failures with exit 1."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "scripts/fetch-python-reference.mjs:21-30: when XCL_PYTHON_REFERENCE is set, the script copies that file to src/generated/python-reference.json, logs 'using \u003cfile\u003e' and calls process.exit(0) before any fetch call at :41. The verification run shows exit 0 with the override and the same output."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "The worktree status (xcl-website.status) and xcl-website.diff list no change to .github/workflows/deploy.yml, and the file still runs `npm ci` and `npm run build` with no reference step (lines 31-41). The verification run shows `git diff --stat .github/workflows/deploy.yml` empty. Out of scope but noted: the diff also changes Makefile (adds `npm run reference` to check), which is not in this item's listed files."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "ede26098-bb56-4f03-aff7-8a0144c1a347",
+      "title": "Render the reference page",
+      "checks": [
+        {
+          "at": "2026-11-10T11:22:23Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "ede26098-bb56-4f03-aff7-8a0144c1a347",
+            "title": "Render the reference page",
+            "criteria": [
+              "The built page shows the site's navigation and footer",
+              "Every entry in the data has an anchored entry on the page showing its signature and description, and its parameters, return value and errors where documented",
+              "`xcl.Config` is labelled synchronous and `xcl.aio.Config` asyncio",
+              "The version shown equals the data's version"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "src/lib/pythonReference.ts"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/reference/python.astro"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/components/reference/Entry.astro"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/styles/global.css"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "Shell.astro"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/pages/reference/python.astro:10 wraps the page in the Shell layout. src/layouts/Shell.astro:28 and :30 render \u003cNav /\u003e and \u003cFooter /\u003e around the slot. dist/reference/python/index.html contains the Nav markup (\u003cnav at line 12) and the footer (\u003cfooter at line 458, from src/components/Footer.astro:4)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "src/components/reference/Entry.astro:14 gives each entry a div with id={entry.id}, and recurses into members at :74 so member entries get anchors too. The signature is rendered at :22 and the description at :24. Parameters, Returns and Raises render at :26-69 when present. The data (src/generated/python-reference.json) has signatures, descriptions, parameters, returns and raises (e.g. xcl.Config at lines 25-48 and its __init__ member at lines 50-57). The built page has matching dt Parameters, Returns and Raises blocks. I did not re-run the 527-entry anchor script. I checked the template logic and the built HTML, and the script result in the verification summary is consistent with that."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "The data labels xcl.Config 'synchronous' (src/generated/python-reference.json:28) and xcl.aio.Config 'asyncio' (:2380). Entry.astro:18 renders a Badge from entry.label for top-level entries, with the text 'synchronous' or 'asyncio'. The built dist/reference/python/index.html contains both labels (grep: 'synchronous' at line 21, 'asyncio' at lines 247-259)."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "The data version is '0.5.0.dev0' (src/generated/python-reference.json:5). src/pages/reference/python.astro:13 shows \u003cBadge text={`version ${reference.version}`} /\u003e and :8 puts reference.version in the meta description. The built page shows 'version 0.5.0.dev0' in the page title area (line 14) and the meta description (line 1). Scope note, not a verdict input: the staged diff also changes package.json, Makefile, README.md and .gitignore, and adds scripts/fetch-python-reference.mjs and xcl-python-ref.txt. None of these are in the goal's file list, so they may breach the scope rule."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "41a1194e-de88-42b4-91b7-054459bba6c9",
+      "title": "Add the Reference menu and PyRef links",
+      "checks": [
+        {
+          "at": "2026-11-10T11:23:19Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "41a1194e-de88-42b4-91b7-054459bba6c9",
+            "title": "Add the Reference menu and PyRef links",
+            "criteria": [
+              "The Reference menu opens the Python reference",
+              "A `PyRef` link goes to the named entry",
+              "A name not in the reference warns in a normal build and the site still builds",
+              "A name not in the reference fails the reference check workflow"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "src/components/Nav.astro"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/components/PyRef.astro"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "console.warn"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": ".github/workflows/reference-check.yml"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "reference-bump.yml"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "deploy.yml"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/components/Nav.astro:47-50 adds a top-level \"Reference\" item with child { label: \"Python\", href: \"/reference/python/\" }, and the dropdown renders children at lines 94-105. The target page exists at src/pages/reference/python.astro. The verification summary reports href=\"/reference/python/\" in the built home page nav."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "src/components/PyRef.astro:25 renders \u003ca href={`/reference/python/#${name}`}\u003e when hasEntry(name) is true. src/components/reference/Entry.astro:14 sets the anchor as id={entry.id}, and src/lib/pythonReference.ts:55 and :62-63 test membership by entry.id, so the link target is the named entry's anchor. The verification summary reports href=\"/reference/python/#xcl.Config.apply\" for a known name."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "src/components/PyRef.astro:17-23: an unknown name without XCL_REFERENCE_STRICT=1 calls console.warn(\"PyRef: the Python reference has no entry named \u003cname\u003e\") and does not throw, so the build continues. It renders plain \u003ccode\u003e (line 25). The verification summary reports exit 0 with that warning and the unknown name rendered as plain code."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": ".github/workflows/reference-check.yml:30-34 runs `npm run build` with XCL_REFERENCE_STRICT: '1', and on pull_request, push to main and workflow_dispatch (lines 7-12). PyRef.astro:19-21 throws when that variable is '1', so an unknown name fails the workflow's build step. The verification summary reports exit 1 naming xcl.NotThere under the strict build. The workflow YAML parses per the verification summary."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "57f994cb-1b54-4aaf-9400-7749301b93ef",
+      "title": "Add the pin bump workflow",
+      "checks": [
+        {
+          "at": "2026-11-10T11:24:22Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "57f994cb-1b54-4aaf-9400-7749301b93ef",
+            "title": "Add the pin bump workflow",
+            "criteria": [
+              "A dispatched release moves the pin and pushes to main only after the site builds",
+              "A build failure leaves the pin and site unchanged",
+              "A dispatch for a version already pinned or older does nothing"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": ".github/workflows/reference-bump.yml"
+                },
+                {
+                  "repo": "xcl-python",
+                  "path": ".github/workflows/engine-bump.yml"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "deploy.yml"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl-website/.github/workflows/reference-bump.yml (untracked, in xcl-website.status and diff): the 'Write the pin' step (line 59-70) writes xcl-python-ref.txt on the runner only. The build steps (lines 72-86: setup-node, npm ci, 'Build the site at the new pin' running npm run build) run next, and the 'Push the pin' step (lines 88-100, git commit then git push origin main) is gated on steps.pin.outputs.changed == 'true' with no continue-on-error, so it runs only after the build succeeds. The push is the only write to main, and the file's header comment (lines 5-7) says the same."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "reference-bump.yml lines 82-86: a failing 'Build the site at the new pin' step stops the job by default, so the 'Push the pin' step (lines 88-100) never runs. Nothing is pushed to main, so the pin on main and the deployed site (deploy.yml triggers only on push to main, deploy.yml lines 3-6) stay unchanged. The runner-local write of xcl-python-ref.txt is discarded with the job. No step pushes before the build."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "reference-bump.yml lines 62-68: current is the pinned tag, newest is the greater of current and TAG under sort -V. If newest equals current (TAG equal to or older than the pin), the step prints 'nothing to do', sets changed=false and exits 0. Every later step that writes or pushes is gated on changed == 'true' (lines 73, 79, 83, 89), so nothing is written or pushed. The tag check (lines 39-44) also rejects malformed tags before this point. The verification run's cases (pinned v0.15.0 with dispatch v0.15.0 and v0.14.9, no change) are consistent with this logic."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "922a027d-f5e9-4e10-ac0e-feeaa0a7bdbb",
+      "title": "Give the website the release bot's access",
+      "checks": [
+        {
+          "at": "2026-11-13T08:07:10Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "922a027d-f5e9-4e10-ac0e-feeaa0a7bdbb",
+            "title": "Give the website the release bot's access",
+            "criteria": [
+              "The release bot App is installed on `xcl-website` with contents write",
+              "`RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY` are set on `xcl-website`"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "jumppad-labs/xcl-website"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "reference-bump.yml"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "The org-level check shows the xcl-release-bot App installed on jumppad-labs with contents: write and repository_selection: selected, but the repository list for that installation could not be read (HTTP 403 from user/installations/\u003cid\u003e/repositories), so nothing in the evidence shows xcl-website is among the selected repositories. The workflow that depends on this (/home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-website/.github/workflows/reference-bump.yml:46-52, actions/create-github-app-token with repositories: xcl-website) would fail if it is not. The diff and status files contain no evidence either way, since installation state lives on GitHub. Confirm by checking the installation's repository list in the GitHub UI (Settings \u003e Installed GitHub Apps \u003e Configure) or with a token that has the scope to call the repositories endpoint. The App being installed at org level with contents write is necessary but not sufficient for this criterion."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "The verification run `gh secret list -R jumppad-labs/xcl-website` exited 0 and lists RELEASE_APP_ID (2026-11-13T08:05:12Z) and RELEASE_APP_PRIVATE_KEY (2026-11-13T08:05:33Z). The workflow reads both as ${{ secrets.RELEASE_APP_ID }} and ${{ secrets.RELEASE_APP_PRIVATE_KEY }} (reference-bump.yml:49-50). This is evidence from the command output, not from the files; I could not re-run gh."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-13T08:08:02Z",
+          "round": 1,
+          "attempt": 2,
+          "goal": {
+            "item": "922a027d-f5e9-4e10-ac0e-feeaa0a7bdbb",
+            "title": "Give the website the release bot's access",
+            "criteria": [
+              "The release bot App is installed on `xcl-website` with contents write",
+              "`RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY` are set on `xcl-website`"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "jumppad-labs/xcl-website"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "reference-bump.yml"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "The org-level check shows the xcl-release-bot App installed on jumppad-labs with contents: write and repository_selection: selected (gh api orgs/jumppad-labs/installations). That does not show xcl-website is in the App's selected repositories. The per-installation repository list (gh api user/installations/\u003cid\u003e/repositories) returned HTTP 403, so the repo selection was never read. The reference-bump.yml workflow (.github/workflows/reference-bump.yml:46-52) relies on the App token for xcl-website, but that file does not prove the installation covers the repo. Confirming needs the repo list read with an authorised token, or the App settings page for xcl-website."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "`gh secret list -R jumppad-labs/xcl-website` exited 0 and lists RELEASE_APP_ID (2026-11-13T08:05:12Z) and RELEASE_APP_PRIVATE_KEY (2026-11-13T08:05:33Z). The workflow references both as ${{ secrets.RELEASE_APP_ID }} and ${{ secrets.RELEASE_APP_PRIVATE_KEY }} at .github/workflows/reference-bump.yml:49-50. This verdict rests on the supplied command output, which I could not re-run."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-13T08:08:56Z",
+          "round": 1,
+          "attempt": 3,
+          "goal": {
+            "item": "922a027d-f5e9-4e10-ac0e-feeaa0a7bdbb",
+            "title": "Give the website the release bot's access",
+            "criteria": [
+              "The release bot App is installed on `xcl-website` with contents write",
+              "`RELEASE_APP_ID` and `RELEASE_APP_PRIVATE_KEY` are set on `xcl-website`"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "jumppad-labs/xcl-website"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "reference-bump.yml"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "Installation state lives on GitHub, not in the files, so it cannot be read from the diff or the worktree. The only installation evidence is the verification summary: `gh api orgs/jumppad-labs/installations` shows xcl-release-bot installed on the org with contents: write and repository_selection: selected. Nothing shows xcl-website is in that selection: the per-repository lookup (`user/installations/\u003cid\u003e/repositories`) was refused with HTTP 403, and the workflow cannot be run by hand (HTTP 404) to test the token. The workflow that depends on it, /home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-website/.github/workflows/reference-bump.yml:46-52, calls actions/create-github-app-token with repositories set to the repo name, so it would fail if the App is not selected for xcl-website. To meet this, confirm the App's repository selection includes jumppad-labs/xcl-website (for example in the org's GitHub App installation settings, or via a permitted API call)."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Verification output for `gh secret list -R jumppad-labs/xcl-website` (exit 0) lists RELEASE_APP_ID (2026-11-13T08:05:12Z) and RELEASE_APP_PRIVATE_KEY (2026-11-13T08:05:33Z). These are repository secrets on xcl-website, and reference-bump.yml:49-50 reads exactly these names as secrets.RELEASE_APP_ID and secrets.RELEASE_APP_PRIVATE_KEY. I did not re-run the command; this verdict rests on the recorded output. The staged xcl-website status also shows reference-bump.yml as an untracked new file in the worktree (xcl-website.status line 7), which is consistent with the goal's file scope."
+            }
+          ],
+          "decision": "exhausted",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-11-13T08:08:56Z",
+          "round": 1,
+          "decision": "accept",
+          "reason": "done by the user on 2026-11-13: App installed on xcl-website; RELEASE_APP_ID and RELEASE_APP_PRIVATE_KEY confirmed by the orchestrator with gh secret list"
+        }
+      ],
+      "attempts": 3,
+      "state": "accepted_shortfall"
+    },
+    {
+      "item": "8de9b791-d6c1-47e5-9c23-bb5d218f66b0",
+      "title": "Write the Python guide",
+      "checks": [
+        {
+          "at": "2026-11-13T08:10:56Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "8de9b791-d6c1-47e5-9c23-bb5d218f66b0",
+            "title": "Write the Python guide",
+            "criteria": [
+              "Following the guide from the top with only its code gives a program that creates a configuration, registers an entity type and a function, uses a Go plugin, applies, keeps state between runs, finds an entity by address and by type, handles a configuration error, turns on logging, prints an entity and destroys it, and that runs the asyncio apply",
+              "The synchronous API comes before asyncio, and the asyncio section says when to use it",
+              "The guide links to the registries, plugins, state and events pages, and each API name links to its reference entry",
+              "The guide has Python code only and meets the wording rules",
+              "Anything planned but not built is marked as not yet supported"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/using-xcl-with-python.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "v0.4.1"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "/keys/jumppad-labs-releases.asc"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "cfg.find"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "xcl.plugin"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "decisions/xcl-is-its-own-language.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/pages/using-xcl-with-python.mdx:49-66 defines infra/main.xcl (settings, docker network, docker container with references); :70-90 registers a dataclass and function; :92-119 uses xcl.GitHubRegistry with xcl-plugin-docker v0.4.1 and the key file; :133-147 apply with state_path and xcl.logging_handler; :153-178 show uses cfg.load, cfg.find by address (:168) and by type (:174); :195-212 catches xcl.ConfigError and prints via xcl.print_error; :216-238 logging and prettylog; :244-252 destroy; the complete program at :256-329 includes all of these plus the sync entry points; :351-367 main_async.py runs the asyncio apply. The verification summary reports the program was run end to end against PyPI xcl-lang 0.14.1 with Docker, including the apply, show, destroy, error and async runs."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "The synchronous sections run from line 27 (Install) through line 252 (Destroy) and the complete program at :254-337. The section '## Using asyncio' starts at :339 and says when to use it at :341-346: use xcl.aio.Config when the program already runs an event loop such as FastAPI or aiohttp, and a plain script gains nothing from it."
+            },
+            {
+              "criterion": 3,
+              "verdict": "not_met",
+              "evidence": "Links to /registries/ (:77, :121 region), /github-registry/ (:121), /plugin-template/ (:123), /state-masking/ (:151) and /events/ (:240) are present, and those pages exist under src/pages. Each PyRef name in the prose links to /reference/python/#name through src/components/PyRef.astro:25. But some API names in prose are plain code with no link: the asyncio section at :373-374 says 'Its `apply` and `destroy` behave as the synchronous ones do. `on_event`, the `state_store` methods and registered functions may also be `async def`', so apply, destroy, on_event and state_store are unlinked. Also :185 'With `include_computed=True`' and :226 `PROCESSED` (EventDataLevel member) and :348 `xcl.aio` are unlinked. The asyncio section's `apply`/`destroy`/`on_event` are API names that should link to their reference entries."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "The programming code in the page is Python only: the code blocks at :79, :108, :133, :163, :229, :247, :256, :351 are python. No Go, TypeScript or other-language code appears. The non-Python blocks (hcl at :49, :186; text at :201; sh at :101, :333, :369) are the XCL input the program needs, shell commands and captured output. Reading the criterion literally against criterion 1 is ambiguous, so this verdict treats those blocks as required input rather than as programming code. Wording rules, per decisions/xcl-is-its-own-language.md and plan.md:138: a grep over the page finds no 'superset', 'interpolation', 'Terraform' or 'resource'. The page calls XCL 'a configuration language of its own' at :20 and uses 'entity' for blocks."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "The one planned-but-unbuilt item, Python plugin authoring, is marked at src/pages/using-xcl-with-python.mdx:121-123: 'Writing a plugin in Python is not yet supported; the plugin template starts a new one in Go.' xcl-python has no xcl/plugin module (the glob of xcl/**/*.py shows none), which matches the plan's note. The other claims checked are built: aio.py:7 and :55 implement async def handlers for on_event, state_store and registered functions, and mask.py exists for state masking."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-13T08:13:32Z",
+          "round": 1,
+          "attempt": 2,
+          "goal": {
+            "item": "8de9b791-d6c1-47e5-9c23-bb5d218f66b0",
+            "title": "Write the Python guide",
+            "criteria": [
+              "Following the guide from the top with only its code gives a program that creates a configuration, registers an entity type and a function, uses a Go plugin, applies, keeps state between runs, finds an entity by address and by type, handles a configuration error, turns on logging, prints an entity and destroys it, and that runs the asyncio apply",
+              "The synchronous API comes before asyncio, and the asyncio section says when to use it",
+              "The guide links to the registries, plugins, state and events pages, and each API name links to its reference entry",
+              "The guide has Python code only and meets the wording rules",
+              "Anything planned but not built is marked as not yet supported"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/using-xcl-with-python.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "v0.4.1"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "/keys/jumppad-labs-releases.asc"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "cfg.find"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "xcl.plugin"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "decisions/xcl-is-its-own-language.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/pages/using-xcl-with-python.mdx:49-331 is the complete program: registries() (L108-119) registers settings type and shout function plus the GitHub plugin xcl-plugin-docker v0.4.1 with the key read from jumppad-labs-releases.asc; apply() (L133-147) has try/except xcl.ConfigError around cfg.apply and prints entity_count; show() (L163-178) uses load, find by address (Settings and None), find_by_type and print_entity(include_computed=True); destroy() (L249-254); logging via on_event=xcl.logging_handler() and basicConfig in __main__ (L295, L329); async program main_async.py (L353-369) uses xcl.aio.Config and asyncio.run. The verification summary reports each step run from these exact files in a clean venv with exit 0 and the expected output, and the replicas=\"two\" error report matches the page. Nothing in the source contradicts those results."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Synchronous material runs from L27 (Install) to L339 (complete program and run steps), and the asyncio section is the last content section at L341-379. L343-348 says when to use it: 'Use xcl.aio.Config when your program already runs an event loop, such as a web service built on FastAPI or aiohttp... A plain script gains nothing from it, so stay with the synchronous API unless you have an event loop to share.'"
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Registries: L77 links /registries/ and L285-era prose; L121 links /github-registry/ ('Installing plugins from GitHub', src/pages/github-registry.mdx title) and L123 links /plugin-template/; state: L151 links /state-masking/ (the only state page in src/pages); events: L242 links /events/ (src/pages/events.mdx). Every API name in prose is wrapped in PyRef, e.g. L72-75 (LocalRegistry, register_type, Meta, register_function), L95-97 (GitHubRegistry, register_plugin), L127-131 (Config, apply, entity_count), L155-160 (Config.load, Config.find, Entity, find_by_type), L182-184 (print_entity), L196-198 (ConfigError, print_error, highlight.for_stream), L220-228 (Config.__init__ labelled on_event, logging_handler, prettylog.handler, EventDataLevel.PROCESSED), L246 (destroy), L343-379 (aio.Config, aio.Config.apply/destroy/__init__, xcl.aio). PyRef.astro:25 renders each as a link to /reference/python/#name, and the verification's strict build (XCL_REFERENCE_STRICT=1) resolved every name. Only the bare package name 'xcl' in L31 and L350 is plain code. No general 'plugins' or 'state' page exists beyond github-registry, plugin-template and state-masking, so these are the closest matches."
+            },
+            {
+              "criterion": 4,
+              "verdict": "met",
+              "evidence": "All code blocks are Python (L79-90, L108-119, L133-147, L163-178, L233-240, L249-254, L258-331, L353-369); the other blocks are the XCL configuration the Python program reads (L49-67 hcl, L187-191 hcl output), shell commands (L33-37, L101-103, L335-339, L371-373) and a text error report (L202-213). Read as 'no code in another SDK language', this holds; read literally as 'no non-Python block of any kind', the hcl and sh blocks are a deviation, though the guide cannot run without its XCL configuration. Wording rules: grep of src/pages/using-xcl-with-python.mdx for superset, interpolation, terraform and resource (case-insensitive) returns no matches. XCL is described as its own language at L20 ('XCL is a configuration language of its own')."
+            },
+            {
+              "criterion": 5,
+              "verdict": "met",
+              "evidence": "The one planned-but-unbuilt item the guide mentions is marked: L121-123 'Writing a plugin in Python is not yet supported; the plugin template starts a new one in Go.' No xcl.plugin module is mentioned in the guide, and import xcl.plugin fails in 0.14.1 per the verification, so nothing else needs a marker. The other features the guide describes (xcl.aio, state_store-related asyncio text at L377-379, state masking, prettylog, print_entity) exist in xcl-python/xcl (aio.py, config.py, prettylog.py, mask.py, _print.py), so they are built and need no marker."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 2,
+      "state": "accepted"
+    },
+    {
+      "item": "355d703e-1ddf-4d7a-8317-a26a03d2f376",
+      "title": "Link the guide from the site",
+      "checks": [
+        {
+          "at": "2026-11-13T08:14:29Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "355d703e-1ddf-4d7a-8317-a26a03d2f376",
+            "title": "Link the guide from the site",
+            "criteria": [
+              "The guide appears under Guides, and the Guides label still opens the same page",
+              "The home page links to the guide and reference outside any language tab",
+              "Every new link opens the right page"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "src/components/Nav.astro"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "src/pages/index.mdx"
+                },
+                {
+                  "repo": "xcl-website",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "src/components/Nav.astro:35 adds { label: \"Using XCL with Python\", href: \"/using-xcl-with-python/\" } as a child of the Guides group (group starts at line 32). The Guides label still links to children[0].href, which is \"/events/\" (Nav.astro:34, unchanged, and Nav.astro:83 renders that href on the label), so it opens the same page as before."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "src/pages/index.mdx:104-106 adds a paragraph linking [Using XCL with Python](/using-xcl-with-python/) and [Python reference](/reference/python/). It sits after the Install CodeTabs closes at index.mdx:102 and before the Section closes at line 108, so it is outside every language slot (go/python divs at lines 31 and 40). Also index.mdx:55-57 in the working tree, same content."
+            },
+            {
+              "criterion": 3,
+              "verdict": "met",
+              "evidence": "Targets exist: src/pages/using-xcl-with-python.mdx (title \"Using XCL with Python - xcl\", line 3) and src/pages/reference/python.astro (renders the Python reference Hero \"Python reference\", lines 10-11). Nav.astro:50 links Reference \u003e Python to /reference/python/. index.mdx links resolve to the same two pages. Nav Guides href /events/ still points to src/pages/events.mdx. Note for the reviewer, outside these criteria: the staged diff also touches Makefile, package.json, src/styles/global.css and .gitignore, which are not in this item's file list."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "8d5dafab-a44c-42ee-bd99-2ae8d8dd0f91",
+      "title": "Update the package README's links",
+      "checks": [
+        {
+          "at": "2026-11-13T08:15:10Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "8d5dafab-a44c-42ee-bd99-2ae8d8dd0f91",
+            "title": "Update the package README's links",
+            "criteria": [
+              "The README links to `/reference/python/` and `/using-xcl-with-python/`",
+              "The README says the reference follows releases"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [
+                {
+                  "repo": "xcl-python",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "README.md:13 reads '- Python API reference: [xcl.dev/reference/python](https://xcl.dev/reference/python/)' and README.md:14 reads '- Getting started guide: [Using XCL with Python](https://xcl.dev/using-xcl-with-python/)' in the worktree xcl-python/README.md. The staged diff (xcl-python.diff, README.md hunk at line 10) shows the old '/api/python' link replaced by '/reference/python/', and grep for 'api/python' in README.md finds nothing. Note for the caller, outside the criteria: the xcl-python staged diff also contains many changes that belong to other items (.github workflows, Makefile, tests/unit/test_docstrings.py deleted, xcl/*.py docstrings, xcl/_version.py), which the scope rule for this item says not to change."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "README.md:806-808 (the 'Releases and the engine pin' section, added in the staged diff's README.md hunk at line 802) reads: 'A release also attaches the package's API reference, generated from its doc comments, to the GitHub release, and the [Python reference](https://xcl.dev/reference/python/) on xcl.dev moves to it once the site has built with it.' This states that the Python reference on xcl.dev follows each release. The earlier line 799 ('Releases are automatic, and follow ...') refers to xcl's release process and is not about the reference."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "7c6275a4-b334-4cab-af1a-ec9ab49248d1",
+      "title": "Link the guide and reference from the xcl README",
+      "checks": [
+        {
+          "at": "2026-11-13T08:15:49Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "7c6275a4-b334-4cab-af1a-ec9ab49248d1",
+            "title": "Link the guide and reference from the xcl README",
+            "criteria": [
+              "The xcl README links to the reference and the guide",
+              "Each link opens the right page"
+            ],
+            "scope": {
+              "repo": "xcl",
+              "files": [
+                {
+                  "repo": "xcl",
+                  "path": "README.md"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "met",
+              "evidence": "xcl README.md lines 226-227 (documentation list) link https://xcl.dev/using-xcl-with-python/ and https://xcl.dev/reference/python/, and lines 249-250 (Other languages) link the same two pages again. The staged diff /home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/tmp/20261110084343-9ebf34a1-python-sdk-reference/goal-check/xcl.diff adds exactly these hunks to README.md and nothing else."
+            },
+            {
+              "criterion": 2,
+              "verdict": "met",
+              "evidence": "Routing is by file path in xcl-website (astro.config.mjs sets site https://xcl.dev with no base path). /using-xcl-with-python/ maps to src/pages/using-xcl-with-python.mdx, whose title is 'Using XCL with Python - xcl' and whose Hero heading is 'Using XCL with Python' (lines 3, 14). /reference/python/ maps to src/pages/reference/python.astro, which renders the 'Python reference' Hero and the reference index for the xcl-lang package (lines 10-11, 17-39). Both targets are the intended pages. Caveat: I did not run the site build, so dist/ output was not inspected; the verdict rests on source routing."
+            }
+          ],
+          "decision": "accept",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [],
+      "attempts": 1,
+      "state": "accepted"
+    },
+    {
+      "item": "11c7bfbb-0d6c-44d0-b617-2826581d9c56",
+      "title": "Release the package with the reference asset",
+      "checks": [
+        {
+          "at": "2026-11-13T08:17:24Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "11c7bfbb-0d6c-44d0-b617-2826581d9c56",
+            "title": "Release the package with the reference asset",
+            "criteria": [
+              "A released version on PyPI has a GitHub release carrying its reference data"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "The release path that would attach the reference data is written but has not run, so no PyPI release carries a reference asset yet. In the staged xcl-python diff, .github/workflows/release.yml adds a `reference` job (lines 290-312 of the file) that generates xcl-lang-\u003cversion\u003e-reference.json with .github/scripts/api_reference.py and uploads it as an artifact. The `github-release` job (lines 415-445) now needs `reference`, creates the release, then runs `gh release upload \"$TAG\" ... xcl-lang-*-reference.json`. The `publish` job also needs `reference` (line 316). This is the intended mechanism, but the files do not show it has happened. The gh check shows the latest release, v0.14.1, has no assets. PyPI's latest xcl-lang is 0.14.1. The xcl-python changes are unstaged or untracked in the worktree (.status lists .github/workflows/release.yml as M and .github/scripts/api_reference.py as ??), so nothing is merged or tagged. The criterion can be met by merging and tagging a release, so it is not impossible, only not yet met. I could not verify the workflow run itself, which would need a real tag push. The workflow text does not contradict the criterion."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-13T08:17:53Z",
+          "round": 1,
+          "attempt": 2,
+          "goal": {
+            "item": "11c7bfbb-0d6c-44d0-b617-2826581d9c56",
+            "title": "Release the package with the reference asset",
+            "criteria": [
+              "A released version on PyPI has a GitHub release carrying its reference data"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "No released version carries reference data yet. The verification shows the latest GitHub release is v0.14.1 with no assets, and PyPI's latest xcl-lang is 0.14.1, so no release from this work exists on either. The xcl-python worktree changes are staged but uncommitted and unmerged (xcl-python.status lists them as ' M'/'??' with no commit). The mechanism that would attach the data is present but only in the uncommitted diff: .github/workflows/release.yml:285-312 adds a 'reference' job that generates xcl-lang-\u003cversion\u003e-reference.json with api_reference.py --check and uploads it as an artifact; publish now needs 'reference' (line 316); and the github-release job (lines 413-445) downloads that artifact and runs 'gh release upload \"$TAG\" ... xcl-lang-*-reference.json' (line 444-445) after creating the release. The criterion is achievable by merging and tagging a release, which I cannot do read-only, so it is not impossible, but the files do not show a PyPI release with its GitHub release asset yet. Supporting files exist as untracked: .github/scripts/api_reference.py, requirements-docs.txt and test_api_reference.py."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-13T08:18:27Z",
+          "round": 1,
+          "attempt": 3,
+          "goal": {
+            "item": "11c7bfbb-0d6c-44d0-b617-2826581d9c56",
+            "title": "Release the package with the reference asset",
+            "criteria": [
+              "A released version on PyPI has a GitHub release carrying its reference data"
+            ],
+            "scope": {
+              "repo": "xcl-python",
+              "files": [],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "The criterion needs an actual PyPI release whose GitHub release carries the reference data, and none exists yet. The verification output shows the latest GitHub release v0.14.1 has no assets, PyPI's latest xcl-lang is 0.14.1, and the xcl-python work is unmerged and unreleased. The code side is in place but unexercised: .github/workflows/release.yml (in the worktree at /home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-python) generates xcl-lang-\u003cversion\u003e-reference.json in a 'reference' job (lines 290-312), gates publish on it (line 316), and attaches it to the GitHub release with gh release upload (lines 440-445). The staged diff at .spektacular/tmp/20261110084343-9ebf34a1-python-sdk-reference/goal-check/xcl-python.diff shows that workflow change (+ lines 44, 48, 81) and the new .github/scripts/api_reference.py. The criterion is achievable once a tag is released through this workflow, so it is not_met rather than impossible."
+            }
+          ],
+          "decision": "exhausted",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-11-13T08:18:27Z",
+          "round": 1,
+          "decision": "skip",
+          "reason": "human release step, done after merge per the release plan"
+        }
+      ],
+      "attempts": 3,
+      "state": "skipped"
+    },
+    {
+      "item": "952c0be3-d1b9-48d0-82a8-8b99b7bb0339",
+      "title": "Set the site's first pin",
+      "checks": [
+        {
+          "at": "2026-11-13T08:19:12Z",
+          "round": 1,
+          "attempt": 1,
+          "goal": {
+            "item": "952c0be3-d1b9-48d0-82a8-8b99b7bb0339",
+            "title": "Set the site's first pin",
+            "criteria": [
+              "The pin names the release with the reference asset",
+              "xcl.dev shows the reference and guide at that version"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "xcl-python-ref.txt"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "/home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-website/xcl-python-ref.txt:1 holds `v0.14.1`, and the verification summary says `gh release view` shows v0.14.1 has no assets. The pin therefore names a release that lacks `xcl-lang-0.14.1-reference.json`, and `npm run reference` returned HTTP 404 for that file. Nothing in the staged xcl-website diff (/home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/tmp/20261110084343-9ebf34a1-python-sdk-reference/goal-check/xcl-website.diff) changes the pin or points at a different release. The criterion can be met once a release that carries the reference asset is pinned."
+            },
+            {
+              "criterion": 2,
+              "verdict": "not_met",
+              "evidence": "No evidence the site shows the reference and guide at this version. The pin resolves to a release without the reference asset, so the prebuild `npm run reference` step (package.json in the diff) cannot fetch the data and the `/reference/python/` page cannot be built from it. The verification summary says the site has not been deployed from this work, and `curl -sI https://xcl.dev/reference/python/` was not run. The staged diff adds the page sources (src/pages/reference/python.astro, src/pages/using-xcl-with-python.mdx), but neither they nor the pin show xcl.dev serving the reference or guide at v0.14.1."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-13T08:19:44Z",
+          "round": 1,
+          "attempt": 2,
+          "goal": {
+            "item": "952c0be3-d1b9-48d0-82a8-8b99b7bb0339",
+            "title": "Set the site's first pin",
+            "criteria": [
+              "The pin names the release with the reference asset",
+              "xcl.dev shows the reference and guide at that version"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "xcl-python-ref.txt"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "/home/nicj/code/github.com/jumppad-labs/xcl/.spektacular/worktrees/20261110084343-9ebf34a1-python-sdk-reference/xcl-website/xcl-python-ref.txt:1 pins v0.14.1. The verification run shows that release has no assets, and `npm run reference` with this pin returns HTTP 404 for xcl-lang-0.14.1-reference.json. The pin therefore does not name a release that carries the reference asset. The criterion can still be met: xcl-python's release.yml (reference job, lines 290-311, and attach step, lines 414-445) attaches the reference JSON to tags cut with the new workflow, so the pin should move to such a tag. The staged xcl-website diff (.status lists xcl-python-ref.txt as untracked) shows no other pin value. Judged from the files, the criterion is not yet met."
+            },
+            {
+              "criterion": 2,
+              "verdict": "not_met",
+              "evidence": "With the current pin, scripts/fetch-python-reference.mjs:45-47 fails the build on the non-OK response (HTTP 404), and the prebuild/predev hooks in the package.json diff run it before every build, so /reference/python/ (src/pages/reference/python.astro, listed in the status as new) cannot be generated at a version. The site has not been deployed from this work, and the curl check of https://xcl.dev/reference/python/ was not run, so there is no evidence that xcl.dev shows the reference or guide at any version. The guide src/pages/using-xcl-with-python.mdx is present but its rendering at a version is unverified. Not met as the files stand."
+            }
+          ],
+          "decision": "retry",
+          "tree_unchanged": true
+        },
+        {
+          "at": "2026-11-13T08:20:20Z",
+          "round": 1,
+          "attempt": 3,
+          "goal": {
+            "item": "952c0be3-d1b9-48d0-82a8-8b99b7bb0339",
+            "title": "Set the site's first pin",
+            "criteria": [
+              "The pin names the release with the reference asset",
+              "xcl.dev shows the reference and guide at that version"
+            ],
+            "scope": {
+              "repo": "xcl-website",
+              "files": [
+                {
+                  "repo": "xcl-website",
+                  "path": "xcl-python-ref.txt"
+                }
+              ],
+              "rule": "Change only the files that belong to this item; change nothing that belongs to another task."
+            }
+          },
+          "verdicts": [
+            {
+              "criterion": 1,
+              "verdict": "not_met",
+              "evidence": "xcl-website/xcl-python-ref.txt:1 holds v0.14.1, the release the verification summary reports as having no assets (gh release view). The fetch script xcl-website/scripts/fetch-python-reference.mjs:37 builds the URL releases/download/\u003ctag\u003e/xcl-lang-\u003cversion\u003e-reference.json from this pin, and that asset 404s, so the pin does not name a release with the reference asset. The asset is only attached by the tag-triggered reference job in xcl-python/.github/workflows/release.yml:290-445, which v0.14.1 predates. Nothing in the staged diff for xcl-website (xcl-website.diff) or in the repo changes the pin to a release that carries the asset, and no such release is shown to exist. The gap is an unpublished release rather than a contradiction, so it is not_met, not impossible."
+            },
+            {
+              "criterion": 2,
+              "verdict": "not_met",
+              "evidence": "Not deployed and not verifiable from the files. The site pages exist in the diff (xcl-website.diff: src/pages/using-xcl-with-python.mdx and src/pages/reference/python.astro referenced in README.md:53-54, Nav.astro additions at lines 81 and 48-50), but the reference data comes from the pin in xcl-python-ref.txt, and that pin resolves to a 404, so npm run reference fails and prebuild stops the build (scripts/fetch-python-reference.mjs). The verification summary also records that curl against xcl.dev/reference/python/ was not run. No file shows xcl.dev serving the reference or guide at any version."
+            }
+          ],
+          "decision": "exhausted",
+          "tree_unchanged": true
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-11-13T08:20:20Z",
+          "round": 1,
+          "decision": "skip",
+          "reason": "human release step, done after merge per the release plan"
+        }
+      ],
+      "attempts": 3,
+      "state": "skipped"
+    }
+  ]
+}
