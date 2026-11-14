@@ -180,7 +180,7 @@ platform, see [Installing plugins from GitHub](https://xcl.dev/github-registry/)
 
 ```go
 gh := registry.NewGitHub(registry.GitHubTrustedKeys(publicKey))
-gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v0.2.0")
+gh.RegisterPlugin("jumppad-labs/xcl-plugin-docker", "v0.4.1")
 ```
 
 **Writing a plugin.** Start from the
@@ -223,6 +223,8 @@ The documentation lives at **[xcl.dev](https://xcl.dev)**:
 - [Events and logging](https://xcl.dev/events/) and [plugin logging](https://xcl.dev/plugin-logging/)
 - [Sensitive values](https://xcl.dev/sensitive-values/) and [state masking](https://xcl.dev/state-masking/)
 - [Configuration text](https://xcl.dev/configuration-text/): turning entities back into XCL
+- [Using XCL with Python](https://xcl.dev/using-xcl-with-python/): a Python program from `pip install` to a
+  working apply, and the [Python reference](https://xcl.dev/reference/python/): every name the package exports
 
 ## Examples
 
@@ -243,7 +245,9 @@ from [jumppad-labs/xcl-python](https://github.com/jumppad-labs/xcl-python):
 the same engine, bundled in the wheel as the `xcl-core` program and run as a
 subprocess on every platform, Alpine included, with no shared library to
 load, and a synchronous and an asyncio API. Go users are unaffected: the Go
-library needs no cgo, and nothing in it changes for the binding.
+library needs no cgo, and nothing in it changes for the binding. Start with
+[Using XCL with Python](https://xcl.dev/using-xcl-with-python/), and look names up in the
+[Python reference](https://xcl.dev/reference/python/).
 
 Each language package has its own version and bundles the engine release it pins; see
 [Releases](#releases).

@@ -1,0 +1,1 @@
+- Finished 2026-11-11: all 13 tasks ticked, test plan and changelogs written, spec reconciled (57/57), finish commit e76a9f9 in xcl-typescript (xcl worktree had no change; the design lives in the project store). Knowledge: updated repo/xcl-typescript gotchas/node-uncaught-ignores-custom-inspect.md.

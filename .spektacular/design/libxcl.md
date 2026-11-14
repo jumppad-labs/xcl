@@ -49,7 +49,7 @@ The root module `github.com/jumppad-labs/xcl` is unchanged by this work. Nothing
 | Core service | `coreservice/` (package in the root module) | no | Implements `CoreService` on the public xcl API: handles, the message dispatcher, the foreign provider, state store and event adapters, the task queue, error mapping. Tested with plain `go test`. |
 | Engine program | `cmd/xcl-core/` (in the root module) | no | A static binary serving `coreservice` over stdio. The transport every SDK ships. Built by the `CGO_ENABLED=0` job for every target from one runner. |
 | Shared library | `bindings/libxcl/` (its own `go.mod`) | yes | `package main`, `//export xcl_call` and three more exports: the same `coreservice` behind a four-function C ABI, for a host that links or loads it in process. Kept buildable and smoke-tested; not shipped in SDK packages. |
-| Language SDKs | `xcl-python`, `xcl-node` (own repositories) | no | Start `xcl-core`, speak `CoreService`, present a native API, derive schemas from native types, run the poll loop. |
+| Language SDKs | `xcl-python`, `xcl-typescript` (own repositories) | no | Start `xcl-core`, speak `CoreService`, present a native API, derive schemas from native types, run the poll loop. |
 
 Dependencies point one way: SDK → transport → `coreservice` → `xcl`. The root module never imports `coreservice`, and `coreservice` imports only the public packages of the root module (`xcl`, `registry`, `plugins`, `state`, `events`, `diff`, `mask`, `types`, `entity`, `errors`, `logger`). Where `coreservice` needs something internal, that something is made public in the root module first.
 
@@ -575,8 +575,8 @@ plugins/plugin.proto         PluginService, HostCallbackService (unchanged; impo
 | xcl (Go) | `plugin.proto` | `protoc-gen-go` + `protoc-gen-go-grpc` | `plugins/proto/` (as today) | gRPC with external plugins |
 | xcl-python | `core.proto`, `types.proto` | `protoc --python_out --pyi_out` | `xcl/_core/*_pb2.py` + `.pyi` stubs | building requests and reading responses for `xcl_call` |
 | xcl-python | `plugin.proto` | `grpc_tools.protoc` (adds `*_pb2_grpc.py`) | `xcl/plugin/` | `plugin.serve()`, a real gRPC server |
-| xcl-node | `core.proto`, `types.proto` | `protoc-gen-es` (`@bufbuild/protobuf`) | `src/core/*_pb.ts` | as Python |
-| xcl-node | `plugin.proto` | `protoc-gen-es` + `@grpc/grpc-js` | `src/plugin/` | Node plugin server |
+| xcl-typescript | `core.proto`, `types.proto` | `protoc-gen-es` (`@bufbuild/protobuf`) | `src/core/*_pb.ts` | as Python |
+| xcl-typescript | `plugin.proto` | `protoc-gen-es` + `@grpc/grpc-js` | `src/plugin/` | Node plugin server |
 
 `plugin.proto` gets gRPC code because external plugins are separate processes. `core.proto` gets message classes only; its `service CoreService` block is the machine-readable list of methods, read through the generated descriptors.
 
@@ -1063,10 +1063,10 @@ if __name__ == "__main__":
 
 ## Node and TypeScript
 
-Repository `xcl-node`, package `@xcl/core`. It follows the same protocol with the same shapes, so only the bindings differ:
+Repository `xcl-typescript`, package `xcl-lang` on npm. The API, package layout and platform packages are in [typescript-sdk.md](typescript-sdk.md), and how entity types are defined is in [typescript-entity-types.md](typescript-entity-types.md). It follows the same protocol with the same shapes, so only the bindings differ:
 
-- Engine: `child_process.spawn` of the bundled `xcl-core` with piped stdio, frames read on the event loop, so nothing blocks it and `Poll` needs no special casing. The binary ships in `@xcl/core-linux-x64-gnu`, `@xcl/core-linux-arm64-musl`, `@xcl/core-darwin-arm64`, `@xcl/core-win32-x64` and so on as `optionalDependencies` with `os`, `cpu` and `libc` fields, the esbuild pattern (esbuild ships an executable this way); `@xcl/core` picks the one that installed. No FFI library and no native addon.
-- Schemas from Zod schemas (`z.object({...})` with `xcl.sensitive()`, `xcl.computed()`, `xcl.block()` refinements) or from decorators on classes; property names are camelCase in TypeScript and converted to snake_case in schema v1 and entity JSON by one rule (`connectionString` ↔ `connection_string`), applied on both directions.
+- Engine: `child_process.spawn` of the bundled `xcl-core` with piped stdio, frames read on the event loop, so nothing blocks it and `Poll` needs no special casing. The binary ships in one `xcl-lang-<os>-<arch>[-<libc>]` package per platform as `optionalDependencies` with `os`, `cpu` and `libc` fields, the esbuild pattern (esbuild ships an executable this way); `xcl-lang` picks the one that installed. No FFI library and no native addon.
+- Schemas from decorated classes; property names are camelCase in TypeScript and converted to snake_case in schema v1 and entity JSON by one rule (`connectionString` ↔ `connection_string`), applied on both directions.
 - API is Promise-based only: `await cfg.apply(paths)`; provider methods return Promises; tasks run concurrently on the event loop. No sync variant.
 - Fork: Node's `cluster` and `child_process.fork` spawn, they do not `fork(2)`, so each worker starts its own engine.
 
@@ -1155,7 +1155,7 @@ Build tooling: `go build` with `CGO_ENABLED=0`, `GOOS` and `GOARCH` for all eigh
 Default route: the library travels inside each ecosystem's platform package.
 
 - PyPI: one wheel per platform, tagged `py3-none-<platform>`, containing the matching `xcl-core`. Eight wheels at about 7 MB compressed is about 56 MB per release; against PyPI's default 10 GB project limit that is about 180 releases before asking for more, and the 100 MB per-file limit is not approached. Per user it is 19 MB in a virtualenv.
-- npm: `@xcl/core` plus one `@xcl/core-<os>-<arch>[-<libc>]` package per target as `optionalDependencies`, about 19 MB in `node_modules`.
+- npm: `xcl-lang` plus one `xcl-lang-<os>-<arch>[-<libc>]` package per target as `optionalDependencies`, about 19 MB in `node_modules`.
 - GitHub release of `jumppad-labs/xcl`: the binaries as `xcl-core_<version>_<os>_<arch>[_musl].tar.gz` (`.zip` on Windows), listed in `xcl-core_<version>_checksums.txt` with `xcl-core_<version>_checksums.txt.sig`, the same asset contract the GitHub registry already verifies for plugins (`registry/github_assets.go`, `registry/github_verify.go`), signed with the same key.
 
 Fallbacks, in order: download the matching archive from the release into `~/.xcl/core/<version>/`, verifying it with the registry's download, checksum and signature code; build from the sdist, which needs Go 1.25 or later and nothing else.

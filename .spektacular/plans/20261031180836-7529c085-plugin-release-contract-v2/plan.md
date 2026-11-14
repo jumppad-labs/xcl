@@ -440,7 +440,7 @@ The repository is now `xcl-plugin-template-go`, and its name uses hyphens, so `m
 - [x] `make dist` produces `<name>-<version>-index.xcl` and one `<name>-<version>-<os>-<arch>.zip` per platform, and the index names those zips with matching checksums.
 - [x] The README describes the hyphenated asset names.
 
-#### - [ ] Task: Release xcl with either separator
+#### - [x] Task: Release xcl with either separator
 **Id:** 42367878-ee15-4daf-ad60-da0359dbab5d
 **Repo:** xcl
 **Depends on:**
@@ -452,9 +452,9 @@ Merge the branch carrying the separator change with the release label, so xcl's 
 *Technical detail:* [context.md#task-release-xcl-with-either-separator](./context.md#task-release-xcl-with-either-separator)
 
 **Acceptance criteria**:
-- [ ] An xcl release that finds an index under either separator is published on GitHub.
+- [x] An xcl release that finds an index under either separator is published on GitHub.
 
-#### - [ ] Task: Publish a template release in the new layout
+#### - [x] Task: Publish a template release in the new layout
 **Id:** 0f9236c4-3d3d-449e-9a01-d6cd28d77794
 **Repo:** xcl-plugin-template
 **Depends on:**
@@ -468,9 +468,9 @@ Push the template's next version tag so its release workflow publishes a signed 
 *Technical detail:* [context.md#task-publish-a-template-release-in-the-new-layout](./context.md#task-publish-a-template-release-in-the-new-layout)
 
 **Acceptance criteria**:
-- [ ] The template's new release is published with an index, its signature and a zip per platform.
+- [x] The template's new release is published with an index, its signature and a zip per platform.
 
-#### - [ ] Task: Move the Docker plugin to the new release layout
+#### - [x] Task: Move the Docker plugin to the new release layout
 **Id:** 40cff90a-96e2-417f-bfab-8a31ff5ce7d5
 **Repo:** xcl-plugin-docker
 **Depends on:**
@@ -482,11 +482,11 @@ Copy the template's release build and workflow changes, bump to the new xcl rele
 *Technical detail:* [context.md#task-move-the-docker-plugin-to-the-new-release-layout](./context.md#task-move-the-docker-plugin-to-the-new-release-layout)
 
 **Acceptance criteria**:
-- [ ] The release build produces zips and an index in the new layout.
-- [ ] The network and container providers answer replace and update for exactly the same changes and dependencies as before.
-- [ ] The README describes the new release layout.
+- [x] The release build produces zips and an index in the new layout.
+- [x] The network and container providers answer replace and update for exactly the same changes and dependencies as before.
+- [x] The README describes the new release layout.
 
-#### - [ ] Task: Move the test plugin to the new release layout
+#### - [x] Task: Move the test plugin to the new release layout
 **Id:** a6d3deb6-98ce-4830-ab07-b6d328ac2a1b
 **Repo:** xcl-plugin-test
 **Depends on:**
@@ -498,11 +498,11 @@ Copy the template's release build and workflow changes, bump to the new xcl rele
 *Technical detail:* [context.md#task-move-the-test-plugin-to-the-new-release-layout](./context.md#task-move-the-test-plugin-to-the-new-release-layout)
 
 **Acceptance criteria**:
-- [ ] The release build produces zips and an index in the new layout.
-- [ ] The test plugin's tests pass unchanged on the new xcl release.
-- [ ] The README describes the new release layout.
+- [x] The release build produces zips and an index in the new layout.
+- [x] The test plugin's tests pass unchanged on the new xcl release.
+- [x] The README describes the new release layout.
 
-#### - [ ] Task: Publish the Docker plugin's new release
+#### - [x] Task: Publish the Docker plugin's new release
 **Id:** e6f9e274-3cfe-43d9-b28f-cc99fe8fd1a0
 **Repo:** xcl-plugin-docker
 **Depends on:**
@@ -514,9 +514,9 @@ Push the Docker plugin's next version tag so a signed release in the new layout 
 *Technical detail:* [context.md#task-publish-the-docker-plugins-new-release](./context.md#task-publish-the-docker-plugins-new-release)
 
 **Acceptance criteria**:
-- [ ] The Docker plugin's new release is published with an index, its signature and a zip per platform.
+- [x] The Docker plugin's new release is published with an index, its signature and a zip per platform.
 
-#### - [ ] Task: Publish the test plugin's new release
+#### - [x] Task: Publish the test plugin's new release
 **Id:** db0022b3-b45f-4beb-a5df-108e8dc59b27
 **Repo:** xcl-plugin-test
 **Depends on:**
@@ -528,7 +528,7 @@ Push the test plugin's next version tag so a signed release in the new layout is
 *Technical detail:* [context.md#task-publish-the-test-plugins-new-release](./context.md#task-publish-the-test-plugins-new-release)
 
 **Acceptance criteria**:
-- [ ] The test plugin's new release is published with an index, its signature and a zip per platform.
+- [x] The test plugin's new release is published with an index, its signature and a zip per platform.
 
 ### Milestone 3: Everything points at the new releases
 
@@ -536,7 +536,7 @@ Push the test plugin's next version tag so a signed release in the new layout is
 
 **Validation point**: the Python SDK's integration suite installs the new test-plugin release on its CI matrix, the example runs against the Docker plugin's new release, and the website builds with the updated pages.
 
-#### - [ ] Task: Point xcl's remote-plugin example at the Docker plugin's new release
+#### - [x] Task: Point xcl's remote-plugin example at the Docker plugin's new release
 **Id:** 9e007f42-f82d-43ea-b968-755c8e8c6ebc
 **Repo:** xcl
 **Depends on:**
@@ -548,9 +548,9 @@ Change the remote-plugin example and any xcl doc that names a Docker plugin rele
 *Technical detail:* [context.md#task-point-xcls-remote-plugin-example-at-the-docker-plugins-new-release](./context.md#task-point-xcls-remote-plugin-example-at-the-docker-plugins-new-release)
 
 **Acceptance criteria**:
-- [ ] The remote-plugin example and xcl's docs pin the Docker plugin's new release, and none pins an old-layout release.
+- [x] The remote-plugin example and xcl's docs pin the Docker plugin's new release, and none pins an old-layout release.
 
-#### - [ ] Task: Move the Python SDK's tests and README to the new releases
+#### - [x] Task: Move the Python SDK's tests and README to the new releases
 **Id:** a90a1c0b-3c63-4957-a539-62b880d54c86
 **Repo:** xcl-python
 **Depends on:**
@@ -563,11 +563,11 @@ Pin the test plugin's new release. Update the integration helpers that describe 
 *Technical detail:* [context.md#task-move-the-python-sdks-tests-and-readme-to-the-new-releases](./context.md#task-move-the-python-sdks-tests-and-readme-to-the-new-releases)
 
 **Acceptance criteria**:
-- [ ] The integration tests install the test plugin's new release, verified against the jumppad-labs key, and apply through it.
-- [ ] A tampered index or zip is refused, an untrusted signature is refused, and an unsigned release installs without keys.
-- [ ] The README pins the Docker plugin's new release and describes no old-layout files.
+- [x] The integration tests install the test plugin's new release, verified against the jumppad-labs key, and apply through it.
+- [x] A tampered index or zip is refused, an untrusted signature is refused, and an unsigned release installs without keys.
+- [x] The README pins the Docker plugin's new release and describes no old-layout files.
 
-#### - [ ] Task: Describe the new release layout on the documentation site
+#### - [x] Task: Describe the new release layout on the documentation site
 **Id:** eb8666c3-a7fa-4bbd-a0ef-ad5514aeec53
 **Repo:** xcl-website
 **Depends on:**
@@ -585,10 +585,10 @@ Update the GitHub registry, plugin template, registries, home and replacement pa
 *Technical detail:* [context.md#task-describe-the-new-release-layout-on-the-documentation-site](./context.md#task-describe-the-new-release-layout-on-the-documentation-site)
 
 **Acceptance criteria**:
-- [ ] The site's registry and plugin-template pages describe the new release layout, cache and errors.
-- [ ] No page describes per-platform tar.gz archives, a checksums file or a signature over a checksums file, or pins an old-layout release.
-- [ ] The replacement page shows replace settings declared with `ReplaceOn`.
-- [ ] The site builds.
+- [x] The site's registry and plugin-template pages describe the new release layout, cache and errors.
+- [x] No page describes per-platform tar.gz archives, a checksums file or a signature over a checksums file, or pins an old-layout release.
+- [x] The replacement page shows replace settings declared with `ReplaceOn`.
+- [x] The site builds.
 
 ### Milestone 4: Run a plugin from source
 
@@ -614,7 +614,7 @@ Let the local registry take a program and its arguments for an external plugin, 
 - [x] `Executable` is no longer part of the `registry` package's public API.
 - [x] The core service starts a plugin from a command sent in its local registry message.
 
-#### - [ ] Task: Register a local plugin as a command from Python
+#### - [x] Task: Register a local plugin as a command from Python
 **Id:** 62535499-cc16-409c-858b-587dce3f4ebe
 **Repo:** xcl-python
 **Depends on:**
@@ -627,9 +627,9 @@ Let `register_external_plugin` take a list, a program and its arguments, as well
 *Technical detail:* [context.md#task-register-a-local-plugin-as-a-command-from-python](./context.md#task-register-a-local-plugin-as-a-command-from-python)
 
 **Acceptance criteria**:
-- [ ] A plugin registered with a list (the Python interpreter, a launcher script and the plugin) starts, and a configuration applies through it, in the sync and the asyncio API.
-- [ ] A plugin registered by a single path starts.
-- [ ] The README shows registering a plugin as a command.
+- [x] A plugin registered with a list (the Python interpreter, a launcher script and the plugin) starts, and a configuration applies through it, in the sync and the asyncio API.
+- [x] A plugin registered by a single path starts.
+- [x] The README shows registering a plugin as a command.
 
 ## Open Questions
 
@@ -816,4 +816,147 @@ Let `register_external_plugin` take a list, a program and its arguments, as well
 - `xcl-plugin-template: README.md`
 
 **Discoveries**: A snapshot `make dist`, read with the xcl worktree's registry code (index lookup, validate, choose, checksum, manifest agreement), passes on all six platforms. The template's v0.1.0 release can only be installed once xcl ships the separator change.
+
+### 2026-11-01 — Task: Release xcl with either separator
+
+**What was done**: The user merged PR #41 (`f-python-plugin`, labelled `patch` and `breaks-bindings`) into `main` as 57d14be. xcl's automation tagged and published **v0.13.1**, which includes ac9990a: the registry finds the index under either separator. The template was then bumped to v0.13.1 on its PR #5 (26b2730).
+
+**Deviations**: The change reached the user's branch through the spec branch. Commit ac9990a was made in the worktree, `f-python-plugin` was merged into `spek/<spec>` (fac8c46), and `f-python-plugin` was fast-forwarded to that. A merge into `f-python-plugin` itself would have been refused over its staged `.spektacular` changes.
+
+**Files changed**:
+- `xcl-plugin-template: go.mod`
+- `xcl-plugin-template: go.sum`
+- `xcl-plugin-template: README.md`
+
+**Discoveries**: `breaks-bindings` was still needed, although this change leaves the proto alone. xcl-python's `main` still sends `external_plugins`, which v0.13.0 removed, and its fix sits on the unmerged `engine/v0.13.0` bump branch. Every xcl PR needs `breaks-bindings` until that branch merges.
+
+### 2026-11-01 — Task: Publish a template release in the new layout
+
+**What was done**: The user merged template PR #5 (the v2 layout, the rename to `xcl-plugin-template-go`, the hyphenated asset names and the xcl v0.13.1 bump) and ran `make release VERSION=v0.1.0`. The release workflow published v0.1.0 with six `xcl-plugin-template-go-0.1.0-<os>-<arch>.zip` files, `xcl-plugin-template-go-0.1.0-index.xcl` and its `.sig`.
+
+**Deviations**: The release is the template's first, v0.1.0, published from the renamed repository `jumppad-labs/xcl-plugin-template-go` with `-`-separated names.
+
+**Files changed**:
+- none (release only)
+
+**Discoveries**: Checked from the published assets. `gpg --verify` of the index signature against https://xcl.dev/keys/jumppad-labs-releases.asc gives a good signature (key 15BDA6843A1FA0EAD1AA5190F775DA00AFD4B502). All six zips match their index checksums. With xcl v0.13.1's GitHub registry trusting that key, the release installs, starts, and starts again from the verified cache.
+
+### 2026-11-01 — Task: Move the Docker plugin to the new release layout
+
+**What was done**: The Docker plugin takes the template's `dist` target (with `./cmd/docker`) and a byte-identical `release.yml`. It builds against xcl v0.13.1. Its network and container providers give their replace settings to `DefaultChanged` as `ReplaceOn`. The README pins v0.4.0, describes the index, zips and index signature, needs xcl v0.13.1 or later, and links to `xcl-plugin-template-go`.
+
+**Deviations**: As with the template, `Changed` defers to `DefaultChanged` first instead of keeping "changes → update" ahead of it, and maps a `NoChange` back to `Update` when changes were reported. The container's network-dependency `Update` rule keeps working the same way. The container's "non-network dependency replaced" rule now runs before the `ReplaceOn` check; both answer `Replace`, so the result is the same. The release names use `-`, matching the template.
+
+**Files changed**:
+- `xcl-plugin-docker: Makefile`
+- `xcl-plugin-docker: .github/workflows/release.yml`
+- `xcl-plugin-docker: go.mod`
+- `xcl-plugin-docker: go.sum`
+- `xcl-plugin-docker: providers/network.go`
+- `xcl-plugin-docker: providers/container.go`
+- `xcl-plugin-docker: providers/network_test.go`
+- `xcl-plugin-docker: providers/container_test.go`
+- `xcl-plugin-docker: README.md`
+
+**Discoveries**: The existing Changed tests build providers through the constructors, so they exercise `ReplaceOn`. The real-engine tests in `providers/docker_test.go` use struct literals but never call `Changed`. `make lint` still needs `GOTOOLCHAIN=go1.26.0` locally, because staticcheck v0.8.1 can't read Go 1.27 export data. The next release is v0.4.0: the latest is v0.3.0, and the layout change breaks installs.
+
+### 2026-11-01 — Task: Move the test plugin to the new release layout
+
+**What was done**: The test plugin takes the template's `dist` target (with `./cmd/xcl-plugin-test`) and a byte-identical `release.yml`, and builds against xcl v0.13.1. Its README describes the hyphenated zips, the index and its signature, needs xcl v0.13.1 or later, and links to `xcl-plugin-template-go`. Its provider and tests are unchanged and pass.
+
+**Deviations**: `Makefile` and `go.sum` changed although the goal's file list didn't name them, since `dist` produces the layout and `go.sum` follows the bump. The release names use `-`, matching the template.
+
+**Files changed**:
+- `xcl-plugin-test: Makefile`
+- `xcl-plugin-test: .github/workflows/release.yml`
+- `xcl-plugin-test: go.mod`
+- `xcl-plugin-test: go.sum`
+- `xcl-plugin-test: README.md`
+
+**Discoveries**: The next release is v0.3.0 (the latest is v0.2.0). xcl-python's `tests/plugins.toml` pins the test plugin version and must move to v0.3.0 once it's out. That change belongs to the Python SDK task.
+
+### 2026-11-01 — Task: Publish the Docker plugin's new release
+
+**What was done**: The user merged xcl-plugin-docker PR #4 (7fecc4d) and released **v0.4.1** in the new layout: six `xcl-plugin-docker-0.4.1-<os>-<arch>.zip`, `xcl-plugin-docker-0.4.1-index.xcl` and its `.sig`.
+
+**Deviations**: v0.4.0 was tagged first, but on the pre-merge commit c52e057 because the local `main` hadn't been pulled. It published in the old layout (tarballs and a signed checksums file) and is still on GitHub. The user released v0.4.1 from the merged `main` instead. The README still pins v0.4.0 and has to move to v0.4.1.
+
+**Files changed**:
+- none (release only)
+
+**Discoveries**: The index signature verifies against https://xcl.dev/keys/jumppad-labs-releases.asc, and all six zips match their checksums. With xcl v0.13.1's GitHub registry trusting that key, v0.4.1 installs, starts (2 types) and starts again from the verified cache. `make release` tags whatever the local checkout's HEAD is, so pull `main` first.
+
+### 2026-11-01 — Task: Publish the test plugin's new release
+
+**What was done**: The user merged xcl-plugin-test PR #4 (d2cde9a) and released **v0.3.1** in the new layout: six `xcl-plugin-test-0.3.1-<os>-<arch>.zip`, `xcl-plugin-test-0.3.1-index.xcl` and its `.sig`.
+
+**Deviations**: v0.3.0 was tagged first, but on the pre-merge commit 5192c0b because the local `main` hadn't been pulled. It published in the old layout and is still on GitHub. The user released v0.3.1 from the merged `main` instead. The pins that follow (xcl's live test, xcl-python's `tests/plugins.toml`, the website) use v0.3.1.
+
+**Files changed**:
+- none (release only)
+
+**Discoveries**: The index signature verifies against the jumppad-labs key, and all six zips match their checksums. With xcl v0.13.1's GitHub registry trusting that key, v0.3.1 installs, starts (1 type) and starts again from the verified cache.
+
+### 2026-11-01 — Task: Point xcl's remote-plugin example at the Docker plugin's new release
+
+**What was done**: The remote-plugin example's `dockerPluginVersion` and the README's GitHub registry example now pin `jumppad-labs/xcl-plugin-docker` v0.4.1. Before, they pinned v0.3.0 and v0.2.0, both old-layout releases.
+
+**Deviations**: The context expected v0.4.0. That tag was cut from the pre-merge commit in the old layout, so the pin is v0.4.1. `README.md` pinned v0.2.0, not v0.3.0.
+
+**Files changed**:
+- `xcl: example/remoteplugin/main.go`
+- `xcl: README.md`
+
+**Discoveries**: The example installs from GitHub at runtime into `./.xcl-cache`. Run it from a scratch directory (build with `go build -o <scratch>/xcl-docker`) to keep the cache, the state and the tracked `remoteplugin` binary out of the checkout. Run against Docker v0.4.1, it applies a real network and container and destroys them. The live test (`XCL_GITHUB_LIVE_PLUGIN=owner/repo@vX.Y.Z`, `XCL_GITHUB_LIVE_KEY=<key file>`) installs Docker v0.4.1 and the test plugin v0.3.1.
+
+
+### 2026-11-02 — Task: Move the Python SDK's tests and README to the new releases
+
+**What was done**: The xcl-python integration tests pin the test plugin at v0.3.1. `ReleaseFiles` now describes a cache entry as the index, its signature, the zip and the zip's extracted files, using the release's `-` asset names. The tamper tests tamper with the index's checksum (refused by the signature check, before the zip is fetched) and with the zip's bytes (refused by the checksum check). The unsigned install checks that the index and zip are cached without a signature, and the directory test checks that only the binary is executable. The README pins Docker v0.4.1 and says the signature covers the index.
+
+**Deviations**: The work is on the spec branch fast-forwarded to `engine/v0.13.1` (xcl-python PR #26), so the protocol stubs in `xcl/_core` are regenerated from v0.13.1, and `LocalRegistry._to_proto` sends each path as a one-word `ExternalPlugin` command. Without that line every local registry fails on the v0.13.1 engine. The list form and its tests stay with "Register a local plugin as a command from Python". The pins are test plugin v0.3.1 and Docker v0.4.1, not the v0.3.0 and v0.4.0 the context names, and the asset names use `-`, not `_`.
+
+**Files changed**:
+- `xcl-python: tests/plugins.toml`
+- `xcl-python: tests/integration/release_helpers.py`
+- `xcl-python: tests/integration/test_test_plugin.py`
+- `xcl-python: tests/integration/test_github_tamper.py`
+- `xcl-python: README.md`
+- `xcl-python: xcl/registry.py`
+- `xcl-python: xcl/_core/core_pb2.py`
+- `xcl-python: xcl/_core/core_pb2.pyi`
+
+**Discoveries**: xcl v0.13.1 already carries the `external_plugin_commands` protocol change, so the command task's work can merge with the engine bump. The plan's "leave it on a branch until an xcl release carries it" no longer applies. With a signed release and a tampered index, the engine requests only the release, the index and the signature (3 requests). A tampered zip costs 4. The full suite against an engine built from the v0.13.1 archive: 959 passed, 1 skip that only applies to the inprocess route.
+
+### 2026-11-02 — Task: Describe the new release layout on the documentation site
+
+**What was done**: The site's GitHub registry page describes the index, the per-platform zips with their manifests, the checksums in the index and the signature over it. It shows a sample index (with the real linux/arm64 checksum of Docker v0.4.1), the new cache entry, the checks made on every start and the reworded errors, and notes that `-` and `_` names both install. The plugin template page shows `ReplaceOn`, lists the new release assets and points at the renamed `xcl-plugin-template-go`. The registries and home pages pin Docker v0.4.1. The replacement page's `DefaultChanged` section describes `ReplaceOn`, and its Docker worked example uses `ReplaceOn`.
+
+**Deviations**: The pins are Docker v0.4.1, not v0.4.0. The replacement page's worked example now quotes jumppad-labs/xcl-plugin-docker's providers instead of xcl's in-repo `example/plugin/plugins/docker`, which doesn't use `ReplaceOn`; the container `Update` it shows is identical in both. `src/config/site.ts` changes `templateURL` to the renamed template repository.
+
+**Files changed**:
+- `xcl-website: src/pages/github-registry.mdx`
+- `xcl-website: src/pages/plugin-template.mdx`
+- `xcl-website: src/pages/registries.mdx`
+- `xcl-website: src/pages/index.mdx`
+- `xcl-website: src/pages/replacement.mdx`
+- `xcl-website: src/config/site.ts`
+
+**Discoveries**: xcl's in-repo Docker example (`example/plugin/plugins/docker`) still writes its replace loops by hand, while the released Docker plugin uses `ReplaceOn`. Pages that quote provider code should quote the plugin repository, or the in-repo example should move to `ReplaceOn` in a later change.
+
+### 2026-11-02 — Task: Register a local plugin as a command from Python
+
+**What was done**: `LocalRegistry.register_external_plugin` takes a plugin's path, or a list or tuple holding a program and its arguments, with any item a `str` or `os.PathLike`. It refuses an empty list with `xcl.SchemaError`, and `_to_proto` sends each registration as an `ExternalPlugin` command. The asyncio API shares the registry. Unit tests cover each accepted form, the order and the refusal. Integration tests start the recording fixture plugin through `[sys.executable, launcher.py, marker, plugin]` in the sync and asyncio APIs, plus a test registering it by path. The README gains a "Local plugins" section, and PARITY.md's mapping row shows the command form.
+
+**Deviations**: The work builds against xcl v0.13.1, the pin on `engine/v0.13.1`, not an unreleased local xcl checkout: that release already carries the protocol change. So the work can merge with PR #26 instead of waiting on a branch for another xcl release. The parameter is renamed from `path` to `command`; no caller passes it by keyword. PARITY.md and the unit and integration test files are changed beside the files the context names.
+
+**Files changed**:
+- `xcl-python: xcl/registry.py`
+- `xcl-python: tests/unit/test_registry.py`
+- `xcl-python: tests/integration/launcher.py`
+- `xcl-python: tests/integration/test_plugin_command.py`
+- `xcl-python: README.md`
+- `xcl-python: PARITY.md`
+
+**Discoveries**: `xcl.aio` isn't imported by `import xcl`; a test module using it must `import xcl.aio` itself, or it passes in the full suite (where another module imported it) and fails on its own.
 
