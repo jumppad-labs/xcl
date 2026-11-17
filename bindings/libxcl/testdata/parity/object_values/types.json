@@ -1,0 +1,35 @@
+[
+  {"schema_version": 1, "type": "database", "subtype": "postgres", "fields": [
+    {"name": "location", "type": "string"},
+    {"name": "port", "type": "number", "format": "int", "optional": true, "default": 5432}
+  ]},
+  {"schema_version": 1, "type": "app", "fields": [
+    {"name": "image", "type": "string"},
+    {"name": "default_endpoint", "type": {"object": [
+      {"name": "port", "type": "number", "format": "int"},
+      {"name": "tls", "type": "bool", "optional": true, "default": false},
+      {"name": "path", "type": "string", "optional": true, "nullable": true},
+      {"name": "token", "type": "string", "optional": true, "sensitive": true}
+    ]}},
+    {"name": "endpoints", "type": {"list": {"object": [
+      {"name": "port", "type": "number", "format": "int"},
+      {"name": "tls", "type": "bool", "optional": true, "default": false},
+      {"name": "path", "type": "string", "optional": true, "nullable": true},
+      {"name": "token", "type": "string", "optional": true, "sensitive": true}
+    ]}}, "optional": true},
+    {"name": "routes", "type": {"map": {"object": [
+      {"name": "port", "type": "number", "format": "int"},
+      {"name": "tls", "type": "bool", "optional": true, "default": false},
+      {"name": "path", "type": "string", "optional": true, "nullable": true},
+      {"name": "token", "type": "string", "optional": true, "sensitive": true}
+    ]}}, "optional": true},
+    {"name": "database", "type": {"entity": [
+      {"name": "location", "type": "string"},
+      {"name": "port", "type": "number", "format": "int", "optional": true, "default": 5432}
+    ]}, "optional": true, "nullable": true},
+    {"name": "databases", "type": {"list": {"entity": [
+      {"name": "location", "type": "string"},
+      {"name": "port", "type": "number", "format": "int", "optional": true, "default": 5432}
+    ]}}, "optional": true}
+  ]}
+]
