@@ -20,7 +20,7 @@ XCL starts from HCL's syntax but does not aim to be compatible with Terraform co
 Where XCL can be clearer or do more, it will diverge.
 
 This repository is the Go implementation: you define block types as Go structs, without needing to know the HCL
-library underneath. Implementations for Python, JavaScript and other languages are planned.
+library underneath. Python and TypeScript packages run the same engine; see [Other languages](#other-languages).
 
 ## Block types
 
@@ -214,7 +214,7 @@ reported in one of three places:
 
 The documentation lives at **[xcl.dev](https://xcl.dev)**:
 
-- [Language reference](https://xcl.dev/language/): files, entities, attributes and blocks, references, expressions, variables, modules and functions, with Go and Python types
+- [Language reference](https://xcl.dev/language/): files, entities, attributes and blocks, references, expressions, variables, modules and functions, with Go, Python and TypeScript types
 - [Registries](https://xcl.dev/registries/): declaring Go types and registering plugins
 - [Installing plugins from GitHub](https://xcl.dev/github-registry/) and the
   [plugin template](https://xcl.dev/plugin-template/)
@@ -225,6 +225,9 @@ The documentation lives at **[xcl.dev](https://xcl.dev)**:
 - [Configuration text](https://xcl.dev/configuration-text/): turning entities back into XCL
 - [Using XCL with Python](https://xcl.dev/using-xcl-with-python/): a Python program from `pip install` to a
   working apply, and the [Python reference](https://xcl.dev/reference/python/): every name the package exports
+- [Using XCL with TypeScript](https://xcl.dev/using-xcl-with-typescript/): a TypeScript program from `npm install`
+  to a working apply, and the [TypeScript reference](https://xcl.dev/reference/typescript/): every name the
+  package exports
 
 ## Examples
 
@@ -248,6 +251,13 @@ load, and a synchronous and an asyncio API. Go users are unaffected: the Go
 library needs no cgo, and nothing in it changes for the binding. Start with
 [Using XCL with Python](https://xcl.dev/using-xcl-with-python/), and look names up in the
 [Python reference](https://xcl.dev/reference/python/).
+
+The engine is available to TypeScript and JavaScript on Node as the `xcl-lang` package on npm,
+`npm install xcl-lang`, from [jumppad-labs/xcl-typescript](https://github.com/jumppad-labs/xcl-typescript):
+the same engine, from a platform package installed alongside it and run as a subprocess, with entity types as
+decorated classes and functions written in TypeScript. Start with
+[Using XCL with TypeScript](https://xcl.dev/using-xcl-with-typescript/), and look names up in the
+[TypeScript reference](https://xcl.dev/reference/typescript/).
 
 Each language package has its own version and bundles the engine release it pins; see
 [Releases](#releases).
