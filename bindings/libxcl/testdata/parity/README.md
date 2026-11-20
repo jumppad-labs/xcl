@@ -63,6 +63,17 @@ logging are compared with Go's:
 
 Paths in all of them are replaced as elsewhere in the record.
 
+The `object_values` fixture covers attributes whose values are objects and
+whole entities: `app` has an object attribute (`default_endpoint`, with a
+required, a defaulted, an optional and a sensitive field), a list and a map of
+the same objects, a reference to a `database "postgres"` block (`database`, an
+`{"entity": …}` type) and a list of references. `app.web` sets all of them and
+`app.edge` only the object and the map. Its `changed/main.xcl` changes one
+field inside `app.web`'s object; registered types have no provider and take no
+part in a diff, so its diff reports no change. `hand_built.json` lists
+`app.edge`, `database.postgres.main` and `app.web`, whose hand-built copy
+carries its references in its metadata.
+
 The `unsupported_block` fixture's configuration has a nested `timeout` block,
 which the `app` type does not have, opening on line 7, so its validate and
 apply fail with an unsupported-block report showing lines 5 to 9.

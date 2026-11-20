@@ -762,3 +762,93 @@ func TestPrettyGroupsReplacesRunPaths(t *testing.T) {
 
 	require.Equal(t, []any{"<time> INFO create success file=<fixture>/main.xcl\n  log = \"<tmp>/recording.log\""}, groups)
 }
+
+func TestParityRecordIsDeterministicForObjectValues(t *testing.T) {
+	first := runParity(t, "object_values")
+	second := runParity(t, "object_values")
+
+	require.Equal(t, first, second)
+}
+
+func TestParityObjectValuesEncodesEveryEntityUnderEveryCombination(t *testing.T) {
+	record := runParity(t, "object_values")
+
+	section := record["encode"].(map[string]any)
+	require.ElementsMatch(t, []string{"app.edge", "app.web", "database.postgres.a", "database.postgres.b", "database.postgres.main"}, keysOf(section))
+
+	for id := range section {
+		texts := encoded(t, record, id)
+		require.ElementsMatch(t, encodeCombinationNames, keysOf(texts["looked_up"].(map[string]any)), "looked_up texts of %s", id)
+		require.ElementsMatch(t, encodeCombinationNames, keysOf(texts["saved"].(map[string]any)), "saved texts of %s", id)
+	}
+}
+
+func TestParityObjectValuesHandBuiltForListedAddresses(t *testing.T) {
+	record := runParity(t, "object_values")
+
+	for _, id := range []string{"app.edge", "database.postgres.main", "app.web"} {
+		texts := encoded(t, record, id)
+		require.ElementsMatch(t, []string{"looked_up", "saved", "hand_built"}, keysOf(texts), "encode texts of %s", id)
+		require.Equal(t, texts["looked_up"], texts["hand_built"], "hand-built texts of %s", id)
+	}
+}
+
+func TestParityObjectValuesFixtureRecordsObjectValues(t *testing.T) {
+	record := runParity(t, "object_values")
+
+	web := entity(t, record["entities"], "app.web")
+
+	require.Equal(t, map[string]any{"port": float64(80), "tls": true, "token": "(sensitive)"}, web["default_endpoint"])
+
+	endpoints := web["endpoints"].([]any)
+	require.Len(t, endpoints, 2)
+	require.Equal(t, float64(8080), endpoints[0].(map[string]any)["port"])
+	require.Equal(t, "/api", endpoints[1].(map[string]any)["path"])
+
+	routes := web["routes"].(map[string]any)
+	require.ElementsMatch(t, []string{"admin", "public"}, keysOf(routes))
+	require.Equal(t, float64(9000), routes["admin"].(map[string]any)["port"])
+}
+
+func TestParityObjectValuesFixtureRecordsReferencedEntities(t *testing.T) {
+	record := runParity(t, "object_values")
+
+	web := entity(t, record["entities"], "app.web")
+
+	database := web["database"].(map[string]any)
+	require.Equal(t, "eu-west-1", database["location"])
+	require.Equal(t, float64(5432), database["port"])
+
+	meta := database["meta"].(map[string]any)
+	require.Equal(t, "database.postgres.main", meta["id"])
+	require.Equal(t, "main", meta["name"])
+	require.Equal(t, "database", meta["type"])
+	require.Equal(t, "postgres", meta["subtype"])
+
+	databases := web["databases"].([]any)
+	require.Len(t, databases, 2)
+	require.Equal(t, "database.postgres.a", databases[0].(map[string]any)["meta"].(map[string]any)["id"])
+	require.Equal(t, float64(5433), databases[0].(map[string]any)["port"])
+	require.Equal(t, "database.postgres.b", databases[1].(map[string]any)["meta"].(map[string]any)["id"])
+	require.Equal(t, "us-east-1", databases[1].(map[string]any)["location"])
+}
+
+func TestParityObjectValuesShowsReferencesWhenAsked(t *testing.T) {
+	record := runParity(t, "object_values")
+
+	lookedUp := encoded(t, record, "app.web")["looked_up"].(map[string]any)
+
+	require.Contains(t, lookedUp["references"], "  database  = database.postgres.main\n")
+	require.Contains(t, lookedUp["references"], "  databases = [database.postgres.a, database.postgres.b]\n")
+	require.Contains(t, lookedUp["none"], "  database = {\n    location = \"eu-west-1\"\n    port     = 5432\n  }\n")
+}
+
+// a registered type has no provider, so it takes no part in a diff: changing
+// a field inside an object reports no change, as it does for any such type
+func TestParityObjectValuesDiffOfRegisteredTypesHasNoChanges(t *testing.T) {
+	record := runParity(t, "object_values")
+
+	diff := record["diff_changed"].(map[string]any)
+	require.Empty(t, diff["resources"])
+	require.Equal(t, "Diff: no changes, 0 unchanged.\n", record["printed_diff_changed"])
+}

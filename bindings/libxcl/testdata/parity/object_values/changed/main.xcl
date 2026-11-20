@@ -1,0 +1,27 @@
+database "postgres" "main" {
+  location = "eu-west-1"
+}
+
+database "postgres" "a" {
+  location = "eu-west-2"
+  port     = 5433
+}
+
+database "postgres" "b" {
+  location = "us-east-1"
+}
+
+app "web" {
+  image            = "nginx"
+  default_endpoint = { port = 81, tls = true, token = "s3cret" }
+  endpoints        = [{ port = 8080 }, { port = 8443, tls = true, path = "/api" }]
+  routes           = { public = { port = 80 }, admin = { port = 9000, tls = true } }
+  database         = database.postgres.main
+  databases        = [database.postgres.a, database.postgres.b]
+}
+
+app "edge" {
+  image            = "envoy"
+  default_endpoint = { port = 443, tls = true }
+  routes           = { public = { port = 443, tls = true, path = "/" } }
+}
